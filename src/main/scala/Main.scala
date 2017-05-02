@@ -67,6 +67,7 @@ object Main extends App with PrintableInstances with PrintableSyntax {
   /*
   * Exercises 1.2.5:  Cat Show
   */
+  //
   import cats.Show
   import cats.syntax.show._
 
