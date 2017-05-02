@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
- import cats.Show
- import cats.syntax.show._
- import cats.syntax.eq._
- import cats.syntax.option._
+import cats.{ Eq, Show }
 
- import cats.instances.int._
- import cats.instances.boolean._
- import cats.instances.option._
+// import cats.syntax.show._
+import cats.syntax.eq._
+import cats.syntax.option._
+
+import cats.instances.option._
 
 /*
  * ##### Chapter 1
@@ -71,7 +70,15 @@ object PrintableSyntax extends PrintableSyntax
 /**
   * What the actual fuck, people.
   */
-object Main extends App with PrintableInstances with PrintableSyntax {
+object Main extends App {
+  OtherMain
+
+}
+
+/**
+  * try this, why not
+  */
+object OtherMain extends PrintableInstances with PrintableSyntax {
 
   val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
   // maru.print()
@@ -87,20 +94,17 @@ object Main extends App with PrintableInstances with PrintableSyntax {
     kittehPrintable format k
   }
 
-  println(555.show)
-  println(maru.show)
-
-  123 === 123
-
-  1.some === None
-  // res9: Boolean = false
-
-  1.some =!= None
-  // res10: Boolean = true”
-
-  import cats.Eq
   implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
 
+  import cats.instances.int._
+  assert(123 === 123)
+
+  assert(1.some =!= None)
+  // res10: Boolean = true”
+
   import cats.instances.tuple._
+  import cats.instances.boolean._
+
   assert((maru === ara, maru =!= ara) === ((false, true)))
+
 }
