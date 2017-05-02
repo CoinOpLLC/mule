@@ -55,6 +55,10 @@ trait PrintableSyntax {
 object PrintableSyntax extends PrintableSyntax
 
 
+/**
+* What the actual fuck, people.
+*/
+
 object Main extends App with PrintableInstances with PrintableSyntax {
 
   val maru = Kitteh(name="Maru", color="Scottish Fold", age=9)
