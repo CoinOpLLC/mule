@@ -24,17 +24,22 @@ trait Printable[A] {
 }
 
 object Printable {
+
   /**
-  * Ideomatic use of `apply` supresses `implicitly` noise.
-  */
-  def apply[A: Printable]: Printable[A] = implicitly[Printable[A]]
+    * Ideomatic use of `apply` supresses `implicitly` noise.
+    */
+  def apply[A: Printable]: Printable[A]  = implicitly[Printable[A]]
   def format[A: Printable](a: A): String = Printable[A] format a
-  def print[A: Printable](a: A): Unit = println(format(a))
+  def print[A: Printable](a: A): Unit    = println(format(a))
 }
 
 trait PrintableInstances {
-  implicit val intPrintable = new Printable[Int] { override def format(a: Int) = a.toString }
-  implicit val stringPrintable = new Printable[String] { override def format(a: String) = a }
+  implicit val intPrintable = new Printable[Int] {
+    override def format(a: Int) = a.toString
+  }
+  implicit val stringPrintable = new Printable[String] {
+    override def format(a: String) = a
+  }
   implicit val kittehPrintable = new Printable[Kitteh] {
     override def format(k: Kitteh) = {
       import k._
@@ -48,25 +53,30 @@ object PrintableInstances extends PrintableInstances
 trait PrintableSyntax {
   implicit class PrintOps[A: Printable](a: A) {
     def format: String = Printable[A] format a
-    def print(): Unit = println(format)
+    def print(): Unit  = println(format)
   }
 }
 
 object PrintableSyntax extends PrintableSyntax
 
+object FuckMe {
+  def now(x: Any) = x match {
+    case i: Int => s"hi $i"
+    case _      => ()
+  }
+}
 
 /**
-* What the actual fuck, people.
-*/
-
+  * What the actual fuck, people.
+  */
 object Main extends App with PrintableInstances with PrintableSyntax {
 
-  val maru = Kitteh(name="Maru", color="Scottish Fold", age=9)
+  val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
   // maru.print()
 
   /*
-  * Exercises 1.2.5:  Cat Show
-  */
+   * Exercises 1.2.5:  Cat Show
+   */
   //
   // another lame comment
   import cats.Show
@@ -74,7 +84,9 @@ object Main extends App with PrintableInstances with PrintableSyntax {
 
   import cats.instances.int._
 
-  implicit val kittehShow = Show show[Kitteh] { k => kittehPrintable format k }
+  implicit val kittehShow = Show show [Kitteh] { k =>
+    kittehPrintable format k
+  }
 
   println(555.show)
   println(maru.show)
