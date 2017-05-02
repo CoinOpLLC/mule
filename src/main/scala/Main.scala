@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+ import cats.Show
+ import cats.syntax.show._
+ import cats.syntax.eq._
+ import cats.syntax.option._
+
+ import cats.instances.int._
+ import cats.instances.boolean._
+ import cats.instances.option._
+
 /*
  * ##### Chapter 1
  */
@@ -59,13 +68,6 @@ trait PrintableSyntax {
 
 object PrintableSyntax extends PrintableSyntax
 
-object FuckMe {
-  def now(x: Any) = x match {
-    case i: Int => s"hi $i"
-    case _      => ()
-  }
-}
-
 /**
   * What the actual fuck, people.
   */
@@ -73,16 +75,13 @@ object Main extends App with PrintableInstances with PrintableSyntax {
 
   val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
   // maru.print()
+  val ara = Kitteh("Ara", 8, "Tuxedo")
 
   /*
    * Exercises 1.2.5:  Cat Show
    */
   //
   // another lame comment
-  import cats.Show
-  import cats.syntax.show._
-
-  import cats.instances.int._
 
   implicit val kittehShow = Show show [Kitteh] { k =>
     kittehPrintable format k
@@ -91,4 +90,17 @@ object Main extends App with PrintableInstances with PrintableSyntax {
   println(555.show)
   println(maru.show)
 
+  123 === 123
+
+  1.some === None
+  // res9: Boolean = false
+
+  1.some =!= None
+  // res10: Boolean = true”
+
+  import cats.Eq
+  implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
+  val (noes, yuss) = (maru === ara, maru =!= ara)
+  assert(noes === false)
+  assert(yuss === true)
 }
