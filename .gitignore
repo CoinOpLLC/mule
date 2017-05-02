@@ -1,0 +1,99 @@
+
+# sbt
+#
+.cache
+.cache-main
+.cache-tests
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+#
+# eclipse
+#
+**/.settings/
+.project
+.classpath
+local.properties
+bin/
+
+#
+# scala-ide
+#
+.worksheet/
+
+#
+# ensime
+#
+.ensime
+.ensime_cache/
+#
+# Linux
+#
+*~
+
+# KDE directory preferences
+.directory
+
+#
+# Mac OS X
+#
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+#
+# Windows
+#
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+#
+# project specfic
+#
+
+# do not check in sources from IB
+ib-client/src/test/java/com/ib/
+
+# Random files go here
+.scratch/
+logs/
