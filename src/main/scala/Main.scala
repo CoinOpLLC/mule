@@ -100,7 +100,7 @@ object Main extends App with PrintableInstances with PrintableSyntax {
 
   import cats.Eq
   implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
-  val (noes, yuss) = (maru === ara, maru =!= ara)
-  assert(noes === false)
-  assert(yuss === true)
+
+  import cats.instances.tuple._
+  assert((maru === ara, maru =!= ara) === ((false, true)))
 }
