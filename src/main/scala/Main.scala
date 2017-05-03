@@ -16,11 +16,16 @@
 
 import cats.{ Eq, Show }
 
-// import cats.syntax.show._
+import cats.syntax.show._
 import cats.syntax.eq._
 import cats.syntax.option._
+import cats.syntax.semigroup._
 
+import cats.instances.int._
+import cats.instances.string._
 import cats.instances.option._
+import cats.instances.tuple._
+import cats.instances.boolean._
 
 /*
  * ##### Chapter 1
@@ -71,14 +76,39 @@ object PrintableSyntax extends PrintableSyntax
   * What the actual fuck, people.
   */
 object Main extends App {
-  OtherMain
+  OneMain
+  println(TwoMain.s.show)
+
+  import TwoMain.{sumz, suem}
+
+  val xs = List(1,2,3)
+  val oxs = List(1.some, None, 2.some, 3.some, None)
+
+  println(s"muh sumz: ${sumz(xs)}")
+  println(s"muh suem: ${suem(oxs)}")
+
+}
+
+object TwoMain {
+  import cats.Monoid
+
+  val s = Monoid[String].combine("foo", "bar")
+
+  def sumz(xs: List[Int]): Int = xs.foldLeft(Monoid[Int].empty)(_ |+| _)
+  def suem[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
+
+  case class Order(totalCost: BigDecimal, quantity: Long)
+  object Order {
+    def combine = ??? // strategy: use unapply / tuple shit somehow
+  }
+
 
 }
 
 /**
   * try this, why not
   */
-object OtherMain extends PrintableInstances with PrintableSyntax {
+object OneMain extends PrintableInstances with PrintableSyntax {
 
   val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
   // maru.print()
@@ -96,14 +126,10 @@ object OtherMain extends PrintableInstances with PrintableSyntax {
 
   implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
 
-  import cats.instances.int._
   assert(123 === 123)
 
   assert(1.some =!= None)
   // res10: Boolean = true”
-
-  import cats.instances.tuple._
-  import cats.instances.boolean._
 
   assert((maru === ara, maru =!= ara) === ((false, true)))
 
