@@ -21,14 +21,16 @@ lazy val buildSettings = List(
     "-feature",
     "-deprecation",
     "-Yno-adapted-args",
-    "-Ywarn-value-discard",
-    "-Xlint",
-    "-Xfatal-warnings",
+    // "-Ywarn-value-discard",
+    // "-Xlint",
+    "-Ywarn-numeric-widen",
     "-unchecked"
   ),
   scalacOptions in Compile ++= Seq(
+    // FIXME: problem with these in interactive mode!!!
+    // need to learn to scope wtih sbt proerly...
     // "-Yno-imports",
-    "-Ywarn-numeric-widen"
+    // "-Xfatal-warnings"
   ),
   // scalacOptions in Compile := Args.tpolecatScalaC,
   headers := Map("scala" -> Apache2_0("2017", "Fairfax Technologies LLC"), "conf" -> Apache2_0("2017", "Fairfax Technologies LLC", "#"))
