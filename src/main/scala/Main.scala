@@ -90,13 +90,16 @@ object Main extends App {
 
 }
 
+// implicit class Foo(val x: Int) extends AnyVal {
+//   def bar: String = ???
+// }
+
 object TwoMain {
   import cats.Monoid
 
-  implicit class AnyPipeToFunction1[T](val v: T) extends AnyVal {
+  implicit class AnyPipeToFunction1[T](val v: T) {
     def |>[U](f: T ⇒ U): U = f(v)
   }
-
   val s = Monoid[String].combine("foo", "bar")
 
   def sumz(xs: List[Int]): Int        = xs.foldLeft(Monoid[Int].empty)(_ |+| _)
