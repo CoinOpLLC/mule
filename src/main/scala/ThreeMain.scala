@@ -16,7 +16,7 @@
 
 package wut
 
-import scala.language.higherKinds
+// import scala.language.higherKinds
 
 import cats.Functor
 import cats.syntax.all._
@@ -24,14 +24,14 @@ import cats.instances.string._
 
 sealed trait Tree[+A]
 final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
-final case class Leaf[A](value: A) extends Tree[A]
+final case class Leaf[A](value: A)                        extends Tree[A]
 
 object ThreeMain {
 
-  implicit val treeFunctor: Functor[Tree] = new Functor[Tree]  {
+  implicit val treeFunctor: Functor[Tree] = new Functor[Tree] {
     override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
       case Branch(left, right) => Branch(left map f, right map f)
-      case Leaf(value) => Leaf(f(value))
+      case Leaf(value)         => Leaf(f(value))
     }
   }
   def format[A](value: A)(implicit p: Printable[A]): String = p.format(value)
@@ -41,7 +41,7 @@ object ThreeMain {
   }
 
   implicit val booleanPrintable = new Printable[Boolean] {
-    def format(value: Boolean): String = if(value) "yes" else "no"
+    def format(value: Boolean): String = if (value) "yes" else "no"
   }
 
   implicit class AnyPipeToFunction1[T](val v: T) {
@@ -49,15 +49,14 @@ object ThreeMain {
   }
 
   format("hello") === "hello" |> assert
-  
+
   format(true) === "yes" |> assert
 
 }
 
-
 trait Printable[A] { self =>
   def format(value: A): String
   def contramap[B](func: B => A): Printable[B] = new Printable[B] {
-      override def format(value: B): String = self.format(func(value))
-    }
+    override def format(value: B): String = self.format(func(value))
+  }
 }
