@@ -25,8 +25,12 @@ import cats.instances.string._
 sealed trait Tree[+A]
 final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
 final case class Leaf[A](value: A)                        extends Tree[A]
+final case class Box[A](value: A)
 
-object ThreeMain {
+object ThreeMain extends MyWay {
+
+  import Kittez._
+  import PrintableInstances.kittehPrintable
 
   implicit val treeFunctor: Functor[Tree] = new Functor[Tree] {
     override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
@@ -34,7 +38,7 @@ object ThreeMain {
       case Leaf(value)         => Leaf(f(value))
     }
   }
-  def format[A](value: A)(implicit p: Printable[A]): String = p.format(value)
+  def format[A](value: A)(implicit p: Printable[A]): String = p format value
 
   implicit val stringPrintable = new Printable[String] {
     def format(value: String): String = "\"" + value + "\""
@@ -44,19 +48,26 @@ object ThreeMain {
     def format(value: Boolean): String = if (value) "yes" else "no"
   }
 
-  implicit class AnyPipeToFunction1[T](val v: T) {
-    def |>[U](f: T ⇒ U): U = f(v)
+  implicit def boxPrintable[A: Printable] = Printable[String].contramap { (b: Box[A]) =>
+    b.toString
   }
 
-  format("hello") === "hello" |> assert
+  format("hello") === """"hello"""" |> assert
 
   format(true) === "yes" |> assert
 
-}
+  format(Box(maru)) === "\"Box(Kitteh(Maru,9,Scottish Fold))\"" |> assert
 
-trait Printable[A] { self =>
-  def format(value: A): String
-  def contramap[B](func: B => A): Printable[B] = new Printable[B] {
-    override def format(value: B): String = self.format(func(value))
+  trait Codec[A] {
+    def encode(value: A): String
+    def decode(value: String): Option[A]
+
+    def imap[B](dec: A => B, enc: B => A): Codec[B] = ???
   }
+
+  def encode[A](value: A)(implicit c: Codec[A]): String =
+    c.encode(value)
+
+  def decode[A](value: String)(implicit c: Codec[A]): Option[A] =
+    c.decode(value)
 }

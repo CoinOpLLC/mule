@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+package wut
+
 import cats.{ Eq, Show }
 
 import cats.syntax.show._
@@ -30,10 +32,16 @@ import cats.instances.boolean._
 /*
  * ##### Chapter 1
  */
-final case class Kitteh(name: String, age: Int, color: String)
 
-trait Printable[A] {
+trait Printable[A] { self =>
   def format(a: A): String
+
+  /**
+    * Create a new `Printable` instance from an existing instance, and a function to map a new type to the type `format`ed by the existing `Printable` instance.
+    */
+  def contramap[B](func: B => A): Printable[B] = new Printable[B] {
+    override def format(value: B): String = self.format(func(value))
+  }
 }
 
 object Printable {
@@ -72,35 +80,75 @@ trait PrintableSyntax {
 
 object PrintableSyntax extends PrintableSyntax
 
+trait MyWay {
+  implicit class AnyPipeToFunction1[T](val v: T) {
+    def |>[U](f: T ⇒ U): U = f(v)
+  }
+}
+
 /**
-  * What the actual fuck, people.
+  * Do: all the things.
   */
-object Main extends App {
-  OneMain
-  println(TwoMain.s.show)
+object Main extends App with MyWay {
 
-  import TwoMain.{ suem, sumz }
-
+  // I wrote a little kata it goes like this...
   val xs = List(1, 2, 3)
   // val oxs = List(1.some, None, 2.some, 3.some, None)
   val oxs = List(1.some, 2.some, 3.some)
 
-  println(s"muh sumz: ${sumz(xs)}")
-  println(s"muh suem: ${suem(oxs)}")
+  val izSaem = (xs zip oxs) forall {
+    case (r, Some(l)) => r === l
+    case _            => ??? // yeah, I know, right?
+  }
+
+  izSaem |> assert
+
+  OneMain
+  TwoMain
+  ThreeMain
 
 }
 
-// implicit class Foo(val x: Int) extends AnyVal {
-//   def bar: String = ???
-// }
+final case class Kitteh(name: String, age: Int, color: String)
 
-object TwoMain {
+object Kittez {
+
+  val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
+  val ara  = Kitteh("Ara", 8, "Tuxedo")
+}
+
+/**
+  * try this, why not
+  */
+object OneMain extends PrintableInstances with PrintableSyntax {
+
+  import Kittez._
+  /*
+   * Exercises 1.2.5:  Cat Show
+   */
+  //
+  // another lame comment
+
+  implicit val kittehShow = Show show [Kitteh] { k =>
+    kittehPrintable format k
+  }
+
+  implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
+
+  assert(123 === 123)
+
+  assert(1.some =!= None)
+  // res10: Boolean = true”
+
+  assert((maru === ara, maru =!= ara) === ((false, true)))
+
+}
+
+object TwoMain extends MyWay {
   import cats.Monoid
 
-  implicit class AnyPipeToFunction1[T](val v: T) {
-    def |>[U](f: T ⇒ U): U = f(v)
-  }
   val s = Monoid[String].combine("foo", "bar")
+  s === "foobar" |> assert
 
   def sumz(xs: List[Int]): Int        = xs.foldLeft(Monoid[Int].empty)(_ |+| _)
   def suem[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
@@ -129,7 +177,7 @@ object TwoMain {
   val o1 = Oardur(555.550001, 78345)
   val o2 = Oardur(168.020660, 186283)
 
-  o1 |+| o2 |> println
+  (o1 |+| o2) === Oardur(723.570661, 264628) |> assert
 
   val map1 = Map("a" -> 1, "b" -> 2)
   val map2 = Map("b" -> 3, "d" -> 4)
@@ -140,37 +188,8 @@ object TwoMain {
   val m1_a = Map(1337 -> o2)
   val m2   = Map(4958 -> Oardur(666.880033, 123456))
   val mmm  = m1 |+| m1_a |+| m2
-  mmm |> println
-
-  mmm === Map(4958 -> Oardur(666.880033, 123456), 1337 -> Oardur(723.570661, 264628)) |> assert
-}
-
-/**
-  * try this, why not
-  */
-object OneMain extends PrintableInstances with PrintableSyntax {
-
-  val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
-  // maru.print()
-  val ara = Kitteh("Ara", 8, "Tuxedo")
-
-  /*
-   * Exercises 1.2.5:  Cat Show
-   */
-  //
-  // another lame comment
-
-  implicit val kittehShow = Show show [Kitteh] { k =>
-    kittehPrintable format k
-  }
-
-  implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
-
-  assert(123 === 123)
-
-  assert(1.some =!= None)
-  // res10: Boolean = true”
-
-  assert((maru === ara, maru =!= ara) === ((false, true)))
-
+  mmm === Map(
+    4958 -> Oardur(666.880033, 123456),
+    1337 -> Oardur(723.570661, 264628)
+  ) |> assert
 }
