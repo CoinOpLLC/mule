@@ -80,16 +80,10 @@ trait PrintableSyntax {
 
 object PrintableSyntax extends PrintableSyntax
 
-trait MyWay {
-  implicit class AnyPipeToFunction1[T](val v: T) {
-    def |>[U](f: T ⇒ U): U = f(v)
-  }
-}
-
 /**
   * Do: all the things.
   */
-object Main extends App with MyWay {
+object Main extends App {
 
   // I wrote a little kata it goes like this...
   val xs = List(1, 2, 3)
@@ -144,7 +138,7 @@ object OneMain extends PrintableInstances with PrintableSyntax {
 
 }
 
-object TwoMain extends MyWay {
+object TwoMain {
   import cats.Monoid
 
   val s = Monoid[String].combine("foo", "bar")

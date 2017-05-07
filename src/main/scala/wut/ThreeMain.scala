@@ -27,7 +27,7 @@ final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
 final case class Leaf[A](value: A)                        extends Tree[A]
 final case class Box[A](value: A)
 
-object ThreeMain extends MyWay {
+object ThreeMain {
 
   import Kittez._
   import PrintableInstances.kittehPrintable
