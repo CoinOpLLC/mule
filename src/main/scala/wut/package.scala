@@ -21,9 +21,10 @@ package object wut extends MyWay {}
   */
 trait MyWay {
 
-  trait Forceable {
-    def force(): Unit = ()
-  }
+  /**
+    * Suppresses warnings from wart remover for cases were the value is intentionally discarded.
+    */
+  val discardValue: Any => Unit = (_: Any) => ()
 
   /**
     * See [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/), and also [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).

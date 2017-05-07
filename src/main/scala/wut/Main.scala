@@ -97,9 +97,9 @@ object Main extends App {
 
   izSaem |> assert
 
-  OneMain.force()
-  TwoMain.force()
-  ThreeMain.force()
+  OneMain |> discardValue
+  TwoMain |> discardValue
+  ThreeMain |> discardValue
 
 }
 
@@ -114,7 +114,7 @@ object Kittez {
 /**
   * try this, why not
   */
-object OneMain extends PrintableInstances with PrintableSyntax with Forceable {
+object OneMain extends PrintableInstances with PrintableSyntax {
 
   import Kittez._
   /*
@@ -138,7 +138,7 @@ object OneMain extends PrintableInstances with PrintableSyntax with Forceable {
 
 }
 
-object TwoMain extends Forceable {
+object TwoMain {
   import cats.Monoid
 
   val s = Monoid[String].combine("foo", "bar")

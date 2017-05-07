@@ -16,20 +16,23 @@
 
 package wut
 
+import scala.language.postfixOps
 // import scala.language.higherKinds
 
-import cats.Functor
+import cats.{ Eq, Functor }
 import cats.syntax.all._
 import cats.instances.string._
+import cats.instances.option._
 
 sealed trait Tree[+A]
 final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
 final case class Leaf[A](value: A)                        extends Tree[A]
+
 final case class Box[A](value: A)
 
-object ThreeMain extends Forceable {
+object ThreeMain {
 
-  import Kittez._
+  import Kittez.maru
   import PrintableInstances.kittehPrintable
 
   implicit val treeFunctor: Functor[Tree] = new Functor[Tree] {
@@ -58,16 +61,34 @@ object ThreeMain extends Forceable {
 
   format(Box(maru)) === "\"Box(Kitteh(Maru,9,Scottish Fold))\"" |> assert
 
-  trait Codec[A] {
+  trait Codec[A] { self =>
     def encode(value: A): String
     def decode(value: String): Option[A]
 
-    def imap[B](dec: A => B, enc: B => A): Codec[B] = ???
+    final def imap[B](dec: A => B, enc: B => A): Codec[B] = new Codec[B] {
+      override def encode(value: B): String         = enc(value) |> self.encode
+      override def decode(value: String): Option[B] = self decode value map dec
+    }
+  }
+  object Codec {
+    def apply[A: Codec]: Codec[A] = implicitly[Codec[A]]
   }
 
-  def encode[A](value: A)(implicit c: Codec[A]): String =
-    c.encode(value)
+  def encode[A: Codec](value: A): String = Codec[A] encode value
 
-  def decode[A](value: String)(implicit c: Codec[A]): Option[A] =
-    c.decode(value)
+  def decode[A: Codec](value: String): Option[A] = Codec[A] decode value
+
+  implicit val intCodec = new Codec[Int] {
+    override def encode(value: Int): String = Integer toString value
+    override def decode(value: String): Option[Int] =
+      scala.util.Try {
+        Integer parseInt value
+      } toOption
+  }
+  implicit def boxCodec[A: Codec]: Codec[Box[A]] = Codec[A] imap (Box[A], _.value)
+  encode(Box(123)) === "123" |> assert
+
+  implicit def boxEq[A] = Eq.fromUniversalEquals[Box[A]]
+  decode[Box[Int]]("618") === Box(618).some |> assert
+
 }
