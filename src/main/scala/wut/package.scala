@@ -21,6 +21,10 @@ package object wut extends MyWay {}
   */
 trait MyWay {
 
+  trait Forceable {
+    def force(): Unit = ()
+  }
+
   /**
     * See [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/), and also [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).
     */

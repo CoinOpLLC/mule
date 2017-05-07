@@ -33,7 +33,7 @@ object Args {
     "-feature",
     "-unchecked",
     "-explaintypes",
-    "-Xfatal-warnings",
+    // "-Xfatal-warnings", sick of this for now. Use for artifact level build settings.
     // "-Xlint", no! use lists of :deets
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
     "-Xfuture", // Turn on future language features.
@@ -85,7 +85,5 @@ object Args {
 
 object License {
   import de.heikoseeberger.sbtheader.license.Apache2_0
-  def apply(dates: String, entity: String) = Map(
-    "scala" -> Apache2_0(dates, entity),
-    "conf" -> Apache2_0(dates, entity, "#"))
+  def apply(dates: String, entity: String) = Map("scala" -> Apache2_0(dates, entity), "conf" -> Apache2_0(dates, entity, "#"))
 }

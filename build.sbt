@@ -15,13 +15,13 @@ lazy val buildSettings = List(
   scalaVersion         := Version.Scala,
   crossPaths in Global := false,
   cancelable in Global := true,
-  scalacOptions ++= Args.allScalaCflags,
+  scalacOptions        ++= Args.allScalaCflags,
   scalacOptions in (Compile, console) ~= { flags =>
     flags filterNot Args.nonConsoleScalaCflags.contains
   },
   scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
-
-  headers := License(dates = "2017", entity = "Fairfax Technologies LLC")
+  wartremoverErrors                ++= Warts.unsafe,
+  headers                          := License(dates = "2017", entity = "Fairfax Technologies LLC")
 )
 
 buildSettings
