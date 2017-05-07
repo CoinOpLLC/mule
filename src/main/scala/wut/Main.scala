@@ -40,7 +40,7 @@ trait Printable[A] { self =>
     * Create a new `Printable` instance from an existing instance, and a function to map a new type to the type `format`ed by the existing `Printable` instance.
     */
   def contramap[B](func: B => A): Printable[B] = new Printable[B] {
-    override def format(value: B): String = self.format(func(value))
+    override def format(value: B): String = self format func(value)
   }
 }
 

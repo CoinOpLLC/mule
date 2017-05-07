@@ -16,7 +16,7 @@
 
 package wut
 
-import scala.language.postfixOps
+// import scala.language.postfixOps
 // import scala.language.higherKinds
 
 import cats.{ Eq, Functor }
@@ -79,11 +79,8 @@ object ThreeMain {
   def decode[A: Codec](value: String): Option[A] = Codec[A] decode value
 
   implicit val intCodec = new Codec[Int] {
-    override def encode(value: Int): String = Integer toString value
-    override def decode(value: String): Option[Int] =
-      scala.util.Try {
-        Integer parseInt value
-      } toOption
+    override def encode(value: Int): String         = value.toString
+    override def decode(value: String): Option[Int] = scala.util.Try(value.toInt).toOption
   }
   implicit def boxCodec[A: Codec]: Codec[Box[A]] = Codec[A] imap (Box[A], _.value)
   encode(Box(123)) === "123" |> assert
