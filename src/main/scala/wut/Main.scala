@@ -18,7 +18,7 @@ package wut
 
 import cats.{ Eq, Show }
 
-import cats.syntax.show._
+// import cats.syntax.show._
 import cats.syntax.eq._
 import cats.syntax.option._
 import cats.syntax.semigroup._
@@ -49,7 +49,7 @@ object Printable {
   /**
     * Ideomatic use of `apply` supresses `implicitly` noise.
     */
-  def apply[A: Printable]: Printable[A]  = implicitly[Printable[A]]
+  def apply[A: Printable]: Printable[A]  = implicitly
   def format[A: Printable](a: A): String = Printable[A] format a
   def print[A: Printable](a: A): Unit    = println(format(a))
 }

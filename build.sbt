@@ -1,6 +1,5 @@
 import de.heikoseeberger.sbtheader
 import sbtheader.AutomateHeaderPlugin
-import sbtheader.license.Apache2_0
 
 def latestScalafmt = "0.7.0-RC1"
 commands += Command.args("scalafmt", "Run scalafmt cli.") {
@@ -16,24 +15,13 @@ lazy val buildSettings = List(
   scalaVersion         := Version.Scala,
   crossPaths in Global := false,
   cancelable in Global := true,
-  // scalacOptions in Compile := Seq("-deprecation", "-feature", "-Xlint"),
-  scalacOptions ++= Seq(
-    "-feature",
-    "-deprecation",
-    "-Yno-adapted-args",
-    // "-Ywarn-value-discard",
-    // "-Xlint",
-    "-Ywarn-numeric-widen",
-    "-unchecked"
-  ),
-  scalacOptions in Compile ++= Seq(
-    // FIXME: problem with these in interactive mode!!!
-    // need to learn to scope wtih sbt proerly...
-    // "-Yno-imports",
-    // "-Xfatal-warnings"
-  ),
-  // scalacOptions in Compile := Args.tpolecatScalaC,
-  headers := Map("scala" -> Apache2_0("2017", "Fairfax Technologies LLC"), "conf" -> Apache2_0("2017", "Fairfax Technologies LLC", "#"))
+  scalacOptions ++= Args.allScalaCflags,
+  scalacOptions in (Compile, console) ~= { flags =>
+    flags filterNot Args.nonConsoleScalaCflags.contains
+  },
+  scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
+
+  headers := License(dates = "2017", entity = "Fairfax Technologies LLC")
 )
 
 buildSettings

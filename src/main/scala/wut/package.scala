@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package object wut extends MyWay {
-
-}
+package object wut extends MyWay {}
 
 /**
   * This is who we are, it's what we do.
