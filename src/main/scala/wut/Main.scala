@@ -100,6 +100,7 @@ object Main extends App {
   OneMain |> discardValue
   TwoMain |> discardValue
   ThreeMain |> discardValue
+  FourMain |> discardValue
 
 }
 

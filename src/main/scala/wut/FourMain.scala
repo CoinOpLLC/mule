@@ -18,13 +18,52 @@ package wut
 
 import scala.language.higherKinds
 
-import cats.Functor
+import cats.{ Eval, Functor, Id /*, Monad */ }
+
+import cats.syntax.eq._
+import cats.syntax.option._
+
+import cats.syntax.applicative._
+import cats.syntax.functor._
+import cats.syntax.flatMap._
+
+import cats.instances.int._
+import cats.instances.option._
 
 object FourMain {
-  trait Monad[F[_]] extends Functor[F] {
+  trait MuhMonad[F[_]] extends Functor[F] {
     def pure[A](a: A): F[A]
     def flatMap[A, B](value: F[A])(func: A => F[B]): F[B]
-    final override def map[A, B](value: F[A])(func: A => B): F[B] = flatMap(value){ a => pure[B](func(a))
+    override def map[A, B](value: F[A])(func: A => B): F[B] =
+      flatMap(value)(_ |> func |> pure)
   }
-}
+
+  val muhIdMonadInstance = new MuhMonad[Id] {
+    override def pure[A](a: A): Id[A]                                 = a
+    override def flatMap[A, B](value: Id[A])(func: A => Id[B]): Id[B] = value |> func
+    override def map[A, B](value: Id[A])(func: A => B): Id[B]         = value |> func // |> pure
+  }
+
+  1.pure[Option] === 1.some |> assert
+
+  for {
+    l <- 1: Id[Int]
+    s <- 20: Id[Int]
+    d <- 12: Id[Int]
+  } yield l * s * d === 240 |> assert
+
+  val foo = Eval.now((0xfeedface * 0x2badbabe + 7) % 13)
+  println(foo)
+
+  def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): Eval[B] =
+    as match {
+      case head :: tail => Eval defer foldRight(tail, fn(head, acc))(fn)
+      case Nil          => Eval now acc
+    }
+
+  val n        = 1000
+  val longList = List.fill(n)(1)
+  foldRight(longList, 0) { (a, b) =>
+    b + a
+  }.value === n |> assert
 }

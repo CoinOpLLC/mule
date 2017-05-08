@@ -35,7 +35,7 @@ trait MyWay {
   /**
     * Civilized function invocation.
     */
-  implicit class AnyPipeToFunction1[T](val v: T) {
-    def |>[U](f: T ⇒ U): U = f(v)
+  implicit class AnyPipeToFunction1[A](val a: A) /* extends AnyVal */ {
+    def |>[B](f: A => B): B = f(a)
   }
 }
