@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-package object wut extends MyWay {}
+package object wut extends MyWay {
+  implicit class AnyPipeToFunction1[A](val a: A) extends AnyVal {
+    def |>[B](f: A => B): B = f(a)
+  }
+}
 
 /**
   * This is who we are, it's what we do.
@@ -33,9 +37,6 @@ trait MyWay {
   val Seq = scala.collection.immutable.Seq
 
   /**
-    * Civilized function invocation.
-    */
-  implicit class AnyPipeToFunction1[A](val a: A) /* extends AnyVal */ {
-    def |>[B](f: A => B): B = f(a)
-  }
+  * Civilized function invocation.
+  */
 }

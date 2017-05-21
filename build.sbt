@@ -19,9 +19,9 @@ lazy val buildSettings = List(
   scalacOptions in (Compile, console) ~= { flags =>
     flags filterNot Args.nonConsoleScalaCflags.contains
   },
-  scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
-  wartremoverErrors                ++= Warts.unsafe,
-  headers                          := License(dates = "2017", entity = "Fairfax Technologies LLC")
+  scalacOptions in (Test, console)        := (scalacOptions in (Compile, console)).value,
+  wartremoverErrors in (Compile, compile) ++= Warts.unsafe,
+  headers                                 := License(dates = "2017", entity = "Fairfax Technologies LLC")
 )
 
 buildSettings

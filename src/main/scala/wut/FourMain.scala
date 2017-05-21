@@ -18,7 +18,7 @@ package wut
 
 import scala.language.higherKinds
 
-import cats.{ Eval, Functor, Id /*, Monad */ }
+import cats.{ Eval, Functor, Id, Monoid /*, Monad */ }
 
 import cats.syntax.eq._
 import cats.syntax.option._
@@ -28,8 +28,36 @@ import cats.syntax.functor._
 import cats.syntax.flatMap._
 
 import cats.instances.int._
-import cats.instances.option._
+import cats.instances.string._
 
+import cats.instances.option._
+import cats.instances.vector._
+
+object OtherFourMain {
+
+  import cats.data.Writer
+  // type Writer[W, A] = WriterT[Id, W, A]
+  type Logged[A] = Writer[Vector[String], A]
+
+  Monoid[String] |> discardValue
+
+  val loggedInt = 618.pure[Logged]
+
+  import cats.syntax.writer._
+
+  val dogMsgs = Vector(
+    "me: _Hello_",
+    "dog: _Yes this is dog_",
+    "me: *Woof*"
+  )
+
+  val loggedDogMsgsUnit: Writer[Vector[String], Unit] = dogMsgs.tell
+
+  val loggedDogMsgsDouble: Writer[Vector[String], Double] = 6.18 writer dogMsgs
+
+  val exNihiloNihiloFit: Writer[Vector[String], Unit] = () writer Vector.empty[String]
+
+}
 object FourMain {
   trait MuhMonad[F[_]] extends Functor[F] {
     def pure[A](a: A): F[A]
@@ -53,7 +81,7 @@ object FourMain {
   } yield l * s * d === 240 |> assert
 
   val foo = Eval.now((0xfeedface * 0x2badbabe + 7) % 13)
-  println(foo)
+  // println(foo)
 
   def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): Eval[B] =
     as match {
@@ -66,4 +94,7 @@ object FourMain {
   foldRight(longList, 0) { (a, b) =>
     b + a
   }.value === n |> assert
+
+  OtherFourMain |> discardValue
+
 }
