@@ -163,7 +163,7 @@ object TwoMain {
       val Some(o)       = l |+| r
       (Oardur.apply _) tupled o
     }
-
+    
     lazy val empty: Oardur = (Oardur.apply _) tupled Monoid[(BigDecimal, Long)].empty
   }
 

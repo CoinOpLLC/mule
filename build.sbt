@@ -11,17 +11,22 @@ commands += Command.args("scalafmt", "Run scalafmt cli.") {
 }
 
 lazy val buildSettings = List(
-  organization         := "io.deftrade",
-  scalaVersion         := Version.Scala,
-  crossPaths in Global := false,
-  cancelable in Global := true,
-  scalacOptions        ++= Args.allScalaCflags,
-  scalacOptions in (Compile, console) ~= { flags =>
-    flags filterNot Args.nonConsoleScalaCflags.contains
-  },
+  organization := "io.deftrade",
+  scalaVersion := Version.Scala,
+  // dependencyUpdatesFilter -= moduleFilter(organization = "org.scala-lang"),
+  dependencyUpdatesExclusions := moduleFilter(organization = "org.scala-lang"),
+  crossPaths in Global        := false,
+  cancelable in Global        := true,
+  scalacOptions               ++= Args.allScalaCflags,
+  scalacOptions in (Compile, console) ~=
+    (_ filterNot Args.nonConsoleScalaCflags.contains),
   scalacOptions in (Test, console)        := (scalacOptions in (Compile, console)).value,
   wartremoverErrors in (Compile, compile) ++= Warts.unsafe,
-  headers                                 := License(dates = "2017", entity = "Fairfax Technologies LLC")
+  headers :=
+    License(
+      dates = "2017",
+      entity = "Fairfax Technologies LLC"
+    )
 )
 
 buildSettings
