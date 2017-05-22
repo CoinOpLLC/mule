@@ -15,6 +15,10 @@
  */
 
 package object wut extends MyWay {
+
+  /**
+    * Civilized function invocation.
+    */
   implicit class AnyPipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
   }
@@ -36,7 +40,4 @@ trait MyWay {
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
 
-  /**
-  * Civilized function invocation.
-  */
 }

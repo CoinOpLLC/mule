@@ -3,11 +3,17 @@ import Keys._
 // import Tests._
 
 object Version {
-  val Scala     = "2.12.2"
-  val Xml       = "1.0.6"
-  val ScalaTest = "3.0.3"
-  val Cats      = "0.9.0"
-  val Ammonite  = "0.8.3"
+  val Scala          = "2.12.2"
+  val Xml            = "1.0.6"
+  val TypesafeConfig = "1.3.1"
+  val ScalaTest      = "3.0.3"
+  val Cats           = "0.9.0"
+  val Ammonite       = "0.8.3"
+  val Classy         = "0.4.0"
+  val PureConfig     = "0.7.0"
+  val Enumeratum     = "1.5.12"
+  val Spire          = "0.14.1"
+  val Refined        = "0.8.0"
 }
 
 object Deps {
@@ -18,8 +24,30 @@ object Deps {
   val xml        = "org.scala-lang.modules" %% "scala-xml"    % Xml
   // val parserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.1"
 
-  val cats = "org.typelevel" %% "cats"    % Cats
-  val amm  = "com.lihaoyi"   % "ammonite" % Ammonite cross CrossVersion.full
+  val conf = "com.typesafe" % "config" % TypesafeConfig
+
+  val cats = "org.typelevel" %% "cats" % Cats
+
+  val spire = "org.typelevel" %% "spire" % Spire
+
+  val refined = "eu.timepit" %% "refined-pureconfig" % Refined
+
+  val enumr8m = "com.beachape" %% "enumeratum" % Enumeratum
+
+  val amm = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
+
+  /** [Case Classy](https://github.com/47deg/case-classy)
+    */
+  val classies = Seq(
+    "com.47deg" %% "classy-core"            % Classy,
+    "com.47deg" %% "classy-config-typesafe" % "0.4.0",
+    "com.47deg" %% "classy-cats"            % "0.4.0"
+  )
+
+  val pureConfigs = Seq(
+    "com.github.pureconfig" %% "pureconfig"         % PureConfig,
+    "eu.timepit"            %% "refined-pureconfig" % Refined
+  )
 
   val scalatest = "org.scalatest" %% "scalatest" % ScalaTest
   val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track

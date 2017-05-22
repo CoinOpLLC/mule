@@ -101,6 +101,8 @@ object Main extends App {
   TwoMain |> discardValue
   ThreeMain |> discardValue
   FourMain |> discardValue
+  ConfStuff |> discardValue
+  Spier |> discardValue
 
 }
 

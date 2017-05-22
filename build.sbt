@@ -32,7 +32,7 @@ lazy val buildSettings = List(
 buildSettings
 
 import Deps._
-lazy val coreDeps = List(reflection, xml, cats)
+lazy val coreDeps = List(reflection, xml, conf, cats, spire, refined, enumr8m) ++ classies ++ pureConfigs
 lazy val testDeps = List(scalatest) map (_ % Test)
 
 lazy val mule = (project in file("."))
