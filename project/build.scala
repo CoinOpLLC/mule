@@ -30,7 +30,7 @@ object Deps {
 
   val spire = "org.typelevel" %% "spire" % Spire
 
-  val refined = "eu.timepit" %% "refined-pureconfig" % Refined
+  val refined = "eu.timepit" %% "refined" % Refined
 
   val enumr8m = "com.beachape" %% "enumeratum" % Enumeratum
 
@@ -40,8 +40,9 @@ object Deps {
     */
   val classies = Seq(
     "com.47deg" %% "classy-core"            % Classy,
-    "com.47deg" %% "classy-config-typesafe" % "0.4.0",
-    "com.47deg" %% "classy-cats"            % "0.4.0"
+    "com.47deg" %% "classy-config-typesafe" % Classy,
+    "com.47deg" %% "classy-generic"         % Classy,
+    "com.47deg" %% "classy-cats"            % Classy
   )
 
   val pureConfigs = Seq(
