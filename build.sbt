@@ -13,7 +13,7 @@ commands += Command.args("scalafmt", "Run scalafmt cli.") {
 lazy val buildSettings = List(
   organization := "io.deftrade",
   scalaVersion := Version.Scala,
-  // dependencyUpdatesFilter -= moduleFilter(organization = "org.scala-lang"),
+  // dependencyUpdatesFilter -= moduleFilter(organization = "org.scala-lang"), // next version
   dependencyUpdatesExclusions := moduleFilter(organization = "org.scala-lang"),
   crossPaths in Global        := false,
   cancelable in Global        := true,

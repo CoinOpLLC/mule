@@ -30,6 +30,9 @@ object Deps {
 
   val spire = "org.typelevel" %% "spire" % Spire
 
+  /**
+    * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
+    */
   val refined = "eu.timepit" %% "refined" % Refined
 
   val enumr8m = "com.beachape" %% "enumeratum" % Enumeratum
@@ -45,6 +48,9 @@ object Deps {
     "com.47deg" %% "classy-cats"            % Classy
   )
 
+  /**
+    * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
+    */
   val pureConfigs = Seq(
     "com.github.pureconfig" %% "pureconfig"         % PureConfig,
     "eu.timepit"            %% "refined-pureconfig" % Refined

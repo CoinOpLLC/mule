@@ -30,6 +30,7 @@ import enumeratum._
 import enumeratum.values._
 
 import cats.Eq
+import cats.instances.int._
 import cats.syntax.eq._
 import cats.syntax.either._
 
@@ -52,22 +53,7 @@ import java.time.format.DateTimeFormatter
 /**
   * Using [PureConfig](https://github.com/pureconfig/pureconfig) and friends.
   */
-case class Conf(date: LocalDate)
-
-object ConfStuff {
-  implicit val localDateInstance = localDateConfigConvert(DateTimeFormatter.ISO_DATE)
-
-  val conf   = parseString(s"""{ date: "2011-12-03" }""")
-  val config = loadConfig[Conf](conf)
-
-  implicit val confEq = Eq.fromUniversalEquals[Conf]
-  implicit val failEq = Eq.fromUniversalEquals[ConfigReaderFailures]
-  implicit val libEq  = Eq.fromUniversalEquals[LibraryItem]
-
-  config === Conf(LocalDate.parse("2011-12-03")).asRight |> assert
-  (LibraryItem withValue 1) === LibraryItem.Book |> assert
-
-}
+case class ConfDate(val date: LocalDate) extends AnyVal
 
 sealed trait Greeting extends EnumEntry
 
@@ -110,9 +96,21 @@ case object LibraryItem extends IntEnum[LibraryItem] {
 
 }
 
-object Spier {
+object Conf {
 
-  import cats.instances.int._
+  import refined.auto._
+
+  implicit val localDateInstance = localDateConfigConvert(DateTimeFormatter.ISO_DATE)
+
+  implicit val confEq = Eq.fromUniversalEquals[ConfDate]
+  implicit val failEq = Eq.fromUniversalEquals[ConfigReaderFailures]
+  implicit val libEq  = Eq.fromUniversalEquals[LibraryItem]
+
+  val confDate   = parseString(s"""{ date: "2011-12-03" }""")
+  val configDate = loadConfig[ConfDate](confDate)
+
+  configDate === ConfDate(LocalDate.parse("2011-12-03")).asRight |> assert
+  (LibraryItem withValue 1) === LibraryItem.Book |> assert
 
   val config = ConfigFactory.parseString(
     """
@@ -121,6 +119,7 @@ object Spier {
       |  schedule {
       |    initial-delay-seconds = 10
       |    interval-minutes = 120
+      |    start-date = { date: 1979-07-04 }
       |  }
       |}
     """.stripMargin
@@ -128,7 +127,8 @@ object Spier {
 
   case class ScheduleSettings(
       initialDelaySeconds: Int Refined NonNegative,
-      intervalMinutes: Int Refined Positive
+      intervalMinutes: Int Refined Positive,
+      startDate: ConfDate
   )
   // defined class ScheduleSettings
 
@@ -136,8 +136,18 @@ object Spier {
       name: String Refined NonEmpty,
       schedule: ScheduleSettings
   )
+
+  implicit val settingsEq = Eq.fromUniversalEquals[Settings]
+
+  val nn: Int Refined NonNegative = 42
+  // val oo: Int Refined NonNegative = -42
+
   // defined class Settings
   val cfg = loadConfig[Settings](config, "se.vlovgr.example")
+
+  val xss = ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-04"))
+
+  // val ok = cfg === Settings("My App", xss)
 
   // bytes and shorts
   val x    = b"100" // without type annotation!
@@ -148,10 +158,11 @@ object Spier {
   val n1 = r"1/3"
   val n2 = r"1599/115866" // simplified at compile-time to 13/942
 
-  val a = x2"10111" // binary
-  val b = x8"27"    // octal
-  val c = x16"17"   // hex
-  Seq(a, b, c).forall((_: Int) === 23) |> assert
+  val a           = x2"10111" // binary
+  val b           = x8"27" // octal
+  val c           = x16"17" // hex
+  val twentyThree = Seq(a, b, c) forall { _ === 23 }
+  twentyThree |> assert
 
   // SI notation for large numbers
 
@@ -159,13 +170,12 @@ object Spier {
   val xx = j"89 234 614 123 234 772"                        // Long
   val yy = big"123 234 435 456 567 678 234 123 112 234 345" // BigInt
   val zz = dec"1 234 456 789.123456789098765"               // BigDecimal
-}
-
-object ClassyStuff {
 
   // Our configuration class hierarchy
   sealed trait Shape
-  case class Circle(radius: Double)                                           extends Shape
+  case class Circle(radius: Double) extends Shape
+  // FIXME: what is Case Classy buying here? It can't work with `refined`
+  // case class Rectangle(length: Double, width: Double Refined Positive) extends Shape
   case class Rectangle(length: Double, width: Double /* Refined Positive */ ) extends Shape
 
   case class MyConfig(someString: Option[String], shapes: List[Shape])
@@ -174,7 +184,7 @@ object ClassyStuff {
   val shapes   = decoder1 fromString """shapes = []"""
   // res4: Either[classy.DecodeError,MyConfig] = Right(MyConfig(None,List()))
 
-  val cfg = decoder1 fromString """
+  val cfgClassy = decoder1 fromString """
     someString = "hello"
     shapes     = []"""
   // res5: Either[classy.DecodeError,MyConfig] = Right(MyConfig(Some(hello),List()))
@@ -193,7 +203,7 @@ object ClassyStuff {
   // res: Either[classy.DecodeError,MyConfig] = Left(AtPath(shapes,And(AtIndex(0,Or(AtPath(circle,Missing),List(AtPath(rectangle,And(AtPath(length,Missing),List(AtPath(width,Missing))))))),List(AtIndex(1,Or(AtPath(circle,AtPath(radius,Missing)),List(AtPath(rectangle,Missing))))))))
 
   // error pretty printing
-  val bad = badCfg fold (
+  val sinisterOutcome = badCfg fold (
     error => error.toPrettyString,
     conf => s"success: $conf"
   )

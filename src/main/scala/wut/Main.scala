@@ -80,32 +80,6 @@ trait PrintableSyntax {
 
 object PrintableSyntax extends PrintableSyntax
 
-/**
-  * Do: all the things.
-  */
-object Main extends App {
-
-  // I wrote a little kata it goes like this...
-  val xs = List(1, 2, 3)
-  // val oxs = List(1.some, None, 2.some, 3.some, None)
-  val oxs = List(1.some, 2.some, 3.some)
-
-  val izSaem = (xs zip oxs) forall {
-    case (r, Some(l)) => r === l
-    case _            => ??? // yeah, I know, right?
-  }
-
-  izSaem |> assert
-
-  OneMain |> discardValue
-  TwoMain |> discardValue
-  ThreeMain |> discardValue
-  FourMain |> discardValue
-  ConfStuff |> discardValue
-  Spier |> discardValue
-
-}
-
 final case class Kitteh(name: String, age: Int, color: String)
 
 object Kittez {
@@ -189,4 +163,34 @@ object TwoMain {
     4958 -> Oardur(666.880033, 123456),
     1337 -> Oardur(723.570661, 264628)
   ) |> assert
+}
+
+/**
+  * Do: all the things.
+  */
+object Main extends App {
+
+  /*
+   *I wrote a little kata it goes like this...
+   */
+  val xs = List(1, 2, 3)
+  // val oxs = List(1.some, None, 2.some, 3.some, None)
+  val oxs = List(1.some, 2.some, 3.some)
+
+  val izSaem = (xs zip oxs) forall {
+    case (r, Some(l)) => r === l
+    case _            => ??? // yeah, I know, right?
+  }
+
+  izSaem |> assert
+
+  /*
+   * [cracks knuckles] OK now do all the things.
+   */
+  OneMain |> discardValue
+  TwoMain |> discardValue
+  ThreeMain |> discardValue
+  FourMain |> discardValue
+  Conf |> discardValue
+
 }

@@ -33,31 +33,6 @@ import cats.instances.string._
 import cats.instances.option._
 import cats.instances.vector._
 
-object OtherFourMain {
-
-  import cats.data.Writer
-  // type Writer[W, A] = WriterT[Id, W, A]
-  type Logged[A] = Writer[Vector[String], A]
-
-  Monoid[String] |> discardValue
-
-  val loggedInt = 618.pure[Logged]
-
-  import cats.syntax.writer._
-
-  val dogMsgs = Vector(
-    "me: _Hello_",
-    "dog: _Yes this is dog_",
-    "me: *Woof*"
-  )
-
-  val loggedDogMsgsUnit: Writer[Vector[String], Unit] = dogMsgs.tell
-
-  val loggedDogMsgsDouble: Writer[Vector[String], Double] = 6.18 writer dogMsgs
-
-  val exNihiloNihiloFit: Writer[Vector[String], Unit] = () writer Vector.empty[String]
-
-}
 object FourMain {
   trait MuhMonad[F[_]] extends Functor[F] {
     def pure[A](a: A): F[A]
@@ -95,6 +70,26 @@ object FourMain {
     b + a
   }.value === n |> assert
 
-  OtherFourMain |> discardValue
+  import cats.data.Writer
+  // type Writer[W, A] = WriterT[Id, W, A]
+  type Logged[A] = Writer[Vector[String], A]
+
+  Monoid[String] |> discardValue
+
+  val loggedInt = 618.pure[Logged]
+
+  import cats.syntax.writer._
+
+  val dogMsgs = Vector(
+    "me: _Hello_",
+    "dog: _Yes this is dog_",
+    "me: *Woof*"
+  )
+
+  val loggedDogMsgsUnit: Writer[Vector[String], Unit] = dogMsgs.tell
+
+  val loggedDogMsgsDouble: Writer[Vector[String], Double] = 6.18 writer dogMsgs
+
+  val exNihiloNihiloFit: Writer[Vector[String], Unit] = () writer Vector.empty[String]
 
 }
