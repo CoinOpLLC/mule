@@ -92,4 +92,29 @@ object FourMain {
 
   val exNihiloNihiloFit: Writer[Vector[String], Unit] = () writer Vector.empty[String]
 
+  def slowly[A](body: => A) =
+    try body
+    finally Thread.sleep(100)
+
+  type LI = Logged[Int]
+
+  // my version. which is lame.
+  def factoRoyale(ln: LI): LI = ln flatMap { n =>
+    slowly {
+      (if (n === 0) 1.pure[Logged]
+       else factoRoyale(ln map (_ - 1)) map (n * _)) mapBoth { (log, ans) =>
+        (log :+ s"fact $n $ans", ans)
+      }
+    }
+  }
+
+  def factorial(n: Int): Logged[Int] =
+  for {
+    ans <- if(n == 0) {
+             1.pure[Logged]
+           } else {
+             slowly(factorial(n - 1).map(_ * n))
+           }
+    _   <- Vector(s"fact $n $ans").tell
+  } yield ans
 }
