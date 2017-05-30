@@ -29,6 +29,7 @@ import cats.syntax.flatMap._
 
 import cats.instances.int._
 import cats.instances.string._
+import cats.instances.tuple._
 
 import cats.instances.option._
 import cats.instances.vector._
@@ -171,7 +172,7 @@ object RaederMoanad {
     for {
       uns <- usernameReader
       pws <- passwordsReader
-    } yield (uns get userId flatMap (un => pws get un)) === password.some
+    } yield (uns get userId flatMap (un => pws get un)) contains password
 
   val db = Db(
     Map(
@@ -192,4 +193,62 @@ object RaederMoanad {
 
   !checkLogin(4, "davinci").run(db) |> assert
 // res9: cats.Id[Boolean] = false
+
+  StaetMoanad |> discardValue
+}
+
+object StaetMoanad {
+  import cats.data.State
+
+  val a = State[Int, String] { state =>
+    (state, s"The state $state is the enemy.")
+  }
+
+  val inspektDemo = State.inspect[Int, String](state => s"The state $state is your friend.")
+
+  inspektDemo.run(13).value === ((13, s"The state ${12 + 1} is your friend.")) |> assert
+
+  type CalcState[A] = State[List[Int], A]
+
+  val SadAssIntLexer = """(\d+)""".r
+
+  type Op = (Int, Int) => Int
+  def opState(op: Op): CalcState[Int] = State[List[Int], Int] {
+    case top :: bis :: rest =>
+      val res = op(top, bis)
+      //println(res :: rest)
+      (res :: rest, res)
+    case _ => ???
+  }
+  def valState(ds: String): CalcState[Int] = State[List[Int], Int] {
+    case stack =>
+      val value = ds.toInt
+      //println(value :: stack)
+      (value :: stack, value)
+  }
+  def evalOne(sym: String): CalcState[Int] = sym match {
+    case "+" => opState(_ + _)
+    case "*" => opState(_ * _)
+    case ds  => valState(ds)
+  }
+
+  evalOne("42").runA(Nil).value === 42 |> assert
+
+  def evalAll(syms: List[String]): CalcState[Int] =
+    syms.foldLeft(0.pure[CalcState]) { (acc, head) =>
+      acc flatMap { _ =>
+        head |> evalOne
+      }
+    }
+
+  val program = evalAll(List("1", "2", "+", "3", "*"))
+  program.runA(Nil).value === 9 |> assert
+
+  val notherProg = for {
+    _   <- evalAll(List("1", "2", "+"))
+    _   <- evalAll(List("3", "4", "+"))
+    ans <- evalOne("*")
+  } yield ans
+
+  notherProg.runA(Nil).value === 21 |> assert
 }
