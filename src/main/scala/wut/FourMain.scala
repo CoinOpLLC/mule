@@ -18,7 +18,7 @@ package wut
 
 import scala.language.higherKinds
 
-import cats.{ Eval, Functor, Id, Monoid /*, Monad */ }
+import cats.{ Eq, Eval, Functor, Id, Monoid /*, Monad */ }
 
 import cats.syntax.eq._
 import cats.syntax.option._
@@ -108,13 +108,88 @@ object FourMain {
     }
   }
 
+  def faktoreal(n: Int): Logged[Int] =
+    for {
+      ans <- n match {
+              case 0 => 1.pure[Logged]
+              case _ => slowly { (n - 1 |> faktoreal) map (_ * n) }
+            }
+      _ <- Vector(s"fact $n $ans").tell
+    } yield ans
+
   def factorial(n: Int): Logged[Int] =
-  for {
-    ans <- if(n == 0) {
-             1.pure[Logged]
-           } else {
-             slowly(factorial(n - 1).map(_ * n))
-           }
-    _   <- Vector(s"fact $n $ans").tell
-  } yield ans
+    for {
+      ans <- if (n == 0) 1.pure[Logged] else slowly { (n - 1 |> factorial) map (_ * n) }
+      _   <- Vector(s"fact $n $ans").tell
+    } yield ans
+
+  RaederMoanad |> discardValue
+}
+
+object RaederMoanad {
+  import cats.data.Reader
+
+  case class Kitteh(naem: String, favFood: String)
+
+  val kittehNaem: Reader[Kitteh, String] = Reader(k => k.naem)
+
+  case class Db(usernames: Map[Int, String], passwords: Map[String, String])
+
+  implicit val dbEq = Eq.fromUniversalEquals[Db]
+
+  type DbReader[R] = Reader[Db, R]
+
+  val usernameReader: DbReader[Map[Int, String]] = Reader { db =>
+    db.usernames
+  }
+
+  val passwordsReader: DbReader[Map[String, String]] = Reader { db =>
+    db.passwords
+  }
+
+  def findUsername(userId: Int): DbReader[Option[String]] = Reader { db =>
+    db.usernames.get(userId)
+  }
+
+  def findYoozername(userId: Int): DbReader[Option[String]] =
+    for {
+      uns <- usernameReader
+    } yield uns get userId
+
+  def checkPassword(
+      username: String,
+      password: String
+  ): DbReader[Boolean] =
+    for {
+      pws <- passwordsReader
+    } yield (pws get username) === password.some
+
+  def checkLogin(
+      userId: Int,
+      password: String
+  ): DbReader[Boolean] =
+    for {
+      uns <- usernameReader
+      pws <- passwordsReader
+    } yield (uns get userId flatMap (un => pws get un)) === password.some
+
+  val db = Db(
+    Map(
+      1 -> "dade",
+      2 -> "kate",
+      3 -> "margo"
+    ),
+    Map(
+      "dade"  -> "zerocool",
+      "kate"  -> "acidburn",
+      "margo" -> "secret"
+    )
+  )
+  db === Db(Map(1 -> "dade", 2 -> "kate", 3 -> "margo"), Map("dade" -> "zerocool", "kate" -> "acidburn", "margo" -> "secret")) |> assert
+
+  checkLogin(1, "zerocool").run(db) |> assert
+// res8: cats.Id[Boolean] = true
+
+  !checkLogin(4, "davinci").run(db) |> assert
+// res9: cats.Id[Boolean] = false
 }

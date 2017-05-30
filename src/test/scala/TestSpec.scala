@@ -46,5 +46,5 @@ class CalculatorSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals
 }
 
 /**
-* TODO: proper tests for the Writer Monad stuff
-*/
+  * TODO: proper tests for the Writer Monad stuff
+  */
