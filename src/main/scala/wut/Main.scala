@@ -187,10 +187,10 @@ object Main extends App {
   /*
    * [cracks knuckles] OK now do all the things.
    */
-  OneMain |> discardValue
-  TwoMain |> discardValue
+  OneMain   |> discardValue
+  TwoMain   |> discardValue
   ThreeMain |> discardValue
-  FourMain |> discardValue
-  Conf |> discardValue
+  FourMain  |> discardValue
+  Conf      |> discardValue
 
 }

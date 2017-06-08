@@ -110,7 +110,7 @@ object Conf {
   val configDate = loadConfig[ConfDate](confDate)
 
   configDate === ConfDate(LocalDate.parse("2011-12-03")).asRight |> assert
-  (LibraryItem withValue 1) === LibraryItem.Book |> assert
+  (LibraryItem withValue 1) === LibraryItem.Book                 |> assert
 
   val config = ConfigFactory.parseString(
     """

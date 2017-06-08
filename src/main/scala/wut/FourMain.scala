@@ -18,7 +18,7 @@ package wut
 
 import scala.language.higherKinds
 
-import cats.{ Eq, Eval, Functor, Id, Monoid /*, Monad */ }
+import cats.{ Eq, Eval, Functor, Id, Monad, Monoid }
 
 import cats.syntax.eq._
 import cats.syntax.option._
@@ -125,6 +125,9 @@ object FourMain {
     } yield ans
 
   RaederMoanad |> discardValue
+  TreeStuff    |> discardValue
+  StaetMoanad  |> discardValue
+
 }
 
 object RaederMoanad {
@@ -194,7 +197,6 @@ object RaederMoanad {
   !checkLogin(4, "davinci").run(db) |> assert
 // res9: cats.Id[Boolean] = false
 
-  StaetMoanad |> discardValue
 }
 
 object StaetMoanad {
@@ -251,4 +253,56 @@ object StaetMoanad {
   } yield ans
 
   notherProg.runA(Nil).value === 21 |> assert
+}
+
+object TreeStuff {
+  sealed trait Tree[+A]
+  final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
+  final case class Leaf[A](value: A)                        extends Tree[A]
+
+  implicit def treeEq[T <: Tree[_]] = Eq.fromUniversalEquals[T]
+
+  def branch[A](left: Tree[A], right: Tree[A]): Tree[A] = Branch(left, right)
+
+  def leaf[A](value: A): Tree[A] = Leaf(value)
+
+  val (ll, rl) = (leaf(22), leaf(33))
+
+  val tr = branch(ll, rl)
+  tr === Branch(Leaf(22), Leaf(33)) |> assert
+
+  implicit val treeMonad = new Monad[Tree] {
+    def flatMap[A, B](tree: Tree[A])(fn: A => Tree[B]): Tree[B] = tree match {
+      case Branch(l, r) => Branch(flatMap(l)(fn), flatMap(r)(fn))
+      case Leaf(a)      => a |> fn
+    }
+
+    def pure[A](a: A): Tree[A] = Leaf(a)
+
+    // @annotation.tailrec
+    def tailRecM[A, B](a: A)(fn: A => Tree[Either[A, B]]): Tree[B] = fn(a) match {
+      case Branch(l, r) =>
+        Branch(
+          flatMap(l) {
+            case Left(a)  => tailRecM(a)(fn)
+            case Right(b) => b |> pure
+          },
+          flatMap(r) {
+            case Left(a)  => tailRecM(a)(fn)
+            case Right(b) => b |> pure
+          }
+        )
+      case Leaf(Left(a1)) => tailRecM(a1)(fn)
+      case Leaf(Right(b)) => Leaf(b)
+    }
+  }
+
+  val tr7 = tr map (_ + 7)
+
+  val trtr = for {
+    i <- tr
+    j <- tr7
+  } yield i + j
+
+  trtr === Branch(Branch(Leaf(51), Leaf(62)), Branch(Leaf(62), Leaf(73))) |> assert
 }
