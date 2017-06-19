@@ -45,6 +45,16 @@ class CalculatorSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals
 
 }
 
+class MonadTransformerExampleSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+  import MonadTransformerStuff._
+  case class TacticalSituation(ally1: String, ally2: String, response: String)
+  "tacticalReport" should "basically work and whatnot" in {
+    tacticalReport("Hot Rod", "Bumblebee") should ===("Hot Rod and Bumblebee are ready to rock!")
+    tacticalReport("Jazz", "Bumblebee") should ===("Jazz and Bumblebee need refractory respite!")
+    tacticalReport("Hot Rod", "Bogodork") should ===("WTF: Bogodork power level unknown.")
+  }
+
+}
 /**
   * TODO: proper tests for the Writer Monad stuff
   */

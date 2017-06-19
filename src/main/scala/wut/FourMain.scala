@@ -305,4 +305,73 @@ object TreeStuff {
   } yield i + j
 
   trtr === Branch(Branch(Leaf(51), Leaf(62)), Branch(Leaf(62), Leaf(73))) |> assert
+
+  MonadTransformerStuff |> discardValue
+}
+
+object MonadTransformerStuff {
+  import cats.data.EitherT
+  import cats.syntax.either._
+  import cats.instances.future._
+
+  import scala.concurrent.{ Await, Future }
+  import scala.concurrent.duration._
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  type Response[A] = EitherT[Future, String, A]
+
+  val powerLevels = Map(
+    "Jazz"      -> 6,
+    "Bumblebee" -> 8,
+    "Hot Rod"   -> 10
+  )
+
+  def getPowerLevel(autobot: String): Response[Int] = {
+    val pl = powerLevels get autobot match {
+      case Some(p) => p.asRight[String]
+      case None    => s"$autobot power level unknown.".asLeft[Int]
+    }
+    Future(pl) |> EitherT.apply
+  }
+
+  def getPowerLevelMuchBetter(autobot: String): Response[Int] =
+    (powerLevels get autobot).fold[Response[Int]](
+      EitherT left Future(s"$autobot power level unknown.")
+    ) { pl =>
+      EitherT right Future(pl)
+    }
+
+  def hrResponse =
+    for {
+      hr <- getPowerLevel("Hot Rod")
+    } yield hr
+
+  // val hrFuture = hrResponse.value
+
+  // val hrpl = Await.result(hrFuture, 1.second)
+  //
+  // hrpl === 10.asRight[String] |> discardValue
+
+  def canSpecialMove(
+      ally1: String,
+      ally2: String
+  ): Response[Boolean] =
+    for {
+      a1 <- getPowerLevel(ally1)
+      a2 <- getPowerLevel(ally2)
+    } yield a1 + a2 > 15
+
+  def tacticalReport(
+      ally1: String,
+      ally2: String
+  ): String = {
+    val csm = Await.result(canSpecialMove(ally1, ally2).value, 1.second)
+    csm match {
+      case Right(true)  => s"$ally1 and $ally2 are ready to rock!"
+      case Right(false) => s"$ally1 and $ally2 need refractory respite!"
+      case Left(msg)    => s"WTF: $msg"
+    }
+
+  }
+
 }
