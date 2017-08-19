@@ -25,7 +25,7 @@ lazy val buildSettings = List(
   headers :=
     License(
       dates = "2017",
-      entity = "Fairfax Technologies LLC"
+      entity = "CoinOp LLC"
     )
 )
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Fairfax Technologies LLC
+ * Copyright 2017 CoinOp LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,6 +191,7 @@ object Main extends App {
   TwoMain   |> discardValue
   ThreeMain |> discardValue
   FourMain  |> discardValue
+  SixMain   |> discardValue
   Conf      |> discardValue
 
 }

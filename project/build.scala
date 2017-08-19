@@ -3,7 +3,7 @@ import Keys._
 // import Tests._
 
 object Version {
-  val Scala          = "2.12.2"
+  val Scala          = "2.12.3"
   val Xml            = "1.0.6"
   val TypesafeConfig = "1.3.1"
   val ScalaTest      = "3.0.3"
