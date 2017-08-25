@@ -361,10 +361,9 @@ object MonadTransformerStuff {
       a2 <- getPowerLevel(ally2)
     } yield a1 + a2 > 15
 
-  def tacticalReport(
-      ally1: String,
-      ally2: String
-  ): String = {
+  def tacticalReportOldAndTired( // #FIXME: don't Await, map.
+                                ally1: String,
+                                ally2: String): String = {
     val csm = Await.result(canSpecialMove(ally1, ally2).value, 1.second)
     csm match {
       case Right(true)  => s"$ally1 and $ally2 are ready to rock!"
@@ -374,4 +373,20 @@ object MonadTransformerStuff {
 
   }
 
+  def tacticalReport(
+      ally1: String,
+      ally2: String
+  ): String = {
+    // val fa = (msg: String) => s"WTF: $ally1 and $ally2 TR fails with: $msg"
+    val fa = (msg: String) => s"WTF: $msg"
+    val fb = (can: Boolean) =>
+      can match {
+        case true  => s"$ally1 and $ally2 are ready to rock!"
+        case false => s"$ally1 and $ally2 need refractory respite!"
+    }
+    Await.result(
+      (canSpecialMove(ally1, ally2).value map (_ fold (fa, fb))),
+      1.second
+    )
+  }
 }

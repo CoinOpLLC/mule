@@ -83,15 +83,15 @@ object SixMain {
 object FormValidation {
 
   val fd = Map(
-    "Alice"   -> 37,
-    "Bob"     -> 23,
-    "Carol"   -> 42,
-    "Dave"    -> 27,
-    "Jaimie"  -> 33,
-    "Kerry"   -> 18,
-    "Leslie"  -> 31,
-    "Terry"   -> 19,
-    "Mallory" -> 67
+    "Alice"   -> "37",
+    "Bob"     -> "23",
+    "Carol"   -> "42",
+    "Dave"    -> "27",
+    "Jaimie"  -> "33",
+    "Kerry"   -> "18",
+    "Leslie"  -> "31",
+    "Terry"   -> "19",
+    "Mallory" -> "67"
   )
 
   import scala.util.Try
@@ -140,4 +140,7 @@ object FormValidation {
     def toValidated[A](eoi: ErrorsOr[A]): AllErrorsOr[A] = Validated fromEither eoi
     ((readName(fd) |> toValidated) |@| (readAge(fd) |> toValidated)) map User.apply
   }
+
+  def readPhørm(fd: FormData): AllErrorsOr[User] = ??? // #FIXME: #wart: inferred `Any`
+  // (readName(fd).toValidated |@| readAge(fd).toValidated) map User.apply
 }
