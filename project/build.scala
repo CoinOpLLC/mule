@@ -6,14 +6,14 @@ object Version {
   val Scala          = "2.12.3"
   val Xml            = "1.0.6"
   val TypesafeConfig = "1.3.1"
-  val ScalaTest      = "3.0.3"
+  val ScalaTest      = "3.0.4"
   val Cats           = "0.9.0"
   val Ammonite       = "0.8.3"
   val Classy         = "0.4.0"
-  val PureConfig     = "0.7.0"
+  val PureConfig     = "0.7.2"
   val Enumeratum     = "1.5.12"
   val Spire          = "0.14.1"
-  val Refined        = "0.8.0"
+  val Refined        = "0.8.2"
 }
 
 object Deps {

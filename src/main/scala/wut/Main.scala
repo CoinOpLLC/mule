@@ -192,6 +192,7 @@ object Main extends App {
   ThreeMain |> discardValue
   FourMain  |> discardValue
   SixMain   |> discardValue
+  Chapter7  |> discardValue
   Conf      |> discardValue
 
 }
