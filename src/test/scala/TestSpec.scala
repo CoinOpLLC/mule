@@ -77,6 +77,20 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
       )
     )
   }
+  "options" should "fail fast and fail hard" in {
+    process(List(2, 4, 6)) should ===(Some(List(2, 4, 6)))
+    process(List(2, 4, 6, 7)) should ===(None)
+  }
+
+  "validation" should "accumlate all the error things" in {
+
+    import cats.data.Validated
+    import cats.instances.list._ // Applicative[ErrorsOr] needs a Monoid[List]
+    import cats.syntax.validated._
+
+    vprocess(List(2, 4, 6)) should ===(List(2, 4, 6).valid)
+    vprocess(List(1, 2, 3)) should ===(List("1 is not even", "3 is not even").invalid)
+  }
 }
 /**
   * TODO: proper tests for the Writer Monad stuff

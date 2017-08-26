@@ -29,8 +29,7 @@ object Chapter7 {
 
   // Combining an accumulator and a hostname using an Applicative:
 
-  def listTraverse[F[_] : Applicative, A, B]
-      (list: List[A])(func: A => F[B]): F[List[B]] =
+  def listTraverse[F[_]: Applicative, A, B](list: List[A])(func: A => F[B]): F[List[B]] =
     list.foldLeft(List.empty[B].pure[F]) { (accum, item) =>
       (accum |@| func(item)).map(_ :+ _)
     }
@@ -42,10 +41,23 @@ object Chapter7 {
     * So `identity` makes perfect sense to use.
     * @return the list within a context.
     */
-  def listSequence[F[_] : Applicative, B]
-      (list: List[F[B]]): F[List[B]] =
+  def listSequence[F[_]: Applicative, B](list: List[F[B]]): F[List[B]] =
     listTraverse(list)(identity)
 
   def process(inputs: List[Int]) =
-    listTraverse(inputs)(n => if(n % 2 == 0) Some(n) else None)
+    listTraverse(inputs)(n => if (n % 2 == 0) Some(n) else None)
+
+  import cats.data.Validated
+  import cats.instances.list._ // Applicative[ErrorsOr] needs a Monoid[List]
+
+  type ErrorsOr[A] = Validated[List[String], A]
+
+  def vprocess(inputs: List[Int]): ErrorsOr[List[Int]] =
+    listTraverse(inputs) { n =>
+      if (n % 2 == 0) {
+        Validated.valid(n)
+      } else {
+        Validated.invalid(List(s"$n is not even"))
+      }
+    }
 }
