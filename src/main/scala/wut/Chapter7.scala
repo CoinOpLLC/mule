@@ -54,10 +54,6 @@ object Chapter7 {
 
   def vprocess(inputs: List[Int]): ErrorsOr[List[Int]] =
     listTraverse(inputs) { n =>
-      if (n % 2 == 0) {
-        Validated.valid(n)
-      } else {
-        Validated.invalid(List(s"$n is not even"))
-      }
+      if (n % 2 == 0) Validated valid n else Validated invalid List(s"$n is not even")
     }
 }
