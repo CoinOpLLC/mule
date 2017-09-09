@@ -12,4 +12,4 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.0-M9")
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "1.8.0")
 
 // http://www.wartremover.org/
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.1.1")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.2.0")

@@ -22,6 +22,11 @@ package wut
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.{ FlatSpec, Matchers }
 
+class RunAndDoNothingSpec extends FlatSpec {
+  "Main program" should "run and do nothing" in {
+    Main.main(Array.empty[String]) |> discardValue
+  }
+}
 object Calculator {
   def add(a: Int, b: Int): Long = a.toLong + b
 }

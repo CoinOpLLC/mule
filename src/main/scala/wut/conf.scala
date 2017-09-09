@@ -52,11 +52,15 @@ import java.time.format.DateTimeFormatter
 
 /**
   * Using [PureConfig](https://github.com/pureconfig/pureconfig) and friends.
+  * #TODO Note that the conf case classes can't be value classes... file issue?
+  * not much of an issue as long as the use case remains squarely a _config_ use case
   */
-case class ConfDate(val date: LocalDate) extends AnyVal
+case class ConfDate(val date: LocalDate) // extends AnyVal
 
+/*
+ * Using `enumeratum`.
+ */
 sealed trait Greeting extends EnumEntry
-
 object Greeting extends Enum[Greeting] {
 
   /*
@@ -70,7 +74,8 @@ object Greeting extends Enum[Greeting] {
   case object GoodBye extends Greeting
   case object Hi      extends Greeting
   case object Bye     extends Greeting
-
+  case object Shalom  extends Greeting
+  case object Aloha   extends Greeting
 }
 
 sealed abstract class LibraryItem(val value: Int, val name: String) extends IntEnumEntry
@@ -79,7 +84,10 @@ case object LibraryItem extends IntEnum[LibraryItem] {
 
   case object Book extends LibraryItem(value = 1, name = "book")
 
-  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements")) // wut? why?
+  /*
+  named params in non-canonic order mess up the macro and cause a unit statement. Still works, but wartremover complains... wild.
+   */
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   case object Movie extends LibraryItem(name = "movie", value = 2)
 
   case object Magazine extends LibraryItem(3, "magazine")
@@ -87,6 +95,8 @@ case object LibraryItem extends IntEnum[LibraryItem] {
   case object CD extends LibraryItem(4, name = "cd")
   // case object Newspaper extends LibraryItem(4, name = "newspaper") <-- will fail to compile because the value 4 is shared
 
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
+  case object DVD extends LibraryItem(name = "dvd", value = 7)
   /*
   val five = 5
   case object Article extends LibraryItem(five, name = "article") <-- will fail to compile because the value is not a literal
@@ -106,15 +116,39 @@ object Conf {
   implicit val failEq = Eq.fromUniversalEquals[ConfigReaderFailures]
   implicit val libEq  = Eq.fromUniversalEquals[LibraryItem]
 
-  val confDate   = parseString(s"""{ date: "2011-12-03" }""")
+  val confDate   = parseString(s"""{ date: 2011-12-03 }""")
   val configDate = loadConfig[ConfDate](confDate)
 
-  configDate === ConfDate(LocalDate.parse("2011-12-03")).asRight |> assert
-  (LibraryItem withValue 1) === LibraryItem.Book                 |> assert
+  println(confDate)
+  println(configDate)
+  println(ConfDate(LocalDate.parse("2011-12-03")).asRight)
 
+  // |> assertOrElse(configDate.toString)
+
+  (LibraryItem withValue 1) === LibraryItem.Book |> assert
+
+  /*
+   */
+  case class ScheduleSettings(
+      initialDelaySeconds: Int Refined NonNegative,
+      intervalMinutes: Int Refined Positive,
+      startDate: ConfDate
+  )
+  implicit val sheduleSettingsEq = Eq.fromUniversalEquals[ScheduleSettings]
+
+  case class Settings(
+      name: String Refined NonEmpty,
+      schedule: ScheduleSettings
+  )
+  implicit val settingsEq = Eq.fromUniversalEquals[Settings]
+
+  val nn: Int Refined NonNegative = 42
+  // val oo: Int Refined NonNegative = -42
+
+  val root = "se.vlovgr.example"
   val config = ConfigFactory.parseString(
-    """
-      |se.vlovgr.example {
+    s"""
+      |$root {
       |  name = "My App"
       |  schedule {
       |    initial-delay-seconds = 10
@@ -125,29 +159,19 @@ object Conf {
     """.stripMargin
   )
 
-  case class ScheduleSettings(
-      initialDelaySeconds: Int Refined NonNegative,
-      intervalMinutes: Int Refined Positive,
-      startDate: ConfDate
-  )
-  // defined class ScheduleSettings
-
-  case class Settings(
-      name: String Refined NonEmpty,
-      schedule: ScheduleSettings
-  )
-
-  implicit val settingsEq = Eq.fromUniversalEquals[Settings]
-
-  val nn: Int Refined NonNegative = 42
-  // val oo: Int Refined NonNegative = -42
-
   // defined class Settings
-  val cfg = loadConfig[Settings](config, "se.vlovgr.example")
+  val cfg = loadConfig[Settings](config, root)
 
-  val xss = ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-04"))
+  println(config)
+  println(cfg)
 
-  // val ok = cfg === Settings("My App", xss)
+  val settings = Settings(
+    "My App",
+    ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-05"))
+  )
+  // cfg.fold(_ => false, _ === settings) |> assert
+  // val _x = cfg fold (_ => false, _ === settings)
+  // _x |> assert
 
   // bytes and shorts
   val x    = b"100" // without type annotation!

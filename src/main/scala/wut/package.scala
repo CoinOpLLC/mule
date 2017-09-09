@@ -22,6 +22,8 @@ package object wut extends MyWay {
   implicit class AnyPipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
   }
+
+  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
 }
 
 /**
