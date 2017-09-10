@@ -89,12 +89,12 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   "validation" should "accumlate all the error things" in {
 
-    import cats.data.Validated
-    import cats.instances.list._ // Applicative[ErrorsOr] needs a Monoid[List]
+    // import cats.data.Validated
+    // import cats.instances.list._ // #TODO I thought Applicative[ErrorsOr] needs a Monoid[List]
     import cats.syntax.validated._
 
     vprocess(List(2, 4, 6)) should ===(List(2, 4, 6).valid)
-    vprocess(List(1, 2, 3)) should ===(List("1 is not even", "3 is not even").invalid)
+    vprocess(List(1, 2, 3)) should ===(List("1 can not even", "3 can not even").invalid)
   }
 }
 /**

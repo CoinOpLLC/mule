@@ -17,10 +17,10 @@
 package wut
 
 import scala.language.higherKinds
-import scala.concurrent.Future
+// import scala.concurrent.Future
 
 import cats.Applicative
-import cats.instances.future._
+// import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.applicative._
 import cats.syntax.cartesian._

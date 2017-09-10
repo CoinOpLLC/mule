@@ -187,12 +187,12 @@ object Main extends App {
   /*
    * [cracks knuckles] OK now do all the things.
    */
-  OneMain   |> discardValue
-  TwoMain   |> discardValue
-  ThreeMain |> discardValue
-  FourMain  |> discardValue
-  SixMain   |> discardValue
-  Chapter7  |> discardValue
-  Conf      |> discardValue
-
+  OneMain    |> discardValue
+  TwoMain    |> discardValue
+  ThreeMain  |> discardValue
+  FourMain   |> discardValue
+  SixMain    |> discardValue
+  Chapter7   |> discardValue
+  Conf       |> discardValue
+  ClassyConf |> discardValue
 }
