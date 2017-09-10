@@ -34,7 +34,7 @@ import cats.instances.int._
 import cats.syntax.eq._
 import cats.syntax.either._
 
-import com.typesafe.config.{ Config, ConfigFactory }
+import com.typesafe.config.ConfigFactory
 import ConfigFactory.parseString
 
 import pureconfig.configurable.localDateConfigConvert
