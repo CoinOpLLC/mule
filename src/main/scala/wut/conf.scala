@@ -116,16 +116,10 @@ object Conf {
   val confDate   = parseString(s"""{ date: 2011-12-03 }""")
   val configDate = loadConfig[ConfDate](confDate)
 
-  println(confDate)
-  println(configDate)
-  println(ConfDate(LocalDate.parse("2011-12-03")).asRight)
-
-  // |> assertOrElse(configDate.toString)
+  configDate === ConfDate(LocalDate.parse("2011-12-03")).asRight |> assertOrElse(configDate.toString)
 
   (LibraryItem withValue 1) === LibraryItem.Book |> assert
 
-  /*
-   */
   case class ScheduleSettings(
       initialDelaySeconds: Int Refined NonNegative,
       intervalMinutes: Int Refined Positive,
@@ -159,16 +153,11 @@ object Conf {
   // defined class Settings
   val cfg = loadConfig[Settings](config, root)
 
-  println(config)
-  println(cfg)
-
   val settings = Settings(
     "My App",
-    ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-05"))
+    ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-04"))
   )
-  // cfg.fold(_ => false, _ === settings) |> assert
-  // val _x = cfg fold (_ => false, _ === settings)
-  // _x |> assert
+  (cfg fold (_ => false, _ === settings)) |> assert
 
   // bytes and shorts
   val x    = b"100" // without type annotation!
