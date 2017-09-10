@@ -43,9 +43,6 @@ import pureconfig.loadConfig
 
 import eu.timepit.refined.pureconfig._
 
-import classy.generic._
-import classy.config._
-
 // effectively, these are application classes... ;)
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -195,40 +192,4 @@ object Conf {
   val yy = big"123 234 435 456 567 678 234 123 112 234 345" // BigInt
   val zz = dec"1 234 456 789.123456789098765"               // BigDecimal
 
-  // Our configuration class hierarchy
-  sealed trait Shape
-  case class Circle(radius: Double) extends Shape
-  // FIXME: what is Case Classy buying here? It can't work with `refined`
-  // case class Rectangle(length: Double, width: Double Refined Positive) extends Shape
-  case class Rectangle(length: Double, width: Double /* Refined Positive */ ) extends Shape
-
-  case class MyConfig(someString: Option[String], shapes: List[Shape])
-
-  val decoder1 = deriveDecoder[Config, MyConfig]
-  val shapes   = decoder1 fromString """shapes = []"""
-  // res4: Either[classy.DecodeError,MyConfig] = Right(MyConfig(None,List()))
-
-  val cfgClassy = decoder1 fromString """
-    someString = "hello"
-    shapes     = []"""
-  // res5: Either[classy.DecodeError,MyConfig] = Right(MyConfig(Some(hello),List()))
-
-  val moarShapes = decoder1 fromString """shapes = [
-    { circle    { radius: 200.0 } },
-    { rectangle { length: 10.0, width: 20.0 } }
-  ]"""
-  // res6: Either[classy.DecodeError,MyConfig] = Right(MyConfig(None,List(Circle(200.0), Rectangle(10.0,20.0))))
-
-  // mismatched config
-  val badCfg = decoder1 fromString """shapes = [
-    { rectangle { radius: 200.0 } },
-    { circle    { length: 10.0, width: -20.0 } }
-  ]"""
-  // res: Either[classy.DecodeError,MyConfig] = Left(AtPath(shapes,And(AtIndex(0,Or(AtPath(circle,Missing),List(AtPath(rectangle,And(AtPath(length,Missing),List(AtPath(width,Missing))))))),List(AtIndex(1,Or(AtPath(circle,AtPath(radius,Missing)),List(AtPath(rectangle,Missing))))))))
-
-  // error pretty printing
-  val sinisterOutcome = badCfg fold (
-    error => error.toPrettyString,
-    conf => s"success: $conf"
-  )
 }

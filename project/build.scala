@@ -117,8 +117,3 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 }
-
-object License {
-  import de.heikoseeberger.sbtheader.license.Apache2_0
-  def apply(dates: String, entity: String) = Map("scala" -> Apache2_0(dates, entity), "conf" -> Apache2_0(dates, entity, "#"))
-}
