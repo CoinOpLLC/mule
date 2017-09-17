@@ -66,4 +66,18 @@ addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "1.1.0")
   */
 addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.5.5")
 
+/**
+  * [tag list (TODO and friends)](https://github.com/johanandren/sbt-taglist)
+  */
+addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
+
+/**
+  * [link](https://github.com/47deg/sbt-org-policies)
+  */
+addSbtPlugin("com.47deg" % "sbt-org-policies" % "0.6.3")
+
+/**
+  * [link](url)
+  */
+
 // #TODO: https://github.com/xuwei-k/sbt-class-diagram

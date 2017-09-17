@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 CoinOp LLC
+ * Copyright 2017 47 Degrees, LLC. <http://www.47deg.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -187,12 +187,12 @@ object Main extends App {
   /*
    * [cracks knuckles] OK now do all the things.
    */
-  OneMain    |> discardValue
-  TwoMain    |> discardValue
-  ThreeMain  |> discardValue
-  FourMain   |> discardValue
-  SixMain    |> discardValue
-  Chapter7   |> discardValue
-  Conf       |> discardValue
-  ClassyConf |> discardValue
+  OneMain           |> discardValue
+  TwoMain           |> discardValue
+  ThreeMain         |> discardValue
+  FourMain          |> discardValue
+  SixMain           |> discardValue
+  Chapter7          |> discardValue
+  PureConfigExample |> discardValue
+  SpireExamples     |> discardValue
 }

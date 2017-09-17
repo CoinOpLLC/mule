@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 CoinOp LLC
+ * Copyright 2017 47 Degrees, LLC. <http://www.47deg.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,17 @@ package wut
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.{ FlatSpec, Matchers }
 
+class EnumeratumSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+  "Enumeratum Greeting" should "work as advertised" in {
+    import EnumeratumExamples.Greeting // look ma no import tax
+    (Greeting withName "Hi") should ===(Greeting.Hi)
+  }
+  "Enumeratum LibraryItem" should "work as advertised" in {
+    import EnumeratumExamples.LibraryItem // look ma no import tax
+    (LibraryItem withValue 1) should ===(LibraryItem.Book)
+    // (LibraryItem withName "book") should ===(LibraryItem.Book)
+  }
+}
 class RunAndDoNothingSpec extends FlatSpec {
   "Main program" should "run and do nothing" in {
     Main.main(Array.empty[String]) |> discardValue
@@ -90,7 +101,7 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
   "validation" should "accumlate all the error things" in {
 
     // import cats.data.Validated
-    // import cats.instances.list._ // #TODO I thought Applicative[ErrorsOr] needs a Monoid[List]
+    // import cats.instances.list._ // TODO I thought Applicative[ErrorsOr] needs a Monoid[List]
     import cats.syntax.validated._
 
     vprocess(List(2, 4, 6)) should ===(List(2, 4, 6).valid)

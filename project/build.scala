@@ -9,7 +9,6 @@ object Version {
   val ScalaTest      = "3.0.4"
   val Cats           = "0.9.0"
   val Ammonite       = "0.8.3"
-  val Classy         = "0.4.0"
   val PureConfig     = "0.8.0"
   val Enumeratum     = "1.5.12"
   val Spire          = "0.14.1"
@@ -35,18 +34,13 @@ object Deps {
     */
   val refined = "eu.timepit" %% "refined" % Refined
 
-  val enumr8m = "com.beachape" %% "enumeratum" % Enumeratum
+  val enumerata = Seq(
+    "com.beachape" %% "enumeratum" % Enumeratum,
+    "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig
+  )
+
 
   val amm = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
-
-  /** [Case Classy](https://github.com/47deg/case-classy)
-    */
-  val classies = Seq(
-    "com.47deg" %% "classy-core"            % Classy,
-    "com.47deg" %% "classy-config-typesafe" % Classy,
-    "com.47deg" %% "classy-generic"         % Classy,
-    "com.47deg" %% "classy-cats"            % Classy
-  )
 
   /**
     * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
