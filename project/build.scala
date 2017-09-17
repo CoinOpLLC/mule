@@ -35,10 +35,9 @@ object Deps {
   val refined = "eu.timepit" %% "refined" % Refined
 
   val enumerata = Seq(
-    "com.beachape" %% "enumeratum" % Enumeratum,
+    "com.beachape"          %% "enumeratum"            % Enumeratum,
     "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig
   )
-
 
   val amm = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
 

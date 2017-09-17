@@ -175,6 +175,7 @@ object PureConfigExample {
   import pureconfig.configurable.localDateConfigConvert
   import pureconfig.error.ConfigReaderFailures
   import pureconfig.loadConfig
+  import pureconfig.module.enumeratum._
 
   import eu.timepit.refined.pureconfig._
 
@@ -216,8 +217,8 @@ object PureConfigExample {
     "My App",
     ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-04"), greeting = Greeting.Aloha)
   )
-  println(cfg)
-  println(settings)
-  // (cfg fold (_ => false, _ === settings)) |> assert
+  // println(cfg)
+  // println(settings)
+  (cfg fold (_ => false, _ === settings)) |> assert
 
 }
