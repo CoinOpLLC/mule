@@ -23,63 +23,10 @@ import cats.instances.int._
 import cats.syntax.eq._
 import cats.syntax.either._
 
-import eu.timepit.refined
-import refined.api.Refined
-import refined.collection._
-import refined.numeric._
-
-/**
-  * Using [PureConfig](https://github.com/pureconfig/pureconfig) and friends.
-  * TODO Note that the conf case classes can't be value classes... file issue?
-  * not much of an issue as long as the use case remains squarely a _config_ use case
-
-  * TODO
-    - enmesh Enumeratum (or equiv) with Refined and Spire types in a case class hierarchy
-    - create HOCON serialization for an instance thereof
-    - bake-off PureConfig against CaseClassy against ???
-  */
-object SpireExamples {
-
-  import spire.syntax.{ literals => sslits }
-  import sslits.literals // the implicit, explicitly. (sic)
-  import sslits.si._    // .us and .eu also available
-  import sslits.radix._ // imports the implicit
-
-  import refined.auto._
-
-  // bytes and shorts
-  val x    = b"100" // without type annotation!
-  val y    = h"999"
-  val mask = b"255" // unsigned constant converted to signed (-1)
-
-  // rationals
-  val n1 = r"1/3"
-  val n2 = r"1599/115866" // simplified at compile-time to 13/942
-
-  val a           = x2"10111" // binary
-  val b           = x8"27" // octal
-  val c           = x16"17" // hex
-  val twentyThree = Seq(a, b, c) forall { _ === 23 }
-  twentyThree |> assert
-
-  // SI notation for large numbers
-
-  val ww = i"1 944 234 123"                                 // Int
-  val xx = j"89 234 614 123 234 772"                        // Long
-  val yy = big"123 234 435 456 567 678 234 123 112 234 345" // BigInt
-  val zz = dec"1 234 456 789.123456789098765"               // BigDecimal
-
-  /**
-    * Demonstrates that spire literals can be used with Refined.
-    */
-  val rww: Int Refined Positive = i"47 618"
-
-}
-
 object EnumeratumExamples {
-
   import enumeratum._
   import enumeratum.values._
+  // TODO: https://github.com/lloydmeta/enumeratum#circe
 
   /*
    * Using `enumeratum`.
@@ -139,7 +86,24 @@ object EnumeratumExamples {
 
 object RefinedExamples {
 
+  /**
+    * Building a configuration case class tree here – but still pure scala, independent of
+    config library format or reader.
+    */
+  import eu.timepit.refined
+  import refined.api.Refined
+  import refined.W
+  import refined.collection._
+  import refined.numeric._
+
+  type NonSystemPort = Int Refined Interval.Closed[W.`1024`.T, W.`65535`.T]
+
+  type ApiKey = SyntaxHighlightKiller.ApiKey
+
   import EnumeratumExamples.Greeting
+
+  type PositiveInt    = Int Refined Positive
+  type NonNegativeInt = Int Refined NonNegative
 
   case class ConfDate(val date: LocalDate) // extends AnyVal
   object ConfDate {
@@ -147,8 +111,8 @@ object RefinedExamples {
   }
 
   case class ScheduleSettings(
-      initialDelaySeconds: Int Refined NonNegative,
-      intervalMinutes: Int Refined Positive,
+      initialDelaySeconds: NonNegativeInt,
+      intervalMinutes: PositiveInt,
       startDate: ConfDate,
       greeting: Greeting
   )
@@ -158,6 +122,8 @@ object RefinedExamples {
 
   case class Settings(
       name: String Refined NonEmpty,
+      port: NonSystemPort,
+      apiKey: ApiKey,
       schedule: ScheduleSettings
   )
   object Settings {
@@ -165,9 +131,59 @@ object RefinedExamples {
   }
 }
 
+object SpireExamples {
+
+  import spire.syntax.{ literals => sslits }
+  import sslits.literals // the implicit, explicitly. (sic)
+  import sslits.si._    // .us and .eu also available
+  import sslits.radix._ // imports the implicit
+
+  // bytes and shorts
+  val x    = b"100" // without type annotation!
+  val y    = h"999"
+  val mask = b"255" // unsigned constant converted to signed (-1)
+
+  // rationals
+  val n1 = r"1/3"
+  val n2 = r"1599/115866" // simplified at compile-time to 13/942
+
+  val a           = x2"10111" // binary
+  val b           = x8"27" // octal
+  val c           = x16"17" // hex
+  val twentyThree = Seq(a, b, c) forall { _ === 23 }
+  twentyThree |> assert
+
+  // SI notation for large numbers
+
+  val ww = i"1 944 234 123"                                 // Int
+  val xx = j"89 234 614 123 234 772"                        // Long
+  val yy = big"123 234 435 456 567 678 234 123 112 234 345" // BigInt
+  val zz = dec"1 234 456 789.123456789098765"               // BigDecimal
+
+  /**
+    * Demonstrates that spire literals can be used with Refined.
+    */
+  import RefinedExamples.{ PositiveInt => PosInt }
+  import eu.timepit.refined.auto._
+  val rww: PosInt = i"47 618"
+
+}
+
+/**
+  * Using [PureConfig](https://github.com/pureconfig/pureconfig) and friends.
+  * TODO Note that the conf case classes can't be value classes... file issue?
+  * not much of an issue as long as the use case remains squarely a _config_ use case
+
+  * TODO
+- enmesh Enumeratum (or equiv) with Refined and Spire types in a case class hierarchy
+- create HOCON serialization for an instance thereof
+- bake-off PureConfig against CaseClassy against ???
+  */
 object PureConfigExample {
 
-  import refined.auto._
+  import spire.syntax.{ literals => sslits }
+  import sslits.radix._ // imports the implicit
+  import sslits.si._    //
 
   import com.typesafe.config.ConfigFactory
   import ConfigFactory.parseString
@@ -175,11 +191,12 @@ object PureConfigExample {
   import pureconfig.configurable.localDateConfigConvert
   import pureconfig.error.ConfigReaderFailures
   import pureconfig.loadConfig
+
   import pureconfig.module.enumeratum._
-
-  import eu.timepit.refined.pureconfig._
-
   import EnumeratumExamples._
+
+  import eu.timepit.refined.auto._
+  import eu.timepit.refined.pureconfig._
   import RefinedExamples._
 
   implicit val localDateInstance =
@@ -187,7 +204,7 @@ object PureConfigExample {
 
   implicit val crfEq = Eq.fromUniversalEquals[ConfigReaderFailures]
   // look ma no negs...
-  val nn: Int Refined NonNegative = 42
+  val nn: NonNegativeInt = x16"2BADD00D"
   // val oo: Int Refined NonNegative = -42
 
   val confDate   = parseString(s"""{ date: 2011-12-03 }""")
@@ -200,6 +217,8 @@ object PureConfigExample {
     s"""
       |$root {
       |  name = "My App"
+      |  api-key = RacrqvWjuu4KVmnTG9b6xyZMTP7jnXy3 // intentionally out of order
+      |  port = 1033
       |  schedule {
       |    initial-delay-seconds = 10
       |    interval-minutes = 120
@@ -215,10 +234,21 @@ object PureConfigExample {
 
   val settings = Settings(
     "My App",
-    ScheduleSettings(10, 120, ConfDate(LocalDate parse "1979-07-04"), greeting = Greeting.Aloha)
+    1033,
+    // "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXyω",
+    "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXy3",
+    ScheduleSettings(i"10", i"120", ConfDate(LocalDate parse "1979-07-04"), greeting = Greeting.Aloha)
   )
   // println(cfg)
   // println(settings)
-  (cfg fold (_ => false, _ === settings)) |> assert
+  (cfg fold (_ => false, _ === settings)) |> (x => assert(x, (cfg, settings)))
 
+}
+
+object SyntaxHighlightKiller {
+  import eu.timepit.refined
+  import refined.api.Refined
+  import refined.string.MatchesRegex
+  import refined.W
+  type ApiKey = String Refined MatchesRegex[W.`"[a-zA-Z0-9]{25,40}"`.T]
 }
