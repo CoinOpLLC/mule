@@ -38,6 +38,11 @@ class RunAndDoNothingSpec extends FlatSpec {
     Main.main(Array.empty[String]) |> discardValue
   }
 }
+
+class PureConfigSpec extends FlatSpec with Matchers {
+  import PureConfigExample.{ cfg, settings }
+  (cfg fold (_ => false, _ === settings)) shouldEqual true
+}
 object Calculator {
   def add(a: Int, b: Int): Long = a.toLong + b
 }
@@ -107,7 +112,20 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     vprocess(List(2, 4, 6)) should ===(List(2, 4, 6).valid)
     vprocess(List(1, 2, 3)) should ===(List("1 can not even", "3 can not even").invalid)
   }
+
 }
+
+case class Yerf(i: Int = 0, s: String = "", d: Double = math.E) {
+  import NonDefaultNamedValues.{ nonDefaultNamedValues => ndnvs }
+  override def toString = ndnvs
+}
+class NdnvSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+  "NDNVs" should "work again" in {
+    val y7 = Yerf(i = 6, s = "wtf")
+    y7.toString should ===("Yerf[i=6; s=wtf]")
+  }
+}
+
 /**
   * TODO: proper tests for the Writer Monad stuff
   */

@@ -235,14 +235,10 @@ object PureConfigExample {
   val settings = Settings(
     "My App",
     1033,
-    // "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXyω",
+    // "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXyω",  // see what I did there? Check it.
     "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXy3",
     ScheduleSettings(i"10", i"120", ConfDate(LocalDate parse "1979-07-04"), greeting = Greeting.Aloha)
   )
-  // println(cfg)
-  // println(settings)
-  (cfg fold (_ => false, _ === settings)) |> (x => assert(x, (cfg, settings)))
-
 }
 
 object SyntaxHighlightKiller {

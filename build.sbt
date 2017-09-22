@@ -28,9 +28,8 @@ lazy val muhBuildSettings = List(
 
 muhBuildSettings
 
-import Deps._
-lazy val coreDeps = List(reflection, xml, conf, cats, spire, refined) ++ enumerata ++ pureConfigs
-lazy val testDeps = List(scalatest) map (_ % Test)
+lazy val coreDeps = Deps.common
+lazy val testDeps = List(Deps.scalatest) map (_ % Test)
 
 lazy val mule = (project in file("."))
 // .enablePlugins(AutomateHeaderPlugin)
