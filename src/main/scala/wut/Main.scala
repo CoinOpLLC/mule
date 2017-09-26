@@ -16,7 +16,7 @@
 
 package wut
 
-import cats.{ Eq, Show }
+import cats.{ Eq, Monoid, Show }
 
 // import cats.syntax.show._
 import cats.syntax.eq._
@@ -29,126 +29,42 @@ import cats.instances.option._
 import cats.instances.tuple._
 import cats.instances.boolean._
 
-/*
- * ##### Chapter 1
- */
-
-trait Printable[A] { self =>
-  def format(a: A): String
-
-  /**
-    * Create a new `Printable` instance from an existing instance, and a function to map a new type to the type `format`ed by the existing `Printable` instance.
-    */
-  def contramap[B](func: B => A): Printable[B] = new Printable[B] {
-    override def format(value: B): String = self format (value |> func)
-  }
-}
-
-object Printable {
-
-  /**
-    * Ideomatic use of `apply` supresses `implicitly` noise.
-    */
-  def apply[A: Printable]: Printable[A]  = implicitly
-  def format[A: Printable](a: A): String = Printable[A] format a
-  def print[A: Printable](a: A): Unit    = println(format(a))
-}
-
-trait PrintableInstances {
-  implicit val intPrintable = new Printable[Int] {
-    override def format(a: Int) = a.toString
-  }
-  implicit val stringPrintable = new Printable[String] {
-    override def format(a: String) = a
-  }
-  implicit val kittehPrintable = new Printable[Kitteh] {
-    override def format(k: Kitteh) = {
-      import k._
-      s"OH HAI ${name} DESU HAZ ${age} YAERZ AM ${color} K BYE"
-    }
-  }
-}
-
-object PrintableInstances extends PrintableInstances
-
-trait PrintableSyntax {
-  implicit class PrintOps[A: Printable](a: A) {
-    def format: String = Printable[A] format a
-    def print(): Unit  = println(format)
-  }
-}
-
-object PrintableSyntax extends PrintableSyntax
-
-final case class Kitteh(name: String, age: Int, color: String)
-
-object Kittez {
-
-  val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
-  val ara  = Kitteh("Ara", 8, "Tuxedo")
-}
-
 /**
   * try this, why not
   */
-object OneMain extends PrintableInstances with PrintableSyntax {
+object OneMain extends {
 
-  import Kittez._
+  import Kats._
+
+  import Printable._
+  import PrintableSyntax._
   /*
    * Exercises 1.2.5:  Cat Show
    */
   //
   // another lame comment
 
-  implicit val kittehShow = Show show [Kitteh] { k =>
-    kittehPrintable format k
-  }
+  implicit val kittehShow = Show show [Kitteh] (_.format)
 
   implicit val kittehEq = Eq.fromUniversalEquals[Kitteh]
 
-  assert(123 === 123)
+  123 === 123 |> assert
 
-  assert(1.some =!= None)
-  // res10: Boolean = true”
+  1.some =!= None |> assert
 
-  assert((maru === ara, maru =!= ara) === ((false, true)))
+  // Note you get tuples for free.
+  (maru === ara, maru =!= ara) === ((false, true)) |> assert
 
-}
+  Monoid[String].combine("foo", "bar") === "foobar" |> assert
 
-object TwoMain {
-  import cats.Monoid
+  def sum[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
 
-  val s = Monoid[String].combine("foo", "bar")
-  s === "foobar" |> assert
+  import cats.instances.map._
 
-  def sumz(xs: List[Int]): Int        = xs.foldLeft(Monoid[Int].empty)(_ |+| _)
-  def suem[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
+  val o1 = Order(555.550001, 78345)
+  val o2 = Order(168.020660, 186283)
 
-  import cats.instances.{ bigDecimal, long, map }
-  import bigDecimal._, long._, map._
-  case class Oardur(totalCost: BigDecimal, quantity: Long)
-
-  /**
-    * Objective here was to try to be as "generic" as possible.
-    * I can start to see the motivation for shapless...
-    */
-  implicit val oardurMonoid = new Monoid[Oardur] {
-
-    def combine(a: Oardur, b: Oardur): Oardur = {
-      val l :: r :: Nil = List(a, b) map (Oardur unapply _)
-      val Some(o)       = l |+| r
-      (Oardur.apply _) tupled o
-    }
-
-    lazy val empty: Oardur = (Oardur.apply _) tupled Monoid[(BigDecimal, Long)].empty
-  }
-
-  implicit val oardurEq = Eq.fromUniversalEquals[Oardur]
-
-  val o1 = Oardur(555.550001, 78345)
-  val o2 = Oardur(168.020660, 186283)
-
-  (o1 |+| o2) === Oardur(723.570661, 264628) |> assert
+  (o1 |+| o2) === Order(723.570661, 264628) |> assert
 
   val map1 = Map("a" -> 1, "b" -> 2)
   val map2 = Map("b" -> 3, "d" -> 4)
@@ -157,12 +73,24 @@ object TwoMain {
 
   val m1   = Map(1337 -> o1)
   val m1_a = Map(1337 -> o2)
-  val m2   = Map(4958 -> Oardur(666.880033, 123456))
+  val m2   = Map(4958 -> Order(666.880033, 123456))
   val mmm  = m1 |+| m1_a |+| m2
   mmm === Map(
-    4958 -> Oardur(666.880033, 123456),
-    1337 -> Oardur(723.570661, 264628)
+    4958 -> Order(666.880033, 123456),
+    1337 -> Order(723.570661, 264628)
   ) |> assert
+
+  import Kats.maru
+
+  import Printable.format
+  format("hello") === """"hello""""                             |> assert
+  format(true) === "yes"                                        |> assert
+  format(Box(maru)) === "\"Box(Kitteh(Maru,9,Scottish Fold))\"" |> assert
+
+  import Codec.{ decode, encode }
+  encode(Box(123)) === "123"                |> assert
+  decode[Box[Int]]("618") === Box(618).some |> assert
+
 }
 
 /**
@@ -188,8 +116,6 @@ object Main extends App {
    * [cracks knuckles] OK now do all the things.
    */
   OneMain           |> discardValue
-  TwoMain           |> discardValue
-  ThreeMain         |> discardValue
   FourMain          |> discardValue
   SixMain           |> discardValue
   Chapter7          |> discardValue

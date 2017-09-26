@@ -47,6 +47,7 @@ addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.11")
 
 /**
   * [site generation](http://www.scala-sbt.org/sbt-site/index.html)
+  * [but see also](https://github.com/sbt/sbt-ghpages)
   */
 addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.0")
 

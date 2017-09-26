@@ -20,13 +20,13 @@ import scala.language.experimental.macros
 
 trait NonDefaultNamedValues {
 
-  //  val start = '('
-  //  val sep = ", "
-  //  val end = ')'
-
-  val start = '['
+  val start = "["
   val sep   = "; "
-  val end   = ']'
+  val end   = "]"
+
+  // val start = "("
+  // val sep   = ", "
+  // val end   = ")"
 
   /**
     * Use to override toString method for case classes to print field names as well as field values,
@@ -43,10 +43,10 @@ trait NonDefaultNamedValues {
     * {{{
     *     override def toString = {
     *       val b = List.newBuilder[String]
-    *     b += "i=" + this.i
-    *     if (this.s != Foo.apply$default$2) b += "s=" + this.s
-    *     b.result mkString (this.productPrefix + "[", ";", "]")
-    *   }
+    *       b += "i=" + this.i
+    *       if (this.s != Foo.apply$default$2) b += "s=" + this.s
+    *       b.result mkString (this.productPrefix + "[", ";", "]")
+    *     }
     * }}}
     *
     * Implementation: identify the companion object for the case class.
@@ -65,31 +65,28 @@ trait NonDefaultNamedValues {
     val companionType     = companionSymbol.typeSignature
     val applySymbol       = companionType.decl(TermName("apply")).asMethod
 
-    val builderTree = q"val b = List.newBuilder[String]"
-
     val nvTrees =
       for {
-        params         <- applySymbol.paramLists
+        params         <- applySymbol.paramLists take 1
         (param, index) <- params.zipWithIndex
-        defaultValTermName = TermName(s"apply$$default$$${index + 1}")
-        fieldNameString    = param.name.decodedName.toString
-        fieldTermName      = param.asTerm.name.toTermName
-        nvAppendTree       = q"""b += $fieldNameString + "=" + this.$fieldTermName"""
-      } yield
+      } yield {
+        val fieldNameString    = param.name.decodedName.toString
+        val fieldTermName      = param.asTerm.name.toTermName
+        val nvAppendTree       = q"""b += $fieldNameString + "=" + this.$fieldTermName"""
+        val defaultValTermName = TermName(s"apply$$default$$${index + 1}")
         companionType member defaultValTermName match {
           case NoSymbol =>
             nvAppendTree
           case _ =>
             q"if (this.$fieldTermName != $companionTermName.$defaultValTermName) $nvAppendTree"
         }
-
-    val mkStringTree = q"""b.result mkString (this.productPrefix + "[", "; ", "]")"""
+      }
 
     c.Expr[String] {
       q"""
-      $builderTree
+      val b = List.newBuilder[String]
       ..$nvTrees
-      $mkStringTree
+      b.result mkString (this.productPrefix + $start, $sep, $end)
       """
     }
   }
