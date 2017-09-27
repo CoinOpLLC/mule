@@ -18,11 +18,6 @@ package wut
 
 import cats.{ Eq, Show }
 
-// import cats.syntax.show._
-import cats.syntax.eq._
-import cats.syntax.option._
-import cats.syntax.semigroup._
-
 import cats.instances.int._
 import cats.instances.string._
 import cats.instances.option._
@@ -80,8 +75,10 @@ object Printable {
   }
 }
 
-// object PrintableInstances extends PrintableInstances
-
+/**
+  * With this convention, syntax ops are imported directly and explicitly rather than via the
+  * "no import tax" method...
+  */
 trait PrintableSyntax {
   implicit class PrintOps[A: Printable](a: A) {
     def format: String = Printable[A] format a
@@ -90,7 +87,6 @@ trait PrintableSyntax {
 }
 
 /**
-  * With this convention, syntax ops are imported directly and explicitly rather than via the
-  * "no import tax" method...
+  * Premixed PrintableSyntax instance, ready for import.
   */
 object PrintableSyntax extends PrintableSyntax
