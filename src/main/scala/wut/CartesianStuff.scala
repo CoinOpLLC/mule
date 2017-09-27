@@ -36,7 +36,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.eq._
 
-object SixMain {
+object CartesianStuff {
 
   val p = Cartesian tuple3 (23.some, "oh hai".some, true.some)
   val q = 23.some |@| "oh hai".some |@| true.some
@@ -81,18 +81,6 @@ object SixMain {
   * FormValidation illustrates `Validation` by combining all errors in a NEL.
   */
 object FormValidation {
-
-  val fd = Map(
-    "Alice"   -> "37",
-    "Bob"     -> "23",
-    "Carol"   -> "42",
-    "Dave"    -> "27",
-    "Jaimie"  -> "33",
-    "Kerry"   -> "18",
-    "Leslie"  -> "31",
-    "Terry"   -> "19",
-    "Mallory" -> "67"
-  )
 
   import scala.util.Try
 

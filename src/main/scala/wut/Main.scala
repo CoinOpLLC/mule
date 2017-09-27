@@ -33,7 +33,7 @@ import cats.instances.vector._
 /**
   * try this, why not
   */
-object OneMain {
+object TypeclassStuff {
 
   import Kats._
 
@@ -227,12 +227,12 @@ object Main extends App {
   /*
    * [cracks knuckles] OK now do all the things.
    */
-  OneMain               |> discardValue
+  TypeclassStuff        |> discardValue
   TreeStuff             |> discardValue
   StaetMoanad           |> discardValue
   MonadTransformerStuff |> discardValue
-  SixMain               |> discardValue
-  Chapter7              |> discardValue
+  CartesianStuff        |> discardValue
+  TraverseStuff         |> discardValue
   PureConfigExample     |> discardValue
   SpireExamples         |> discardValue
 }

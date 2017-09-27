@@ -78,7 +78,7 @@ class MonadTransformerExampleSpec extends FlatSpec with Matchers with TypeChecke
 }
 
 class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
-  import Chapter7._
+  import TraverseStuff._
   "sequence" should "expand cartesian product in collections" in {
     import cats.instances.vector._
     // NO: why? remember _Cartesian_...
@@ -113,6 +113,7 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
     vprocess(List(1, 2, 3)) should ===(List("1 can not even", "3 can not even").invalid)
   }
 
+  // FIXME: test FormValidation
 }
 
 case class Yerf(i: Int = 0, s: String = "", d: Double = math.E) {

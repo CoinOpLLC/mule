@@ -95,4 +95,16 @@ object MuhDomain {
       "margo" -> "secret"
     )
   )
+
+  lazy val fd = Map(
+    "Alice"   -> "37",
+    "Bob"     -> "23",
+    "Carol"   -> "42",
+    "Dave"    -> "27",
+    "Jaimie"  -> "33",
+    "Kerry"   -> "18",
+    "Leslie"  -> "31",
+    "Terry"   -> "19",
+    "Mallory" -> "67"
+  )
 }

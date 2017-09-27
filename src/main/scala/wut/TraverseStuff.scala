@@ -25,7 +25,7 @@ import cats.instances.option._
 import cats.syntax.applicative._
 import cats.syntax.cartesian._
 
-object Chapter7 {
+object TraverseStuff {
 
   // Combining an accumulator and a hostname using an Applicative:
 
