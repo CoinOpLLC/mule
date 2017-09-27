@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 47 Degrees, LLC. <http://www.47deg.com>
+ * Copyright 2017 CoinOp LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,6 @@
  */
 
 package wut
-
-import cats.{ Eq, Show }
-
-import cats.instances.int._
-import cats.instances.string._
-import cats.instances.option._
-import cats.instances.tuple._
-import cats.instances.boolean._
 
 /**
   * `Printable` is our stab at `CoinOp` domain typeclasses.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 47 Degrees, LLC. <http://www.47deg.com>
+ * Copyright 2017 CoinOp LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,11 @@
 package wut
 
 /**
-  * We are of the opinion that dependence on cats is appropriate for a `utils` collection here.
+  * We are of the opinion that `This is fine.`
+  * (For a `utils` collection here.)
   */
+import scala.language.higherKinds
+
 import cats.{ Eq, Functor, Id, Monad }
 import cats.syntax.all._
 

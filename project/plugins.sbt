@@ -75,7 +75,7 @@ addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
 /**
   * [link](https://github.com/47deg/sbt-org-policies)
   */
-addSbtPlugin("com.47deg" % "sbt-org-policies" % "0.6.3")
+// addSbtPlugin("com.47deg" % "sbt-org-policies" % "0.6.3")
 
 /**
   * [link](url)

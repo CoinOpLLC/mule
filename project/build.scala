@@ -124,4 +124,6 @@ object Args {
     "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
+
+  lazy val initialCommands = "" //"""ammonite.Main().run()"""
 }
