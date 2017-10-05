@@ -40,7 +40,7 @@ object Main extends App {
   izSaem |> assert
 
   /*
-   * [cracks knuckles] OK now do all the things.
+   * [cracks knuckles] OK now do all the (FP) things.
    */
   TypeclassStuff        |> discardValue
   TreeStuff             |> discardValue
@@ -53,5 +53,6 @@ object Main extends App {
    * OK do moar things.
    */
   PureConfigExample |> discardValue
+  Time4SExample     |> discardValue
   SpireExamples     |> discardValue
 }

@@ -15,6 +15,7 @@ object Version {
   val Refined        = "0.8.0"
   val Squants        = "1.3.0"
   val Fansi          = "0.2.5"
+  val Time4S         = "1.4"
 }
 
 object Deps {
@@ -33,6 +34,8 @@ object Deps {
 
   val squants = "org.typelevel" %% "squants" % Squants
 
+  val time4s = "com.markatta" %% "timeforscala" % Time4S
+
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
@@ -42,9 +45,6 @@ object Deps {
     "com.beachape"          %% "enumeratum"            % Enumeratum,
     "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig
   )
-
-  val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
-  val fansi = "com.lihaoyi" %% "fansi"   % Fansi
 
   /**
     * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
@@ -57,6 +57,11 @@ object Deps {
   val scalatest = "org.scalatest" %% "scalatest" % ScalaTest
   val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
 
+  /** Marginal ergonomics and sundry whatnots – non-canon. */
+  val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
+  val fansi = "com.lihaoyi" %% "fansi"   % Fansi
+
+
   lazy val common = List(
     reflection,
     xml,
@@ -64,7 +69,8 @@ object Deps {
     cats,
     spire,
     squants,
-    refined
+    refined,
+    time4s
   ) ++ enumerata ++ pureConfigs
 }
 

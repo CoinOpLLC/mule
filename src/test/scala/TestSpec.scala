@@ -117,7 +117,8 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 }
 
 case class Yerf(i: Int = 0, s: String = "", d: Double = math.E) {
-  import NonDefaultNamedValues.{ nonDefaultNamedValues => ndnvs }
+  // import NonDefaultNamedValues.{ nonDefaultNamedValues => ndnvs }
+  import FintechNDNVs.{ muhNDNVs => ndnvs }
   override def toString = ndnvs
 }
 class NdnvSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {

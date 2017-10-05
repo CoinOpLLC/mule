@@ -18,11 +18,7 @@ package wut
 
 import scala.language.experimental.macros
 
-trait NonDefaultNamedValues {
-
-  val start = "["
-  val sep   = "; "
-  val end   = "]"
+abstract class NonDefaultNamedValues(val start: String, val sep: String, val end: String) {
 
   // val start = "("
   // val sep   = ", "
@@ -49,12 +45,15 @@ trait NonDefaultNamedValues {
     *     }
     * }}}
     *
-    * Implementation: identify the companion object for the case class.
-    * For each parameter of the apply method of the companion,
-    * identify the field with the same name.
-    * If the field has a value which is not equal to the default value for the corresponding
-    * parameter in the apply method, or there is no default value, emit a "name=value" string
-    * for the toString method.
+    * Implementation:
+    *   - identify the companion object for the case class.
+    *   - For each parameter of the apply method of the companion,
+    *       - identify the field with the same `name`.
+    *       - quote an expression which will produce a `"$``=$value"` string
+    *       - If there is no default value,
+    *           - return that expression
+    *       - else
+    *           - return an expression which conditions the production of the string on the value differening from the default.
     */
   def impl2(c: reflect.macros.blackbox.Context): c.Expr[String] = {
 
@@ -92,7 +91,14 @@ trait NonDefaultNamedValues {
   }
 }
 
-object NonDefaultNamedValues extends NonDefaultNamedValues {
+/**
+  * Default behavior is to match formatting style of case classes.
+  */
+object NonDefaultNamedValues extends NonDefaultNamedValues("(", ",", ")") {
 
   def nonDefaultNamedValues: String = macro impl2
+}
+
+object FintechNDNVs extends NonDefaultNamedValues("[", "; ", "]") {
+  def muhNDNVs: String = macro impl2
 }

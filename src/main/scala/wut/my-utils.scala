@@ -37,17 +37,9 @@ object Db {
 
   implicit lazy val eq = Eq.fromUniversalEquals[Db]
 
-  lazy val usernameReader: DbReader[Map[Int, String]] = Reader { db =>
-    db.usernames
-  }
-
-  lazy val passwordsReader: DbReader[Map[String, String]] = Reader { db =>
-    db.passwords
-  }
-
-  def findUsername(userId: Int): DbReader[Option[String]] = Reader { db =>
-    db.usernames get userId
-  }
+  lazy val usernameReader: DbReader[Map[Int, String]]     = Reader(_.usernames)
+  lazy val passwordsReader: DbReader[Map[String, String]] = Reader(_.passwords)
+  def findUsername(userId: Int): DbReader[Option[String]] = Reader(_.usernames get userId)
 
   /**
     * Yes, this is an unususally phat interface. For instructional purposes only.
@@ -61,18 +53,12 @@ object Db {
   import cats.instances.option._
   import cats.syntax.eq._
 
-  def checkPassword(
-      username: String,
-      password: String
-  ): DbReader[Boolean] =
+  def checkPassword(username: String, password: String): DbReader[Boolean] =
     for {
       pws <- passwordsReader
     } yield (pws get username) === password.some
 
-  def checkLogin(
-      userId: Int,
-      password: String
-  ): DbReader[Boolean] =
+  def checkLogin(userId: Int, password: String): DbReader[Boolean] =
     for {
       uns <- usernameReader
       pws <- passwordsReader
@@ -136,13 +122,20 @@ object Tree {
 trait MuhMonad[F[_]] extends Functor[F] {
   def pure[A](a: A): F[A]
   def flatMap[A, B](value: F[A])(func: A => F[B]): F[B]
-  override def map[A, B](value: F[A])(func: A => B): F[B] =
-    flatMap(value)(_ |> func |> pure)
+
+  /**
+    * Making [[map]] `final` would preclude optimization. This could be desirable, or not.
+    */
+  override def map[A, B](value: F[A])(func: A => B): F[B] = flatMap(value)(_ |> func |> pure)
 }
 object MuhMonadInstances {
   implicit val id = new MuhMonad[Id] {
     override def pure[A](a: A): Id[A]                                 = a
     override def flatMap[A, B](value: Id[A])(func: A => Id[B]): Id[B] = value |> func
-    override def map[A, B](value: Id[A])(func: A => B): Id[B]         = value |> func // |> pure
+
+    /**
+      * Note we don't need to override here; but for Id we can optimize...
+      */
+    override def map[A, B](value: Id[A])(func: A => B): Id[B] = value |> func // |> pure
   }
 }
