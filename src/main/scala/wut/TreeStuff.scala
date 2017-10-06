@@ -124,10 +124,7 @@ object TreeStuff {
 
   val tr7 = tr map (_ + 7)
 
-  val trtr = for {
-    i <- tr
-    j <- tr7
-  } yield i + j
+  val trtr = for(i <- tr; j <- tr7) yield i + j
 
   trtr === Branch(Branch(Leaf(51), Leaf(62)), Branch(Leaf(62), Leaf(73))) |> assert
 
