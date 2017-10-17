@@ -1,10 +1,9 @@
 package wut
 
 import com.markatta.timeforscala._
-import com.markatta.timeforscala.Month.{January, March}
+import com.markatta.timeforscala.Month.{ January, March }
 
 object Time4SExample {
-
 
   // java.time.Duration
   val d1 = Duration(seconds = 20, nanos = 1)
@@ -21,6 +20,10 @@ object Time4SExample {
   val p4 = Months(10)
   val p5 = Years(10)
 
+  val oldRule = Years(1) + Days(1)
+  // val severanceRule = Weeks(2) per Year(10) // how to do this?
+  val quarterYear = Months(12 / 4)
+
   // java.time.LocalDate
   val ld1 = LocalDate(2015, 1, 1)
   val ld2 = LocalDate(2015, January, 1)
@@ -29,11 +32,6 @@ object Time4SExample {
   // java.time.LocalTime
   val lt1 = LocalTime(20, 30)
   val lt2 = LocalTime(hour = 20, minute = 30, second = 12, nano = 5)
-
-  // java.time.LocalDate
-  val ld4 = LocalDate(2015, 1, 1)
-  val ld5 = LocalDate(2015, January, 1)
-  val ld6 = LocalDate("2015-01-01")
 
   // java.time.LocalDateTime
   val ldt1 = LocalDateTime(2015, 1, 1, 20, 30, 5)
@@ -47,19 +45,6 @@ object Time4SExample {
   // java.time.YearMonth
   val ym1 = YearMonth(2015, 1)
   val ym2 = YearMonth(2015, January)
-
-  import com.markatta.timeforscala.TimeExpressions._
-
-  val t1 = 1.nano
-  val t2 = 2.millis
-  val t3 = 2.seconds
-  val t4 = 3.minutes
-  val t5 = 1.hour
-
-  val t6 = 5.days
-  val t7 = 1.week
-  val t8 = 7.months
-  val t9 = 2.years
 
 // java.time.Duration
   assert(Minutes(20) - Minutes(10) == Minutes(10))
@@ -79,12 +64,41 @@ object Time4SExample {
   assert(LocalDate(2015, January, 1) + Months(2) == LocalDate(2015, March, 1))
   assert(LocalDate(2015, March, 1) - Months(2) == LocalDate(2015, January, 1))
 
-  import scala.concurrent.duration.Duration
+}
+
+/**
+  * If (if!) we ever have to mix / convert between these types, this is how.
+  */
+object SyntaxForwardTime {
+
+  import com.markatta.timeforscala.TimeExpressions._
+
+  import scala.concurrent.{ duration => scd }
   import cats.syntax.eq._
 
+  implicit val scdDurationEq = cats.Eq.fromUniversalEquals[scd.Duration]
   implicit val durationEq = cats.Eq.fromUniversalEquals[Duration]
+  implicit val periodEq = cats.Eq.fromUniversalEquals[Period]
 
-  val t2fd: Duration = 2.seconds.toFiniteDuration
-  assert(t2fd === Duration(t2fd.toString), t2fd)
+  val t2fd: scd.Duration = 2.seconds.toFiniteDuration
+  t2fd === scd.Duration(t2fd.toString) |> assert
+
+  val t1 = 1.nano
+  val t2 = 2.millis
+  val t3 = 2.seconds
+  val t4 = 3.minutes
+  val t5 = 1.hour
+
+  val t6 = 5.days
+  val t7 = 1.week
+  val t8 = 7.months
+  val t9 = 2.years
+
+  1.year + 1.day === Period(years=1, days=1, months=0) |> assert
+
+  val x = 19.hours + 47.minutes
+}
+
+object Money4S {
 
 }

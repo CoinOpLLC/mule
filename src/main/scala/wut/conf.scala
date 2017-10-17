@@ -85,6 +85,11 @@ object EnumeratumExamples {
 
 }
 
+case class ConfDate(val date: LocalDate) // extends AnyVal
+object ConfDate {
+  implicit val confDateEq = Eq.fromUniversalEquals[ConfDate]
+}
+
 object RefinedExamples {
 
   /**
@@ -105,11 +110,6 @@ object RefinedExamples {
 
   type PositiveInt    = Int Refined Positive
   type NonNegativeInt = Int Refined NonNegative
-
-  case class ConfDate(val date: LocalDate) // extends AnyVal
-  object ConfDate {
-    implicit val confDateEq = Eq.fromUniversalEquals[ConfDate]
-  }
 
   case class ScheduleSettings(
       initialDelaySeconds: NonNegativeInt,
@@ -182,6 +182,8 @@ object SpireExamples {
   */
 object PureConfigExample {
 
+  import java.{ time => jt }
+
   import spire.syntax.{ literals => sslits }
   import sslits.radix._ // imports the implicit
   import sslits.si._    //
@@ -200,9 +202,7 @@ object PureConfigExample {
   import eu.timepit.refined.pureconfig._
   import RefinedExamples._
 
-  implicit val localDateInstance =
-    localDateConfigConvert(java.time.format.DateTimeFormatter.ISO_DATE)
-
+  implicit val ldcc  = localDateConfigConvert(jt.format.DateTimeFormatter.ISO_DATE)
   implicit val crfEq = Eq.fromUniversalEquals[ConfigReaderFailures]
   // look ma no negs...
   val nn: NonNegativeInt = x16"2BADD00D"

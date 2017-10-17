@@ -16,6 +16,8 @@ object Version {
   val Squants        = "1.3.0"
   val Fansi          = "0.2.5"
   val Time4S         = "1.4"
+  // FIXME: add this https://github.com/softwaremill/akka-http-session
+  // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
 }
 
 object Deps {
