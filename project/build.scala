@@ -16,6 +16,7 @@ object Version {
   val Squants        = "1.3.0"
   val Fansi          = "0.2.5"
   val Time4S         = "1.4"
+  val AkkaHttp       = "10.0.9"
   // FIXME: add this https://github.com/softwaremill/akka-http-session
   // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
 }
@@ -63,6 +64,7 @@ object Deps {
   val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi"   % Fansi
 
+  val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
 
   lazy val common = List(
     reflection,
@@ -72,7 +74,8 @@ object Deps {
     spire,
     squants,
     refined,
-    time4s
+    time4s,
+    akkaHttp
   ) ++ enumerata ++ pureConfigs
 }
 

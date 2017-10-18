@@ -77,8 +77,8 @@ object SyntaxForwardTime {
   import cats.syntax.eq._
 
   implicit val scdDurationEq = cats.Eq.fromUniversalEquals[scd.Duration]
-  implicit val durationEq = cats.Eq.fromUniversalEquals[Duration]
-  implicit val periodEq = cats.Eq.fromUniversalEquals[Period]
+  implicit val durationEq    = cats.Eq.fromUniversalEquals[Duration]
+  implicit val periodEq      = cats.Eq.fromUniversalEquals[Period]
 
   val t2fd: scd.Duration = 2.seconds.toFiniteDuration
   t2fd === scd.Duration(t2fd.toString) |> assert
@@ -94,11 +94,9 @@ object SyntaxForwardTime {
   val t8 = 7.months
   val t9 = 2.years
 
-  1.year + 1.day === Period(years=1, days=1, months=0) |> assert
+  1.year + 1.day === Period(years = 1, days = 1, months = 0) |> assert
 
   val x = 19.hours + 47.minutes
 }
 
-object Money4S {
-
-}
+object Money4S {}
