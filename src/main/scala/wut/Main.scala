@@ -34,7 +34,6 @@ object Main extends App {
 
   val izSaem = (xs zip oxs) forall {
     case (r, Some(l)) => r === l
-    case _            => ??? // yeah, I know, right?
   }
 
   izSaem |> assert
@@ -55,4 +54,5 @@ object Main extends App {
   PureConfigExample |> discardValue
   Time4SExample     |> discardValue
   SpireExamples     |> discardValue
+  SyntaxForwardTime |> discardValue
 }

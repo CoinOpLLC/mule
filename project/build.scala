@@ -42,11 +42,13 @@ object Deps {
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
-  val refined = "eu.timepit" %% "refined" % Refined
+  val refined = Seq(
+    "eu.timepit" %% "refined" % Refined,
+    "eu.timepit" %% "refined-pureconfig" % Refined
+  )
 
   val enumerata = Seq(
-    "com.beachape"          %% "enumeratum"            % Enumeratum,
-    "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig
+    "com.beachape"          %% "enumeratum"            % Enumeratum
   )
 
   /**
@@ -54,16 +56,18 @@ object Deps {
     */
   val pureConfigs = Seq(
     "com.github.pureconfig" %% "pureconfig"         % PureConfig,
-    "eu.timepit"            %% "refined-pureconfig" % Refined
+    "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig,
+    "com.github.pureconfig" %% "pureconfig-squants" % PureConfig
   )
 
   val scalatest = "org.scalatest" %% "scalatest" % ScalaTest
   val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
-  val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
+  // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi"   % Fansi
 
+  /** toolkits */
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
 
   lazy val common = List(
@@ -73,10 +77,10 @@ object Deps {
     cats,
     spire,
     squants,
-    refined,
     time4s,
-    akkaHttp
-  ) ++ enumerata ++ pureConfigs
+    akkaHttp,
+    fansi
+  ) ++ refined ++ enumerata ++ pureConfigs
 }
 
 object Args {

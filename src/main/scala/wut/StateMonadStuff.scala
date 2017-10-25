@@ -39,8 +39,6 @@ object StateMonadStuff {
 
   type CalcState[A] = State[List[Int], A]
 
-  val SadLittleIntLexer = """(\d+)""".r
-
   type Op = (Int, Int) => Int
   def opState(op: Op): CalcState[Int] = State[List[Int], Int] {
     case top :: bis :: rest =>
@@ -48,11 +46,9 @@ object StateMonadStuff {
       (res :: rest, res)
     case _ => ???
   }
-  def valState(ds: String): CalcState[Int] = State[List[Int], Int] {
-    case stack =>
-      val value = ds.toInt
-      //println(value :: stack)
-      (value :: stack, value)
+  def valState(ds: String): CalcState[Int] = State[List[Int], Int] { stack =>
+    val value = ds.toInt
+    (value :: stack, value)
   }
   def evalOne(sym: String): CalcState[Int] = sym match {
     case "+" => opState(_ + _)

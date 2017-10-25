@@ -33,7 +33,7 @@ object Order {
 
       /**
         * Objective here was to try to be as "generic" as possible.
-        * I can start to see the motivation for shapless...
+        * I can start to see the motivation for shapeless...
         */
       val l :: r :: Nil = List(a, b) map (Order unapply _)
       val Some(o)       = l |+| r
@@ -63,6 +63,13 @@ object Kitteh {
   import cats.data.Reader
   type KittehReader[A] = Reader[Kitteh, A]
   lazy val nameReader: KittehReader[String] = Reader(_.name)
+
+  val add = (_: Int) + (_: Int)
+  val not = ~(_: Int)
+
+  val inc = add(_: Int, 1)
+  val neg = not andThen inc
+  val dec = add(_: Int, (1 |> neg))
 
 }
 

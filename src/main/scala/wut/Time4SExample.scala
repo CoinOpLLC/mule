@@ -1,5 +1,6 @@
 package wut
 
+import java.{ time => jt }
 import com.markatta.timeforscala._
 import com.markatta.timeforscala.Month.{ January, March }
 
@@ -70,6 +71,9 @@ object Time4SExample {
   * If (if!) we ever have to mix / convert between these types, this is how.
   */
 object SyntaxForwardTime {
+  implicit class WithHack(val value: Temporal) extends AnyVal {
+    def adjusted(ta: java.time.temporal.TemporalAdjuster) = value `with` ta
+  }
 
   import com.markatta.timeforscala.TimeExpressions._
 
@@ -97,6 +101,64 @@ object SyntaxForwardTime {
   1.year + 1.day === Period(years = 1, days = 1, months = 0) |> assert
 
   val x = 19.hours + 47.minutes
+
+  import squants.{ time => st }
+
+  val wwDays    = st.Days(5)
+  val wwSeconds = wwDays.toSeconds / 3
+
+  import jt.DayOfWeek
+  import jt.temporal.{ TemporalAdjusters => jttTAs }
+
+  // third tuesday
+  val firstTuesday = jttTAs firstInMonth DayOfWeek.TUESDAY
+  val thirdTuesday = TemporalAdjuster { _ adjusted firstTuesday plus 2.weeks }
+
+  def squantsToJavaTime(from: st.Time): jt.Duration = Nanos(from.toNanoseconds.toLong)
+
+  Money4S |> discardValue
 }
 
-object Money4S {}
+object TemporalAdjuster {
+  import java.time.temporal.TemporalAdjuster
+  def apply(adjust: Temporal => Temporal): TemporalAdjuster = new TemporalAdjuster {
+    override def adjustInto(t: Temporal): Temporal = adjust(t)
+  }
+}
+
+/**
+Keep Calm, and Carry On.
+{{{
+  scala> Nanos(Double.MaxValue.toLong)
+  res0: com.markatta.timeforscala.Duration = PT2562047H47M16.854775807S
+
+
+}}}
+
+
+  */
+object Money4S {
+
+  def showme[T <: AnyRef](t: T): Unit = println(t)
+
+  import squants.{ market => sm }
+
+  implicit val moneyContext = sm.defaultMoneyContext
+
+  val doubleEagle  = sm.Money(20)
+  val silverTalent = 15 * 12 * sm.Money(1, sm.XAG)
+
+}
+
+object FansiCrap {
+  import fansi.Color.{ LightMagenta }
+  def colorme[S <: AnyRef](s: S): String = (fansi.Str(s.toString) overlay LightMagenta).render
+  def fade(n: Int) =
+    (
+      (0 to 255) map { i =>
+        fansi.Back.True(i, 255 - i, 255)(" ")
+      } grouped n map (_.mkString)
+    ) mkString "\n"
+
+  // fade(32) |> showme
+}

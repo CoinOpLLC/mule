@@ -13,8 +13,10 @@ object Server extends App with Directives {
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   val routes: Route =
-    path("/yerf") {
-      complete("Yerf! 😼")
+    path("/yerf" / Segment / IntNumber) { (seg, i) =>
+      get {
+        complete(s"""$seg Yerf! ${"😼" * i}""")
+      }
     } ~ path("/yiff") {
       post {
         val resp: ResponseEntity = HttpEntity(
@@ -25,6 +27,5 @@ object Server extends App with Directives {
       }
     }
   //
-  Http().bindAndHandle(routes, "0.0.0.0", 8002) |> discardValue
-
+  Http().bindAndHandle(routes, "0.0.0.0", 8888) |> discardValue
 }
