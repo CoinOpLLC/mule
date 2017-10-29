@@ -1,6 +1,7 @@
 package wut
 
 import java.{ time => jt }
+import jt.{temporal => jtt }
 import com.markatta.timeforscala._
 import com.markatta.timeforscala.Month.{ January, March }
 
@@ -108,7 +109,7 @@ object SyntaxForwardTime {
   val wwSeconds = wwDays.toSeconds / 3
 
   import jt.DayOfWeek
-  import jt.temporal.{ TemporalAdjusters => jttTAs }
+  import jtt.{ TemporalAdjusters => jttTAs }
 
   // third tuesday
   val firstTuesday = jttTAs firstInMonth DayOfWeek.TUESDAY
@@ -161,4 +162,61 @@ object FansiCrap {
     ) mkString "\n"
 
   // fade(32) |> showme
+}
+
+object WeekTimeStuff {
+
+  import jt.DayOfWeek
+  import jtt.WeekFields
+  // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
+  // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
+
+
+  // issue to get correct by construction: dealing with `DayOfWeek` int values across `Locale`s
+
+  // 2 `WeekField`s of note: ISO and SundayStart (used in Asia)
+  // otherwise use `Locale`
+
+  // scala>   val dow = ISO.dayOfWeek
+  // dow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[MONDAY,4]]
+  //
+  // scala>   val sow = jtt.WeekFields.SUNDAY_START.dayOfWeek
+  // sow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[SUNDAY,1]]
+  //
+  // scala> today get dow
+  // res108: Int = 6
+  //
+  // scala> today get sow
+  // res109: Int = 7
+
+
+  val iso = WeekFields.ISO
+  val dow = iso.dayOfWeek
+
+  import cats.Order
+  import cats.syntax.all._
+
+  import com.markatta.timeforscala._
+  import com.markatta.timeforscala.TimeExpressions._
+
+  // Time Lording...
+  // implicit def temporalEq[T <: Temporal]: Eq[T] = Eq.fromUniversalEquals[T]
+  implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T] = Order.fromComparable[T]
+  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
+
+  val today = LocalDate()
+  val yesterday = today - 1.day
+
+  yesterday < today |> assert
+
+  // adopt a Firm wide convention
+  import scala.collection.immutable.SortedSet
+
+  // val coinopWeekFields = jtt.WeekFields of (jt.DayOfWeek.MONDAY, 3)
+  // better idea: stick with ISO and be rigorous about others
+  // make use of locale
+  type WorkWeek = SortedSet[jt.DayOfWeek]
+  // need to define an ordering on DayOfWeek. Which would be great.
+  // TODO: when does the week roll around?
+  // TODO: what about that succ stuff from scalaz?
 }

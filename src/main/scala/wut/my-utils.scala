@@ -62,7 +62,7 @@ object Db {
     for {
       uns <- usernameReader
       pws <- passwordsReader
-    } yield (uns get userId flatMap (un => pws get un)) contains password
+    } yield (uns get userId flatMap (pws get _)) contains password
 }
 
 /**

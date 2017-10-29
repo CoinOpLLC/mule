@@ -40,13 +40,13 @@ object StateMonadStuff {
   type CalcState[A] = State[List[Int], A]
 
   type Op = (Int, Int) => Int
-  def opState(op: Op): CalcState[Int] = State[List[Int], Int] {
+  def opState(op: Op): CalcState[Int] = State {
     case top :: bis :: rest =>
       val res = op(top, bis)
       (res :: rest, res)
     case _ => ???
   }
-  def valState(ds: String): CalcState[Int] = State[List[Int], Int] { stack =>
+  def valState(ds: String): CalcState[Int] = State { stack =>
     val value = ds.toInt
     (value :: stack, value)
   }
@@ -75,4 +75,5 @@ object StateMonadStuff {
   } yield ans
 
   (notherProg runA Nil).value === 21 |> assert
+
 }
