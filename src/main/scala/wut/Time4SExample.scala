@@ -149,6 +149,9 @@ object Money4S {
   val doubleEagle  = sm.Money(20)
   val silverTalent = 15 * 12 * sm.Money(1, sm.XAG)
 
+  import java.{ util => ju }
+  val javabux = ju.Currency.getAvailableCurrencies
+
 }
 
 object FansiCrap {
