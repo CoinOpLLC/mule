@@ -29,6 +29,8 @@ object TypeclassStuff {
   import cats.instances.boolean._
   import cats.instances.tuple._
 
+  import model._
+
   import Kats._
 
   import Printable._
@@ -57,10 +59,10 @@ object TypeclassStuff {
 
   import cats.instances.map._
 
-  val o1 = Order(555.550001, 78345)
-  val o2 = Order(168.020660, 186283)
+  val o1 = Order.legacy(555.550001, 78345)
+  val o2 = Order.legacy(168.020660, 186283)
 
-  (o1 |+| o2) === Order(723.570661, 264628) |> assert
+  (o1 |+| o2) === Order(-2, -2, 264628, 723.570661, None) |> assertOrElse((o1 |+| o2).toString)
 
   val map1 = Map("a" -> 1, "b" -> 2)
   val map2 = Map("b" -> 3, "d" -> 4)
@@ -69,12 +71,12 @@ object TypeclassStuff {
 
   val m1   = Map(1337 -> o1)
   val m1_a = Map(1337 -> o2)
-  val m2   = Map(4958 -> Order(666.880033, 123456))
+  val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
   val mmm  = m1 |+| m1_a |+| m2
   mmm === Map(
-    4958 -> Order(666.880033, 123456),
-    1337 -> Order(723.570661, 264628)
-  ) |> assert
+    4958 -> Order(-1, -1, 123456, 666.880033, None),
+    1337 -> Order(-2, -2, 264628, 723.570661, None)
+  ) |> assertOrElse(mmm.toString)
 
   import Kats.maru
   import Printable.format

@@ -1,7 +1,7 @@
 package wut
 
 import java.{ time => jt }
-import jt.{temporal => jtt }
+import jt.{ temporal => jtt }
 import com.markatta.timeforscala._
 import com.markatta.timeforscala.Month.{ January, March }
 
@@ -171,7 +171,6 @@ object WeekTimeStuff {
   // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
   // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
 
-
   // issue to get correct by construction: dealing with `DayOfWeek` int values across `Locale`s
 
   // 2 `WeekField`s of note: ISO and SundayStart (used in Asia)
@@ -189,7 +188,6 @@ object WeekTimeStuff {
   // scala> today get sow
   // res109: Int = 7
 
-
   val iso = WeekFields.ISO
   val dow = iso.dayOfWeek
 
@@ -201,10 +199,10 @@ object WeekTimeStuff {
 
   // Time Lording...
   // implicit def temporalEq[T <: Temporal]: Eq[T] = Eq.fromUniversalEquals[T]
-  implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T] = Order.fromComparable[T]
+  implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
   implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
-  val today = LocalDate()
+  val today     = LocalDate()
   val yesterday = today - 1.day
 
   yesterday < today |> assert

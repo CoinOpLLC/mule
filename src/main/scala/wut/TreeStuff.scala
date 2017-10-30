@@ -23,6 +23,8 @@ import cats.instances.vector._
 
 import cats.syntax.all._
 
+import model._
+
 object TreeStuff {
 
   import cats.{ Eval, Id, Monoid }

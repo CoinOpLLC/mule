@@ -20,12 +20,12 @@ package wut
   * Codec is a type class. Let's give it its own file, because we're feeling generous.
   */
 trait Codec[A] { self =>
-  def encode(value: A): String
-  def decode(value: String): Option[A]
+  def encode(a: A): String
+  def decode(sa: String): Option[A]
 
   final def imap[B](dec: A => B, enc: B => A): Codec[B] = new Codec[B] {
-    override def encode(value: B): String         = enc(value) |> self.encode
-    override def decode(value: String): Option[B] = self decode value map dec
+    override def encode(b: B): String          = b  |> enc |> self.encode
+    override def decode(sb: String): Option[B] = sb |> self.decode map dec
   }
 }
 object Codec {

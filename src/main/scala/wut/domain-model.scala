@@ -16,102 +16,116 @@
 
 package wut
 
-import cats.{ Eq, Monoid }
+package object model {
+  type ItemId    = Long
+  type AccountId = Long
+  type Comment   = String
 
-case class Order(totalCost: BigDecimal, quantity: Long)
-object Order {
-
-  import cats.instances.{ bigDecimal, long, option, tuple }
-  import bigDecimal._, long._, option._, tuple._
-
-  import cats.syntax.semigroup._
-
-  implicit val eq = Eq.fromUniversalEquals[Order]
-  implicit val monoid = new Monoid[Order] {
-
-    def combine(a: Order, b: Order): Order = {
-
-      /**
-        * Objective here was to try to be as "generic" as possible.
-        * I can start to see the motivation for shapeless...
-        */
-      val l :: r :: Nil = List(a, b) map (Order unapply _)
-      val Some(o)       = l |+| r
-      (Order.apply _) tupled o
-    }
-
-    lazy val empty: Order = (Order.apply _) tupled Monoid[(BigDecimal, Long)].empty
-  }
+  def captureReturn[A, B](f: A => B) = new { type Return = B }
 }
 
-/**
-  * Domain model class. The only domain that matters tbh.
-  *
-  * In a better example, these would be in their own file(s).
-  */
+package model {
+
+  import cats.{ Eq, Monoid }
+  import cats.syntax.all._
+  import cats.{ instances => ci }
+  import ci.int._, ci.string._, ci.double._, ci.boolean._, ci.bigDecimal._, ci.long._
+  import ci.option._, ci.tuple._
+
+  case class Order(
+      account: AccountId,
+      item: ItemId,
+      quantity: Long,
+      totalCost: BigDecimal,
+      comment: Option[Comment]
+  )
+  object Order {
+
+    def legacy(bd: BigDecimal, q: Long): Order = apply(-1, -1, q, bd, None)
+
+    type Tpl = (AccountId, ItemId, Long, BigDecimal, Option[Comment])
+    val tuple: Order => Tpl   = Order.unapply(_).fold(???)(identity)
+    val untuple: Tpl => Order = tpl => tpl |> (Order.apply(_, _, _, _, _)).tupled
+
+    implicit val eq    = Eq.fromUniversalEquals[Order]
+    implicit val order = cats.Order by tuple
+    implicit val monoid = new Monoid[Order] {
+
+      def combine(a: Order, b: Order): Order = tuple(a) |+| tuple(b) |> untuple
+
+      lazy val empty: Order = Monoid[Tpl].empty |> untuple
+    }
+  }
+
+  /**
+    * Domain model class. The only domain that matters tbh.
+    *
+    * In a better example, these would be in their own file(s).
+    */
 // @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class Kitteh(name: String, age: Int, color: String, favFood: String)
-object Kitteh {
-  def apply(name: String, age: Int, color: String): Kitteh = Kitteh(name, age, color, "Kibble")
-  implicit val printable = new Printable[Kitteh] {
-    override def format(k: Kitteh) = {
-      import k._
-      s"OH HAI $name DESU HAZ $age YAERZ AM $color EATZ $favFood K THX BYE"
+  final case class Kitteh(name: String, age: Int, color: String, favFood: String)
+  object Kitteh {
+    def apply(name: String, age: Int, color: String): Kitteh = Kitteh(name, age, color, "Kibble")
+    implicit val printable = new Printable[Kitteh] {
+      override def format(k: Kitteh) = {
+        import k._
+        s"OH HAI $name DESU HAZ $age YAERZ AM $color EATZ $favFood K THX BYE"
+      }
     }
+
+    import cats.data.Reader
+    type KittehReader[A] = Reader[Kitteh, A]
+    lazy val nameReader: KittehReader[String] = Reader(_.name)
+
+    val add = (_: Int) + (_: Int)
+    val not = ~(_: Int)
+
+    val inc = add(_: Int, 1)
+    val neg = not andThen inc
+    val dec = add(_: Int, (1 |> neg))
+
   }
 
-  import cats.data.Reader
-  type KittehReader[A] = Reader[Kitteh, A]
-  lazy val nameReader: KittehReader[String] = Reader(_.name)
-
-  val add = (_: Int) + (_: Int)
-  val not = ~(_: Int)
-
-  val inc = add(_: Int, 1)
-  val neg = not andThen inc
-  val dec = add(_: Int, (1 |> neg))
-
-}
-
-/** Distinguished cats! */
-object Kats {
-  val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
-  val ara  = Kitteh("Ara", 8, "Tuxedo")
-}
-
-final case class Box[A](value: A)
-object Box {
-  implicit def eq[A: Eq] = Eq.fromUniversalEquals[Box[A]]
-
-  implicit def boxPrintable[A: Printable] = Printable[String].contramap { (b: Box[A]) =>
-    b.toString
+  /** Distinguished cats! */
+  object Kats {
+    val maru = Kitteh(name = "Maru", color = "Scottish Fold", age = 9)
+    val ara  = Kitteh("Ara", 8, "Tuxedo")
   }
-  implicit def boxCodec[A: Codec]: Codec[Box[A]] = Codec[A] imap (Box[A], _.value)
-}
 
-object MuhDomain {
-  lazy val db = Db(
-    Map(
-      1 -> "dade",
-      2 -> "kate",
-      3 -> "margo"
-    ),
-    Map(
-      "dade"  -> "zerocool",
-      "kate"  -> "acidburn",
-      "margo" -> "secret"
+  final case class Box[A](value: A)
+  object Box {
+    implicit def eq[A: Eq] = Eq.fromUniversalEquals[Box[A]]
+
+    implicit def boxPrintable[A: Printable] = Printable[String].contramap { (b: Box[A]) =>
+      b.toString
+    }
+    implicit def boxCodec[A: Codec]: Codec[Box[A]] = Codec[A] imap (Box[A], _.value)
+  }
+
+  object MuhDomain {
+    lazy val db = Db(
+      Map(
+        1 -> "dade",
+        2 -> "kate",
+        3 -> "margo"
+      ),
+      Map(
+        "dade"  -> "zerocool",
+        "kate"  -> "acidburn",
+        "margo" -> "secret"
+      )
     )
-  )
 
-  lazy val fd = Map(
-    "Alice"   -> "37",
-    "Bob"     -> "23",
-    "Carol"   -> "42",
-    "Dave"    -> "27",
-    "Jaimie"  -> "33",
-    "Kerry"   -> "18",
-    "Leslie"  -> "31",
-    "Terry"   -> "19",
-    "Mallory" -> "67"
-  )
+    lazy val fd = Map(
+      "Alice"   -> "37",
+      "Bob"     -> "23",
+      "Carol"   -> "42",
+      "Dave"    -> "27",
+      "Jaimie"  -> "33",
+      "Kerry"   -> "18",
+      "Leslie"  -> "31",
+      "Terry"   -> "19",
+      "Mallory" -> "67"
+    )
+  }
 }
