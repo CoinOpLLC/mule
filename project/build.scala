@@ -12,7 +12,7 @@ object Version {
   val PureConfig     = "0.8.0"
   val Enumeratum     = "1.5.12"
   val Spire          = "0.14.1"
-  val Refined        = "0.8.0"
+  val Refined        = "0.8.4"
   val Squants        = "1.3.0"
   val Fansi          = "0.2.5"
   val Time4S         = "1.4"
@@ -44,7 +44,9 @@ object Deps {
     */
   val refined = Seq(
     "eu.timepit" %% "refined" % Refined,
+    "eu.timepit" %% "refined-cats" % Refined,
     "eu.timepit" %% "refined-pureconfig" % Refined
+
   )
 
   val enumerata = Seq(
