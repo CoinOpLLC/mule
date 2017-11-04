@@ -33,27 +33,35 @@ import refined.collection._
 import refined.numeric._
 import refined.auto._
 
+import squants.{ Each, market => sm }
+import sm.Money
+
 object api {
 
   type ItemId    = Long
   type AccountId = Long
   type Comment   = String
 
-  import squants.{ market => sm }
-
   implicit val moneyContext = sm.defaultMoneyContext
 
   val doubleEagle = sm.Money(20)
 
-  type AssetId  = Long Refined Interval.Closed[W.`100`, W.`199`]
-  type Quantity = Long Refined Positive
-
-  type Position = (Quantity, sm.Money)
+  type AssetId = Long Refined Interval.Closed[W.`100000`, W.`100099`]
+  // type AssetId     = String
+  type AccountRole = String
+  type ClientId    = String
+  // type Quantity = Long Refined NonNegative
+  type Quantity = Double
+  // type Price    = sm.Price[squants.Dimensionless]
+  type Price = Double
+  // price and quantity need `Monoids`.
+  type Position = (Quantity, Price)
   type Folio    = Map[AssetId, Position]
+  type Account  = Map[AccountId, Folio]
+  type Client   = Map[ClientId, Map[AccountRole, AccountId]]
 
-  // implicit val positionMonoid = Monoid[Position]
+  implicit val accountMonoid = Monoid[Account]
 
-  def captureReturn[A, B](f: A => B) = new { type Return = B }
 }
 
 import api._
@@ -111,4 +119,17 @@ object MuhDomain {
     "Terry"   -> "19",
     "Mallory" -> "67"
   )
+}
+
+sealed trait Denomination extends Any {
+  def symbol: String
+  def code: String
+  // etc
+}
+
+object Denomination {}
+
+final case class USD(val amount: BigDecimal) extends AnyVal with Denomination {
+  override def symbol: String = "$"
+  override def code: String   = "USD"
 }
