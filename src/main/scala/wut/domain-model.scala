@@ -33,8 +33,8 @@ import refined.collection._
 import refined.numeric._
 import refined.auto._
 
-import squants.{ Each, market => sm }
-import sm.Money
+// import squants.{ Each, market => sm }
+// import sm.Money
 
 object api {
 
@@ -42,9 +42,9 @@ object api {
   type AccountId = Long
   type Comment   = String
 
-  implicit val moneyContext = sm.defaultMoneyContext
+  // implicit val moneyContext = sm.defaultMoneyContext
 
-  val doubleEagle = sm.Money(20)
+  // val doubleEagle = sm.Money(20)
 
   type AssetId = Long Refined Interval.Closed[W.`100000`, W.`100099`]
   // type AssetId     = String
@@ -119,17 +119,4 @@ object MuhDomain {
     "Terry"   -> "19",
     "Mallory" -> "67"
   )
-}
-
-sealed trait Denomination extends Any {
-  def symbol: String
-  def code: String
-  // etc
-}
-
-object Denomination {}
-
-final case class USD(val amount: BigDecimal) extends AnyVal with Denomination {
-  override def symbol: String = "$"
-  override def code: String   = "USD"
 }
