@@ -3,12 +3,12 @@ import Keys._
 // import Tests._
 
 object Version {
-  val Scala          = "2.12.3"
+  val Scala          = "2.12.4"
   val Xml            = "1.0.6"
-  val TypesafeConfig = "1.3.1"
   val ScalaTest      = "3.0.4"
+  val TypesafeConfig = "1.3.1"
   val Cats           = "0.9.0"
-  val Ammonite       = "0.8.3"
+  val Quicklens      = "1.4.11"
   val PureConfig     = "0.8.0"
   val Enumeratum     = "1.5.12"
   val Spire          = "0.14.1"
@@ -17,8 +17,8 @@ object Version {
   val Fansi          = "0.2.5"
   val Time4S         = "1.4"
   val AkkaHttp       = "10.0.9"
-  // FIXME: add this https://github.com/softwaremill/akka-http-session
-  // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
+  val HttpSession    = "0.5.1"
+  val Ammonite       = "0.8.3"
 }
 
 object Deps {
@@ -32,6 +32,8 @@ object Deps {
   val conf = "com.typesafe" % "config" % TypesafeConfig
 
   val cats = "org.typelevel" %% "cats" % Cats
+
+  val quicklens = "com.softwaremill.quicklens" %% "quicklens" % Quicklens
 
   val spire = "org.typelevel" %% "spire" % Spire
 
@@ -72,34 +74,42 @@ object Deps {
   /** toolkits */
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
 
-  lazy val common = List(
-    reflection,
-    xml,
-    conf,
-    cats,
-    spire,
-    squants,
-    time4s,
-    akkaHttp,
-    fansi
-  ) ++ refined ++ enumerata ++ pureConfigs
+  val httpSession = "com.softwaremill.akka-http-session" %% "core" % HttpSession
+  val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
+  // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
+
+
+  lazy val common = refined ++ enumerata ++ pureConfigs ++
+    List(
+      reflection,
+      xml,
+      cats,
+      conf,
+      spire,
+      squants,
+      time4s,
+      akkaHttp,
+      httpSession,
+      // httpSessionJwt,
+      fansi
+    )
 }
 
 object Args {
-  lazy val allScalaCflags = Seq(
+  lazy val allScalaCflags = xlintDeets ++ ywarnDeets ++ ywarnUnusedDeets ++ Seq(
     "-deprecation",
     "-encoding",
     "UTF-8",
     "-feature",
     "-unchecked",
     "-explaintypes",
-    // "-Xfatal-warnings", sick of this for now. Use for artifact level build settings.
+    // "-Xfatal-warnings", FIXME sick of this for now. Use for artifact level build settings.
     // "-Xlint", no! use lists of :deets
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
     "-Xfuture", // Turn on future language features.
     "-Yno-adapted-args",
     "-Ypartial-unification" // Enable partial unification in type constructor inference
-  ) ++ xlintDeets ++ ywarns ++ ywarnUnusedDeets
+  )
 
   lazy val nonConsoleScalaCflags = Set("-Xfatal-warnings") ++ ywarnUnusedDeets
 
@@ -123,7 +133,7 @@ object Args {
     "-Xlint:unsound-match" // Pattern match may not be typesafe.
   )
 
-  lazy val ywarns = List(
+  lazy val ywarnDeets = List(
     "-Ywarn-dead-code", // Warn when dead code is identified.
     "-Ywarn-extra-implicit", // Warn when more than one implicit parameter section is defined.
     "-Ywarn-inaccessible", // Warn about inaccessible types in method signatures.
@@ -142,5 +152,5 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  lazy val initialCommands = "" //"""ammonite.Main().run()"""
+  lazy val initialCommands = "import wut._" //"""ammonite.Main().run()"""
 }
