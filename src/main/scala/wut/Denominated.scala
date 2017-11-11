@@ -29,14 +29,24 @@ import ci.eq._
 
 // Idea: `Denomination[C <: JvmCurrency]` typeclass. Construct money from their (implicit) instances.
 
-private[model] case class Denomination(val value: JvmCurrency) /* extends AnyVal */ { self =>
-  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
-    type AmountType = N
-    def denomination: Denomination = self
-    def currency: JvmCurrency      = value
-  }
+/** This wants to be a value class someday (it told me so). */
+final case class Denomination private[model] (private val jc: JvmCurrency) { self =>
 
   import Denomination._
+
+  def code: String        = jc.getCurrencyCode
+  def numericCode: Int    = jc.getNumericCode
+  def fractionDigits: Int = jc.getDefaultFractionDigits
+  def displayName: String = jc.getDisplayName
+  def symbol: String      = jc.getSymbol
+
+  /** This wants to be a value class someday (it told me so). */
+  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
+    type AmountType = N
+    def currency: Denomination = self
+    override def toString      = s"""${currency.code}($amount)"""
+  }
+  def apply[N: Numeric](n: N) = Denominated(n)
 
   implicit def eq[N: Numeric]: Eq[Denominated[N]] = Eq.fromUniversalEquals[Denominated[N]]
 
@@ -70,6 +80,6 @@ object Examples {
   val buxxf: Int => USD.Denominated[Int] = Denominated[Int](USD)
   val buxx                               = 20 |> buxxf
   val bx2                                = 20 |> buxxf
-  import USD._
+  // import USD._
   // buxx === bx2 |> assert FIXME
 }
