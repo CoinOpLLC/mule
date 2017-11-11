@@ -3,7 +3,6 @@ package model
 
 // import scala.language.implicitConversions
 
-import java.util.{ Currency => JvmCurrency }
 // import scala.util.Try
 
 import cats.{ Eq, Monoid }
@@ -13,16 +12,16 @@ import ci.int._, ci.string._, ci.double._, ci.boolean._, ci.bigDecimal._, ci.lon
 import ci.option._, ci.tuple._, ci.list._, ci.set._, ci.map._
 import ci.eq._
 
-// import enumeratum._
-// import enumeratum.values._
+import enumeratum._
+import enumeratum.values._
 
 //
-// import eu.timepit.refined
-// import refined.api.Refined
-// import refined.W
-// import refined.collection._
-// import refined.numeric._
-// import refined.auto._
+import eu.timepit.refined
+import refined.api.Refined
+import refined.W
+import refined.collection._
+import refined.numeric._
+import refined.auto._
 
 // TODO: try a typeclass for currency,
 // use an implicit def to turn the type bounds into a set of instances...
@@ -30,9 +29,9 @@ import ci.eq._
 // Idea: `Denomination[C <: JvmCurrency]` typeclass. Construct money from their (implicit) instances.
 
 /** This wants to be a value class someday (it told me so). */
-final case class Denomination private[model] (private val jc: JvmCurrency) { self =>
+sealed abstract class Denomination extends EnumEntry { denomination =>
 
-  import Denomination._
+  val jc = java.util.Currency getInstance denomination.entryName ensuring (_ != null)
 
   def code: String        = jc.getCurrencyCode
   def numericCode: Int    = jc.getNumericCode
@@ -41,9 +40,9 @@ final case class Denomination private[model] (private val jc: JvmCurrency) { sel
   def symbol: String      = jc.getSymbol
 
   /** This wants to be a value class someday (it told me so). */
-  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
+  final case class Denominated[N](val amount: N) {
     type AmountType = N
-    def currency: Denomination = self
+    def currency: Denomination = denomination
     override def toString      = s"""${currency.code}($amount)"""
   }
   def apply[N: Numeric](n: N) = Denominated(n)
@@ -58,21 +57,21 @@ final case class Denomination private[model] (private val jc: JvmCurrency) { sel
   }
 }
 
-object Denomination {
+object Denomination extends Enum[Denomination] {
 
-  private def apply(code: String): Denomination = Denomination(JvmCurrency getInstance code)
+  val values = findValues
 
-  lazy val USD = "USD" |> apply
-  lazy val EUR = "EUR" |> apply
+  case object USD extends Denomination
+  case object EUR extends Denomination
+  case object XYZ extends Denomination
 
-  implicit def eqN[N: Numeric]: Eq[N]         = Eq.fromUniversalEquals[N]
-  implicit val eqJvmCurrency: Eq[JvmCurrency] = Eq.fromUniversalEquals[JvmCurrency]
-  implicit def eq                             = Eq.fromUniversalEquals[Denomination]
+  implicit def eqN[N: Numeric]: Eq[N] = Eq.fromUniversalEquals[N]
+  implicit def eqD[D <: Denomination] = Eq.fromUniversalEquals[D]
 
 }
 
 object Denominated {
-  def apply[N: Numeric](d: Denomination): N => d.Denominated[N] = n => d.Denominated(n)
+  def apply[N: Numeric](d: Denomination): N => d.Denominated[N] = n => d(n)
 }
 
 object Examples {
@@ -80,6 +79,9 @@ object Examples {
   val buxxf: Int => USD.Denominated[Int] = Denominated[Int](USD)
   val buxx                               = 20 |> buxxf
   val bx2                                = 20 |> buxxf
-  // import USD._
-  // buxx === bx2 |> assert FIXME
+  buxx === bx2 |> assert
+}
+
+private[model] object UglyTypeDefs {
+  type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
 }
