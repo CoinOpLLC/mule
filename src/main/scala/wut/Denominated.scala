@@ -28,10 +28,19 @@ import refined.auto._
 
 // Idea: `Denomination[C <: JvmCurrency]` typeclass. Construct money from their (implicit) instances.
 
+/*
+ * This is an old pattern actually; Enums as factories...
+ * and another oldie: phantom types for the value class, to allow it to carry the currency "masslessly"
+ */
 /** This wants to be a value class someday (it told me so). */
+final case class D2[N, D <: Denomination](val value: N) extends AnyVal // with Ordered[N] FIXME
+object D2 {
+  implicit def eq[N: Numeric, D <: Denomination] = Eq.fromUniversalEquals[D2[N, D]]
+}
+
 sealed abstract class Denomination extends EnumEntry { denomination =>
 
-  val jc = java.util.Currency getInstance denomination.entryName ensuring (_ != null)
+  val jc = java.util.Currency getInstance denomination.entryName
 
   def code: String        = jc.getCurrencyCode
   def numericCode: Int    = jc.getNumericCode
@@ -39,13 +48,18 @@ sealed abstract class Denomination extends EnumEntry { denomination =>
   def displayName: String = jc.getDisplayName
   def symbol: String      = jc.getSymbol
 
-  /** This wants to be a value class someday (it told me so). */
-  final case class Denominated[N](val amount: N) {
+  /** This wants to be a value class someday (it told me so).
+  OK whacky idea: take it outside so it can be a value class; use Refined to tag it with
+  the currency type ?!
+  `type USD[N] = Denominated[N] Refined USD // or something`
+    */
+  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
     type AmountType = N
     def currency: Denomination = denomination
     override def toString      = s"""${currency.code}($amount)"""
   }
   def apply[N: Numeric](n: N) = Denominated(n)
+  def d2[N: Numeric](n: N)    = D2[N, denomination.type](n)
 
   implicit def eq[N: Numeric]: Eq[Denominated[N]] = Eq.fromUniversalEquals[Denominated[N]]
 
@@ -63,7 +77,7 @@ object Denomination extends Enum[Denomination] {
 
   case object USD extends Denomination
   case object EUR extends Denomination
-  case object XYZ extends Denomination
+  case object XYZ extends Denomination // FIXME doesn't find problem b/c lazy init
 
   implicit def eqN[N: Numeric]: Eq[N] = Eq.fromUniversalEquals[N]
   implicit def eqD[D <: Denomination] = Eq.fromUniversalEquals[D]
@@ -80,6 +94,11 @@ object Examples {
   val buxx                               = 20 |> buxxf
   val bx2                                = 20 |> buxxf
   buxx === bx2 |> assert
+
+  val d20 = USD.d2(20)
+  val d21 = USD.d2(21)
+
+  val e20 = EUR.d2(20)
 }
 
 private[model] object UglyTypeDefs {
