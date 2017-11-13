@@ -12,15 +12,15 @@ import ci.int._, ci.string._, ci.double._, ci.boolean._, ci.bigDecimal._, ci.lon
 import ci.option._, ci.tuple._, ci.list._, ci.set._, ci.map._
 import ci.eq._
 
-import enumeratum._
-import enumeratum.values._
+// import enumeratum._
+// import enumeratum.values._
 
 //
 import eu.timepit.refined
 import refined.api.Refined
 import refined.W
-import refined.collection._
-import refined.numeric._
+// import refined.collection._
+// import refined.numeric._
 import refined.auto._
 
 // TODO: try a typeclass for currency,
@@ -33,74 +33,104 @@ import refined.auto._
  * and another oldie: phantom types for the value class, to allow it to carry the currency "masslessly"
  */
 /** This wants to be a value class someday (it told me so). */
-final case class D2[N, D <: Denomination](val value: N) extends AnyVal // with Ordered[N] FIXME
-object D2 {
-  implicit def eq[N: Numeric, D <: Denomination] = Eq.fromUniversalEquals[D2[N, D]]
+import java.util.Currency
+import scala.language.higherKinds
+
+sealed trait Denomination {
+
+  protected def jc: Currency
+
+  type DnType[µ] <: Denominated[µ]
+
+  final def code: String        = jc.getCurrencyCode
+  final def numericCode: Int    = jc.getNumericCode
+  final def fractionDigits: Int = jc.getDefaultFractionDigits
+  final def displayName: String = jc.getDisplayName
+  final def symbol: String      = jc.getSymbol
+
 }
 
-sealed abstract class Denomination extends EnumEntry { denomination =>
+object Denomination {
+  implicit def eqN[N: Numeric]: Eq[N] = Eq.fromUniversalEquals[N] // where should this go?
+}
 
-  val jc = java.util.Currency getInstance denomination.entryName
+sealed trait Denominated[N] extends Any {
+  type D <: Denomination
+  def amount: N
+  def denomination: D
 
-  def code: String        = jc.getCurrencyCode
-  def numericCode: Int    = jc.getNumericCode
-  def fractionDigits: Int = jc.getDefaultFractionDigits
-  def displayName: String = jc.getDisplayName
-  def symbol: String      = jc.getSymbol
+  final override def toString: String = s"${denomination.code}($amount)"
 
-  /** This wants to be a value class someday (it told me so).
-  OK whacky idea: take it outside so it can be a value class; use Refined to tag it with
-  the currency type ?!
-  `type USD[N] = Denominated[N] Refined USD // or something`
-    */
-  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
-    type AmountType = N
-    def currency: Denomination = denomination
-    override def toString      = s"""${currency.code}($amount)"""
+}
+
+object USD extends Denomination {
+
+  override protected lazy val jc = Currency getInstance "USD"
+
+  def apply[N: Numeric](amount: N): USD[N]        = new USD[N](amount)
+  def unapply[N: Numeric](usd: USD[N]): Option[N] = usd.amount.some
+
+  implicit def eq[N: Numeric]: Eq[USD[N]] = Eq.fromUniversalEquals[USD[N]]
+
+  implicit def monoid[N: Numeric]: Monoid[USD[N]] = new Monoid[USD[N]] {
+    val N                                              = implicitly[Numeric[N]]
+    override def combine(a: USD[N], b: USD[N]): USD[N] = apply(N.plus(a.amount, b.amount))
+    override lazy val empty: USD[N]                    = apply(N.zero)
   }
-  def apply[N: Numeric](n: N) = Denominated(n)
-  def d2[N: Numeric](n: N)    = D2[N, denomination.type](n)
+}
 
-  implicit def eq[N: Numeric]: Eq[Denominated[N]] = Eq.fromUniversalEquals[Denominated[N]]
+final class USD[N] private (val amount: N) extends AnyVal with Denominated[N] {
+  type AmountType = N
+  type D          = USD.type
+  override def denomination = USD
+}
 
-  implicit def monoid[N: Numeric] = new Monoid[Denominated[N]] {
-    val N = implicitly[Numeric[N]]
-    type DN = Denominated[N]
-    override def combine(a: DN, b: DN): DN = Denominated[N](N.plus(a.amount, b.amount))
-    override lazy val empty: DN            = Denominated[N](N.zero)
+object EUR extends Denomination {
+
+  override protected lazy val jc = Currency getInstance "EUR"
+
+  def apply[N: Numeric](amount: N): EUR[N]        = new EUR[N](amount)
+  def unapply[N: Numeric](usd: EUR[N]): Option[N] = usd.amount.some
+
+  implicit def eq[N: Numeric]: Eq[EUR[N]] = Eq.fromUniversalEquals[EUR[N]]
+
+  implicit def monoid[N: Numeric]: Monoid[EUR[N]] = new Monoid[EUR[N]] {
+    val N                                              = implicitly[Numeric[N]]
+    override def combine(a: EUR[N], b: EUR[N]): EUR[N] = apply(N.plus(a.amount, b.amount))
+    override lazy val empty: EUR[N]                    = apply(N.zero)
   }
 }
 
-object Denomination extends Enum[Denomination] {
-
-  val values = findValues
-
-  case object USD extends Denomination
-  case object EUR extends Denomination
-  case object XYZ extends Denomination // FIXME doesn't find problem b/c lazy init
-
-  implicit def eqN[N: Numeric]: Eq[N] = Eq.fromUniversalEquals[N]
-  implicit def eqD[D <: Denomination] = Eq.fromUniversalEquals[D]
-
+final class EUR[N] private (val amount: N) extends AnyVal with Denominated[N] {
+  type AmountType = N
+  type D          = EUR.type
+  override def denomination = EUR
 }
 
-object Denominated {
-  def apply[N: Numeric](d: Denomination): N => d.Denominated[N] = n => d(n)
+object Denominated { // FIXME this is fuxd: apply() can't return a specific enough return type
+  def apply[N: Numeric, D <: Denomination](n: N, d: D): Denominated[N] = d match {
+    case USD => USD(n)
+  }
+
 }
 
 object Examples {
   import Denomination._
-  val buxxf: Int => USD.Denominated[Int] = Denominated[Int](USD)
-  val buxx                               = 20 |> buxxf
-  val bx2                                = 20 |> buxxf
-  buxx === bx2 |> assert
+  // val buxf: Int => USD[Int] = Denominated[Int, USD[Int]](USD)
+  // val bux20                 = 20 |> buxf
+  // val bux20too              = 20 |> buxf
+  // bux20 === bux20too |> assert
 
-  val d20 = USD.d2(20)
-  val d21 = USD.d2(21)
+  val benjAhMin = USD(100)
+  val benjOhOne = USD(101)
+  val e20       = EUR(20)
 
-  val e20 = EUR.d2(20)
+  benjAhMin =!= benjOhOne |> assert
+  e20 === EUR(20)         |> assert
+  val x = Denominated(20, EUR)
+  // x === e20 |> assert FIXME
 }
 
 private[model] object UglyTypeDefs {
-  type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
+  type CurrencyCode = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
 }
