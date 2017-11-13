@@ -55,8 +55,10 @@ object Denomination {
 }
 
 sealed trait Denominated[N] extends Any {
-  type D <: Denomination
+
+  type AmountType = N
   def amount: N
+  type D <: Denomination
   def denomination: D
 
   final override def toString: String = s"${denomination.code}($amount)"
@@ -65,6 +67,7 @@ sealed trait Denominated[N] extends Any {
 
 object USD extends Denomination {
 
+  type DnType[µ] = USD[µ]
   override protected lazy val jc = Currency getInstance "USD"
 
   def apply[N: Numeric](amount: N): USD[N]        = new USD[N](amount)
@@ -80,12 +83,13 @@ object USD extends Denomination {
 }
 
 final class USD[N] private (val amount: N) extends AnyVal with Denominated[N] {
-  type AmountType = N
-  type D          = USD.type
+  type D = USD.type
   override def denomination = USD
 }
 
 object EUR extends Denomination {
+
+  type DnType[µ] = EUR[µ]
 
   override protected lazy val jc = Currency getInstance "EUR"
 
@@ -102,14 +106,14 @@ object EUR extends Denomination {
 }
 
 final class EUR[N] private (val amount: N) extends AnyVal with Denominated[N] {
-  type AmountType = N
-  type D          = EUR.type
+  type D = EUR.type
   override def denomination = EUR
 }
 
 object Denominated { // FIXME this is fuxd: apply() can't return a specific enough return type
-  def apply[N: Numeric, D <: Denomination](n: N, d: D): Denominated[N] = d match {
+  def apply[N: Numeric, D <: Denomination](n: N, d: D): d.DnType[N] = d match {
     case USD => USD(n)
+    case EUR => EUR(n)
   }
 
 }
