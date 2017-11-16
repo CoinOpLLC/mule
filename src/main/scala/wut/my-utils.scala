@@ -60,9 +60,9 @@ object Db {
 
   def checkLogin(userId: Int, password: String): DbReader[Boolean] =
     for {
-      uns <- usernameReader
-      pws <- passwordsReader
-    } yield (uns get userId flatMap (pws get _)) contains password
+      ou <- userId |> findUsername
+      ok <- ou.fold(Reader((_: Db) => false))(checkPassword(_, password))
+    } yield ok
 }
 
 /**
