@@ -173,17 +173,28 @@ object TemporalAdjuster {
 }
 
 object TQ {
+  import cats.syntax.either._, cats.syntax.option._
   import jtt.{ TemporalQueries => TQs }
   type TQ[R] = TemporalAccessor => R
-  def apply[R](tq: TQ[R]): TemporalQuery[R] = new TemporalQuery[R] {
+  def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[R] = new TemporalQuery[R] {
     override def queryFrom(ta: TemporalAccessor): R = ta |> tq
   }
 
-  def chronology: TQ[Chronology]       = _ query TQs.chronology
-  def localDate: TQ[Option[LocalDate]] = ta => Option(ta query TQs.localDate) // TODO: this is lift!
-  def localTime: TQ[Option[LocalTime]] = ta => Option(ta query TQs.localTime)
-  def precision: TQ[TemporalUnit]      = _ query TQs.precision
+  def chronology: TQ[Option[Chronology]]  = optionize(_ query TQs.chronology)
+  def precision: TQ[Option[TemporalUnit]] = optionize(_ query TQs.precision)
 
+  def localDate: TQ[Option[LocalDate]] = optionize(_ query TQs.localDate)
+  def localTime: TQ[Option[LocalTime]] = optionize(_ query TQs.localTime)
+
+  def offset: TQ[Option[ZoneOffset]] = optionize(_ query TQs.offset)
+  def zoneId: TQ[Option[ZoneId]]     = optionize(_ query TQs.zoneId)
+  def zone: TQ[Either[Option[ZoneOffset], ZoneId]] = _ query TQs.zone match {
+    case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
+    case zid if zid != null => zid.asRight // actual ZoneId
+    case _                  => none.asLeft // not applicable - zone makes no sense
+  }
+
+  private def optionize[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
 }
 
 object WeekTimeStuff {
