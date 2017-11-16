@@ -120,13 +120,6 @@ object SyntaxForwardTime {
   Money4S |> discardValue
 }
 
-object TemporalAdjuster {
-  import java.time.temporal.TemporalAdjuster
-  def apply(adjust: Temporal => Temporal): TemporalAdjuster = new TemporalAdjuster {
-    override def adjustInto(t: Temporal): Temporal = adjust(t)
-  }
-}
-
 /**
 Keep Calm, and Carry On.
 {{{
@@ -167,10 +160,37 @@ object FansiCrap {
   // fade(32) |> showme
 }
 
+import jtt.{ TemporalAccessor, TemporalQuery }
+
+import jt.chrono.Chronology
+
+object TemporalAdjuster {
+  import java.time.temporal.TemporalAdjuster
+  type TA = Temporal => Temporal
+  def apply(ta: TA): TemporalAdjuster = new TemporalAdjuster {
+    override def adjustInto(t: Temporal): Temporal = t |> ta
+  }
+}
+
+object TQ {
+  import jtt.{ TemporalQueries => TQs }
+  type TQ[R] = TemporalAccessor => R
+  def apply[R](tq: TQ[R]): TemporalQuery[R] = new TemporalQuery[R] {
+    override def queryFrom(ta: TemporalAccessor): R = ta |> tq
+  }
+
+  def chronology: TQ[Chronology]       = _ query TQs.chronology
+  def localDate: TQ[Option[LocalDate]] = ta => Option(ta query TQs.localDate) // TODO: this is lift!
+  def localTime: TQ[Option[LocalTime]] = ta => Option(ta query TQs.localTime)
+  def precision: TQ[TemporalUnit]      = _ query TQs.precision
+
+}
+
 object WeekTimeStuff {
 
   import jt.DayOfWeek
   import jtt.WeekFields
+
   // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
   // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
 
@@ -190,6 +210,9 @@ object WeekTimeStuff {
   //
   // scala> today get sow
   // res109: Int = 7
+
+  // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
+  // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
 
   val iso = WeekFields.ISO
   val dow = iso.dayOfWeek
@@ -217,7 +240,11 @@ object WeekTimeStuff {
   // better idea: stick with ISO and be rigorous about others
   // make use of locale
   type WorkWeek = SortedSet[jt.DayOfWeek]
+  type Holidays = SortedSet[jt.LocalDate] // TODO: is day gran sufficient?
   // need to define an ordering on DayOfWeek. Which would be great.
   // TODO: when does the week roll around?
   // TODO: what about that succ stuff from scalaz?
+
+  // `TemporalQuery` is the way to do the "is this a working day or not" thing.
+  // Just build an immutable list of `WorkWeek`s out as far as you can.
 }

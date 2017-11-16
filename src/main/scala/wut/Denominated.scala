@@ -36,13 +36,16 @@ object D9d {
 
 sealed trait Denomination extends EnumEntry { denomination =>
 
-  val jc = java.util.Currency getInstance denomination.entryName
+  private val jc = java.util.Currency getInstance denomination.entryName
 
   def code: String        = jc.getCurrencyCode
   def numericCode: Int    = jc.getNumericCode
   def fractionDigits: Int = jc.getDefaultFractionDigits
   def displayName: String = jc.getDisplayName
   def symbol: String      = jc.getSymbol
+
+  type ExchangeRate <: { def apply(bid: Double, ask: Double): Nothing }
+  def /(base: Denomination): ExchangeRate = ???
 
   final case class Denominated[N](val amount: N) /* extends AnyVal */ {
     type AmountType = N
