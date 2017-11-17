@@ -39,6 +39,7 @@ object Db {
 
   lazy val usernameReader: DbReader[Map[Int, String]]     = Reader(_.usernames)
   lazy val passwordsReader: DbReader[Map[String, String]] = Reader(_.passwords)
+
   def findUsername(userId: Int): DbReader[Option[String]] = Reader(_.usernames get userId)
 
   /**
@@ -54,14 +55,12 @@ object Db {
   import cats.syntax.eq._
 
   def checkPassword(username: String, password: String): DbReader[Boolean] =
-    for {
-      pws <- passwordsReader
-    } yield (pws get username) === password.some
+    for { pws <- passwordsReader } yield pws get username contains password
 
   def checkLogin(userId: Int, password: String): DbReader[Boolean] =
     for {
-      ou <- userId |> findUsername
-      ok <- ou.fold(Reader((_: Db) => false))(checkPassword(_, password))
+      ou <- findUsername(userId)
+      ok <- ou.fold(false.pure[DbReader])(checkPassword(_, password))
     } yield ok
 }
 

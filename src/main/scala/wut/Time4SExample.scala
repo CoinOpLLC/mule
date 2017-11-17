@@ -113,7 +113,7 @@ object SyntaxForwardTime {
 
   // third tuesday
   val firstTuesday = jttTAs firstInMonth DayOfWeek.TUESDAY
-  val thirdTuesday = TemporalAdjuster { _ adjusted firstTuesday plus 2.weeks }
+  val thirdTuesday = TA { _ adjusted firstTuesday plus 2.weeks }
 
   def squantsToJavaTime(from: st.Time): jt.Duration = Nanos(from.toNanoseconds.toLong)
 
@@ -164,20 +164,27 @@ import jtt.{ TemporalAccessor, TemporalQuery }
 
 import jt.chrono.Chronology
 
-object TemporalAdjuster {
+object TA {
   import java.time.temporal.TemporalAdjuster
-  type TA = Temporal => Temporal
-  def apply(ta: TA): TemporalAdjuster = new TemporalAdjuster {
-    override def adjustInto(t: Temporal): Temporal = t |> ta
+  type TA[+R <: Temporal] = LocalDate => R
+  type TALD               = TA[LocalDate]
+  def apply[R <: Temporal](ta: TA[R]): TemporalAdjuster = new TemporalAdjuster {
+    override def adjustInto(t: Temporal): R = t match {
+      case ld: LocalDate => ld |> ta
+      case _             => ??? // I know, right?
+    }
   }
 }
 
 object TQ {
   import cats.syntax.either._, cats.syntax.option._
   import jtt.{ TemporalQueries => TQs }
-  type TQ[R] = TemporalAccessor => R
-  def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[R] = new TemporalQuery[R] {
-    override def queryFrom(ta: TemporalAccessor): R = ta |> tq
+  type TQ[+R] = LocalDate => R
+  def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
+    override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
+      case ld: LocalDate => (ld |> tq).some
+      case _             => none
+    }
   }
 
   def chronology: TQ[Option[Chronology]]  = optionize(_ query TQs.chronology)
@@ -201,29 +208,6 @@ object WeekTimeStuff {
 
   import jt.DayOfWeek
   import jtt.WeekFields
-
-  // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
-  // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
-
-  // issue to get correct by construction: dealing with `DayOfWeek` int values across `Locale`s
-
-  // 2 `WeekField`s of note: ISO and SundayStart (used in Asia)
-  // otherwise use `Locale`
-
-  // scala>   val dow = ISO.dayOfWeek
-  // dow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[MONDAY,4]]
-  //
-  // scala>   val sow = jtt.WeekFields.SUNDAY_START.dayOfWeek
-  // sow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[SUNDAY,1]]
-  //
-  // scala> today get dow
-  // res108: Int = 6
-  //
-  // scala> today get sow
-  // res109: Int = 7
-
-  // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
-  // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
 
   val iso = WeekFields.ISO
   val dow = iso.dayOfWeek
@@ -258,4 +242,56 @@ object WeekTimeStuff {
 
   // `TemporalQuery` is the way to do the "is this a working day or not" thing.
   // Just build an immutable list of `WorkWeek`s out as far as you can.
+
+  import cats.data.Reader
+  import TQ.TQ
+  import TA.{ TA, TALD }
+
+  implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
+
+  type TqReader[R] = Reader[LocalDate, Option[R]]
+  type TaReader[R] = Reader[LocalDate, R]
+
+  type HolidayPredicate = LocalDate => Boolean
+  val holidayPredicate: HolidayPredicate = _ => false
+  val isWorkDay: TQ[Boolean]             = holidayPredicate(_)
+
+  @annotation.tailrec
+  private[this] def findWorkDay(delta: Period)(ld: LocalDate): LocalDate = ld match {
+    case d if d |> isWorkDay => d
+    case _ => findWorkDay(delta)(ld + delta)
+  }
+
+  val nextWorkDay: TALD = findWorkDay(1.day)
+  val prevWorkDay: TALD = findWorkDay(-1.day)
+
+  val sameMonthNextWorkDay: TALD = ld => {
+    val next = ld |> nextWorkDay
+    if (ld.getMonth === next.getMonth) next else ld |> prevWorkDay
+  }
+
+  // this should enrich LocalDate...
+  def plusWorkDays(day: LocalDate, offset: Int): LocalDate = ???
 }
+// dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
+// weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
+
+// issue to get correct by construction: dealing with `DayOfWeek` int values across `Locale`s
+
+// 2 `WeekField`s of note: ISO and SundayStart (used in Asia)
+// otherwise use `Locale`
+
+// scala>   val dow = ISO.dayOfWeek
+// dow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[MONDAY,4]]
+//
+// scala>   val sow = jtt.WeekFields.SUNDAY_START.dayOfWeek
+// sow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[SUNDAY,1]]
+//
+// scala> today get dow
+// res108: Int = 6
+//
+// scala> today get sow
+// res109: Int = 7
+
+// Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
+// The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
