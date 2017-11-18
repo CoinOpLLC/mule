@@ -23,23 +23,24 @@ import cats.{ Cartesian, Eq, Id, Monad }
 
 import cats.data.{ Validated, NonEmptyList => NEL }
 
-import cats.instances.int._
-import cats.instances.string._
-import cats.instances.boolean._
-import cats.instances.tuple._
-import cats.instances.option._
+import cats.implicits._
+// import cats.instances.int._
+// import cats.instances.string._
+// import cats.instances.boolean._
+// import cats.instances.tuple._
+// import cats.instances.option._
 // import cats.instances.either._
-
-import cats.syntax.cartesian._
-import cats.syntax.validated._
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.eq._
+//
+// import cats.syntax.cartesian._
+// import cats.syntax.validated._
+// import cats.syntax.either._
+// import cats.syntax.option._
+// import cats.syntax.eq._
 
 object CartesianStuff {
 
   val p = Cartesian tuple3 (23.some, "oh hai".some, true.some)
-  val q = 23.some |@| "oh hai".some |@| true.some
+  val q = (23.some, "oh hai".some,  true.some)
 
   p === q.tupled |> assert
 
@@ -90,25 +91,14 @@ object FormValidation {
   type ErrorsOr[A]    = NEL[String] Either A
   type AllErrorsOr[A] = NEL[String] Validated A
 
-  // This is pretty much the best thing ever.
-  val thoroughlyValidatedInteger: AllErrorsOr[Int] = Validated catchNonFatal {
-    "42".toInt // such compute. many parse. very return.
-  } leftMap { t =>
-    NEL of s"$t"
-  }
-
-  val alternativelyValidatedInteger: AllErrorsOr[Int] =
-    23.valid[NEL[String]].ensure(NEL of "Yerf!")(_ <= 0)
-
-  val alternativelyEitherizedInteger: ErrorsOr[Int] =
-    93.asRight[NEL[String]].ensure(NEL of "Yerf!")(_ <= 0)
 
   def getValue(name: String)(fd: FormData): ErrorsOr[String] =
     (fd get name) toRight (NEL of s"$name: no such name")
 
-  def parseInt(name: String)(s: String): ErrorsOr[Int] = Try(s.toInt).toEither leftMap { t =>
-    NEL of s"$name: can't parse $s as an int: caught $t"
-  }
+  def parseInt(name: String)(s: String): ErrorsOr[Int] =
+    Try(s.toInt).toEither leftMap { t =>
+      NEL of s"$name: can't parse $s as an int: caught $t"
+    }
 
   def nonBlank(name: String)(s: String): ErrorsOr[String] =
     s.some filter (_ =!= "") toRight (NEL of s"$name not blank")
@@ -116,20 +106,24 @@ object FormValidation {
   def nonNegative(name: String)(n: Int): ErrorsOr[Int] =
     n.some filter (_ >= 0) toRight (NEL of s"$name is negative")
 
-  def readName(fd: FormData): ErrorsOr[String] = getValue("name")(fd)
+  def readName(fd: FormData): ErrorsOr[String] =
+    for {
+      name <- getValue("name")(fd)
+      nbName <- nonBlank("name")(name)
+    } yield nbName
+
 
   def readAge(fd: FormData): ErrorsOr[Int] =
     for {
-      s <- getValue("age")(fd)
-      i <- parseInt("age")(s)
+      age <- getValue("age")(fd)
+      nbAge <- nonBlank("age")(age)
+      i <- parseInt("age")(nbAge)
     } yield i
 
   def toAllErrorsOr[A](eoi: ErrorsOr[A]): AllErrorsOr[A] = Validated fromEither eoi
 
-  import cats.implicits._
-  def readForm(fd: FormData): AllErrorsOr[User] = {
+  def readForm(fd: FormData): AllErrorsOr[User] =
     (toAllErrorsOr(readName(fd)), toAllErrorsOr(readAge(fd))) mapN User.apply
-  }
 
 //   def readPhørm(fd: FormData): AllErrorsOr[User] = // #FIXME: #wart: inferred `Any`
 //     (readName(fd).toValidated, readAge(fd).toValidated) mapN User.apply
