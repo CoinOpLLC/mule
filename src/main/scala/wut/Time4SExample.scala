@@ -197,14 +197,24 @@ object WeekendsAndHolidays {
 
   // stick with ISO and be rigorous about others
   // TODO: make use of locale?
-  type WorkWeek = SortedSet[jt.DayOfWeek]
-  type Holidays = SortedSet[jt.LocalDate]
+  type WorkWeek = SortedSet[DayOfWeek]
+  type Holidays = SortedSet[LocalDate]
+
+  val workWeek: WorkWeek = {
+    import jt.DayOfWeek._
+    SortedSet.empty[DayOfWeek] ++ values - SATURDAY - SUNDAY
+  }
+  val mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_,_,_)
+  val daysOff = Seq(
+    (2017,12,25), (2017,1,1), (2017,7,4)
+  )
+  val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
 
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
     def workDay(ld: LocalDate): Boolean =
       (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
   }
-  implicit def workYear: WorkYear = ???
+  implicit lazy val workYear: WorkYear = WorkYear(workWeek, holidays)
 
   // need to define an ordering on DayOfWeek. Which would be great.
   // TODO: when does the week roll around?
