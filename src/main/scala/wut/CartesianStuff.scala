@@ -40,7 +40,7 @@ import cats.implicits._
 object CartesianStuff {
 
   val p = Cartesian tuple3 (23.some, "oh hai".some, true.some)
-  val q = (23.some, "oh hai".some,  true.some)
+  val q = (23.some, "oh hai".some, true.some)
 
   p === q.tupled |> assert
 
@@ -91,7 +91,6 @@ object FormValidation {
   type ErrorsOr[A]    = NEL[String] Either A
   type AllErrorsOr[A] = NEL[String] Validated A
 
-
   def getValue(name: String)(fd: FormData): ErrorsOr[String] =
     (fd get name) toRight (NEL of s"$name: no such name")
 
@@ -108,16 +107,15 @@ object FormValidation {
 
   def readName(fd: FormData): ErrorsOr[String] =
     for {
-      name <- getValue("name")(fd)
+      name   <- getValue("name")(fd)
       nbName <- nonBlank("name")(name)
     } yield nbName
 
-
   def readAge(fd: FormData): ErrorsOr[Int] =
     for {
-      age <- getValue("age")(fd)
+      age   <- getValue("age")(fd)
       nbAge <- nonBlank("age")(age)
-      i <- parseInt("age")(nbAge)
+      i     <- parseInt("age")(nbAge)
     } yield i
 
   def toAllErrorsOr[A](eoi: ErrorsOr[A]): AllErrorsOr[A] = Validated fromEither eoi

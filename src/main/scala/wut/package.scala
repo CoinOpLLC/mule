@@ -46,6 +46,8 @@ trait MyWay {
 
 trait MyTime {
 
+  // TODO: typeclass for date based vs time based (and DateTime has both) - in fact for all field...
+
   // import java.{ time => jt }
   //
   // type Clock         = jt.Clock
