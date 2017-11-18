@@ -6,8 +6,8 @@ object Version {
   val Scala          = "2.12.4"
   val Xml            = "1.0.6"
   val ScalaTest      = "3.0.4"
-  val TypesafeConfig = "1.3.1"
-  val Cats           = "0.9.0"
+  val TypesafeConfig = "1.3.2"
+  val Cats           = "1.0.0-RC1"
   val Quicklens      = "1.4.11"
   val PureConfig     = "0.8.0"
   val Enumeratum     = "1.5.12"
@@ -15,9 +15,9 @@ object Version {
   val Refined        = "0.8.4"
   val Squants        = "1.3.0"
   val Fansi          = "0.2.5"
-  val Time4S         = "1.4"
-  val AkkaHttp       = "10.0.9"
-  val HttpSession    = "0.5.1"
+  val Time4S         = "1.5"
+  val AkkaHttp       = "10.0.10"
+  val HttpSession    = "0.5.3"
   val Ammonite       = "0.8.3"
 }
 
@@ -31,7 +31,7 @@ object Deps {
 
   val conf = "com.typesafe" % "config" % TypesafeConfig
 
-  val cats = "org.typelevel" %% "cats" % Cats
+  val cats = "org.typelevel" %% "cats-core" % Cats
 
   val quicklens = "com.softwaremill.quicklens" %% "quicklens" % Quicklens
 

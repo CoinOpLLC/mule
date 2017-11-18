@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package object wut extends MyWay {
+package object wut extends MyWay with MyTime {
 
   /**
     * Civilized function invocation.
@@ -41,5 +41,65 @@ trait MyWay {
     */
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
+
+}
+
+trait MyTime {
+
+  // import java.{ time => jt }
+  //
+  // type Clock         = jt.Clock
+  // type Month         = jt.Month
+  // type Year          = jt.Year
+  // type DayOfWeek     = jt.DayOfWeek
+  // type LocalTime     = jt.LocalTime
+  // type Instant       = jt.Instant
+  // type YearMonth     = jt.YearMonth
+  // type Duration      = jt.Duration
+  // type LocalDate     = jt.LocalDate
+  // type LocalDateTime = jt.LocalDateTime
+  // type ZonedDateTime = jt.ZonedDateTime
+  // type Period        = jt.Period
+  // type ZoneId        = jt.ZoneId
+  // type ZoneOffset    = jt.ZoneOffset
+  //
+  // // FIXME: concordance with scala.concurrent etc...
+  // type TimeUnit = java.util.concurrent.TimeUnit
+  //
+  // // let's see if we can do without these...
+  // // type IsoChronology = jt.chrono.IsoChronology
+  // // type Chronology    = jt.chrono.Chronology
+  //
+  // type TemporalAccessor = jt.temporal.TemporalAccessor
+  // type Temporal         = jt.temporal.Temporal
+  // type TemporalAmount   = jt.temporal.TemporalAmount
+  //
+  // type TemporalUnit      = jt.temporal.TemporalUnit
+  // type ChronoUnit        = jt.temporal.ChronoUnit
+  // type IsoChronUnit      = jt.temporal.IsoFields
+  // type TemporalAdjuster  = jt.temporal.TemporalAdjuster
+  // type TemporalAdjusters = jt.temporal.TemporalAdjusters
+  //
+  // type DateTimeFormatter = jt.format.DateTimeFormatter
+  // type FormatStyle       = jt.format.FormatStyle
+  //
+  // import jt.Month._
+  // val January: jt.Month   = JANUARY
+  // val February: jt.Month  = FEBRUARY
+  // val March: jt.Month     = MARCH
+  // val May: jt.Month       = MAY
+  // val April: jt.Month     = APRIL
+  // val June: jt.Month      = JUNE
+  // val July: jt.Month      = JULY
+  // val August: jt.Month    = AUGUST
+  // val September: jt.Month = SEPTEMBER
+  // val October: jt.Month   = OCTOBER
+  // val November: jt.Month  = NOVEMBER
+  // val December: jt.Month  = DECEMBER
+  //
+  // def apply(month: Int): Month                 = jt.Month of month
+  // def apply(accessor: TemporalAccessor): Month = jt.Month from accessor
+  //
+  // def unapply(month: Month): Option[Int] = Some(month.getValue)
 
 }

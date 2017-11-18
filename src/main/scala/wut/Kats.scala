@@ -22,13 +22,6 @@ object Kitteh {
   type KittehReader[A] = Reader[Kitteh, A]
   lazy val nameReader: KittehReader[String] = Reader(_.name)
 
-  val add = (_: Int) + (_: Int)
-  val not = ~(_: Int)
-
-  val inc = add(_: Int, 1)
-  val neg = not andThen inc
-  val dec = add(_: Int, (1 |> neg))
-
 }
 
 /** Distinguished cats! */

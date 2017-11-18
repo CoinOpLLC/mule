@@ -1,15 +1,6 @@
 // import de.heikoseeberger.sbtheader
 // import sbtheader.AutomateHeaderPlugin
 
-// def latestScalafmt = "0.7.0-RC1"
-// commands += Command.args("scalafmt", "Run scalafmt cli.") {
-//   case (state, args) =>
-//     val Right(scalafmt) =
-//       org.scalafmt.bootstrap.ScalafmtBootstrap.fromVersion(latestScalafmt)
-//     scalafmt.main("--non-interactive" +: args.toArray)
-//     state
-// }
-
 val apache2URL = new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")
 
 lazy val muhBuildSettings = List(

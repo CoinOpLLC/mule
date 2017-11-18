@@ -265,9 +265,14 @@ object WeekTimeStuff {
   val nextWorkDay: TALD = findWorkDay(1.day)
   val prevWorkDay: TALD = findWorkDay(-1.day)
 
-  val sameMonthNextWorkDay: TALD = ld => {
-    val next = ld |> nextWorkDay
-    if (ld.getMonth === next.getMonth) next else ld |> prevWorkDay
+  val sameMonthNextWorkDay = {
+    val x = for {
+      ld <- (identity[LocalDate] _).pure[TaReader]
+      // nwd <- nextWorkDay.pure[TaReader]
+      // pwd <- prevWorkDay.pure[TaReader]
+      // b = day.getMonth === nwd(ld).getMonth
+    } yield ld //yield if (b) nwd else pwd
+    x.run
   }
 
   // this should enrich LocalDate...

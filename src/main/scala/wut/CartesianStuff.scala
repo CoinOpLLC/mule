@@ -87,7 +87,7 @@ object FormValidation {
   case class User(name: String, age: Int)
 
   type FormData       = Map[String, String]
-  type ErrorsOr[A]    = Either[NEL[String], A]
+  type ErrorsOr[A]    = NEL[String] Either A
   type AllErrorsOr[A] = NEL[String] Validated A
 
   // This is pretty much the best thing ever.
@@ -124,11 +124,14 @@ object FormValidation {
       i <- parseInt("age")(s)
     } yield i
 
+  def toAllErrorsOr[A](eoi: ErrorsOr[A]): AllErrorsOr[A] = Validated fromEither eoi
+
+  import cats.implicits._
   def readForm(fd: FormData): AllErrorsOr[User] = {
-    def toValidated[A](eoi: ErrorsOr[A]): AllErrorsOr[A] = Validated fromEither eoi
-    ((readName(fd) |> toValidated) |@| (readAge(fd) |> toValidated)) map User.apply
+    (toAllErrorsOr(readName(fd)), toAllErrorsOr(readAge(fd))) mapN User.apply
   }
 
-  def readPhørm(fd: FormData): AllErrorsOr[User] = ??? // #FIXME: #wart: inferred `Any`
-  // (readName(fd).toValidated |@| readAge(fd).toValidated) map User.apply
+//   def readPhørm(fd: FormData): AllErrorsOr[User] = // #FIXME: #wart: inferred `Any`
+//     (readName(fd).toValidated, readAge(fd).toValidated) mapN User.apply
+
 }

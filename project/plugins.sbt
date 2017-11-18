@@ -1,23 +1,26 @@
 /**
   * Implementing suggestions from [this post](https://pbassiner.github.io/blog/essential_sbt_plugins.html).
+  *
+  * settings and tasks (mostly(!)) beginWith `dependencyUpdates`
   */
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.3.1")
 
 /**
   * [Dependency graph](https://github.com/jrudolph/sbt-dependency-graph)
   */
-// addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.0")
 
 /**
-  * code ccoverage plugin not supported yet... !
+  * code ccoverage plugin - https://github.com/scoverage/sbt-scoverage
+  * see also https://github.com/scoverage/scalac-scoverage-plugin
   */
-// addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.0")
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.1")
 
 /**
   * [Dependency Checker](https://github.com/albuch/sbt-dependency-check)
   * this is a vulnerability check... use SNYK instead? or what
   */
-addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.1.10")
+addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.1")
 
 /**
   * Native Packlager
@@ -43,7 +46,7 @@ addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-RC11")
 /**
   * [source code formatter (scalafmt)](https://github.com/lucidsoftware/neo-sbt-scalafmt)
   */
-addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.11")
+addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.14")
 
 /**
   * [site generation](http://www.scala-sbt.org/sbt-site/index.html)
@@ -59,13 +62,15 @@ addSbtPlugin("com.frugalmechanic" % "fm-sbt-s3-resolver" % "0.12.0")
 /**
   * [scaladoc: other API resolution](https://github.com/ThoughtWorksInc/sbt-api-mappings)
   */
-// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
-addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "1.1.0")
+// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "1.1.0") // for SBT 0.13_
+addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
 
 /**
   * [TUT](https://github.com/tpolecat/tut)
   */
-addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.5.5")
+// addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.5.5") // for SBT 0.13_
+addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.6.2")
+
 
 /**
   * [tag list (TODO and friends)](https://github.com/johanandren/sbt-taglist)
@@ -78,7 +83,10 @@ addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
 // addSbtPlugin("com.47deg" % "sbt-org-policies" % "0.6.3")
 
 /**
+  * [Pretty class diagrams; needs graphviz](https://github.com/xuwei-k/sbt-class-diagram)
+  */
+addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
+
+/**
   * [link](url)
   */
-
-// #TODO: https://github.com/xuwei-k/sbt-class-diagram
