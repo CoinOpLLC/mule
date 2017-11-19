@@ -2,57 +2,21 @@ package wut
 
 import java.{ time => jt }
 import jt.{ temporal => jtt }
-import jtt.{TemporalField, TemporalAdjuster, TemporalQuery}
+import jtt.{ TemporalAdjuster, TemporalField, TemporalQuery }
 
+import scala.collection.immutable.SortedSet
 import scala.concurrent.{ duration => scd }
 
 import com.markatta.timeforscala._
-import com.markatta.timeforscala.Month.{January, March}
+import com.markatta.timeforscala.Month.{ January, March }
 import com.markatta.timeforscala.TimeExpressions._
 
 import cats.Order
 import cats.data.Reader
 import cats.implicits._
 
-import enumeratum._
+import enumeratum._, values._
 
-object TemporalAdjuster {
-  type TA[+R <: Temporal] = LocalDate => R
-  type TALD               = TA[LocalDate]
-  def apply[R <: Temporal](ta: TA[R]): TemporalAdjuster = new TemporalAdjuster {
-    override def adjustInto(t: Temporal): R = t match {
-      case ld: LocalDate => ld |> ta
-      case _             => ??? // I know, right?
-    }
-  }
-}
-
-object TemporalQuery {
-  import jtt.{TemporalQueries => TQs }
-  type TQ[+R] = LocalDate => R
-  def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
-    override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
-      case ld: LocalDate => (ld |> tq).some
-      case _             => none
-    }
-  }
-
-  def chronology: TQ[Option[Chronology]]  = optionize(_ query TQs.chronology)
-  def precision: TQ[Option[TemporalUnit]] = optionize(_ query TQs.precision)
-
-  def localDate: TQ[Option[LocalDate]] = optionize(_ query TQs.localDate)
-  def localTime: TQ[Option[LocalTime]] = optionize(_ query TQs.localTime)
-
-  def offset: TQ[Option[ZoneOffset]] = optionize(_ query TQs.offset)
-  def zoneId: TQ[Option[ZoneId]]     = optionize(_ query TQs.zoneId)
-  def zone: TQ[Either[Option[ZoneOffset], ZoneId]] = _ query TQs.zone match {
-    case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
-    case zid if zid != null => zid.asRight // actual ZoneId
-    case _                  => none.asLeft // not applicable - zone makes no sense
-  }
-
-  private def optionize[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
-}
 object Time4SExample {
 
   // java.time.Duration
@@ -152,35 +116,109 @@ object SyntaxForwardTime {
   val wwSeconds = wwDays.toSeconds / 3
 
   // third tuesday
-  val firstTuesday = jtt.TemporalAdjusters firstInMonth jt.DayOfWeek.WEDNESDAY
-  val thirdTuesday = TemporalAdjuster { _ adjusted firstTuesday plus 2.weeks }
+  val TemporalAdjuster(firstTuesday) = jtt.TemporalAdjusters firstInMonth jt.DayOfWeek.WEDNESDAY
+  val thirdTuesday                   = TemporalAdjuster { firstTuesday andThen (_ plus 2.weeks) }
 
   def squantsToJavaTime(from: st.Time): jt.Duration = Nanos(from.toNanoseconds.toLong)
 
   Money4S |> discardValue
 }
-sealed trait Tenor extends EnumEntry  // make these TemporalUnits? Half already are, basically...
 
-// FIXME: these have standard codes...
-object Tenor extends Enum[Tenor] {
-  lazy val values = findValues
+object TemporalAdjuster {
 
-  case object Spot extends Tenor
-  case object Overnight extends Tenor
-  case object SpotNext extends Tenor
-  case object TomorrowNext extends Tenor
-  case object Day  extends Tenor
-  case object Week extends Tenor
-  case object Month extends Tenor
-  case object Year extends Tenor
+  def apply(adjust: LocalDate => LocalDate): TemporalAdjuster = new TemporalAdjuster {
+    @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+    override def adjustInto(t: Temporal): Temporal = t match {
+      case ld: LocalDate => ld |> adjust
+      case _ =>
+        throw new jt.DateTimeException(
+          s"only args of type LocalDate are accepted; found ${t.getClass}"
+        )
+    }
+  }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def unapply(ta: TemporalAdjuster): Option[LocalDate => LocalDate] =
+    Some(
+      localDate =>
+        // justification for this downcast:
+        // per the `TemporalAdjuster` javadocs, and I quote:
+        // > The returned object must have the same observable type as the input object
+        // i.e., skating on thin ice, assuming this is obeyed.
+        (ta adjustInto localDate).asInstanceOf[LocalDate]
+    )
 }
 
-object WeekendsAndHolidays {
+object TemporalQuery {
+  import jtt.{ TemporalQueries => TQs }
+  type TQ[+R] = LocalDate => R // TODO: interface design: consider R := LocalDate => LocalDate... !
+  // in other words: A TQ[LocalDate => LocalDate] Query produces an Adjuster from a LocalDate
+  def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
+    override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
+      case ld: LocalDate => (ld |> tq).some
+      case _             => none
+    }
+  }
+
+  def chronology: TQ[Option[Chronology]]  = optionize(_ query TQs.chronology)
+  def precision: TQ[Option[TemporalUnit]] = optionize(_ query TQs.precision)
+
+  def localDate: TQ[Option[LocalDate]] = optionize(_ query TQs.localDate)
+  def localTime: TQ[Option[LocalTime]] = optionize(_ query TQs.localTime)
+
+  def offset: TQ[Option[ZoneOffset]] = optionize(_ query TQs.offset)
+  def zoneId: TQ[Option[ZoneId]]     = optionize(_ query TQs.zoneId)
+  def zone: TQ[Either[Option[ZoneOffset], ZoneId]] = _ query TQs.zone match {
+    case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
+    case zid if zid != null => zid.asRight // actual ZoneId
+    case _                  => none.asLeft // not applicable - zone makes no sense
+  }
+
+  private def optionize[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
+}
+
+// issue: can I just go ahead and make these Durations?
+sealed abstract class Tenor(val code: String) extends EnumEntry
+object Tenor extends Enum[Tenor] {
+
+  case object Spot         extends Tenor("SP") // zero days later
+  case object SpotNext     extends Tenor("SN") // one dat later
+  case object Overnight    extends Tenor("ON") // one day later
+  case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
+  // issue: might need a **pair** of dates as state for the algebra... but do we?
+  // TomorrowNext increments both cursors, in effect... why, exactly?!
+  // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
+
+  lazy val values = findValues
+
+}
+// TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
+
+final case class WorkDay(val n: Int) extends AnyVal
+
+// TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
+
+sealed trait SpotLag extends EnumEntry // T_0, T_1, T_2
+
+sealed trait DayCountConvention extends EnumEntry //
+//ACT_[360|365|ACT]
+// CONV_30_360, CONV_360E_[ISDA|IMSA]
+// others?
+// idea: build the calc func into this trait?
+
+sealed trait ImmPeriod extends EnumEntry {
+  def indexes: SortedSet[Int] // BitSet // [0], [0,2], [2,3], [0,1,2,3]
+}
+
+object ImmPeriod {
+  def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
+}
+
+object WorkTime {
 
   import jtt.WeekFields
 
-  val iso: WeekFields = WeekFields.ISO
+  val iso: WeekFields    = WeekFields.ISO
   val dow: TemporalField = iso.dayOfWeek
 
   // Time Lording...
@@ -193,8 +231,6 @@ object WeekendsAndHolidays {
 
   yesterday < today |> assert
 
-  import scala.collection.immutable.SortedSet
-
   // stick with ISO and be rigorous about others
   // TODO: make use of locale?
   type WorkWeek = SortedSet[DayOfWeek]
@@ -204,10 +240,12 @@ object WeekendsAndHolidays {
     import jt.DayOfWeek._
     SortedSet.empty[DayOfWeek] ++ values - SATURDAY - SUNDAY
   }
-  val mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_,_,_)
+  val mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_, _, _)
   val daysOff = Seq(
-    (2017,12,25), (2017,1,1), (2017,7,4)
-  )
+    (12, 25),
+    (1, 1),
+    (7, 4)
+  ) map { case (m, d) => (2017, m, d) }
   val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
 
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
@@ -224,7 +262,6 @@ object WeekendsAndHolidays {
   // Just build an immutable list of `WorkWeek`s out as far as you can.
 
   import TemporalQuery.TQ
-  import TemporalAdjuster.{ TA, TALD }
 
   implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
 
@@ -234,23 +271,41 @@ object WeekendsAndHolidays {
   type WorkDayPredicate = LocalDate => Boolean
   def workDay(implicit WY: WorkYear): WorkDayPredicate = WY workDay _
 
+  sealed abstract class SeekWorkDay(delta: Period, sameMonth: Boolean) extends EnumEntry {
+    final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster {
+      case ld => ld + delta
+    }
+  }
+
+  object SeekWorkDay extends Enum[SeekWorkDay] {
+
+    case object Next          extends SeekWorkDay(delta = 1.day, sameMonth = false)
+    case object NextSameMonth extends SeekWorkDay(delta = 1.day, sameMonth = true)
+    case object Prev          extends SeekWorkDay(delta = -1.day, sameMonth = false)
+    case object PrevSameMonth extends SeekWorkDay(delta = -1.day, sameMonth = true)
+
+    lazy val values = findValues
+  }
+
   @annotation.tailrec
   private[this] def findWorkDay(delta: Period)(ld: LocalDate): LocalDate = ld match {
     case d if d |> workDay => d
     case _ => findWorkDay(delta)(ld + delta)
   }
 
-  val nextWorkDay: TALD = findWorkDay(1.day)
-  val prevWorkDay: TALD = findWorkDay(-1.day)
+  import scala.util.Try
+  def safe[T, R](f: T => R): T => Try[R] = t => Try { t |> f }
+
+  val nextWorkDay: LocalDate => LocalDate = findWorkDay(1.day)
+  val prevWorkDay: LocalDate => LocalDate = findWorkDay(-1.day)
 
   // there is quite a bit to critique here - not very efficient.
-  val sameMonthNextWorkDay: TALD =
+  val sameMonthNextWorkDay: LocalDate => LocalDate =
     (for {
-      twd <- Reader(identity: TALD)
+      twd <- Reader(identity: LocalDate => LocalDate)
       nwd <- Reader(nextWorkDay)
       pwd <- Reader(prevWorkDay)
     } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
-
 
   // this should enrich LocalDate...
   def plusWorkDays(day: LocalDate, offset: Int): LocalDate = ???

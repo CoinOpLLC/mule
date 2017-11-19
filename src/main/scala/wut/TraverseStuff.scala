@@ -21,9 +21,11 @@ import scala.language.higherKinds
 
 import cats.Applicative
 // import cats.instances.future._
-import cats.instances.option._
-import cats.syntax.applicative._
-import cats.syntax.cartesian._
+// import cats.instances.option._
+// import cats.syntax.applicative._
+// import cats.syntax.cartesian._
+
+import cats.implicits._
 
 object TraverseStuff {
 
@@ -31,7 +33,7 @@ object TraverseStuff {
 
   def listTraverse[F[_]: Applicative, A, B](list: List[A])(func: A => F[B]): F[List[B]] =
     list.foldLeft(List.empty[B].pure[F]) { (accum, item) =>
-      (accum |@| func(item)).map(_ :+ _)
+      (accum, func(item)) mapN (_ :+ _)
     }
 
   /**

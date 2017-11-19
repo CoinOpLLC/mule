@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import scala.language.implicitConversions
 
 package object wut extends MyWay with MyTime {
 
   /**
     * Civilized function invocation.
     */
-  implicit class AnyPipeToFunction1[A](val a: A) extends AnyVal {
-    def |>[B](f: A => B): B = f(a)
-  }
+  implicit def pipeToFunction1[A](a: A) = PipeToFunction1(a)
 
   def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+}
+
+final case class PipeToFunction1[A](val a: A) extends AnyVal {
+  def |>[B](f: A => B): B = f(a)
 }
 
 /**

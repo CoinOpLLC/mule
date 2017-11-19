@@ -94,22 +94,6 @@ object Order {
   }
 }
 
-sealed trait Tenor extends EnumEntry
-
-object Tenor extends Enum[Tenor] {
-  lazy val values = findValues
-
-  case object Spot extends Tenor
-  case object Overnight extends Tenor
-  case object SpotNext extends Tenor
-  case object TomorrowNext extends Tenor
-  case object Day  extends Tenor
-  case object Week extends Tenor
-  case object Month extends Tenor
-  case object Year extends Tenor
-
-}
-
 object MuhDomain {
   lazy val db = Db(
     Map(

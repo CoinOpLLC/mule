@@ -16,12 +16,14 @@
 
 package wut
 
-import cats.instances.int._
-import cats.instances.string._
-import cats.instances.option._
-import cats.instances.vector._
+// import cats.instances.int._
+// import cats.instances.string._
+// import cats.instances.option._
+// import cats.instances.vector._
+//
+// import cats.syntax.all._
 
-import cats.syntax.all._
+import cats.implicits._
 
 import model._
 
