@@ -87,7 +87,7 @@ object FormValidation {
 
   case class User(name: String, age: Int)
 
-  type FormData       = Map[String, String]
+  type FormData       = String Map String
   type ErrorsOr[A]    = NEL[String] Either A
   type AllErrorsOr[A] = NEL[String] Validated A
 

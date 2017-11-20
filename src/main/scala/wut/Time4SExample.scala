@@ -317,8 +317,6 @@ object WorkTime {
       }
   }
 
-  def safe[T, R](f: T => R): T => Try[R] = t => Try { t |> f }
-
   val nextWorkDay: LocalDate => LocalDate = moveByWorkDays(1)
   val prevWorkDay: LocalDate => LocalDate = moveByWorkDays(-1)
 

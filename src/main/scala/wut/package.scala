@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import scala.language.implicitConversions
+import scala.util.Try
 
 package object wut extends MyWay with MyTime {
 
@@ -44,6 +45,8 @@ trait MyWay {
     */
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
+
+  def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
 
 }
 
