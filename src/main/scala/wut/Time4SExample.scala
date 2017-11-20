@@ -4,6 +4,7 @@ import java.{ time => jt }
 import jt.{ temporal => jtt }
 import jtt.{ TemporalAdjuster, TemporalField, TemporalQuery }
 
+import scala.util.Try
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ duration => scd }
 
@@ -236,23 +237,30 @@ object WorkTime {
   type WorkWeek = SortedSet[DayOfWeek]
   type Holidays = SortedSet[LocalDate]
 
-  val workWeek: WorkWeek = {
-    import jt.DayOfWeek._
-    SortedSet.empty[DayOfWeek] ++ values - SATURDAY - SUNDAY
-  }
   val mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_, _, _)
   val daysOff = Seq(
     (12, 25),
     (1, 1),
     (7, 4)
   ) map { case (m, d) => (2017, m, d) }
-  val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
 
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
     def workDay(ld: LocalDate): Boolean =
       (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
   }
-  implicit lazy val workYear: WorkYear = WorkYear(workWeek, holidays)
+
+  object WorkYear {
+
+    import jt.DayOfWeek
+
+    lazy val workWeek: WorkWeek =
+      SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
+
+    lazy val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
+
+    implicit lazy val workYear: WorkYear = WorkYear(workWeek, holidays)
+
+  }
 
   // need to define an ordering on DayOfWeek. Which would be great.
   // TODO: when does the week roll around?
@@ -268,12 +276,21 @@ object WorkTime {
   type TqReader[R] = Reader[LocalDate, Option[R]]
   type TaReader[R] = Reader[LocalDate, R]
 
-  type WorkDayPredicate = LocalDate => Boolean
-  def workDay(implicit WY: WorkYear): WorkDayPredicate = WY workDay _
+  def workDay(ld: LocalDate)(implicit wy: WorkYear): Boolean = wy workDay ld
 
-  sealed abstract class SeekWorkDay(delta: Period, sameMonth: Boolean) extends EnumEntry {
-    final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster {
-      case ld => ld + delta
+  sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
+    final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
+    final def adjuster: LocalDate => LocalDate   = _adj(delta, sameMonth)
+    private def _adj(d: Period, sm: Boolean): LocalDate => LocalDate = {
+      case ld if workDay(ld) && sm && (ld + d).getMonth === ld.getMonth =>
+        ld + d
+      case ld if workDay(ld) && sm =>
+        ld |> _adj(delta.negated, false)
+      case ld if workDay(ld) =>
+        ld + d
+      case ld =>
+        val dd = if (d.isNegative) d - 1.day else d + 1.day
+        ld |> _adj(dd, sm)
     }
   }
 
@@ -286,18 +303,24 @@ object WorkTime {
 
     lazy val values = findValues
   }
+  import SeekWorkDay._
 
   @annotation.tailrec
-  private[this] def findWorkDay(delta: Period)(ld: LocalDate): LocalDate = ld match {
-    case d if d |> workDay => d
-    case _ => findWorkDay(delta)(ld + delta)
+  def moveByWorkDays(nwds: Int)(ld: LocalDate): LocalDate = nwds match {
+    case n if n == 0 => ld |> Next.adjuster
+    case n =>
+      val (adjuster, delta) = if (n < 0) (Prev.adjuster, -1.day) else (Next.adjuster, 1.day)
+      val movedByOne        = ld + delta |> adjuster
+      n match {
+        case 1 => movedByOne
+        case n => moveByWorkDays(n - 1)(movedByOne)
+      }
   }
 
-  import scala.util.Try
   def safe[T, R](f: T => R): T => Try[R] = t => Try { t |> f }
 
-  val nextWorkDay: LocalDate => LocalDate = findWorkDay(1.day)
-  val prevWorkDay: LocalDate => LocalDate = findWorkDay(-1.day)
+  val nextWorkDay: LocalDate => LocalDate = moveByWorkDays(1)
+  val prevWorkDay: LocalDate => LocalDate = moveByWorkDays(-1)
 
   // there is quite a bit to critique here - not very efficient.
   val sameMonthNextWorkDay: LocalDate => LocalDate =

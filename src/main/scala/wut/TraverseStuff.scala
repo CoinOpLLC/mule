@@ -25,7 +25,7 @@ import cats.Applicative
 // import cats.syntax.applicative._
 // import cats.syntax.cartesian._
 
-import cats.implicits._
+import cats.implicits._ // FIXME: this is lazy - what's the deal with Cartesian.ops.mapN ?
 
 object TraverseStuff {
 
