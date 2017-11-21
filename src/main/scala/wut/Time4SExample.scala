@@ -128,6 +128,7 @@ object SyntaxForwardTime {
 object TemporalAdjuster {
 
   def apply(adjust: LocalDate => LocalDate): TemporalAdjuster = new TemporalAdjuster {
+    // justification: creating an instance of a java lib class; this is what the doc says: throw.
     @SuppressWarnings(Array("org.wartremover.warts.Throw"))
     override def adjustInto(t: Temporal): Temporal = t match {
       case ld: LocalDate => ld |> adjust
@@ -217,13 +218,13 @@ object ImmPeriod {
 
 object WorkTime {
 
+
   import jtt.WeekFields
 
   val iso: WeekFields    = WeekFields.ISO
   val dow: TemporalField = iso.dayOfWeek
 
-  // Time Lording...
-  // implicit def temporalEq[T <: Temporal]: Eq[T] = Eq.fromUniversalEquals[T]
+  // n.b.: all `jtt.Temporal`s are also `Comparable`
   implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
   implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
@@ -237,24 +238,36 @@ object WorkTime {
   type WorkWeek = SortedSet[DayOfWeek]
   type Holidays = SortedSet[LocalDate]
 
-  val mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_, _, _)
-  val daysOff = Seq(
-    (12, 25),
-    (1, 1),
-    (7, 4)
-  ) map { case (m, d) => (2017, m, d) }
+  /**
+    * do some configure-with-code here...
+    */
 
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
     def workDay(ld: LocalDate): Boolean =
       (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
   }
 
+  object WorkTimeConf {
+
+    val daysOff = Seq(
+      (12, 25),
+      (1, 1),
+      (7, 4)
+    ) map { case (m, d) => (2017, m, d) }
+
+  }
+
   object WorkYear {
+
+    import WorkTimeConf._
 
     import jt.DayOfWeek
 
     lazy val workWeek: WorkWeek =
       SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
+
+
+    private def mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_, _, _)
 
     lazy val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
 
@@ -317,14 +330,14 @@ object WorkTime {
       }
   }
 
-  val nextWorkDay: LocalDate => LocalDate = moveByWorkDays(1)
+  val adjustWorkDay: LocalDate => LocalDate = moveByWorkDays(0)
   val prevWorkDay: LocalDate => LocalDate = moveByWorkDays(-1)
 
   // there is quite a bit to critique here - not very efficient.
-  val sameMonthNextWorkDay: LocalDate => LocalDate =
+  val sameMonthAdjustWorkDay: LocalDate => LocalDate =
     (for {
       twd <- Reader(identity: LocalDate => LocalDate)
-      nwd <- Reader(nextWorkDay)
+      nwd <- Reader(adjustWorkDay)
       pwd <- Reader(prevWorkDay)
     } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
 

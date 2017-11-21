@@ -48,7 +48,6 @@ object Deps {
     "eu.timepit" %% "refined" % Refined,
     "eu.timepit" %% "refined-cats" % Refined,
     "eu.timepit" %% "refined-pureconfig" % Refined
-
   )
 
   val enumerata = Seq(
