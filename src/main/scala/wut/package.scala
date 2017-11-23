@@ -125,17 +125,29 @@ package wut {
   }
   object _impl {
 
-    // yet another take on an old fav:
-    // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22
     //
-    val rx1 = """([A-Z]+)([A-Z][a-z])""".r // splits off strings of capital letters, leaving one...
-    val rx2 = """([a-z\d])([A-Z])""".r     // splits transition from lower -> upper case
 
-    def delimit(rx: Regex)(s: String): String = rx replaceAllIn (s, "$1•$2")
 
-    def camelTo(name: String)(sep: String): String =
-      (name |> delimit(rx1) |> delimit(rx2)) split "•" mkString sep
+    object camelTo {
+
+      // yet another take on an old fav:
+      // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22
+
+      // splits off strings of capital letters leaving one...
+      private val rx1 = """([A-Z]+)([A-Z][a-z])""".r
+
+      // splits transition from lower -> upper case
+      private val rx2 = """([a-z\d])([A-Z])""".r
+
+      private def delimit(rx: Regex)(s: String): String = rx replaceAllIn (s, "$1•$2")
+
+      def apply(name: String)(sep: String): String =
+        (name |> delimit(rx1) |> delimit(rx2)) split "•" mkString sep
+    }
 
     def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo(s)("")
+    // def kamelTo(name: String )(sep: String): String =
+    //   (name foldRight (Seq.empty[Char])((a, b) => a +: b)).mkString
+
   }
 }

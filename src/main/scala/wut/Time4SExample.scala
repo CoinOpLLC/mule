@@ -292,8 +292,10 @@ object WorkTime {
   def workDay(ld: LocalDate)(implicit wy: WorkYear): Boolean = wy workDay ld
 
   sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
+
     final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
     final def adjuster: LocalDate => LocalDate   = _adj(delta, sameMonth)
+
     private def _adj(d: Period, sm: Boolean): LocalDate => LocalDate = {
       case ld if workDay(ld) && sm && (ld + d).getMonth === ld.getMonth =>
         ld + d
