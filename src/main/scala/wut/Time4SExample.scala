@@ -218,7 +218,6 @@ object ImmPeriod {
 
 object WorkTime {
 
-
   import jtt.WeekFields
 
   val iso: WeekFields    = WeekFields.ISO
@@ -241,7 +240,6 @@ object WorkTime {
   /**
     * do some configure-with-code here...
     */
-
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
     def workDay(ld: LocalDate): Boolean =
       (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
@@ -265,7 +263,6 @@ object WorkTime {
 
     lazy val workWeek: WorkWeek =
       SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
-
 
     private def mkLD: (Int, Int, Int) => LocalDate = LocalDate.apply(_, _, _)
 
@@ -333,7 +330,7 @@ object WorkTime {
   }
 
   val adjustWorkDay: LocalDate => LocalDate = moveByWorkDays(0)
-  val prevWorkDay: LocalDate => LocalDate = moveByWorkDays(-1)
+  val prevWorkDay: LocalDate => LocalDate   = moveByWorkDays(-1)
 
   // there is quite a bit to critique here - not very efficient.
   val sameMonthAdjustWorkDay: LocalDate => LocalDate =

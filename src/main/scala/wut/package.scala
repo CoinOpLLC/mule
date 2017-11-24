@@ -127,7 +127,6 @@ package wut {
 
     //
 
-
     object camelTo {
 
       // yet another take on an old fav:
@@ -146,8 +145,14 @@ package wut {
     }
 
     def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo(s)("")
-    // def kamelTo(name: String )(sep: String): String =
-    //   (name foldRight (Seq.empty[Char])((a, b) => a +: b)).mkString
 
+    private val (uppers, lowers) = ('A' to 'Z', 'a' to 'z')
+    private val digits           = '0' to '9'
+
+    def bustHumps(name: String)(sep: String): Seq[Char] = name.foldRight(Seq.empty[Char]) { (a, b) =>
+      (a, b) match {
+        case (c, h :: t) if (lowers contains c) && (uppers contains h) => a +: b
+      }
+    }
   }
 }
