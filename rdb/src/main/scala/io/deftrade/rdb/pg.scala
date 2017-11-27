@@ -1,4 +1,5 @@
-package wip
+package io.deftrade
+package rdb
 
 import cats._
 import cats.implicits._

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package io.deftrade.meta
 
 import scala.language.experimental.macros
 

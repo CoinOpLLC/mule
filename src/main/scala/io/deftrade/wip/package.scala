@@ -18,7 +18,9 @@ import scala.language.implicitConversions
 import scala.util.Try
 import scala.util.matching.Regex
 
-package object wut extends MyWay with MyTime {
+package io
+
+package object deftrade extends MyWay with MyTime {
 
   import _impl._
 
@@ -35,7 +37,7 @@ package object wut extends MyWay with MyTime {
   def camelToWord(name: String): String   = camelTo(name)(" ")
 
 }
-package wip {
+package deftrade {
 
   final case class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+package io.deftrade
 package wip
 package model
 

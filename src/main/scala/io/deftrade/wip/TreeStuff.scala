@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+package io.deftrade
 package wip
 
 // import cats.instances.int._

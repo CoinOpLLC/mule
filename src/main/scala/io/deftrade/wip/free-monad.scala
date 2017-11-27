@@ -1,3 +1,4 @@
+package io.deftrade
 package wip
 
 import scala.language.higherKinds
