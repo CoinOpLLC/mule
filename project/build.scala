@@ -19,14 +19,18 @@ object Version {
   val AkkaHttp       = "10.0.10"
   val HttpSession    = "0.5.3"
   val Ammonite       = "0.8.3"
+  val Quill          = "2.3.0"
+  val PgJdbc         = "9.4.1208"
+  // val PgJdbc = "9.4-1201-jdbc41"
 }
 
 object Deps {
 
   import Version._
 
-  val reflection = "org.scala-lang"         % "scala-reflect" % Scala
-  val xml        = "org.scala-lang.modules" %% "scala-xml"    % Xml
+  val scompiler  = "org.scala-lang"         % "scala-compiler" % Scala
+  val reflection = "org.scala-lang"         % "scala-reflect"  % Scala
+  val xml        = "org.scala-lang.modules" %% "scala-xml"     % Xml
   // val parserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.1"
 
   val conf = "com.typesafe" % "config" % TypesafeConfig
@@ -63,12 +67,18 @@ object Deps {
     "com.github.pureconfig" %% "pureconfig-squants" % PureConfig
   )
 
-  val scalatest = "org.scalatest" %% "scalatest" % ScalaTest
-  val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
+  val scalatest = "org.scalatest" %% "scalatest" % ScalaTest % Test
+  // val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi"   % Fansi
+
+  val quills = Seq(
+    "org.postgresql" % "postgresql" % PgJdbc,
+    "io.getquill" %% "quill-jdbc" % Quill,
+    "io.getquill" %% "quill-async-postgres" % Quill
+  )
 
   /** toolkits */
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
@@ -77,21 +87,32 @@ object Deps {
   val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
   // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
 
+  lazy val httplibs = List(
+    akkaHttp,
+    httpSession,
+    httpSessionJwt
+  )
 
-  lazy val common = refined ++ enumerata ++ pureConfigs ++
+  lazy val funlibs =
     List(
-      reflection,
-      xml,
       cats,
-      conf,
+      quicklens,
       spire,
       squants,
-      time4s,
-      akkaHttp,
-      httpSession,
-      // httpSessionJwt,
-      fansi
     )
+  lazy val misclibs =
+    List(
+      reflection,
+      scompiler,
+      xml,
+      conf,
+      time4s,
+      fansi,
+      scalatest
+    )
+
+  lazy val moarlibs =
+    funlibs ++ refined ++ enumerata ++ pureConfigs ++ quills ++ httplibs ++ misclibs
 }
 
 object Args {
@@ -151,5 +172,10 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  lazy val initialCommands = "import wut._" //"""ammonite.Main().run()"""
+  lazy val initialCommands = //"""ammonite.Main().run()"""
+    """import wut._
+      |import cats._
+      |import cats.implicits._
+      |import java.{time => jt}
+      |""".stripMargin
 }

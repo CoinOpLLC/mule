@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 import cats.data.EitherT
 import cats.syntax.either._

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 // import cats.instances.int._
 // import cats.instances.string._

@@ -35,7 +35,7 @@ package object wut extends MyWay with MyTime {
   def camelToWord(name: String): String   = camelTo(name)(" ")
 
 }
-package wut {
+package wip {
 
   final case class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
@@ -146,12 +146,14 @@ package wut {
 
     def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo(s)("")
 
-    private val (uppers, lowers) = ('A' to 'Z', 'a' to 'z')
-    private val digits           = '0' to '9'
+    private val (uppers, nonUppers) = ('A' to 'Z', ('a' to 'z') ++ ('0' to '9'))
 
-    def bustHumps(name: String)(sep: String): Seq[Char] = name.foldRight(Seq.empty[Char]) { (a, b) =>
+    def bustHumps(name: String)(sep: Option[Char]): Seq[Char] = name.foldRight(Seq.empty[Char]) { (a, b) =>
       (a, b) match {
-        case (c, h :: t) if (lowers contains c) && (uppers contains h) => a +: b
+        case (c, h :: _) if (nonUppers contains c) && (uppers contains h) =>
+          sep.fold(a +: b)(a +: _ +: b)
+        case _ =>
+          a +: b
       }
     }
   }

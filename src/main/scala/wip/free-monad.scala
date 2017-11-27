@@ -1,4 +1,4 @@
-package wut
+package wip
 
 import scala.language.higherKinds
 import cats.{ Functor }

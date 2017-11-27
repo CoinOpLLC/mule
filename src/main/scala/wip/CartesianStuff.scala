@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 import scala.language.higherKinds
 // import scala.language.implicitConversions

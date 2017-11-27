@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 /**
   * Codec is a type class. Let's give it its own file, because we're feeling generous.

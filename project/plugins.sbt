@@ -88,5 +88,14 @@ addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
 addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
 
 /**
+  * [Flyway database migrations tool](https://flywaydb.org/):
+  * schema roll-back, roll-forward, etc.
+  */
+// // resolvers += Resolver.typesafeRepo("releases")
+// // resolvers += Resolver.url("bintray-sbt-plugin-releases")
+// resolvers += "Flyway" at "https://flywaydb.org/repo"
+// addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.0.2") // TODO: current version is at least 4.2.0
+
+/**
   * [link](url)
   */

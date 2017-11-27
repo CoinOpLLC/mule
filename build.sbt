@@ -1,37 +1,44 @@
-// import de.heikoseeberger.sbtheader
-// import sbtheader.AutomateHeaderPlugin
+import Deps._
 
-val apache2URL = new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")
+crossPaths in Global := false
+cancelable in Global := true
 
-lazy val muhBuildSettings = List(
+List(
+  scalafmtOnCompile := true,
+  organization      := "com.coinopllc",
+  scalaVersion      := Version.Scala,
+  organizationName  := "CoinOp LLC",
+  startYear         := Some(2017),
+  licenses += (
+    "Apache-2.0",
+    new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")
+  )
+) // map (_ in ThisBuild)
 
-  organization            := "com.coinopllc",
-
-  scalaVersion            := Version.Scala,
-  dependencyUpdatesFilter -= moduleFilter(organization = "org.scala-lang"), // #TODO... why?
-
-  crossPaths in Global    := false,
-  cancelable in Global    := true,
-
-  scalacOptions           ++= Args.allScalaCflags,
-  scalacOptions in (Compile, console) --= Args.nonConsoleScalaCflags.to[Seq],
+lazy val common = List(
+  scalacOptions                           ++= Args.allScalaCflags,
+  scalacOptions in (Compile, console)     --= Args.nonConsoleScalaCflags.to[Seq],
   scalacOptions in (Test, console)        := (scalacOptions in (Compile, console)).value,
-
   wartremoverErrors in (Compile, compile) ++= Warts.unsafe,
-
-  organizationName                        := "CoinOp LLC",
-  startYear                               := Some(2017),
-  licenses                                += ("Apache-2.0", apache2URL)
+  dependencyUpdatesFilter                 -= moduleFilter(organization = "org.scala-lang"), // #TODO... why?
+  initialCommands in (Test, console)      := Args.initialCommands
 )
 
-muhBuildSettings
+lazy val macros = project.settings(common).settings(libraryDependencies ++= quills ++ List(reflection, scompiler, scalatest))
 
-lazy val coreDeps = Deps.common
-lazy val testDeps = List(Deps.scalatest) map (_ % Test)
+lazy val rdb = project.dependsOn(macros).settings(common).settings(libraryDependencies ++= moarlibs) //. // TODO: choke down on deps
+// settings(
+//   // scgBaseSettings(Test) ++
+//   Seq(
+//     flywayLocations := List("filesystem:db/src/main/resources/db/migration"),
+//     flywayDriver := "org.postgresql.Driver",
+//     flywayUrl := "jdbc:postgresql://localhost:5432/test",
+//     flywayUser := "ndw",
+//     flywayCleanOnValidationError := true,
+//     flywayTable := "schema_versions" // migrations metadata table name
+//     // scgPackage := "io.deftrade.db.test"
+//   )
+// )
 
-lazy val mule = (project in file("."))
-// .enablePlugins(AutomateHeaderPlugin)
-  .settings(
-    libraryDependencies ++= coreDeps ++ testDeps,
-    initialCommands in (Test, console) := Args.initialCommands
-  )
+// top level project - TODO: eventually this should only aggregate (no active dev)
+lazy val mule = (project in file(".")).aggregate(macros, rdb).settings(common).settings(libraryDependencies ++= moarlibs)

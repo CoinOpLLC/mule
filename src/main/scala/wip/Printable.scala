@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 /**
   * `Printable` is our stab at `CoinOp` domain typeclasses.

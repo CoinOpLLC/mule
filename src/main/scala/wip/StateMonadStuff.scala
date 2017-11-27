@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wut
+package wip
 
 import cats.syntax.eq._
 import cats.syntax.applicative._
