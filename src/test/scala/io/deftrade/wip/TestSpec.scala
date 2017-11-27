@@ -1,28 +1,12 @@
-/*
- * Copyright 2017 47 Degrees, LLC. <http://www.47deg.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package wut
+package io.deftrade
+package wip
 
 /**
   * Uses ideas from (this post)[https://medium.com/@shanielh/5-tips-for-scalatest-that-will-make-testing-great-again-58190df1df88].
   */
-import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.{ FlatSpec, Matchers }
 
-class EnumeratumSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+class EnumeratumSpec extends FlatSpec with Matchers {
   "Enumeratum Greeting" should "work as advertised" in {
     import EnumeratumExamples.Greeting // look ma no import tax
     (Greeting withName "Hi") should ===(Greeting.Hi)
@@ -47,7 +31,7 @@ object Calculator {
   def add(a: Int, b: Int): Long = a.toLong + b
 }
 
-class CalculatorSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+class CalculatorSpec extends FlatSpec with Matchers {
   case class Case(a: Int, b: Int, expected: Long)
 
   private val cases = Seq(Case(1, 1, 2), Case(Int.MaxValue, Int.MaxValue, Int.MaxValue.toLong * 2))
@@ -66,7 +50,7 @@ class CalculatorSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals
 
 }
 
-class MonadTransformerExampleSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+class MonadTransformerExampleSpec extends FlatSpec with Matchers {
   import MonadTransformerStuff._
   case class TacticalSituation(ally1: String, ally2: String, response: String)
   "tacticalReport" should "basically work and whatnot" in {
@@ -77,7 +61,7 @@ class MonadTransformerExampleSpec extends FlatSpec with Matchers with TypeChecke
 
 }
 
-class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
+class TraverseSpec extends FlatSpec with Matchers {
   import TraverseStuff._
   "sequence" should "expand cartesian product in collections" in {
     import cats.instances.vector._
@@ -115,19 +99,6 @@ class TraverseSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
 
   // FIXME: test FormValidation
 }
-
-case class Yerf(i: Int = 0, s: String = "", d: Double = math.E) {
-  // import NonDefaultNamedValues.{ nonDefaultNamedValues => ndnvs }
-  import FintechNDNVs.{ muhNDNVs => ndnvs }
-  override def toString = ndnvs
-}
-class NdnvSpec extends FlatSpec with Matchers with TypeCheckedTripleEquals {
-  "NDNVs" should "work again" in {
-    val y7 = Yerf(i = 6, s = "wtf")
-    y7.toString should ===("Yerf[i=6; s=wtf]")
-  }
-}
-
 /**
   * TODO: proper tests for the Writer Monad stuff
   */

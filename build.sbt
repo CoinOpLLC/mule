@@ -3,17 +3,13 @@ import Deps._
 crossPaths in Global := false
 cancelable in Global := true
 
-List(
-  scalafmtOnCompile := true,
-  organization      := "com.coinopllc",
-  scalaVersion      := Version.Scala,
-  organizationName  := "CoinOp LLC",
-  startYear         := Some(2017),
-  licenses += (
-    "Apache-2.0",
-    new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")
-  )
-) // map (_ in ThisBuild)
+scalafmtOnCompile := true
+organization      := "com.coinopllc"
+scalaVersion      := Version.Scala
+organizationName  := "CoinOp LLC"
+startYear         := Some(2017)
+licenses          += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+headerLicense     := Some(HeaderLicense.ALv2("2017", organizationName.value))
 
 lazy val common = List(
   scalacOptions                           ++= Args.allScalaCflags,

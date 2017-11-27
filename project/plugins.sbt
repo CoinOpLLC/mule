@@ -30,7 +30,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2")
 /**
   * [License Header plugin](https://github.com/sbt/sbt-header)
   */
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "3.0.1")
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "4.0.0")
 
 /**
   * As with real warts, there will be blood: be prepeared.
