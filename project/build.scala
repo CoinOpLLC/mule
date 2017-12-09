@@ -110,12 +110,12 @@ object Deps {
       fansi,
       scalatest
     )
-
-  lazy val moarlibs =
-    funlibs ++ refined ++ enumerata ++ pureConfigs ++ quills ++ httplibs ++ misclibs
 }
 
 object Args {
+
+  lazy val alv2url = new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")
+
   lazy val allScalaCflags = xlintDeets ++ ywarnDeets ++ ywarnUnusedDeets ++ Seq(
     "-deprecation",
     "-encoding",
