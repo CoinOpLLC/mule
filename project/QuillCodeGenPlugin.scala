@@ -38,7 +38,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
         qcgOutFile := {
           ((qcgPackage.value split '.')
             .foldLeft((sourceManaged in conf).value) { _ / _ }) /
-              "Tables.scala"  // "This is fine."
+              QuillCodeGen.scalaFileName
         },
 
         qcgRunUncached := {
