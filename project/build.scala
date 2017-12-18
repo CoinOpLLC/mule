@@ -14,13 +14,14 @@ object Version {
   val Spire          = "0.14.1"
   val Refined        = "0.8.4"
   val Squants        = "1.3.0"
+  val Circe          = "0.8.0"
   val Fansi          = "0.2.5"
   val Time4S         = "1.5"
-  val AkkaHttp       = "10.0.10"
+  val AkkaHttp       = "10.0.11"
   val HttpSession    = "0.5.3"
   val Ammonite       = "0.8.3"
-  val Quill          = "2.3.0"
-  val PgJdbc         = "9.4.1208"
+  val Quill          = "2.3.1"
+  val PgJdbc         = "9.4.1212"
   // val PgJdbc = "9.4-1201-jdbc41"
 }
 
@@ -49,23 +50,37 @@ object Deps {
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
   val refined = Seq(
-    "eu.timepit" %% "refined" % Refined,
-    "eu.timepit" %% "refined-cats" % Refined,
-    "eu.timepit" %% "refined-pureconfig" % Refined
-  )
+    "eu.timepit" %% "refined",
+    "eu.timepit" %% "refined-cats",
+    "eu.timepit" %% "refined-pureconfig",
+  ) map (_ % Refined)
 
   val enumerata = Seq(
-    "com.beachape"          %% "enumeratum"            % Enumeratum
+    "com.beachape" %% "enumeratum"       % Enumeratum,
+    "com.beachape" %% "enumeratum-circe" % Enumeratum,
   )
+
+
+
+  val circeii = Seq(
+    "io.circe" %% "circe-core",
+    "io.circe" %% "circe-generic",
+    // "io.circe" %% "circe-generic-extras",
+    "io.circe" %% "circe-parser",
+    "io.circe" %% "circe-shapes",
+    "io.circe" %% "circe-scodec",
+    "io.circe" %% "circe-refined",
+    "io.circe" %% "circe-java8",
+  ) map (_ % Circe)
 
   /**
     * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
     */
   val pureConfigs = Seq(
-    "com.github.pureconfig" %% "pureconfig"         % PureConfig,
-    "com.github.pureconfig" %% "pureconfig-enumeratum" % PureConfig,
-    "com.github.pureconfig" %% "pureconfig-squants" % PureConfig
-  )
+    "com.github.pureconfig" %% "pureconfig",
+    "com.github.pureconfig" %% "pureconfig-enumeratum",
+    "com.github.pureconfig" %% "pureconfig-squants",
+  ) map (_ % PureConfig)
 
   val scalatest = "org.scalatest" %% "scalatest" % ScalaTest % Test
   // val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
@@ -74,11 +89,12 @@ object Deps {
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi"   % Fansi
 
+  val postgres = "org.postgresql" % "postgresql" % PgJdbc
+
   val quills = Seq(
-    "org.postgresql" % "postgresql" % PgJdbc,
-    "io.getquill" %% "quill-jdbc" % Quill,
-    "io.getquill" %% "quill-async-postgres" % Quill
-  )
+    "io.getquill" %% "quill-jdbc",
+    "io.getquill" %% "quill-async-postgres",
+  ) map (_ % Quill)
 
   /** toolkits */
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
@@ -128,7 +144,7 @@ object Args {
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
     "-Xfuture", // Turn on future language features.
     "-Yno-adapted-args",
-    "-Ypartial-unification" // Enable partial unification in type constructor inference
+    "-Ypartial-unification", // Enable partial unification in type constructor inference
   )
 
   lazy val nonConsoleScalaCflags = Set("-Xfatal-warnings") ++ ywarnUnusedDeets

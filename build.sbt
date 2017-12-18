@@ -13,6 +13,7 @@ lazy val common = List(
   cancelable                              := true,
   scalafmtOnCompile                       := true,
   initialCommands in (Test, console)      := Args.initialCommands,
+  ensimeIgnoreMissingDirectories          := true,
   startYear                               := Some(2017),
   licenses                                += ("Apache-2.0", Args.alv2url),
   headerLicense := Some(
@@ -23,21 +24,25 @@ lazy val common = List(
 lazy val macros = project
   .settings(common)
   .settings(
-    libraryDependencies ++= quills ++ List(reflection, scompiler, scalatest)
+    libraryDependencies ++= quills ++
+      Seq(reflection, scompiler, scalatest)
   )
 
 lazy val rdb = project
   .dependsOn(macros)
   .settings(common)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs
+    libraryDependencies ++= funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs ++
+      Seq(postgres)
   )
 
 lazy val wip = project
   .dependsOn(macros, rdb)
   .settings(
     libraryDependencies ++=
-      funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs ++ httplibs ++ refined
+      funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++
+        quills ++ httplibs ++ circeii ++
+        Seq(postgres)
   )
 // .settings(
 //   Seq(

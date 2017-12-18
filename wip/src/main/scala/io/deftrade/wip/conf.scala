@@ -28,7 +28,6 @@ import cats.syntax.either._
 object EnumeratumExamples {
   import enumeratum._
   import enumeratum.values._
-  // TODO: https://github.com/lloydmeta/enumeratum#circe
 
   /*
    * Using `enumeratum`.
@@ -243,6 +242,29 @@ object PureConfigExample {
   )
 
 }
+
+sealed trait Suit {
+  def symbol: Char
+  final override def toString: String = s"$symbol "
+}
+
+object Suit {
+  val labels = 0 to 3 map (i => ('♠' + i).toChar)
+}
+
+object Spade   extends Suit { def symbol: Char = '♠' }
+object Heart   extends Suit { def symbol: Char = '♡' }
+object Diamond extends Suit { def symbol: Char = '♢' }
+object Club    extends Suit { def symbol: Char = '♣' }
+
+case class Card(value: Int, suit: Suit)
+
+object DanceWithMeCirce {
+
+  val card = Card(3, Club)
+
+}
+
 object SyntaxHighlightKiller {
   import eu.timepit.refined
   import refined.api.Refined

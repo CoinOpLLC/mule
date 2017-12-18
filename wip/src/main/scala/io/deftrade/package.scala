@@ -44,6 +44,10 @@ package io {
       def p2f1[B](f: A => B): B = a |> f
     }
 
+    final case class PhatString(val s: String) extends AnyVal {
+      def noSpaces: String = s filterNot (" \n\r\t" contains _)
+    }
+
     /**
       * This is who we are, it's what we do.
       */
@@ -125,13 +129,25 @@ package io {
       // def unapply(month: Month): Option[Int] = Some(month.getValue)
 
     }
+
     object _impl {
+
+      def notice(
+          distname: String,
+          version: String,
+          entity: String,
+          lic: String,
+          licShort: String
+      ): String =
+        s"""The CoinOp DefTrade distribution bundles $distname $version, copyright $entity,
+      |which is available under $lic.
+      |For details, see licenses/$entity-$distname.$licShort.""".stripPrefix
 
       //
 
       object camelTo {
 
-        // yet another take on an old fav:
+        // Our Gold standard (for testing): yet another take on an old fav:
         // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22
 
         // splits off strings of capital letters leaving one...
@@ -142,21 +158,45 @@ package io {
 
         private def delimit(rx: Regex)(s: String): String = rx replaceAllIn (s, "$1•$2")
 
-        def apply(name: String)(sep: String): String =
+        def apply(sep: String)(name: String): String =
           (name |> delimit(rx1) |> delimit(rx2)) split "•" mkString sep
       }
 
-      def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo(s)("")
+      def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo("")(s)
 
       private val (uppers, nonUppers) = ('A' to 'Z', ('a' to 'z') ++ ('0' to '9'))
 
-      def bustHumps(name: String)(sep: Option[Char]): Seq[Char] = name.foldRight(Seq.empty[Char]) { (a, b) =>
-        (a, b) match {
-          case (c, h :: _) if (nonUppers contains c) && (uppers contains h) =>
-            sep.fold(a +: b)(a +: _ +: b)
-          case _ =>
-            a +: b
+      def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
+        name
+          .foldLeft(Seq.empty[Char])() { (b, a) =>
+            (b, a) match {
+              case (h +: g +: t, c)
+                  if (uppers contains g) &&
+                    (uppers contains h) &&
+                    (nonUppers contains c) =>
+                sep.fold()(c +: h +: _ +: g +: t)
+              case _ => a +: b
+            }
+          }
+          .reverse
+
+      def bustHumps(sep: Option[Char])(name: String): Seq[Char] =
+        name.foldRight(Seq.empty[Char]) { (a, b) =>
+          (a, b) match {
+            case (c, h +: _) if (nonUppers contains c) && (uppers contains h) =>
+              sep.fold(a +: b)(a +: _ +: b)
+            case _ =>
+              a +: b
+          }
         }
+      def maybeSepFrom(s: String): Option[Char] = s match {
+        case "_" => Some('_')
+        case "-" => Some('-')
+        case _   => None
+      }
+      def camelToo(sep: String)(name: String): String = {
+        val osc = maybeSepFromString(sep)
+        name |> splitCaps(osc) |> bustHumps(osc)
       }
     }
   }

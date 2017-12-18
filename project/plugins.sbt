@@ -23,7 +23,7 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.1")
 addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.1")
 
 /**
-  * Native Packlager
+  * Native Packager
   */
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2")
 
@@ -57,7 +57,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.0")
 /**
   * [Amazon S3 publishing and resolution](https://github.com/frugalmechanic/fm-sbt-s3-resolver)
   */
-addSbtPlugin("com.frugalmechanic" % "fm-sbt-s3-resolver" % "0.12.0")
+// addSbtPlugin("com.frugalmechanic" % "fm-sbt-s3-resolver" % "0.12.0")
 
 /**
   * [scaladoc: other API resolution](https://github.com/ThoughtWorksInc/sbt-api-mappings)
@@ -91,11 +91,12 @@ addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
   * [Flyway database migrations tool](https://flywaydb.org/):
   * schema roll-back, roll-forward, etc.
   */
-// // resolvers += Resolver.typesafeRepo("releases")
-// // resolvers += Resolver.url("bintray-sbt-plugin-releases")
 // resolvers += "Flyway" at "https://flywaydb.org/repo"
-// addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.0.2") // TODO: current version is at least 4.2.0
+resolvers += "Flyway" at "https://davidmweber.github.io/flyway-sbt.repo"
+addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0") // TODO: current version is at least 4.2.0
 
 /**
   * [link](url)
   */
+  // // resolvers += Resolver.typesafeRepo("releases")
+  // // resolvers += Resolver.url("bintray-sbt-plugin-releases")
