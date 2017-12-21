@@ -46,7 +46,13 @@ addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-RC11")
 /**
   * [source code formatter (scalafmt)](https://github.com/lucidsoftware/neo-sbt-scalafmt)
   */
-addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.14")
+// `addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.14")
+
+/**
+  * [The Official™ scalafmt-sbt plugin](http://scalameta.org/scalafmt/#Installation)
+  */
+addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.3.0")
+
 
 /**
   * [site generation](http://www.scala-sbt.org/sbt-site/index.html)

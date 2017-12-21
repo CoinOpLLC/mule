@@ -10,8 +10,8 @@ object QuillCodeGenPlugin extends AutoPlugin {
   override def requires = org.flywaydb.sbt.FlywayPlugin
   // override def trigger = allRequirements
 
-  type FileSet = Set[File]
-  type FileSetFunction = FileSet => FileSet
+  type FileSet           = Set[File]
+  type FileSetFunction   = FileSet => FileSet
   type FileSetCombinator = FileSetFunction => FileSetFunction
 
   object autoImport {
@@ -32,19 +32,16 @@ object QuillCodeGenPlugin extends AutoPlugin {
       import org.flywaydb.sbt.FlywayPlugin.autoImport._
 
       Seq(
-
         qcgPackage := "rdb",
-
         qcgOutFile := {
           ((qcgPackage.value split '.')
             .foldLeft((sourceManaged in conf).value) { _ / _ }) /
-              QuillCodeGen.scalaFileName
+            QuillCodeGen.scalaFileName
         },
-
         qcgRunUncached := {
-          flywayMigrate.value  // i.e. do the migrate. Returns Unit - pure effect
+          flywayMigrate.value // i.e. do the migrate. Returns Unit - pure effect
           QuillCodeGen(
-            driver = flywayDriver.value,  // conciously coupling to Flyway config
+            driver = flywayDriver.value, // conciously coupling to Flyway config
             url = flywayUrl.value,
             user = flywayUser.value,
             password = flywayPassword.value,
@@ -53,10 +50,9 @@ object QuillCodeGenPlugin extends AutoPlugin {
           )
           Seq(qcgOutFile.value)
         },
-
         qcgRun := {
 
-          import FilesInfo.{lastModified, exists} // these are the flags we care about
+          import FilesInfo.{ exists, lastModified } // these are the flags we care about
 
           // named; sbt forbids invoking tasks within anon functions
           def doTheThing: FileSet = {
@@ -65,15 +61,14 @@ object QuillCodeGenPlugin extends AutoPlugin {
           }
 
           val inSet = Set.empty[File] ++ (flywayLocations.value map { fl =>
-              (fl.stripPrefix("filesystem:") split '/').foldLeft(baseDirectory.value) { _ / _ }
-            })
-          val tag = streams.value.cacheDirectory / "gen-quill-code"
-          val cacher: FileSetCombinator = FileFunction.cached(tag, lastModified, exists)
+            (fl.stripPrefix("filesystem:") split '/').foldLeft(baseDirectory.value) { _ / _ }
+          })
+          val tag                        = streams.value.cacheDirectory / "gen-quill-code"
+          val cacher: FileSetCombinator  = FileFunction.cached(tag, lastModified, exists)
           val cachedQcg: FileSetFunction = cacher(_ => doTheThing)
 
           cachedQcg(inSet).toSeq
         },
-
         sourceGenerators in conf += qcgRun.taskValue
       )
     }

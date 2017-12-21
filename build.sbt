@@ -11,7 +11,7 @@ lazy val common = List(
   dependencyUpdatesFilter                 -= moduleFilter(organization = "org.scala-lang"),
   crossPaths                              := false,
   cancelable                              := true,
-  scalafmtOnCompile                       := true,
+  // scalafmtOnCompile                       := true,
   initialCommands in (Test, console)      := Args.initialCommands,
   ensimeIgnoreMissingDirectories          := true,
   startYear                               := Some(2017),
