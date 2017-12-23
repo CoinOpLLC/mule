@@ -10,8 +10,8 @@ object QuillCodeGenPlugin extends AutoPlugin {
   override def requires = org.flywaydb.sbt.FlywayPlugin
   // override def trigger = allRequirements
 
-  type FileSet           = Set[File]
-  type FileSetFunction   = FileSet => FileSet
+  type FileSet = Set[File]
+  type FileSetFunction = FileSet => FileSet
   type FileSetCombinator = FileSetFunction => FileSetFunction
 
   object autoImport {
@@ -45,14 +45,17 @@ object QuillCodeGenPlugin extends AutoPlugin {
             url = flywayUrl.value,
             user = flywayUser.value,
             password = flywayPassword.value,
-            folder = (sourceManaged in conf).value, // n.b. `sourceManaged` => treat as disposable
+            file = (sourceManaged in conf).value, // n.b. `sourceManaged` => treat as disposable
             pkg = qcgPackage.value
           )
           Seq(qcgOutFile.value)
         },
         qcgRun := {
 
-          import FilesInfo.{ exists, lastModified } // these are the flags we care about
+          import FilesInfo.{
+            exists,
+            lastModified
+          } // these are the flags we care about
 
           // named; sbt forbids invoking tasks within anon functions
           def doTheThing: FileSet = {
@@ -61,10 +64,12 @@ object QuillCodeGenPlugin extends AutoPlugin {
           }
 
           val inSet = Set.empty[File] ++ (flywayLocations.value map { fl =>
-            (fl.stripPrefix("filesystem:") split '/').foldLeft(baseDirectory.value) { _ / _ }
+            (fl.stripPrefix("filesystem:") split '/')
+              .foldLeft(baseDirectory.value) { _ / _ }
           })
-          val tag                        = streams.value.cacheDirectory / "gen-quill-code"
-          val cacher: FileSetCombinator  = FileFunction.cached(tag, lastModified, exists)
+          val tag = streams.value.cacheDirectory / "gen-quill-code"
+          val cacher: FileSetCombinator =
+            FileFunction.cached(tag, lastModified, exists)
           val cachedQcg: FileSetFunction = cacher(_ => doTheThing)
 
           cachedQcg(inSet).toSeq

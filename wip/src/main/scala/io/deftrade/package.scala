@@ -141,7 +141,7 @@ package io {
       ): String =
         s"""The CoinOp DefTrade distribution bundles $distname $version, copyright $entity,
       |which is available under $lic.
-      |For details, see licenses/$entity-$distname.$licShort.""".stripPrefix
+      |For details, see licenses/$entity-$distname.$licShort.""".stripMargin
 
       //
 
@@ -168,19 +168,19 @@ package io {
 
       def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
-          .foldLeft(Seq.empty[Char])() { (b, a) =>
+          .foldLeft(Seq.empty[Char]) { (b, a) =>
             (b, a) match {
               case (h +: g +: t, c)
                   if (uppers contains g) &&
                     (uppers contains h) &&
-                    (nonUppers contains c) =>
-                sep.fold()(c +: h +: _ +: g +: t)
+                    (nonUppers contains c) => // sep between g and h
+                sep.fold(c +: h +: g +: t)(c +: h +: _ +: g +: t)
               case _ => a +: b
             }
           }
           .reverse
 
-      def bustHumps(sep: Option[Char])(name: String): Seq[Char] =
+      def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
         name.foldRight(Seq.empty[Char]) { (a, b) =>
           (a, b) match {
             case (c, h +: _) if (nonUppers contains c) && (uppers contains h) =>
@@ -195,8 +195,8 @@ package io {
         case _   => None
       }
       def camelToo(sep: String)(name: String): String = {
-        val osc = maybeSepFromString(sep)
-        name |> splitCaps(osc) |> bustHumps(osc)
+        val osc = maybeSepFrom(sep)
+        (name |> splitCaps(osc) |> bustHumps(osc)).mkString
       }
     }
   }

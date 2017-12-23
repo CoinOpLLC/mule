@@ -1,8 +1,8 @@
 package io.deftrade.sbt
 
 import java.io.File
-import java.nio.file.{ Files, Paths }
-import java.sql.{ Connection, DriverManager, ResultSet }
+import java.nio.file.{Files, Paths}
+import java.sql.{Connection, DriverManager, ResultSet}
 
 /**
   *  This customizes the Slick code generator. We only do simple name mappings.
@@ -12,34 +12,34 @@ object QuillCodeGen {
 
   type EnumModel = Vector[(String, String)] // enum -> value
 
-  val TABLE_NAME     = "TABLE_NAME"
-  val COLUMN_NAME    = "COLUMN_NAME"
-  val TYPE_NAME      = "TYPE_NAME"
-  val NULLABLE       = "NULLABLE"
-  val PK_NAME        = "pk_name"
-  val FK_TABLE_NAME  = "fktable_name"
+  val TABLE_NAME = "TABLE_NAME"
+  val COLUMN_NAME = "COLUMN_NAME"
+  val TYPE_NAME = "TYPE_NAME"
+  val NULLABLE = "NULLABLE"
+  val PK_NAME = "pk_name"
+  val FK_TABLE_NAME = "fktable_name"
   val FK_COLUMN_NAME = "fkcolumn_name"
-  val PK_TABLE_NAME  = "pktable_name"
+  val PK_TABLE_NAME = "pktable_name"
   val PK_COLUMN_NAME = "pkcolumn_name"
 
   val scalaFileName = "GeneratedQuillCode.scala"
 
   val defaultTypeMap = Map(
-    "int4"        -> "Int",
-    "serial4"     -> "Int",
-    "int8"        -> "Long",
-    "serial8"     -> "Long",
-    "float8"      -> "Double",
-    "numeric"     -> "BigDecimal",
-    "varchar"     -> "String",
-    "text"        -> "String",
-    "bool"        -> "Boolean",
-    "bytea"       -> "Array[Byte]", // PostgreSQL
-    "uuid"        -> "java.util.UUID", // H2, PostgreSQL
-    "timestamp"   -> "java.time.LocalDateTime",
+    "int4" -> "Int",
+    "serial4" -> "Int",
+    "int8" -> "Long",
+    "serial8" -> "Long",
+    "float8" -> "Double",
+    "numeric" -> "BigDecimal",
+    "varchar" -> "String",
+    "text" -> "String",
+    "bool" -> "Boolean",
+    "bytea" -> "Array[Byte]", // PostgreSQL
+    "uuid" -> "java.util.UUID", // H2, PostgreSQL
+    "timestamp" -> "java.time.LocalDateTime",
     "timestamptz" -> "java.time.OffsetDateTime",
-    "json"        -> "me.fix.Json",
-    "jsonb"       -> "me.fix.Json"
+    "json" -> "me.fix.Json",
+    "jsonb" -> "me.fix.Json"
   )
 
   def apply(
@@ -47,7 +47,7 @@ object QuillCodeGen {
       url: String,
       user: String,
       password: String,
-      folder: File, // output directory for generated source
+      file: File,
       pkg: String,
       schema: String = "public",
       imports: String = "",
@@ -63,9 +63,11 @@ object QuillCodeGen {
 
         val scalaName = namingStrategy table name
 
-        val applyArgs = for (col <- columns) yield s"${col.scalaName}: ${col.scalaOptionType}"
+        val applyArgs = for (col <- columns)
+          yield s"${col.scalaName}: ${col.scalaOptionType}"
 
-        val valueClasses = for (c <- columns if c.isPrimaryKey) yield c.asValueClass
+        val valueClasses = for (c <- columns if c.isPrimaryKey)
+          yield c.asValueClass
 
         s"""|/**
             |  * $scalaName
@@ -87,7 +89,8 @@ object QuillCodeGen {
     }
 
     case class SimpleColumn(tableName: String, columnName: String) {
-      def asValueType = s"${namingStrategy table tableName}.${namingStrategy table columnName}"
+      def asValueType =
+        s"${namingStrategy table tableName}.${namingStrategy table columnName}"
     }
 
     case class Column(tableName: String,
@@ -112,7 +115,6 @@ object QuillCodeGen {
         s"case class ${namingStrategy table columnName}(value: $scalaType) extends AnyVal"
     }
 
-    val file: File      = ??? // folder / scalaFileName
     val logstream = System.err // FIXME lol no... or maybe?!
 
     logstream println s"Starting output generation for $file..."
@@ -127,19 +129,25 @@ object QuillCodeGen {
 
       // construct raw `ForeignKey`s from the metadata `ResultSet`
       val unresolvedFKs = for {
-        tRs  <- results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
-        fkRs <- results(db.getMetaData getExportedKeys (null, schema, tRs getString TABLE_NAME))
+        tRs <- results(
+          db.getMetaData getTables (null, schema, "%", Array("TABLE")))
+        fkRs <- results(
+          db.getMetaData getExportedKeys (null, schema, tRs getString TABLE_NAME))
       } yield
         ForeignKey(
-          from = SimpleColumn(fkRs getString FK_TABLE_NAME, fkRs getString FK_COLUMN_NAME),
-          to = SimpleColumn(fkRs getString PK_TABLE_NAME, fkRs getString PK_COLUMN_NAME)
+          from = SimpleColumn(fkRs getString FK_TABLE_NAME,
+                              fkRs getString FK_COLUMN_NAME),
+          to = SimpleColumn(fkRs getString PK_TABLE_NAME,
+                            fkRs getString PK_COLUMN_NAME)
         )
 
       // "resolve" by following references (?!)
       val fks = for {
         xfk <- unresolvedFKs
         yfk <- unresolvedFKs
-      } yield if (xfk.to == yfk.from) ForeignKey(from = xfk.from, to = yfk.to) else xfk
+      } yield
+        if (xfk.to == yfk.from) ForeignKey(from = xfk.from, to = yfk.to)
+        else xfk
 
       fks.toSet
     }
@@ -150,23 +158,38 @@ object QuillCodeGen {
         results(db.getMetaData getTables (null, schema, "%", Array("TABLE"))).toVector
 
       for {
-        tRs <- tableResultSets if !(excludedTables contains (tRs getString TABLE_NAME))
+        tRs <- tableResultSets
+        if !(excludedTables contains (tRs getString TABLE_NAME))
         tableName = tRs getString TABLE_NAME
-        pkNames = (results(db.getMetaData getPrimaryKeys (null, null, tableName)).toSeq map { _ getString COLUMN_NAME }).toSet
+        pkNames = (results(
+          db.getMetaData getPrimaryKeys (null, null, tableName)).toSeq map {
+          _ getString COLUMN_NAME
+        }).toSet
       } yield {
         val columns: Seq[Either[String, Column]] = for {
-          colRs <- results(db.getMetaData getColumns (null, schema, tableName, null)).toSeq
+          colRs <- results(
+            db.getMetaData getColumns (null, schema, tableName, null)).toSeq
         } yield {
-          val colName  = colRs getString COLUMN_NAME
-          val sqlType  = (colRs getString TYPE_NAME).toLowerCase
+          val colName = colRs getString COLUMN_NAME
+          val sqlType = (colRs getString TYPE_NAME).toLowerCase
           val nullable = colRs getBoolean NULLABLE
-          val sc       = SimpleColumn(tableName, colName)
-          val ref      = foreignKeys find (_.from == sc) map (_.to)
-          (typeMap get sqlType).fold(Left(sqlType): Either[String, Column]) { scalaType =>
-            Right(Column(tableName, colName, scalaType, nullable, pkNames contains colName, ref))
+          val sc = SimpleColumn(tableName, colName)
+          val ref = foreignKeys find (_.from == sc) map (_.to)
+          (typeMap get sqlType).fold(Left(sqlType): Either[String, Column]) {
+            scalaType =>
+              Right(
+                Column(tableName,
+                       colName,
+                       scalaType,
+                       nullable,
+                       pkNames contains colName,
+                       ref))
           }
         }
-        columns collect { case Left(colName) => warn(s"UNMAPPED: table: $tableName col $colName") }
+        columns collect {
+          case Left(colName) =>
+            warn(s"UNMAPPED: table: $tableName col $colName")
+        }
         Table(tableName, columns collect { case Right(col) => col })
       }
     }
@@ -184,14 +207,15 @@ object QuillCodeGen {
        """.stripMargin.getBytes
     )
 
-    println(s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
+    println(
+      s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
 
   }
 
   def results(resultSet: ResultSet): Iterator[ResultSet] =
     new Iterator[ResultSet] {
       def hasNext = resultSet.next()
-      def next()  = resultSet
+      def next() = resultSet
     }
 
   def warn(msg: String): Unit =
@@ -213,24 +237,25 @@ trait ReverseNamingStrategy {
 
 object ReverseSnakeCase extends ReverseNamingStrategy {
 
-  import CamelCaser.{ decap, rehump }
+  import CamelCaser.{decap, rehump}
 
-  override def column(s: String): String  = decap(rehump(s))
+  override def column(s: String): String = decap(rehump(s))
   override def default(s: String): String = rehump(s)
 }
 
 object ReverseEscapingSnakeCase extends ReverseNamingStrategy {
 
-  import CamelCaser.{ decap, escape, rehump }
+  import CamelCaser.{decap, escape, rehump}
 
-  override def column(s: String): String  = escape(decap(rehump(s)))
+  override def column(s: String): String = escape(decap(rehump(s)))
   override def default(s: String): String = rehump(s)
 }
 
 object CamelCaser {
 
-  def rehump(s: String): String = (s.toLowerCase split "_" map capitalize).mkString
-  def decap(s: String): String  = s.head.toLower +: s.tail
+  def rehump(s: String): String =
+    (s.toLowerCase split "_" map capitalize).mkString
+  def decap(s: String): String = s.head.toLower +: s.tail
   def escape(s: String): String = if (reservedWords contains s) s"`$s`" else s
 
   private def capitalize(s: String): String = s match {

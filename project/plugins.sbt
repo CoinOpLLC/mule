@@ -46,13 +46,12 @@ addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-RC11")
 /**
   * [source code formatter (scalafmt)](https://github.com/lucidsoftware/neo-sbt-scalafmt)
   */
-// `addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.14")
+addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.15")
 
 /**
   * [The Official™ scalafmt-sbt plugin](http://scalameta.org/scalafmt/#Installation)
   */
-addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.3.0")
-
+// addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.3.0")
 
 /**
   * [site generation](http://www.scala-sbt.org/sbt-site/index.html)
@@ -76,7 +75,6 @@ addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
   */
 // addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.5.5") // for SBT 0.13_
 addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.6.2")
-
 
 /**
   * [tag list (TODO and friends)](https://github.com/johanandren/sbt-taglist)
@@ -104,5 +102,13 @@ addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0") // TODO: current version i
 /**
   * [link](url)
   */
-  // // resolvers += Resolver.typesafeRepo("releases")
-  // // resolvers += Resolver.url("bintray-sbt-plugin-releases")
+// // resolvers += Resolver.typesafeRepo("releases")
+// // resolvers += Resolver.url("bintray-sbt-plugin-releases")
+
+/**
+  * meta lib stuff
+  */
+
+val pgJdbcVersion= "9.4.1212"
+libraryDependencies += "org.postgresql" % "postgresql" % pgJdbcVersion
+scalafmtOnCompile in ThisBuild := true // all projects
