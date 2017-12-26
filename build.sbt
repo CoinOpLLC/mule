@@ -30,6 +30,7 @@ lazy val macros = project
 
 lazy val rdb = project
   .dependsOn(macros)
+  .enablePlugins(QuillCodeGenPlugin)
   .settings(common)
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs ++
@@ -38,6 +39,7 @@ lazy val rdb = project
 
 lazy val wip = project
   .dependsOn(macros, rdb)
+  .settings(common)
   .settings(
     libraryDependencies ++=
       funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++
@@ -59,4 +61,4 @@ lazy val wip = project
 // top level project - TODO: eventually this should only aggregate (no active dev)
 lazy val mule = (project in file("."))
   .aggregate(macros, rdb, wip)
-  .settings(common)
+  // .settings(common)

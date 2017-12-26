@@ -3,6 +3,7 @@ import Keys._
 // import Tests._
 
 object Version {
+
   val Scala = "2.12.4"
   val Xml = "1.0.6"
   val ScalaTest = "3.0.4"
@@ -21,7 +22,8 @@ object Version {
   val HttpSession = "0.5.3"
   val Ammonite = "0.8.3"
   val Quill = "2.3.1"
-  val PgJdbc = "9.4.1212"
+  val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+
   // val PgJdbc = "9.4-1201-jdbc41"
 }
 

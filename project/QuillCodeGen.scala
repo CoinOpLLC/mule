@@ -4,6 +4,8 @@ import java.io.File
 import java.nio.file.{Files, Paths}
 import java.sql.{Connection, DriverManager, ResultSet}
 
+import DepluralizerImplicit._
+
 /**
   *  This customizes the Slick code generator. We only do simple name mappings.
   *  For a more advanced example see https://github.com/cvogt/slick-presentation/tree/scala-exchange-2013
@@ -22,8 +24,6 @@ object QuillCodeGen {
   val PK_TABLE_NAME = "pktable_name"
   val PK_COLUMN_NAME = "pkcolumn_name"
 
-  val scalaFileName = "GeneratedQuillCode.scala"
-
   val defaultTypeMap = Map(
     "int4" -> "Int",
     "serial4" -> "Int",
@@ -36,10 +36,10 @@ object QuillCodeGen {
     "bool" -> "Boolean",
     "bytea" -> "Array[Byte]", // PostgreSQL
     "uuid" -> "java.util.UUID", // H2, PostgreSQL
-    "timestamp" -> "java.time.LocalDateTime",
-    "timestamptz" -> "java.time.OffsetDateTime",
-    "json" -> "me.fix.Json",
-    "jsonb" -> "me.fix.Json"
+    "timestamp" -> "LocalDateTime",
+    "timestamptz" -> "OffsetDateTime",
+    "json" -> "Json",
+    "jsonb" -> "Json"
   )
 
   def apply(
@@ -47,15 +47,17 @@ object QuillCodeGen {
       url: String,
       user: String,
       password: String,
-      file: File,
       pkg: String,
+      imports: Seq[String],
+      file: File,
       schema: String = "public",
-      imports: String = "",
       typeMap: Map[String, String] = defaultTypeMap,
       excludedTables: Set[String] = Set("schema_version"),
       namingStrategy: ReverseNamingStrategy = ReverseSnakeCase
-      // ): Unit = ???
   ): Unit = {
+
+    val logstream = System.err
+    logstream println s"Starting output generation for $file..."
 
     case class Table(name: String, columns: Seq[Column]) {
 
@@ -115,16 +117,9 @@ object QuillCodeGen {
         s"case class ${namingStrategy table columnName}(value: $scalaType) extends AnyVal"
     }
 
-    val logstream = System.err // FIXME lol no... or maybe?!
-
-    logstream println s"Starting output generation for $file..."
-
     val startTime = System.currentTimeMillis()
-
     val _jdbc = (Class forName driver).newInstance()
-
     val db: Connection = DriverManager.getConnection(url, user, password)
-
     val foreignKeys: Set[ForeignKey] = {
 
       // construct raw `ForeignKey`s from the metadata `ResultSet`
@@ -199,8 +194,13 @@ object QuillCodeGen {
     Files write (
       Paths get file.toURI,
       s"""|package ${pkg}
-          |${imports}
           |
+          |${imports map (p => s"import $p") mkString "\n"}
+          |
+          |/**
+          |  * Generated code - do not modify
+          |  * QuillCodeGen  at ${java.time.ZonedDateTime.now}
+          |  */
           |object Tables {
           |  ${tables map (_.toCode) mkString "\n\n  "}
           |}
@@ -230,16 +230,21 @@ object QuillCodeGen {
 // ---
 
 trait ReverseNamingStrategy {
+
+  final protected def maybeDepluralize(s: String): String =
+    s.depluralizeOption.fold(s)(identity)
+
   final def table(s: String): String = default(s)
   def column(s: String): String
   def default(s: String): String
+
 }
 
 object ReverseSnakeCase extends ReverseNamingStrategy {
 
   import CamelCaser.{decap, rehump}
 
-  override def column(s: String): String = decap(rehump(s))
+  override def column(s: String): String = maybeDepluralize(decap(rehump(s)))
   override def default(s: String): String = rehump(s)
 }
 
@@ -247,7 +252,8 @@ object ReverseEscapingSnakeCase extends ReverseNamingStrategy {
 
   import CamelCaser.{decap, escape, rehump}
 
-  override def column(s: String): String = escape(decap(rehump(s)))
+  override def column(s: String): String =
+    maybeDepluralize(escape(decap(rehump(s))))
   override def default(s: String): String = rehump(s)
 }
 
@@ -306,6 +312,32 @@ object CamelCaser {
   )
 
 }
+object DepluralizerImplicit {
+
+  private val RxRow = "(.*)(?i:sheep|series|as|is|us)".r
+  private val RxXes = "(.*)(x|ss|z|ch|sh)es".r
+  private val RxIes = "(.*)ies".r
+  private val RxS = "(.*)s".r
+  private val RxEn = "(.*x)en".r
+
+  implicit class StringDepluralizer(val s: String) extends AnyVal {
+
+    def depluralize = s match {
+      case RxRow("pizz") => s"Pizza" // exceptional Pizza
+      case RxRow(_)      => s"${s}Row"
+      case RxXes(t, end) => s"$t$end"
+      case RxIes(t)      => s"${t}y" // parties => party
+      case RxEn(t)       => t // oxen => ox
+      case RxS(t)        => t // cars => car
+      case _ =>
+        throw new IllegalArgumentException(
+          s"sorry - we seem to need a new depluralize() rule for $s"
+        )
+    }
+    def depluralizeOption = scala.util.Try(depluralize).toOption
+  }
+}
+
 //       url match {
 //
 //       case "" => ()
@@ -746,3 +778,6 @@ object CamelCaser {
 //     }
 //   }
 // }
+/**
+  * Interprets a name as a plural noun and returns the singular version. Hacked ad hoc as needed.
+  */

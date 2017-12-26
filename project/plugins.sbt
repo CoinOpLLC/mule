@@ -1,4 +1,9 @@
 /**
+  *
+  */
+scalafmtOnCompile in ThisBuild := true // all projects
+
+/**
   * Implementing suggestions from [this post](https://pbassiner.github.io/blog/essential_sbt_plugins.html).
   *
   * settings and tasks (mostly(!)) beginWith `dependencyUpdates`
@@ -104,11 +109,3 @@ addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0") // TODO: current version i
   */
 // // resolvers += Resolver.typesafeRepo("releases")
 // // resolvers += Resolver.url("bintray-sbt-plugin-releases")
-
-/**
-  * meta lib stuff
-  */
-
-val pgJdbcVersion= "9.4.1212"
-libraryDependencies += "org.postgresql" % "postgresql" % pgJdbcVersion
-scalafmtOnCompile in ThisBuild := true // all projects
