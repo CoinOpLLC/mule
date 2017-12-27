@@ -25,6 +25,9 @@ object QuillCodeGen {
   val PK_COLUMN_NAME = "pkcolumn_name"
 
   val defaultTypeMap = Map(
+    "serial"      -> "Int",
+    "bigserial"   -> "Long",
+    "money"       -> "BigDecimal",
     "int4"        -> "Int",
     "serial4"     -> "Int",
     "int8"        -> "Long",
@@ -148,8 +151,7 @@ object QuillCodeGen {
 
     val tables: Seq[Table] = {
 
-      val tableResultSets =
-        results(db.getMetaData getTables (null, schema, "%", Array("TABLE"))).toVector
+      val tableResultSets = results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
 
       for {
         tRs <- tableResultSets
@@ -177,7 +179,7 @@ object QuillCodeGen {
         }
         Table(tableName, columns collect { case Right(col) => col })
       }
-    }
+    }.force
 
     db.close() // all done with the db now
 
@@ -197,28 +199,35 @@ object QuillCodeGen {
 
     logstream println codeString
 
-    Files write (Paths get file.toURI, codeString.getBytes)
+    /// FIXME CURSOR
+    // Files write (Paths get file.toURI, codeString.getBytes)
 
     println(s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
 
   }
 
-  def results(rs: ResultSet): Iterator[ResultSet] = {
+  def results(rs: ResultSet): Stream[ResultSet] = {
     val nonEmpty = rs.first()
     // logstream println s"init: iter($rs) nonEmpty == ${nonEmpty}"
-    if (nonEmpty)
-      new Iterator[ResultSet] {
+    if (nonEmpty) {
+      rs.previous()
+      val iter = new Iterator[ResultSet] {
+        var first = true;
         def hasNext =
-          /* val ret = */ !rs.isLast()
+          first ||
+            /* val ret = */ !rs.isLast()
         // logstream println s"iter($rs)::hasNext hn=${ret}"
         // ret
         def next() = {
           rs.next()
+          first = false
           // val hn = !rs.isLast()
           // logstream println s"iter($rs)::next hn=${hn}"
           rs
         }
-      } else Iterator.empty
+      }
+      iter.toStream
+    } else Stream.empty
   }
 
   def warn(msg: String): Unit =
