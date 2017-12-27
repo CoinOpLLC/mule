@@ -38,7 +38,10 @@ lazy val rdb = project
   )
 
 lazy val wip = project
-  .dependsOn(macros, rdb)
+  .dependsOn(
+    macros,
+    // rdb,
+  )
   .settings(common)
   .settings(
     libraryDependencies ++=
