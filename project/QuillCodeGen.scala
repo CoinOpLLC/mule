@@ -1,8 +1,8 @@
 package io.deftrade.sbt
 
 import java.io.File
-import java.nio.file.{Files, Paths}
-import java.sql.{Connection, DriverManager, ResultSet}
+import java.nio.file.{ Files, Paths }
+import java.sql.{ Connection, DriverManager, ResultSet }
 
 import DepluralizerImplicit._
 
@@ -14,33 +14,35 @@ object QuillCodeGen {
 
   type EnumModel = Vector[(String, String)] // enum -> value
 
-  val TABLE_NAME = "TABLE_NAME"
-  val COLUMN_NAME = "COLUMN_NAME"
-  val TYPE_NAME = "TYPE_NAME"
-  val NULLABLE = "NULLABLE"
-  val PK_NAME = "pk_name"
-  val FK_TABLE_NAME = "fktable_name"
+  val TABLE_NAME     = "TABLE_NAME"
+  val COLUMN_NAME    = "COLUMN_NAME"
+  val TYPE_NAME      = "TYPE_NAME"
+  val NULLABLE       = "NULLABLE"
+  val PK_NAME        = "pk_name"
+  val FK_TABLE_NAME  = "fktable_name"
   val FK_COLUMN_NAME = "fkcolumn_name"
-  val PK_TABLE_NAME = "pktable_name"
+  val PK_TABLE_NAME  = "pktable_name"
   val PK_COLUMN_NAME = "pkcolumn_name"
 
   val defaultTypeMap = Map(
-    "int4" -> "Int",
-    "serial4" -> "Int",
-    "int8" -> "Long",
-    "serial8" -> "Long",
-    "float8" -> "Double",
-    "numeric" -> "BigDecimal",
-    "varchar" -> "String",
-    "text" -> "String",
-    "bool" -> "Boolean",
-    "bytea" -> "Array[Byte]", // PostgreSQL
-    "uuid" -> "java.util.UUID", // H2, PostgreSQL
-    "timestamp" -> "LocalDateTime",
+    "int4"        -> "Int",
+    "serial4"     -> "Int",
+    "int8"        -> "Long",
+    "serial8"     -> "Long",
+    "float8"      -> "Double",
+    "numeric"     -> "BigDecimal",
+    "varchar"     -> "String",
+    "text"        -> "String",
+    "bool"        -> "Boolean",
+    "bytea"       -> "Array[Byte]", // PostgreSQL
+    "uuid"        -> "java.util.UUID", // H2, PostgreSQL
+    "timestamp"   -> "LocalDateTime",
     "timestamptz" -> "OffsetDateTime",
-    "json" -> "Json",
-    "jsonb" -> "Json"
+    "json"        -> "Json",
+    "jsonb"       -> "Json"
   )
+
+  val logstream = System.err
 
   def apply(
       driver: String,
@@ -56,7 +58,6 @@ object QuillCodeGen {
       namingStrategy: ReverseNamingStrategy = ReverseSnakeCase
   ): Unit = {
 
-    val logstream = System.err
     logstream println s"Starting output generation for $file..."
 
     case class Table(name: String, columns: Seq[Column]) {
@@ -72,7 +73,7 @@ object QuillCodeGen {
           yield c.asValueClass
 
         s"""|/**
-            |  * $scalaName
+            |  * table $schema.$name
             |  */
             |case class $scalaName(
             |  ${applyArgs mkString ",\n    "}
@@ -92,7 +93,7 @@ object QuillCodeGen {
 
     case class SimpleColumn(tableName: String, columnName: String) {
       def asValueType =
-        s"${namingStrategy table tableName}.${namingStrategy table columnName}"
+        s"${namingStrategy table tableName}.${namingStrategy default columnName}"
     }
 
     case class Column(tableName: String,
@@ -117,23 +118,21 @@ object QuillCodeGen {
         s"case class ${namingStrategy table columnName}(value: $scalaType) extends AnyVal"
     }
 
-    val startTime = System.currentTimeMillis()
-    val _jdbc = (Class forName driver).newInstance()
-    val db: Connection = DriverManager.getConnection(url, user, password)
+    val startTime      = System.currentTimeMillis()
+    val _jdbc          = (Class forName driver).newInstance()
+    val db: Connection = DriverManager getConnection (url, user, password)
+
+    logstream println db
     val foreignKeys: Set[ForeignKey] = {
 
       // construct raw `ForeignKey`s from the metadata `ResultSet`
       val unresolvedFKs = for {
-        tRs <- results(
-          db.getMetaData getTables (null, schema, "%", Array("TABLE")))
-        fkRs <- results(
-          db.getMetaData getExportedKeys (null, schema, tRs getString TABLE_NAME))
+        tRs  <- results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
+        fkRs <- results(db.getMetaData getExportedKeys (null, schema, tRs getString TABLE_NAME))
       } yield
         ForeignKey(
-          from = SimpleColumn(fkRs getString FK_TABLE_NAME,
-                              fkRs getString FK_COLUMN_NAME),
-          to = SimpleColumn(fkRs getString PK_TABLE_NAME,
-                            fkRs getString PK_COLUMN_NAME)
+          from = SimpleColumn(fkRs getString FK_TABLE_NAME, fkRs getString FK_COLUMN_NAME),
+          to = SimpleColumn(fkRs getString PK_TABLE_NAME, fkRs getString PK_COLUMN_NAME)
         )
 
       // "resolve" by following references (?!)
@@ -156,29 +155,20 @@ object QuillCodeGen {
         tRs <- tableResultSets
         if !(excludedTables contains (tRs getString TABLE_NAME))
         tableName = tRs getString TABLE_NAME
-        pkNames = (results(
-          db.getMetaData getPrimaryKeys (null, null, tableName)).toSeq map {
+        pkNames = (results(db.getMetaData getPrimaryKeys (null, null, tableName)).toSeq map {
           _ getString COLUMN_NAME
         }).toSet
       } yield {
         val columns: Seq[Either[String, Column]] = for {
-          colRs <- results(
-            db.getMetaData getColumns (null, schema, tableName, null)).toSeq
+          colRs <- results(db.getMetaData getColumns (null, schema, tableName, null)).toSeq
         } yield {
-          val colName = colRs getString COLUMN_NAME
-          val sqlType = (colRs getString TYPE_NAME).toLowerCase
+          val colName  = colRs getString COLUMN_NAME
+          val sqlType  = (colRs getString TYPE_NAME).toLowerCase
           val nullable = colRs getBoolean NULLABLE
-          val sc = SimpleColumn(tableName, colName)
-          val ref = foreignKeys find (_.from == sc) map (_.to)
-          (typeMap get sqlType).fold(Left(sqlType): Either[String, Column]) {
-            scalaType =>
-              Right(
-                Column(tableName,
-                       colName,
-                       scalaType,
-                       nullable,
-                       pkNames contains colName,
-                       ref))
+          val sc       = SimpleColumn(tableName, colName)
+          val ref      = foreignKeys find (_.from == sc) map (_.to)
+          (typeMap get sqlType).fold(Left(sqlType): Either[String, Column]) { scalaType =>
+            Right(Column(tableName, colName, scalaType, nullable, pkNames contains colName, ref))
           }
         }
         columns collect {
@@ -191,8 +181,7 @@ object QuillCodeGen {
 
     db.close() // all done with the db now
 
-    Files write (
-      Paths get file.toURI,
+    val codeString =
       s"""|package ${pkg}
           |
           |${imports map (p => s"import $p") mkString "\n"}
@@ -204,19 +193,33 @@ object QuillCodeGen {
           |object Tables {
           |  ${tables map (_.toCode) mkString "\n\n  "}
           |}
-       """.stripMargin.getBytes
-    )
+       """.stripMargin
 
-    println(
-      s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
+    logstream println codeString
+
+    Files write (Paths get file.toURI, codeString.getBytes)
+
+    println(s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
 
   }
 
-  def results(resultSet: ResultSet): Iterator[ResultSet] =
-    new Iterator[ResultSet] {
-      def hasNext = resultSet.next()
-      def next() = resultSet
-    }
+  def results(rs: ResultSet): Iterator[ResultSet] = {
+    val nonEmpty = rs.first()
+    // logstream println s"init: iter($rs) nonEmpty == ${nonEmpty}"
+    if (nonEmpty)
+      new Iterator[ResultSet] {
+        def hasNext =
+          /* val ret = */ !rs.isLast()
+        // logstream println s"iter($rs)::hasNext hn=${ret}"
+        // ret
+        def next() = {
+          rs.next()
+          // val hn = !rs.isLast()
+          // logstream println s"iter($rs)::next hn=${hn}"
+          rs
+        }
+      } else Iterator.empty
+  }
 
   def warn(msg: String): Unit =
     System.err.println(s"[${Console.YELLOW}warn${Console.RESET}] $msg")
@@ -231,37 +234,32 @@ object QuillCodeGen {
 
 trait ReverseNamingStrategy {
 
-  final protected def maybeDepluralize(s: String): String =
+  private[this] def maybeDepluralize(s: String): String =
     s.depluralizeOption.fold(s)(identity)
 
-  final def table(s: String): String = default(s)
+  final def default(s: String): String = CamelCaser rehump s
+  final def table(s: String): String   = maybeDepluralize(default(s))
   def column(s: String): String
-  def default(s: String): String
 
 }
 
 object ReverseSnakeCase extends ReverseNamingStrategy {
 
-  import CamelCaser.{decap, rehump}
-
-  override def column(s: String): String = maybeDepluralize(decap(rehump(s)))
-  override def default(s: String): String = rehump(s)
+  override def column(s: String): String = CamelCaser decap default(s)
 }
 
 object ReverseEscapingSnakeCase extends ReverseNamingStrategy {
 
-  import CamelCaser.{decap, escape, rehump}
+  import CamelCaser.{ decap, escape }
 
-  override def column(s: String): String =
-    maybeDepluralize(escape(decap(rehump(s))))
-  override def default(s: String): String = rehump(s)
+  override def column(s: String): String = escape(decap(default(s)))
 }
 
 object CamelCaser {
 
   def rehump(s: String): String =
     (s.toLowerCase split "_" map capitalize).mkString
-  def decap(s: String): String = s.head.toLower +: s.tail
+  def decap(s: String): String  = s.head.toLower +: s.tail
   def escape(s: String): String = if (reservedWords contains s) s"`$s`" else s
 
   private def capitalize(s: String): String = s match {
@@ -317,8 +315,8 @@ object DepluralizerImplicit {
   private val RxRow = "(.*)(?i:sheep|series|as|is|us)".r
   private val RxXes = "(.*)(x|ss|z|ch|sh)es".r
   private val RxIes = "(.*)ies".r
-  private val RxS = "(.*)s".r
-  private val RxEn = "(.*x)en".r
+  private val RxS   = "(.*)s".r
+  private val RxEn  = "(.*x)en".r
 
   implicit class StringDepluralizer(val s: String) extends AnyVal {
 

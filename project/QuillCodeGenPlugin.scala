@@ -8,10 +8,10 @@ import java.io.File
 object QuillCodeGenPlugin extends AutoPlugin {
 
   override def requires = org.flywaydb.sbt.FlywayPlugin
-  override def trigger = noTrigger
+  override def trigger  = noTrigger
 
-  type FileSet = Set[File]
-  type FileSetFunction = FileSet => FileSet
+  type FileSet           = Set[File]
+  type FileSetFunction   = FileSet => FileSet
   type FileSetCombinator = FileSetFunction => FileSetFunction
 
   object autoImport {
@@ -57,12 +57,8 @@ object QuillCodeGenPlugin extends AutoPlugin {
         qcgOutFile := ((qcgPackage.value split '.')
           .foldLeft(sourceManaged.value) { _ / _ }) /
           qcgOutFileName.value,
-        flywayDriver := "org.postgresql.Driver",
-        flywayUrl := "jdbc:postgresql://localhost:5432/test",
-        flywayUser := "deftrade",
-        flywayPassword := "password",
         qcgRunUncached := {
-          // FIXME: this needs to come back when the code gen is working
+          // FIXME: UNCOMMENT when the code gen is working
           // flywayMigrate.value // i.e. do the migrate. Returns Unit - pure effect
           _root_.io.deftrade.sbt.QuillCodeGen(
             driver = flywayDriver.value, // conciously coupling to Flyway config
@@ -77,10 +73,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
         },
         qcgRun := {
 
-          import FilesInfo.{
-            exists,
-            lastModified
-          } // these are the flags we care about
+          import FilesInfo.{ exists, lastModified } // these are the flags we care about
 
           // named; sbt forbids invoking tasks within anon functions
           def doTheThing: FileSet = {

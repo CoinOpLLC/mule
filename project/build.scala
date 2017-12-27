@@ -4,25 +4,25 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.12.4"
-  val Xml = "1.0.6"
-  val ScalaTest = "3.0.4"
+  val Scala          = "2.12.4"
+  val Xml            = "1.0.6"
+  val ScalaTest      = "3.0.4"
   val TypesafeConfig = "1.3.2"
-  val Cats = "1.0.0-RC1"
-  val Quicklens = "1.4.11"
-  val PureConfig = "0.8.0"
-  val Enumeratum = "1.5.12"
-  val Spire = "0.14.1"
-  val Refined = "0.8.4"
-  val Squants = "1.3.0"
-  val Circe = "0.8.0"
-  val Fansi = "0.2.5"
-  val Time4S = "1.5"
-  val AkkaHttp = "10.0.11"
-  val HttpSession = "0.5.3"
-  val Ammonite = "0.8.3"
-  val Quill = "2.3.1"
-  val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+  val Cats           = "1.0.0-RC1"
+  val Quicklens      = "1.4.11"
+  val PureConfig     = "0.8.0"
+  val Enumeratum     = "1.5.12"
+  val Spire          = "0.14.1"
+  val Refined        = "0.8.4"
+  val Squants        = "1.3.0"
+  val Circe          = "0.8.0"
+  val Fansi          = "0.2.5"
+  val Time4S         = "1.5"
+  val AkkaHttp       = "10.0.11"
+  val HttpSession    = "0.5.3"
+  val Ammonite       = "0.8.3"
+  val Quill          = "2.3.1"
+  val PgJdbc         = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
 
   // val PgJdbc = "9.4-1201-jdbc41"
 }
@@ -31,9 +31,9 @@ object Deps {
 
   import Version._
 
-  val scompiler = "org.scala-lang" % "scala-compiler" % Scala
-  val reflection = "org.scala-lang" % "scala-reflect" % Scala
-  val xml = "org.scala-lang.modules" %% "scala-xml" % Xml
+  val scompiler  = "org.scala-lang"         % "scala-compiler" % Scala
+  val reflection = "org.scala-lang"         % "scala-reflect"  % Scala
+  val xml        = "org.scala-lang.modules" %% "scala-xml"     % Xml
   // val parserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.1"
 
   val conf = "com.typesafe" % "config" % TypesafeConfig
@@ -58,7 +58,7 @@ object Deps {
   ) map (_ % Refined)
 
   val enumerata = Seq(
-    "com.beachape" %% "enumeratum" % Enumeratum,
+    "com.beachape" %% "enumeratum"       % Enumeratum,
     "com.beachape" %% "enumeratum-circe" % Enumeratum,
   )
 
@@ -99,8 +99,8 @@ object Deps {
   /** toolkits */
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
 
-  val httpSession = "com.softwaremill.akka-http-session" %% "core" % HttpSession
-  val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt" % HttpSession
+  val httpSession    = "com.softwaremill.akka-http-session" %% "core" % HttpSession
+  val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
   // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
 
   lazy val httplibs = List(
@@ -182,7 +182,7 @@ object Args {
   lazy val ywarnUnusedDeets = List(
     "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
     "-Ywarn-unused:imports", // Warn if an import selector is not referenced.
-    "-Ywarn-unused:locals", // Warn if a local definition is unused.
+    "-Ywarn-unused:locals",  // Warn if a local definition is unused.
     // "-Ywarn-unused:params", // Warn if a value parameter is unused.
     "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
     "-Ywarn-unused:privates" // Warn if a private member is unused.

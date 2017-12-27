@@ -19,7 +19,6 @@ package wip
 
 import java.{ time => jt }
 import jt.{ temporal => jtt }
-import jtt.{ TemporalAdjuster, TemporalField, TemporalQuery }
 
 import scala.util.Try
 import scala.collection.immutable.SortedSet
@@ -144,7 +143,7 @@ object SyntaxForwardTime {
 
 object TemporalAdjuster {
 
-  def apply(adjust: LocalDate => LocalDate): TemporalAdjuster = new TemporalAdjuster {
+  def apply(adjust: LocalDate => LocalDate): jtt.TemporalAdjuster = new jtt.TemporalAdjuster {
     // justification: creating an instance of a java lib class; this is what the doc says: throw.
     @SuppressWarnings(Array("org.wartremover.warts.Throw"))
     override def adjustInto(t: Temporal): Temporal = t match {
@@ -157,7 +156,7 @@ object TemporalAdjuster {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def unapply(ta: TemporalAdjuster): Option[LocalDate => LocalDate] =
+  def unapply(ta: jtt.TemporalAdjuster): Option[LocalDate => LocalDate] =
     Some(
       localDate =>
         // justification for this downcast:
@@ -169,9 +168,12 @@ object TemporalAdjuster {
 }
 
 object TemporalQuery {
-  import jtt.{ TemporalQueries => TQs }
-  type TQ[+R] = LocalDate => R // TODO: interface design: consider R := LocalDate => LocalDate... !
+  import jtt.{ TemporalQuery, TemporalQueries => TQs }
+  type TQ[+R] = LocalDate => R
+  // consider R := LocalDate => LocalDate... !
   // in other words: A TQ[LocalDate => LocalDate] Query produces an Adjuster from a LocalDate
+  type TA = TQ[LocalDate => LocalDate]
+
   def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
     override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
       case ld: LocalDate => (ld |> tq).some
@@ -237,8 +239,8 @@ object WorkTime {
 
   import jtt.WeekFields
 
-  val iso: WeekFields    = WeekFields.ISO
-  val dow: TemporalField = iso.dayOfWeek
+  val iso: WeekFields        = WeekFields.ISO
+  val dow: jtt.TemporalField = iso.dayOfWeek
 
   // n.b.: all `jtt.Temporal`s are also `Comparable`
   implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
@@ -307,8 +309,8 @@ object WorkTime {
 
   sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
 
-    final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
-    final def adjuster: LocalDate => LocalDate   = _adj(delta, sameMonth)
+    final def temporalAdjuster: jtt.TemporalAdjuster = TemporalAdjuster(adjuster)
+    final def adjuster: LocalDate => LocalDate       = _adj(delta, sameMonth)
 
     private def _adj(d: Period, sm: Boolean): LocalDate => LocalDate = {
       case ld if workDay(ld) && sm && (ld + d).getMonth === ld.getMonth =>

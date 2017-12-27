@@ -1,6 +1,6 @@
 import Deps._
 
-lazy val common = List(
+lazy val common = Seq(
   organization                            := "io.deftrade",
   organizationName                        := "CoinOp LLC",
   scalaVersion                            := Version.Scala,
@@ -21,6 +21,13 @@ lazy val common = List(
   )
 )
 
+lazy val flyway = Seq(
+  flywayDriver   := "org.postgresql.Driver",
+  flywayUrl      := "jdbc:postgresql://localhost:5432/test",
+  flywayUser     := "deftrade",
+  flywayPassword := "password"
+)
+
 lazy val macros = project
   .settings(common)
   .settings(
@@ -32,6 +39,7 @@ lazy val rdb = project
   .dependsOn(macros)
   .enablePlugins(QuillCodeGenPlugin)
   .settings(common)
+  .settings(flyway)
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs ++
       Seq(postgres)
@@ -39,7 +47,7 @@ lazy val rdb = project
 
 lazy val wip = project
   .dependsOn(
-    macros,
+    macros
     // rdb,
   )
   .settings(common)
@@ -64,4 +72,4 @@ lazy val wip = project
 // top level project - TODO: eventually this should only aggregate (no active dev)
 lazy val mule = (project in file("."))
   .aggregate(macros, rdb, wip)
-  // .settings(common)
+// .settings(common)
