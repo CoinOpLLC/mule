@@ -197,12 +197,13 @@ object QuillCodeGen {
           |}
        """.stripMargin
 
-    logstream println codeString
+    // logstream println codeString
 
-    /// FIXME CURSOR
-    // Files write (Paths get file.toURI, codeString.getBytes)
-
-    println(s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)")
+    // TODO: this is smelly; is there a better ideom?
+    val path = file.toPath
+    if (path.getParent.toFile.mkdirs) logstream println s"qcg: created dirs for $path"
+    Files write (path, codeString.getBytes)
+    logstream println s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
 
   }
 
