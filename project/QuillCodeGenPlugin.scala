@@ -51,7 +51,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
           "cats.Eq",
           "java.util.UUID",
           "java.time.{LocalDateTime, OffsetDateTime}",
-          "circe.Json"
+          "io.circe.Json"
         ),
         qcgOutFileName := "GeneratedQuillCode.scala",
         qcgOutFile := ((qcgPackage.value split '.')
@@ -86,9 +86,11 @@ object QuillCodeGenPlugin extends AutoPlugin {
               .foldLeft(baseDirectory.value) { _ / _ }
           })
           val tag = streams.value.cacheDirectory / "gen-quill-code"
-          val cacher: FileSetCombinator =
+          val cache: FileSetCombinator =
             FileFunction.cached(tag, lastModified, exists)
-          val cachedQcg: FileSetFunction = cacher(_ => doTheThing)
+          val cachedQcg: FileSetFunction = cache { _ => // n.b. we use inSet only to trigger
+            doTheThing
+          }
 
           cachedQcg(inSet).toSeq
         },

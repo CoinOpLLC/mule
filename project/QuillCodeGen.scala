@@ -7,8 +7,7 @@ import java.sql.{ Connection, DriverManager, ResultSet }
 import DepluralizerImplicit._
 
 /**
-  *  This customizes the Slick code generator. We only do simple name mappings.
-  *  For a more advanced example see https://github.com/cvogt/slick-presentation/tree/scala-exchange-2013
+  * Rather than "Type all the things", this generator restricts itself to typing all the indexes.
   */
 object QuillCodeGen {
 
@@ -58,7 +57,7 @@ object QuillCodeGen {
       schema: String = "public",
       typeMap: Map[String, String] = defaultTypeMap,
       excludedTables: Set[String] = Set("schema_version"),
-      namingStrategy: ReverseNamingStrategy = ReverseSnakeCase
+      namingStrategy: ReverseNamingStrategy = ReverseEscapingSnakeCase
   ): Unit = {
 
     logstream println s"Starting output generation for $file..."
@@ -70,7 +69,7 @@ object QuillCodeGen {
         val scalaName = namingStrategy table name
 
         val applyArgs = for (col <- columns)
-          yield s"${col.scalaName}: ${col.scalaOptionType}"
+          yield s"${col.asValueName}: ${col.scalaOptionType}"
 
         val valueClasses = for (c <- columns if c.isPrimaryKey)
           yield c.asValueClass
@@ -79,10 +78,10 @@ object QuillCodeGen {
             |  * table $schema.$name
             |  */
             |case class $scalaName(
-            |  ${applyArgs mkString ",\n    "}
+            |  ${applyArgs mkString ",\n  "}
             |)
             |object $scalaName {
-            |  ${valueClasses mkString "\n    "}
+            |  ${valueClasses mkString "\n  "}
             |}""".stripMargin
       }
     }
@@ -108,17 +107,18 @@ object QuillCodeGen {
 
       def scalaOptionType = {
         val raw = if (isPrimaryKey) {
-          s"${namingStrategy table columnName}"
+          s"${namingStrategy table tableName}.$asTypeName"
         } else {
           reference.fold(scalaType)(_.asValueType)
         }
         if (nullable) s"Option[$raw]" else raw
       }
 
-      def scalaName: String = s"${namingStrategy column columnName}"
+      lazy val asValueName: String = namingStrategy column columnName
+      lazy val asTypeName: String  = namingStrategy table columnName
 
       def asValueClass: String =
-        s"case class ${namingStrategy table columnName}(value: $scalaType) extends AnyVal"
+        s"case class $asTypeName(value: $scalaType) extends AnyVal"
     }
 
     val startTime      = System.currentTimeMillis()
@@ -190,7 +190,8 @@ object QuillCodeGen {
           |
           |/**
           |  * Generated code - do not modify
-          |  * QuillCodeGen  at ${java.time.ZonedDateTime.now}
+          |  * QuillCodeGen
+          |  * ${java.time.ZonedDateTime.now}
           |  */
           |object Tables {
           |  ${tables map (_.toCode) mkString "\n\n  "}

@@ -65,7 +65,6 @@ package io {
       val Seq = scala.collection.immutable.Seq
 
       def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
-
     }
 
     trait MyTime {
