@@ -40,6 +40,7 @@ object QuillCodeGen {
     "uuid"        -> "java.util.UUID", // H2, PostgreSQL
     "timestamp"   -> "LocalDateTime",
     "timestamptz" -> "OffsetDateTime",
+    "tstzrange"   -> "Raynge[OffsetDateTime]",
     "json"        -> "Json",
     "jsonb"       -> "Json"
   )
@@ -194,7 +195,7 @@ object QuillCodeGen {
           |  * ${java.time.ZonedDateTime.now}
           |  */
           |object Tables {
-          |  ${tables map (_.toCode) mkString "\n\n  "}
+          |${tables map (_.toCode) mkString "\n\n"}
           |}
        """.stripMargin
 

@@ -1,24 +1,23 @@
 package io.deftrade
 package rdb
 
-import cats._
-import cats.implicits._
+// import cats._
+// import cats.implicits._
 
 // URLParser.parse("jdbc:postgresql://localhost:5233/my_database?user=postgres&password=somepassword")
 // val connection: Connection = new PostgreSQLConnection(configuration)
 
-sealed trait Bound {
+sealed trait Bounds {
   final def lower = toString charAt 0
   final def upper = toString charAt 1
 }
-case object `[)` extends Bound
-case object `[]` extends Bound
-case object `(]` extends Bound
-case object `()` extends Bound
+case object `[)` extends Bounds
+case object `[]` extends Bounds
+case object `(]` extends Bounds
+case object `()` extends Bounds
 
-// n.b. since I'm not sure what postgres does when lower > upper, don't check yet
-class Range[A] private (val lower: A, upper: A, bound: Bound) {
-  final override def toString = s"${bound.lower}${lower}, ${upper}${bound.upper}"
+object Bounds {
+  implicit val defaultBounds: Bounds = `[)`
 }
 
 /**
@@ -30,6 +29,20 @@ trait Boundless[A] {
 }
 
 object Boundless {
+
+  /**
+    * since SQL uses `NULL` to signal ±∞ (I know, right?),
+    * we need pairs of `Option[A]` to construct a `Raynge` in the general case
+    */
+  implicit def optionBoundless[A]: Boundless[Option[A]] = new Boundless[Option[A]] {
+    override def noLower = None
+    override def noUpper = None
+  }
+
+  /**
+    * If we know the type `A` is Boundless (that is, has distinguished values for -∞ and ∞),
+    * we don't need to wrap `A` in `Option`.
+    */
   implicit val doubleBoundless: Boundless[Double] = new Boundless[Double] {
     override def noLower = Double.NegativeInfinity
     override def noUpper = Double.PositiveInfinity
@@ -44,17 +57,39 @@ object Boundless {
     override def noLower = LocalDateTime.MIN
     override def noUpper = LocalDateTime.MAX
   }
+
+  def apply[A: Boundless]: Boundless[A] = implicitly
 }
 
-object Range {
+// n.b. since I'm not sure what postgres does when lower > upper, don't check yet
+class Raynge[A] private (lower: A, upper: A, bound: Bounds) {
+  final override def toString = s"${bound.lower}${lower}, ${upper}${bound.upper}"
+}
 
-  implicit def toOptionRange[A](pair: (Option[A], Option[A]))(implicit bound: Bound) =
-    new Range(pair._1, pair._2, bound)
+object Raynge {
 
-  implicit def toRange[A: Boundless](pair: (A, A))(implicit bound: Bound) =
-    new Range(pair._1, pair._2, bound)
+  /**
+    * The spec says we can only make `Raynge[A]`s out of `Boundless` types.
+    */
+  def apply[A: Boundless](lower: A, upper: A)(implicit bounds: Bounds): Raynge[A] =
+    apply(upper, lower, bounds)
 
-  object ImplicitBounds {
-    implicit val defaultBound: Bound = `[)`
+  /**
+    * Accepting an explicit bounds spec is always polite.
+    */
+  def apply[A: Boundless](lower: A, upper: A, bounds: Bounds): Raynge[A] =
+    new Raynge[A](upper, lower, bounds)
+
+  /**
+    * Enrange all the Pairs fit to be enRanged.
+    */
+  implicit class RangePair[A: Boundless](val aa: (A, A))(implicit bounds: Bounds) {
+    def toRange = Raynge[A](aa._1, aa._2)
+  }
+
+  object ImplicitConversions {
+
+    implicit def convertToRange[A: Boundless](aa: (A, A))(implicit bound: Bounds) =
+      Raynge(aa._1, aa._2, bound)
   }
 }

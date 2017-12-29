@@ -43,7 +43,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
       import org.flywaydb.sbt.FlywayPlugin.autoImport._
 
       Seq(
-        qcgPackage := "io.deftade.rdb",
+        qcgPackage := "io.deftrade.rdb",
         qcgImports := Seq(
           "io.getquill._",
           "cats.syntax._",
