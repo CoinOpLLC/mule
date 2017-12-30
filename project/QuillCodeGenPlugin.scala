@@ -50,7 +50,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
           "cats.implicits._",
           "cats.Eq",
           "java.util.UUID",
-          "java.time.{LocalDateTime, OffsetDateTime}",
+          "java.time.{LocalDateTime, OffsetDateTime, Duration}",
           "io.circe.Json"
         ),
         qcgOutFileName := "GeneratedQuillCode.scala",
@@ -97,6 +97,12 @@ object QuillCodeGenPlugin extends AutoPlugin {
         sourceGenerators += qcgRun.taskValue
       )
     }
+
+    // val wut = sql"""
+    //         SELECT t.typname, e.enumlabel
+    //         FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;"""
+    //       .as[(String, String)].toMap
+
   }
 
   import autoImport._

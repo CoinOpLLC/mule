@@ -40,6 +40,7 @@ object QuillCodeGen {
     "uuid"        -> "java.util.UUID", // H2, PostgreSQL
     "timestamp"   -> "LocalDateTime",
     "timestamptz" -> "OffsetDateTime",
+    "interval"    -> "Duration",
     "tstzrange"   -> "Raynge[OffsetDateTime]",
     "json"        -> "Json",
     "jsonb"       -> "Json"

@@ -22,6 +22,10 @@ lazy val common = Seq(
 )
 
 lazy val flyway = Seq(
+  //     flywayCleanOnValidationError := true,
+  //     flywayTable := "schema_versions" // migrations metadata table name
+  //     // scgPackage := "io.deftrade.db.test"
+  flywayLocations := List("filesystem:rdb/src/main/resources/db/migration"),
   flywayDriver   := "org.postgresql.Driver",
   flywayUrl      := "jdbc:postgresql://localhost:5432/test",
   flywayUser     := "deftrade",
@@ -57,17 +61,6 @@ lazy val wip = project
         quills ++ httplibs ++ circeii ++
         Seq(postgres)
   )
-// .settings(
-//   Seq(
-//     flywayLocations := List("filesystem:db/src/main/resources/db/migration"),
-//     flywayDriver := "org.postgresql.Driver",
-//     flywayUrl := "jdbc:postgresql://localhost:5432/test",
-//     flywayUser := "ndw",
-//     flywayCleanOnValidationError := true,
-//     flywayTable := "schema_versions" // migrations metadata table name
-//     // scgPackage := "io.deftrade.db.test"
-//   )
-// )
 
 // top level project - TODO: eventually this should only aggregate (no active dev)
 lazy val mule = (project in file("."))
