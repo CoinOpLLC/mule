@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+// no package chaining: does not depend on core, which implements io.deftrade api
+// DO NOT REMOVE THIS COMMENT
+
 package io.deftrade.meta
 
 import scala.language.experimental.macros

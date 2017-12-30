@@ -120,11 +120,11 @@ object Deps {
     List(
       reflection,
       scompiler,
-      xml,
-      conf,
-      time4s,
-      fansi,
-      scalatest
+      xml, // FIXME: check the state of available alternatives
+      conf, // we believe our opinions are worthy of opinionating
+      time4s, // FIXME: remove this dependency
+      fansi, // can't help myself
+      scalatest // pre-scoped to Test configuration
     )
 }
 

@@ -17,19 +17,18 @@ lazy val common = Seq(
   startYear                               := Some(2017),
   licenses                                += ("Apache-2.0", Args.alv2url),
   headerLicense := Some(
-    HeaderLicense.ALv2("2017", organizationName.value)
+    HeaderLicense.ALv2("2017", organizationName.value) // FIXME: why repeat the year?
   )
 )
 
 lazy val flyway = Seq(
-  //     flywayCleanOnValidationError := true,
-  //     flywayTable := "schema_versions" // migrations metadata table name
-  //     // scgPackage := "io.deftrade.db.test"
-  flywayLocations := List("filesystem:rdb/src/main/resources/db/migration"),
-  flywayDriver   := "org.postgresql.Driver",
-  flywayUrl      := "jdbc:postgresql://localhost:5432/test",
-  flywayUser     := "deftrade",
-  flywayPassword := "password"
+  flywayCleanOnValidationError := true,
+  flywayTable                  := "schema_versions", // migrations metadata table name
+  flywayLocations              := Seq("filesystem:rdb/src/main/resources/db/migration"),
+  flywayDriver                 := "org.postgresql.Driver",
+  flywayUrl                    := "jdbc:postgresql://localhost:5432/test",
+  flywayUser                   := "deftrade",
+  flywayPassword               := "password"
 )
 
 lazy val macros = project
@@ -39,30 +38,33 @@ lazy val macros = project
       Seq(reflection, scompiler, scalatest)
   )
 
-lazy val rdb = project
+lazy val core = project
   .dependsOn(macros)
-  .enablePlugins(QuillCodeGenPlugin)
   .settings(common)
-  .settings(flyway)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ pureConfigs ++ quills ++ misclibs ++
-      Seq(postgres)
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs
   )
 
-lazy val wip = project
-  .dependsOn(
-    macros
-    // rdb,
+// rdb := relational data base
+lazy val rdb = project
+  .dependsOn(core)
+  .enablePlugins(QuillCodeGenPlugin)
+  .settings(common, flyway)
+  .settings(
+    libraryDependencies ++= quills ++ circeii ++ Seq(postgres)
   )
+
+// wip := work in progress
+lazy val wip = project
+// .dependsOn(core, rdb)
+  .dependsOn(core)
   .settings(common)
   .settings(
-    libraryDependencies ++=
-      funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++
-        quills ++ httplibs ++ circeii ++
-        Seq(postgres)
+    libraryDependencies ++= httplibs ++ Seq(scalatest)
   )
 
 // top level project - TODO: eventually this should only aggregate (no active dev)
 lazy val mule = (project in file("."))
-  .aggregate(macros, rdb, wip)
-// .settings(common)
+// .dependsOn(core, rdb, wip)
+  .dependsOn(core, rdb)
+  .settings(common)
