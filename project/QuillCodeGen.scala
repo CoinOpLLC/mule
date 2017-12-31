@@ -46,6 +46,7 @@ object QuillCodeGen {
     "jsonb"       -> "Json"
   )
 
+  // FIXME: use sbt logging system
   val logstream = System.err
 
   def apply(
@@ -128,16 +129,48 @@ object QuillCodeGen {
     val db: Connection = DriverManager getConnection (url, user, password)
 
     logstream println db
+
+    def tableRows             = results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
+    def xkRows(tR: ResultSet) = results(db.getMetaData getExportedKeys (null, schema, tR getString TABLE_NAME))
+
+    def pkRows(tableName: String)     = results(db.getMetaData getPrimaryKeys (null, null, tableName))
+    def columnRows(tableName: String) = results(db.getMetaData getColumns (null, schema, tableName, null))
+
+    def tidy[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
+      kvs groupBy (_._1) map {
+        case (k, kvs) => (k, kvs map (_._2))
+      }
+
+    val enumSql =
+      """|SELECT t.typname, e.enumlabel
+         |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
+         |""".stripMargin
+
+    def enumRows: Traversable[(String, String)] =
+      results(db.createStatement executeQuery enumSql) map { row =>
+        (row getString "t.typename", row getString "e.enumLabel")
+      }
+
+    def adtCode =
+      for ((key, values) <- tidy(enumRows))
+        yield {
+          val k  = namingStrategy table key
+          val es = values map (e => s"case object ${namingStrategy default e} extends $k")
+          s"""|sealed trait ${k}
+            |${es mkString "\n"}
+            |""".stripMargin
+        }
+
     val foreignKeys: Set[ForeignKey] = {
 
       // construct raw `ForeignKey`s from the metadata `ResultSet`
       val unresolvedFKs = for {
-        tRs  <- results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
-        fkRs <- results(db.getMetaData getExportedKeys (null, schema, tRs getString TABLE_NAME))
+        tR  <- tableRows
+        fkR <- xkRows(tR)
       } yield
         ForeignKey(
-          from = SimpleColumn(fkRs getString FK_TABLE_NAME, fkRs getString FK_COLUMN_NAME),
-          to = SimpleColumn(fkRs getString PK_TABLE_NAME, fkRs getString PK_COLUMN_NAME)
+          from = SimpleColumn(fkR getString FK_TABLE_NAME, fkR getString FK_COLUMN_NAME),
+          to = SimpleColumn(fkR getString PK_TABLE_NAME, fkR getString PK_COLUMN_NAME)
         )
 
       // "resolve" by following references (?!)
@@ -153,18 +186,16 @@ object QuillCodeGen {
 
     val tables: Seq[Table] = {
 
-      val tableResultSets = results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
+      import language.postfixOps // hold my beer
 
       for {
-        tRs <- tableResultSets
-        if !(excludedTables contains (tRs getString TABLE_NAME))
-        tableName = tRs getString TABLE_NAME
-        pkNames = (results(db.getMetaData getPrimaryKeys (null, null, tableName)).toSeq map {
-          _ getString COLUMN_NAME
-        }).toSet
+        tR <- tableRows
+        if !(excludedTables contains (tR getString TABLE_NAME))
+        tableName = tR getString TABLE_NAME
+        pkNames   = pkRows(tableName).toSeq map (_ getString COLUMN_NAME) toSet
       } yield {
         val columns: Seq[Either[String, Column]] = for {
-          colRs <- results(db.getMetaData getColumns (null, schema, tableName, null)).toSeq
+          colRs <- columnRows(tableName).toSeq
         } yield {
           val colName  = colRs getString COLUMN_NAME
           val sqlType  = (colRs getString TYPE_NAME).toLowerCase
@@ -196,8 +227,10 @@ object QuillCodeGen {
           |  * ${java.time.ZonedDateTime.now}
           |  */
           |object Tables {
-          |${tables map (_.toCode) mkString "\n\n"}
+          |  ${tables map (_.toCode) mkString "\n\n  "}
           |}
+          |
+          |${adtCode.toSeq mkString "\n\n"}
        """.stripMargin
 
     // logstream println codeString
@@ -223,8 +256,8 @@ object QuillCodeGen {
         // logstream println s"iter($rs)::hasNext hn=${ret}"
         // ret
         def next() = {
-          rs.next()
           first = false
+          rs.next()
           // val hn = !rs.isLast()
           // logstream println s"iter($rs)::next hn=${hn}"
           rs
@@ -237,10 +270,6 @@ object QuillCodeGen {
   def warn(msg: String): Unit =
     System.err.println(s"[${Console.YELLOW}warn${Console.RESET}] $msg")
 
-  def debugPrintColumnLabels(rs: ResultSet): Unit =
-    for (i <- 1 to rs.getMetaData.getColumnCount) {
-      println(rs.getMetaData getColumnLabel i)
-    }
 }
 
 // ---
@@ -349,6 +378,131 @@ object DepluralizerImplicit {
   }
 }
 
+object TableConst {
+
+  // DatabaseMetaData::getTables
+  // Each table description has the following columns:
+  // Note: Some databases may not return information for all tables.
+
+  trait TableTag
+  type TableConst = String // Refined TableTag
+
+  val TABLE_CAT: TableConst   = "TABLE_CAT"   // table catalog (may be null)
+  val TABLE_SCHEM: TableConst = "TABLE_SCHEM" // table schema (may be null)
+  val TABLE_NAME: TableConst  = "TABLE_NAME"  // table name
+  val TABLE_TYPE
+    : TableConst             = "TABLE_TYPE" // table type. Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM".
+  val REMARKS: TableConst    = "REMARKS"    // explanatory comment on the table
+  val TYPE_CAT: TableConst   = "TYPE_CAT"   // the types catalog (may be null)
+  val TYPE_SCHEM: TableConst = "TYPE_SCHEM" // the types schema (may be null)
+  val TYPE_NAME: TableConst  = "TYPE_NAME"  // type name (may be null)
+  val SELF_REFERENCING_COL_NAME
+    : TableConst = "SELF_REFERENCING_COL_NAME" // name of the designated "identifier" column of a typed table (may be null)
+  val REF_GENERATION
+    : TableConst = "REF_GENERATION" // specifies how values in SELF_REFERENCING_COL_NAME are created. Values are "SYSTEM", "USER", "DERIVED". (may be null)
+
+}
+
+object XkConst {
+  trait XkTag
+  type XkConst = String // Refined XkTag
+
+  // getExportedKeys
+  val PKTABLE_CAT: XkConst   = "PKTABLE_CAT"   // primary key table catalog (may be null)
+  val PKTABLE_SCHEM: XkConst = "PKTABLE_SCHEM" // primary key table schema (may be null)
+  val PKTABLE_NAME: XkConst  = "PKTABLE_NAME"  // primary key table name
+  val PKCOLUMN_NAME: XkConst = "PKCOLUMN_NAME" // primary key column name
+  val FKTABLE_CAT: XkConst   = "FKTABLE_CAT"   // foreign key table catalog (may be null) being exported (may be null)
+  val FKTABLE_SCHEM: XkConst = "FKTABLE_SCHEM" // foreign key table schema (may be null) being exported (may be null)
+  val FKTABLE_NAME: XkConst  = "FKTABLE_NAME"  // foreign key table name being exported
+  val FKCOLUMN_NAME: XkConst = "FKCOLUMN_NAME" // foreign key column name being exported
+  val KEY_SEQ: XkConst       = "KEY_SEQ"       // sequence number within foreign key( a value of 1 represents the first column of the foreign key, a value of 2 would represent the second column within the foreign key).
+  val UPDATE_RULE: XkConst   = "UPDATE_RULE"   // What happens to foreign key when primary is updated:
+  // importedNoAction - do not allow update of primary key if it has been imported
+  // importedKeyCascade - change imported key to agree with primary key update
+  // importedKeySetNull - change imported key to NULL if its primary key has been updated
+  // importedKeySetDefault - change imported key to default values if its primary key has been updated
+  // importedKeyRestrict - same as importedKeyNoAction (for ODBC 2.x compatibility)
+  val DELETE_RULE: XkConst = "DELETE_RULE" // What happens to the foreign key when primary is deleted.
+// importedKeyNoAction - do not allow delete of primary key if it has been imported
+// importedKeyCascade - delete rows that import a deleted key
+// importedKeySetNull - change imported key to NULL if its primary key has been deleted
+// importedKeyRestrict - same as importedKeyNoAction (for ODBC 2.x compatibility)
+// importedKeySetDefault - change imported key to default if its primary key has been deleted
+  val FK_NAME: XkConst       = "FK_NAME"       // foreign key name (may be null)
+  val PK_NAME: XkConst       = "PK_NAME"       // primary key name (may be null)
+  val DEFERRABILITY: XkConst = "DEFERRABILITY" // can the evaluation of foreign key constraints be deferred until commit
+// importedKeyInitiallyDeferred - see SQL92 for definition
+// importedKeyInitiallyImmediate - see SQL92 for definition
+// importedKeyNotDeferrable - see SQL92 for definition
+
+}
+object PkConst {
+  trait PkTag
+  type PkConst = String // Refined PkTag
+
+  // getPrimaryKeys
+  val TABLE_CAT: PkConst   = "TABLE_CAT"   // table catalog (may be null)
+  val TABLE_SCHEM: PkConst = "TABLE_SCHEM" // table schema (may be null)
+  val TABLE_NAME: PkConst  = "TABLE_NAME"  // table name
+  val COLUMN_NAME: PkConst = "COLUMN_NAME" // column name
+  val KEY_SEQ: PkConst     = "KEY_SEQ"     // sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key).
+  val PK_NAME: PkConst     = "PK_NAME"     // primary key name (may be null)
+
+  trait ColumnTag
+  type ColumnConst = String // Refined ColumnTag
+
+}
+object ColumnConst {
+  // getColumns
+  // Retrieves a description of table columns available in the specified catalog.
+  // Only column descriptions matching the catalog, schema, table and column name criteria are returned. They are ordered by TABLE_CAT,TABLE_SCHEM, TABLE_NAME, and ORDINAL_POSITION.
+  // Each column description has the following columns:
+
+  type ColumnConst = String
+  val TABLE_CAT: ColumnConst   = "TABLE_CAT"   // table catalog (may be null)
+  val TABLE_SCHEM: ColumnConst = "TABLE_SCHEM" // table schema (may be null)
+  val TABLE_NAME: ColumnConst  = "TABLE_NAME"  // table name
+  val COLUMN_NAME: ColumnConst = "COLUMN_NAME" // column name
+  val DATA_TYPE: ColumnConst   = "DATA_TYPE"   // SQL type from java.sql.Types
+  val TYPE_NAME: ColumnConst   = "TYPE_NAME"   // Data source dependent type name, for a UDT the type name is fully qualified
+  val COLUMN_SIZE: ColumnConst = "COLUMN_SIZE" // column size.
+  //  BUFFER_LENGTH is not used.
+  val DECIMAL_DIGITS
+    : ColumnConst                 = "DECIMAL_DIGITS" // the number of fractional digits. Null is returned for data types where DECIMAL_DIGITS is not applicable.
+  val NUM_PREC_RADIX: ColumnConst = "NUM_PREC_RADIX" // Radix (typically either 10 or 2)
+  val NULLABLE: ColumnConst       = "NULLABLE"       // is NULL allowed.
+  // columnNoNulls - might not allow NULL values
+  // columnNullable - definitely allows NULL values
+  // columnNullableUnknown - nullability unknown
+  val REMARKS: ColumnConst = "REMARKS" // comment describing column (may be null)
+  val COLUMN_DEF
+    : ColumnConst                    = "COLUMN_DEF"        // default value for the column, which should be interpreted as a string when the value is enclosed in single quotes (may be null)
+  val SQL_DATA_TYPE: ColumnConst     = "SQL_DATA_TYPE"     // unused
+  val SQL_DATETIME_SUB: ColumnConst  = "SQL_DATETIME_SUB"  // unused
+  val CHAR_OCTET_LENGTH: ColumnConst = "CHAR_OCTET_LENGTH" // for char types the maximum number of bytes in the column
+  val ORDINAL_POSITION: ColumnConst  = "ORDINAL_POSITION"  // index of column in table (starting at 1)
+  val IS_NULLABLE: ColumnConst       = "IS_NULLABLE"       // ISO rules are used to determine the nullability for a column.
+  // YES --- if the column can include NULLs
+  // NO --- if the column cannot include NULLs
+  // empty string --- if the nullability for the column is unknown
+  val SCOPE_CATALOG
+    : ColumnConst = "SCOPE_CATALOG" // catalog of table that is the scope of a reference attribute (null if DATA_TYPE isn't REF)
+  val SCOPE_SCHEMA
+    : ColumnConst              = "SCOPE_SCHEMA" // schema of table that is the scope of a reference attribute (null if the DATA_TYPE isn't REF)
+  val SCOPE_TABLE: ColumnConst = "SCOPE_TABLE"  // table name that this the scope of a reference attribute (null if the DATA_TYPE isn't REF)
+  val SOURCE_DATA_TYPE
+    : ColumnConst                   = "SOURCE_DATA_TYPE" // source type of a distinct type or user-generated Ref type, SQL type from java.sql.Types (null if DATA_TYPE isn't DISTINCT or user-generated REF)
+  val IS_AUTOINCREMENT: ColumnConst = "IS_AUTOINCREMENT" // Indicates whether this column is auto incremented
+  // YES --- if the column is auto incremented
+  // NO --- if the column is not auto incremented
+  // empty string --- if it cannot be determined whether the column is auto incremented
+  val IS_GENERATEDCOLUMN: ColumnConst = "IS_GENERATEDCOLUMN" // Indicates whether this is a generated column
+  // YES --- if this a generated column
+  // NO --- if this not a generated column
+  // empty string --- if it cannot be determined whether this is a generated column
+
+}
 //       url match {
 //
 //       case "" => ()

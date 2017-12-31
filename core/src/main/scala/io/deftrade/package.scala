@@ -168,8 +168,8 @@ package io {
       def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
           .foldLeft(Seq.empty[Char]) { (b, a) =>
-            (b, a) match {
-              case (h +: g +: t, c)
+            (a, b) match { // yeah just flip your head around, it's easier, trust me
+              case (c, h +: g +: t)
                   if (uppers contains g) &&
                     (uppers contains h) &&
                     (nonUppers contains c) => // sep between g and h
