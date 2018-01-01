@@ -1,4 +1,4 @@
-package io.deftrade.sbt
+pgpackage io.deftrade.sbt
 
 import java.io.File
 import java.nio.file.{ Files, Paths }
@@ -65,6 +65,18 @@ object QuillCodeGen {
 
     logstream println s"Starting output generation for $file..."
 
+    val startTime      = System.currentTimeMillis()
+    val _jdbc          = (Class forName driver).newInstance()
+    val db: Connection = DriverManager getConnection (url, user, password)
+
+    logstream println db
+
+    val enumMap: String Map Traversable[String] =
+      tidy(results(db.createStatement executeQuery enumSql) map { row =>
+        (row getString "t.typename", row getString "e.enumLabel")
+      })
+
+    /** */
     case class Table(name: String, columns: Seq[Column]) {
 
       def toCode: String = {
@@ -89,6 +101,7 @@ object QuillCodeGen {
       }
     }
 
+    /** */
     case class ForeignKey(from: SimpleColumn, to: SimpleColumn)
     object ForeignKey {
       def apply(pair: (SimpleColumn, SimpleColumn)): ForeignKey = pair match {
@@ -96,63 +109,67 @@ object QuillCodeGen {
       }
     }
 
+    /** */
     case class SimpleColumn(tableName: String, columnName: String) {
       def asValueType =
         s"${namingStrategy table tableName}.${namingStrategy default columnName}"
     }
 
+    /** */
+    case class ColumnType(typeName: String, columnSize: Int, decimalDigits: Int, columnDef: Option[String]) {
+      def toScalaType: String = typeMap
+      private val EnumNamingConvention = """(.*)_e""".r
+      private val ArrayNamingConvention = """(.*)\[\]""".r
+      private def scalaName: Option[String] = typeName match {
+        case EnumNamingConvention(root) =>
+        case ArranNamingConvention(scalar) => typeMap get scalar
+      }
+    }
+
+    /** */
+    object ColumnType {
+      def apply(rs: ResultSet) = new ColType(
+        typeName = rs getString "TYPE_NAME",   // Data source dependent type name, for a UDT the type name is fully qualified
+        columnSize = rs getint "COLUMN_SIZE",
+        decimalDigits = rs getInt "DECIMAL_DIGITS",  // zero if not decimal
+        columnDef = Option(rs getString "COLUMN_DEF") // NULL => null => None
+      )
+    }
+
+
+    /** */
     case class Column(tableName: String,
                       columnName: String,
-                      scalaType: String,
+                      ordinal: Int,
+                      isPk: Boolean,
+                      autoincrement: Boolean,
                       nullable: Boolean,
-                      isPrimaryKey: Boolean,
-                      reference: Option[SimpleColumn]) {
-
-      def scalaOptionType = {
-        val raw = if (isPrimaryKey) {
-          s"${namingStrategy table tableName}.$asTypeName"
-        } else {
-          reference.fold(scalaType)(_.asValueType)
+                      pgType: ColumnType,
+                      reference: Option[SimpleColumn] = None
+                      remarks: String = "") {
+      def scalaOptionType: Option[String] = {
+        val raw: Option[String] = if (isPk) {
+          Some(s"${namingStrategy table tableName}.$asTypeName")
+        } else (reference, scalaType) match {
+          case (Some(ref), _) => Some(ref.asValueType)
+          case (_, Some(tpe)) => Some(tpe)
+          case _ => None
         }
-        if (nullable) s"Option[$raw]" else raw
+        if (nullable) raw map (r => s"Option[$r]") else raw
       }
+
+      def scalaType: Option[String] = ???
 
       lazy val asValueName: String = namingStrategy column columnName
       lazy val asTypeName: String  = namingStrategy table columnName
 
       def asValueClass: String =
-        s"case class $asTypeName(value: $scalaType) extends AnyVal"
+        s"case class $asTypeName(value: ${pgType.typeName}) extends AnyVal"
     }
 
-    val startTime      = System.currentTimeMillis()
-    val _jdbc          = (Class forName driver).newInstance()
-    val db: Connection = DriverManager getConnection (url, user, password)
-
-    logstream println db
-
-    def tableRows             = results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
-    def xkRows(tR: ResultSet) = results(db.getMetaData getExportedKeys (null, schema, tR getString TABLE_NAME))
-
-    def pkRows(tableName: String)     = results(db.getMetaData getPrimaryKeys (null, null, tableName))
-    def columnRows(tableName: String) = results(db.getMetaData getColumns (null, schema, tableName, null))
-
-    def tidy[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
-      kvs groupBy (_._1) map {
-        case (k, kvs) => (k, kvs map (_._2))
-      }
-
-    val enumSql =
-      """|SELECT t.typname, e.enumlabel
-         |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
-         |""".stripMargin
-
-    def enumRows: Traversable[(String, String)] =
-      results(db.createStatement executeQuery enumSql) map { row =>
-        (row getString "t.typename", row getString "e.enumLabel")
-      }
 
     def adtCode =
-      for ((key, values) <- tidy(enumRows))
+      for ((key, values) <- enumMap)
         yield {
           val k  = namingStrategy table key
           val es = values map (e => s"case object ${namingStrategy default e} extends $k")
@@ -160,6 +177,12 @@ object QuillCodeGen {
             |${es mkString "\n"}
             |""".stripMargin
         }
+
+    def tableRows             = results(db.getMetaData getTables (null, schema, "%", Array("TABLE")))
+    def xkRows(tR: ResultSet) = results(db.getMetaData getExportedKeys (null, schema, tR getString TABLE_NAME))
+
+    def pkRows(tableName: String)     = results(db.getMetaData getPrimaryKeys (null, null, tableName))
+    def columnRows(tableName: String) = results(db.getMetaData getColumns (null, schema, tableName, null))
 
     val foreignKeys: Set[ForeignKey] = {
 
@@ -187,23 +210,29 @@ object QuillCodeGen {
     val tables: Seq[Table] = {
 
       import language.postfixOps // hold my beer
-
+      type ColumnE = Either[String, Column]
       for {
         tR <- tableRows
         if !(excludedTables contains (tR getString TABLE_NAME))
         tableName = tR getString TABLE_NAME
         pkNames   = pkRows(tableName).toSeq map (_ getString COLUMN_NAME) toSet
       } yield {
-        val columns: Seq[Either[String, Column]] = for {
+        val columns: Seq[ColumnE]] = for {
           colRs <- columnRows(tableName).toSeq
         } yield {
           val colName  = colRs getString COLUMN_NAME
-          val sqlType  = (colRs getString TYPE_NAME).toLowerCase
+          val pgType  = (colRs getString TYPE_NAME).toLowerCase
           val nullable = colRs getBoolean NULLABLE
-          val sc       = SimpleColumn(tableName, colName)
-          val ref      = foreignKeys find (_.from == sc) map (_.to)
-          (typeMap get sqlType).fold(Left(sqlType): Either[String, Column]) { scalaType =>
-            Right(Column(tableName, colName, scalaType, nullable, pkNames contains colName, ref))
+          val ref      = foreignKeys find (_.from == SimpleColumn(tableName, colName)) map (_.to)
+          // FIXME CURSOR
+          ordinal  = rs getInt "ORDINAL_POSITION",  // index of column in table (starting at 1)
+          autoIncrement = rs getBoolean "IS_AUTOINCREMENT"
+          remarks = Option(rs getString "REMARKS").fold("")(_)
+          columnType = ColType apply rs
+          (typeMap get pgType).fold(Left(pgType): ColumnE) { scalaType =>
+            Right(Column(
+              tableName, colName, scalaType, nullable, pkNames contains colName, ref
+            ))
           }
         }
         columns collect {
@@ -266,6 +295,16 @@ object QuillCodeGen {
       iter.toStream
     } else Stream.empty
   }
+
+  def tidy[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
+    kvs groupBy (_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
+  val enumSql =
+    """|SELECT t.typname, e.enumlabel
+       |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
+       |""".stripMargin
 
   def warn(msg: String): Unit =
     System.err.println(s"[${Console.YELLOW}warn${Console.RESET}] $msg")
@@ -354,18 +393,18 @@ object CamelCaser {
 }
 object DepluralizerImplicit {
 
-  private val RxRow = "(.*)(?i:sheep|series|as|is|us)".r
-  private val RxXes = "(.*)(x|ss|z|ch|sh)es".r
-  private val RxIes = "(.*)ies".r
-  private val RxS   = "(.*)s".r
-  private val RxEn  = "(.*x)en".r
+  private val RxId  = """(\w+)(?i:sheep|series|as|is|us)""".r
+  private val RxXes = """(\w+)(x|ss|z|ch|sh)es""".r
+  private val RxIes = """(\w+)ies""".r
+  private val RxS   = """(\w+)s""".r
+  private val RxEn  = """(\w+x)en""".r
 
   implicit class StringDepluralizer(val s: String) extends AnyVal {
 
     def depluralize = s match {
-      case RxRow("pizz") => s"Pizza" // exceptional Pizza
-      case RxRow(_)      => s"${s}Row"
-      case RxXes(t, end) => s"$t$end"
+      case RxId("pizz")  => s"Pizza" // exceptional Pizza
+      case RxId(t)       => t // t is its own plural
+      case RxXes(t, end) => s"$t$end" // maybe lops off the final "es"
       case RxIes(t)      => s"${t}y" // parties => party
       case RxEn(t)       => t // oxen => ox
       case RxS(t)        => t // cars => car
@@ -384,27 +423,33 @@ object TableConst {
   // Each table description has the following columns:
   // Note: Some databases may not return information for all tables.
 
-  trait TableTag
-  type TableConst = String // Refined TableTag
+  case class TableConst(val tag: String) extends AnyVal // Refined TableTag
+
+  import scala.language.implicitConversions
+  implicit def string2TableConst(tag: String) = TableConst(tag)
 
   val TABLE_CAT: TableConst   = "TABLE_CAT"   // table catalog (may be null)
   val TABLE_SCHEM: TableConst = "TABLE_SCHEM" // table schema (may be null)
   val TABLE_NAME: TableConst  = "TABLE_NAME"  // table name
-  val TABLE_TYPE
-    : TableConst             = "TABLE_TYPE" // table type. Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM".
+  val TABLE_TYPE: TableConst  = "TABLE_TYPE" // table type.
+    // Typical types are
+    //  "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM".
   val REMARKS: TableConst    = "REMARKS"    // explanatory comment on the table
-  val TYPE_CAT: TableConst   = "TYPE_CAT"   // the types catalog (may be null)
-  val TYPE_SCHEM: TableConst = "TYPE_SCHEM" // the types schema (may be null)
-  val TYPE_NAME: TableConst  = "TYPE_NAME"  // type name (may be null)
-  val SELF_REFERENCING_COL_NAME
-    : TableConst = "SELF_REFERENCING_COL_NAME" // name of the designated "identifier" column of a typed table (may be null)
-  val REF_GENERATION
-    : TableConst = "REF_GENERATION" // specifies how values in SELF_REFERENCING_COL_NAME are created. Values are "SYSTEM", "USER", "DERIVED". (may be null)
+  // val TYPE_CAT: TableConst   = "TYPE_CAT"   // the types catalog (may be null)
+  // val TYPE_SCHEM: TableConst = "TYPE_SCHEM" // the types schema (may be null)
+  // val TYPE_NAME: TableConst  = "TYPE_NAME"  // type name (may be null)
+  // val SELF_REFERENCING_COL_NAME
+  //   : TableConst = "SELF_REFERENCING_COL_NAME"
+  //   // name of the designated "identifier" column of a typed table (may be null)
+  // val REF_GENERATION
+  //   : TableConst = "REF_GENERATION"
+  //   // specifies how values in SELF_REFERENCING_COL_NAME are created.
+  //   // Values are "SYSTEM", "USER", "DERIVED". (may be null)
 
 }
 
 object XkConst {
-  trait XkTag
+
   type XkConst = String // Refined XkTag
 
   // getExportedKeys
@@ -438,7 +483,7 @@ object XkConst {
 
 }
 object PkConst {
-  trait PkTag
+
   type PkConst = String // Refined PkTag
 
   // getPrimaryKeys
@@ -451,56 +496,6 @@ object PkConst {
 
   trait ColumnTag
   type ColumnConst = String // Refined ColumnTag
-
-}
-object ColumnConst {
-  // getColumns
-  // Retrieves a description of table columns available in the specified catalog.
-  // Only column descriptions matching the catalog, schema, table and column name criteria are returned. They are ordered by TABLE_CAT,TABLE_SCHEM, TABLE_NAME, and ORDINAL_POSITION.
-  // Each column description has the following columns:
-
-  type ColumnConst = String
-  val TABLE_CAT: ColumnConst   = "TABLE_CAT"   // table catalog (may be null)
-  val TABLE_SCHEM: ColumnConst = "TABLE_SCHEM" // table schema (may be null)
-  val TABLE_NAME: ColumnConst  = "TABLE_NAME"  // table name
-  val COLUMN_NAME: ColumnConst = "COLUMN_NAME" // column name
-  val DATA_TYPE: ColumnConst   = "DATA_TYPE"   // SQL type from java.sql.Types
-  val TYPE_NAME: ColumnConst   = "TYPE_NAME"   // Data source dependent type name, for a UDT the type name is fully qualified
-  val COLUMN_SIZE: ColumnConst = "COLUMN_SIZE" // column size.
-  //  BUFFER_LENGTH is not used.
-  val DECIMAL_DIGITS
-    : ColumnConst                 = "DECIMAL_DIGITS" // the number of fractional digits. Null is returned for data types where DECIMAL_DIGITS is not applicable.
-  val NUM_PREC_RADIX: ColumnConst = "NUM_PREC_RADIX" // Radix (typically either 10 or 2)
-  val NULLABLE: ColumnConst       = "NULLABLE"       // is NULL allowed.
-  // columnNoNulls - might not allow NULL values
-  // columnNullable - definitely allows NULL values
-  // columnNullableUnknown - nullability unknown
-  val REMARKS: ColumnConst = "REMARKS" // comment describing column (may be null)
-  val COLUMN_DEF
-    : ColumnConst                    = "COLUMN_DEF"        // default value for the column, which should be interpreted as a string when the value is enclosed in single quotes (may be null)
-  val SQL_DATA_TYPE: ColumnConst     = "SQL_DATA_TYPE"     // unused
-  val SQL_DATETIME_SUB: ColumnConst  = "SQL_DATETIME_SUB"  // unused
-  val CHAR_OCTET_LENGTH: ColumnConst = "CHAR_OCTET_LENGTH" // for char types the maximum number of bytes in the column
-  val ORDINAL_POSITION: ColumnConst  = "ORDINAL_POSITION"  // index of column in table (starting at 1)
-  val IS_NULLABLE: ColumnConst       = "IS_NULLABLE"       // ISO rules are used to determine the nullability for a column.
-  // YES --- if the column can include NULLs
-  // NO --- if the column cannot include NULLs
-  // empty string --- if the nullability for the column is unknown
-  val SCOPE_CATALOG
-    : ColumnConst = "SCOPE_CATALOG" // catalog of table that is the scope of a reference attribute (null if DATA_TYPE isn't REF)
-  val SCOPE_SCHEMA
-    : ColumnConst              = "SCOPE_SCHEMA" // schema of table that is the scope of a reference attribute (null if the DATA_TYPE isn't REF)
-  val SCOPE_TABLE: ColumnConst = "SCOPE_TABLE"  // table name that this the scope of a reference attribute (null if the DATA_TYPE isn't REF)
-  val SOURCE_DATA_TYPE
-    : ColumnConst                   = "SOURCE_DATA_TYPE" // source type of a distinct type or user-generated Ref type, SQL type from java.sql.Types (null if DATA_TYPE isn't DISTINCT or user-generated REF)
-  val IS_AUTOINCREMENT: ColumnConst = "IS_AUTOINCREMENT" // Indicates whether this column is auto incremented
-  // YES --- if the column is auto incremented
-  // NO --- if the column is not auto incremented
-  // empty string --- if it cannot be determined whether the column is auto incremented
-  val IS_GENERATEDCOLUMN: ColumnConst = "IS_GENERATEDCOLUMN" // Indicates whether this is a generated column
-  // YES --- if this a generated column
-  // NO --- if this not a generated column
-  // empty string --- if it cannot be determined whether this is a generated column
 
 }
 //       url match {
@@ -916,33 +911,3 @@ object ColumnConst {
 //     |""".stripMargin
 //   }
 // }
-//
-// /**
-//  * Interprets a name as a plural noun and returns the singular version. Hacked ad hoc as needed.
-//  */
-// private[db] object Depluralizer {
-//
-//   private val RxRow = "(.*)(?i:sheep|series|as|is|us)".r
-//   private val RxXes = "(.*)(x|ss|z|ch|sh)es".r
-//   private val RxIes = "(.*)ies".r
-//   private val RxS = "(.*)s".r
-//   private val RxEn = "(.*x)en".r
-//
-//   implicit class StringDepluralizer(val s: String) extends AnyVal {
-//
-//     def depluralize = s match {
-//       case RxRow("pizz") => s"Pizza" // exceptional Pizza
-//       case RxRow(_) => s"${s}Row"
-//       case RxXes(t, end) => s"$t$end"
-//       case RxIes(t) => s"${t}y" // parties => party
-//       case RxEn(t) => t // oxen => ox
-//       case RxS(t) => t // cars => car
-//       case _ => throw new IllegalArgumentException(
-//         s"sorry - we seem to need a new depluralize() rule for $s"
-//       )
-//     }
-//   }
-// }
-/**
-  * Interprets a name as a plural noun and returns the singular version. Hacked ad hoc as needed.
-  */
