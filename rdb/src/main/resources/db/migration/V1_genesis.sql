@@ -111,13 +111,11 @@ create table orders (
 
   deliver_to jsonb not null,
   est_delivery interval not null,
-  status order_status_e not null,
+  status order_status_e not null
 
-  span tstzrange not null
 );
 create index orders_uuid_dk on orders(uuid);
 create index orders_deliver_to on orders using gin(deliver_to);
-create index orders_span on orders using gist(span);
 --
 -- all payments recorded here, including change (negative amount).
 -- a btc addr may be used only once per order

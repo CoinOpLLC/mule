@@ -130,15 +130,16 @@ object QuillCodeGen {
     case class ColumnType(pgType: String, scalaType: String, columnSize: Int, decimalDigits: Int, columnDef: Option[String])
     object ColumnType {
 
-      private val EnumNamingConvention  = """(.*)_e""".r
-      private val ArrayNamingConvention = """(.*)\[\]""".r
-
       // Data source dependent type name, for a UDT the type name is fully qualified
       private def pgType(row: ResultSet) = (row getString "TYPE_NAME").toLowerCase
 
       def parse(row: ResultSet): Either[String, ColumnType] = parse(row, pgType(row))
 
       private def parse(row: ResultSet, pgType: String): Either[String, ColumnType] = {
+
+        val EnumNamingConvention = """(.*)_e""".r
+
+        val ArrayNamingConvention = """(.*)\[\]""".r
 
         def columnTypeFor(scalaType: String) =
           new ColumnType(
@@ -152,14 +153,14 @@ object QuillCodeGen {
         pgType match {
 
           case EnumNamingConvention(root) =>
-            val scalaType = rns default root
+            val scalaType = rns default pgType
             if (Tables.enumMap contains scalaType) Right(columnTypeFor(scalaType))
             else Left(s"Unmapped enum?! ${root}_e")
 
           case ArrayNamingConvention(scalar) =>
             parse(row, scalar) map { ct =>
               ct copy (
-                pgType = s"$pgType[]",
+                pgType = pgType, // the original passed-in parameter
                 scalaType = s"Seq[${ct.scalaType}]"
               )
             }
@@ -184,13 +185,12 @@ object QuillCodeGen {
                       remarks: String = "") {
 
       def scalaOptionType: String =
-        if (isPk) s"${rns table tableName}.$asTypeName" // agressively type all the keys
-        else
-          (reference, columnType.scalaType) match {
-            case (Some(ref), _)                => ref.asValueType
-            case (_, rawScalaType) if nullable => s"Option[$rawScalaType]"
-            case _                             => columnType.scalaType
-          }
+        (reference, columnType.scalaType, isPk) match {
+          case (Some(ref), _, _)             => ref.asValueType
+          case (_, _, true)                  => s"${rns table tableName}.$asTypeName"
+          case (_, scalaType, _) if nullable => s"Option[$scalaType]"
+          case (_, scalaType, _)             => scalaType
+        }
 
       lazy val asValueName: String = rns column columnName
       lazy val asTypeName: String  = rns table columnName
@@ -283,9 +283,12 @@ object QuillCodeGen {
             case (k, kvs) => (k, kvs map (_._2))
           }
 
-        tidy(results(db.createStatement executeQuery enumSql) map { row =>
-          (row getString "t.typename", row getString "e.enumLabel")
-        }) map {
+        val enumRs = db.createStatement executeQuery enumSql
+        val b      = List.newBuilder[(String, String)]
+        while (enumRs.next()) {
+          b += ((enumRs getString "typname") -> (enumRs getString "enumlabel"))
+        }
+        tidy(b.result) map {
           case (key, values) =>
             (rns table key, values map (rns default _))
         }
@@ -300,21 +303,22 @@ object QuillCodeGen {
                 |""".stripMargin
           }
 
-      def code = s"""|package ${pkg}
-          |
-          |${imports map (p => s"import $p") mkString "\n"}
-          |
-          |/**
-          |  * Generated code - do not modify
-          |  * QuillCodeGen
-          |  * ${java.time.ZonedDateTime.now}
-          |  */
-          |object Tables {
-          |  ${Tables.tables map (_.toCode) mkString "\n\n  "}
-          |}
-          |
-          |${adtCode.toSeq mkString "\n\n"}
-       """.stripMargin
+      def code =
+        s"""|package ${pkg}
+            |
+            |${imports map (p => s"import $p") mkString "\n"}
+            |
+            |/**
+            |  * Generated code - do not modify
+            |  * QuillCodeGen
+            |  * ${java.time.ZonedDateTime.now}
+            |  */
+            |object Tables {
+            |  ${Tables.tables map (_.toCode) mkString "\n\n  "}
+            |}
+            |
+            |${adtCode.toSeq mkString "\n\n"}
+         """.stripMargin
 
     }
 
