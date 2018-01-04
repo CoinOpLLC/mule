@@ -11,10 +11,24 @@ import DepluralizerImplicit._
   */
 object QuillCodeGen {
 
+  type Error    = String
+  type Or[R, L] = Either[L, R] // SWIDT?
+  type Legit[A] = A Or Error // kawaii, ne?
+
+  val Error = Left
+  val Legit = Right
+
+  // @inline def Error(err: String)                       = Left apply err
+  // @inline def Error[A](legit: Legit[A]): Option[Error] = Left unappply legit
+  //
+  // @inline def Legit[A](a: A)                       = Right apply a
+  // @inline def Legit[A](legit: Legit[A]): Option[A] = Right unapply legit
+
   val defaultTypeMap = Map(
     "serial"      -> "Int",
     "bigserial"   -> "Long",
     "money"       -> "BigDecimal",
+    "int2"        -> "Short",
     "int4"        -> "Int",
     "serial4"     -> "Int",
     "int8"        -> "Long",
@@ -98,7 +112,7 @@ object QuillCodeGen {
 
         def columnRows = results(db.getMetaData getColumns (null, schema, tableName, null))
 
-        val columns: Seq[Either[String, Column]] =
+        val columns: Seq[Legit[Column]] =
           (for {
             row <- columnRows
           } yield {
@@ -106,10 +120,10 @@ object QuillCodeGen {
           }).toSeq
 
         columns collect {
-          case Left(colName) =>
+          case Error(colName) =>
             warn(s"UNMAPPED: table: $tableName col $colName")
         }
-        new Table(tableName, columns collect { case Right(col) => col })
+        new Table(tableName, columns collect { case Legit(col) => col })
       }
     }
 
@@ -133,42 +147,45 @@ object QuillCodeGen {
       // Data source dependent type name, for a UDT the type name is fully qualified
       private def pgType(row: ResultSet) = (row getString "TYPE_NAME").toLowerCase
 
-      def parse(row: ResultSet): Either[String, ColumnType] = parse(row, pgType(row))
+      def parse(row: ResultSet): Legit[ColumnType] = parse(row, pgType(row))
 
-      private def parse(row: ResultSet, pgType: String): Either[String, ColumnType] = {
+      private def parse(row: ResultSet, pgType: String): Legit[ColumnType] = {
 
         val EnumNamingConvention = """(.*)_e""".r
 
         val ArrayNamingConvention = """(.*)\[\]""".r
 
-        def columnTypeFor(scalaType: String) =
-          new ColumnType(
+        def scalaTypeFor(pgType: String): Legit[String] = pgType match {
+          case EnumNamingConvention(_) =>
+            val scalaType = rns default pgType
+            if (Tables.enumMap contains scalaType)
+              Legit(scalaType)
+            else
+              Error(s"Unmapped: enum?! $pgType")
+
+          case ArrayNamingConvention(scalar) =>
+            scalaTypeFor(scalar)
+              .fold(
+                scalarError => Error(s"Unmapped: array $pgType: no mapped scalar: $scalarError"),
+                scalaScalarType => Legit(s"Seq[$scalaScalarType]")
+              )
+
+          case _ =>
+            (typeMap get pgType).fold(
+              Error(s"Unmapped: $pgType"): Legit[String]
+            ) { scalaType =>
+              Legit(scalaType)
+            }
+        }
+
+        scalaTypeFor(pgType) map { scalaType =>
+          ColumnType(
             pgType = pgType,
             scalaType = scalaType,
             columnSize = row getInt "COLUMN_SIZE", // for varchar?
             decimalDigits = row getInt "DECIMAL_DIGITS", // zero if not decimal
             columnDef = Option(row getString "COLUMN_DEF") // NULL => null => None
           )
-
-        pgType match {
-
-          case EnumNamingConvention(root) =>
-            val scalaType = rns default pgType
-            if (Tables.enumMap contains scalaType) Right(columnTypeFor(scalaType))
-            else Left(s"Unmapped enum?! ${root}_e")
-
-          case ArrayNamingConvention(scalar) =>
-            parse(row, scalar) map { ct =>
-              ct copy (
-                pgType = pgType, // the original passed-in parameter
-                scalaType = s"Seq[${ct.scalaType}]"
-              )
-            }
-
-          case pgType =>
-            (typeMap get pgType).fold(Left(s"Unmapped: $pgType"): Either[String, ColumnType]) { scalaType =>
-              Right(columnTypeFor(scalaType))
-            }
         }
       }
     }
@@ -199,7 +216,7 @@ object QuillCodeGen {
         s"case class $asTypeName(value: ${columnType.scalaType}) extends AnyVal"
     }
     object Column {
-      def parse(row: ResultSet, tableName: String, foreignKeys: Seq[ForeignKey], pkNames: Set[String]): Either[String, Column] =
+      def parse(row: ResultSet, tableName: String, foreignKeys: Seq[ForeignKey], pkNames: Set[String]): Legit[Column] =
         (ColumnType parse row) map { ct =>
           val columnName = row getString "COLUMN_NAME"
           new Column(
