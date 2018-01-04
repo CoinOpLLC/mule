@@ -149,26 +149,32 @@ object QuillCodeGen {
 
       def parse(row: ResultSet): Legit[ColumnType] = parse(row, pgType(row))
 
+      val EnumNamingConvention = """(.*)_e""".r
+      // val ArrayNamingConvention = """(.*)\[\]""".r
+      object ArrayNamingConvention {
+        def unapply(s: String): Option[String] = if (s startsWith "_") Some(s drop 1) else None
+      }
+
       private def parse(row: ResultSet, pgType: String): Legit[ColumnType] = {
 
-        val EnumNamingConvention = """(.*)_e""".r
-
-        val ArrayNamingConvention = """(.*)\[\]""".r
-
         def scalaTypeFor(pgType: String): Legit[String] = pgType match {
-          case EnumNamingConvention(_) =>
-            val scalaType = rns default pgType
-            if (Tables.enumMap contains scalaType)
-              Legit(scalaType)
-            else
-              Error(s"Unmapped: enum?! $pgType")
 
           case ArrayNamingConvention(scalar) =>
+            // logstream println s"Array: pgType=$pgType; scalar=$scalar"
             scalaTypeFor(scalar)
               .fold(
                 scalarError => Error(s"Unmapped: array $pgType: no mapped scalar: $scalarError"),
                 scalaScalarType => Legit(s"Seq[$scalaScalarType]")
               )
+
+          case EnumNamingConvention(root) =>
+            // logstream println s"Enum: pgType=$pgType; root=$root"
+            val scalaType = rns default pgType
+            Either cond [Error, String] (
+              Tables.enumMap contains scalaType,
+              scalaType,
+              s"Unmapped: enum?! pgType=$pgType; root=$root"
+            )
 
           case _ =>
             (typeMap get pgType).fold(
