@@ -4,6 +4,8 @@ import java.io.File
 import java.nio.file.{ Files, Paths }
 import java.sql.{ Connection, DriverManager, ResultSet }
 
+import sbt.Logger
+
 import DepluralizerImplicit._
 
 /**
@@ -48,10 +50,8 @@ object QuillCodeGen {
     "jsonb"       -> "Json"
   )
 
-  // FIXME: use sbt logging system
-  val logstream = System.err
-
   def apply(
+      log: Logger,
       driver: String,
       url: String,
       user: String,
@@ -121,7 +121,7 @@ object QuillCodeGen {
 
         columns collect {
           case Error(colName) =>
-            warn(s"UNMAPPED: table: $tableName col $colName")
+            log warn s"UNMAPPED: table: $tableName col $colName"
         }
         new Table(tableName, columns collect { case Legit(col) => col })
       }
@@ -160,7 +160,7 @@ object QuillCodeGen {
         def scalaTypeFor(pgType: String): Legit[String] = pgType match {
 
           case ArrayNamingConvention(scalar) =>
-            // logstream println s"Array: pgType=$pgType; scalar=$scalar"
+            log debug s"Array: pgType=$pgType; scalar=$scalar"
             scalaTypeFor(scalar)
               .fold(
                 scalarError => Error(s"Unmapped: array $pgType: no mapped scalar: $scalarError"),
@@ -168,7 +168,7 @@ object QuillCodeGen {
               )
 
           case EnumNamingConvention(root) =>
-            // logstream println s"Enum: pgType=$pgType; root=$root"
+            log debug s"Enum: pgType=$pgType; root=$root"
             val scalaType = rns default pgType
             Either cond [Error, String] (
               Tables.enumMap contains scalaType,
@@ -286,7 +286,7 @@ object QuillCodeGen {
           yfk <- unresolvedFKs
         } yield // two hops reduced to one...
         if (xfk.to == yfk.from) {
-          logstream println s"remapped foreign key chaining at ${xfk.to}"
+          log info s"remapped foreign key chaining at ${xfk.to}"
           ForeignKey(from = xfk.from, to = yfk.to)
         } else {
           xfk
@@ -351,18 +351,15 @@ object QuillCodeGen {
     }
 
     val path = file.toPath
-    logstream println s"Starting output generation for $file in $path..."
+    log info s"Starting output generation for $path..."
 
-    if (path.getParent.toFile.mkdirs) logstream println s"qcg: created dirs for $path"
+    if (path.getParent.toFile.mkdirs) log info s"qcg: created dirs for $path"
 
     Files write (path, Tables.code.getBytes)
 
     db.close()
-    logstream println s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
+    log success s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
   }
-
-  def warn(msg: String): Unit =
-    System.err.println(s"[${Console.YELLOW}warn${Console.RESET}] $msg")
 
   def results(rs: ResultSet): Stream[ResultSet] = {
     val nonEmpty = rs.next()

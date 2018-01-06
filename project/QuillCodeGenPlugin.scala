@@ -61,6 +61,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
           // FIXME: UNCOMMENT when the code gen is working
           // flywayMigrate.value // i.e. do the migrate. Returns Unit - pure effect
           _root_.io.deftrade.sbt.QuillCodeGen(
+            log = streams.value.log,
             driver = flywayDriver.value, // conciously coupling to Flyway config
             url = flywayUrl.value,
             user = flywayUser.value,
