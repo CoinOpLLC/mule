@@ -55,7 +55,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
         ),
         qcgOutFileName := "GeneratedQuillCode.scala",
         qcgOutFile := ((qcgPackage.value split '.')
-          .foldLeft(sourceManaged.value) { _ / _ }) /
+          .foldLeft(sourceManaged.value / "scala") { _ / _ }) /
           qcgOutFileName.value,
         qcgRunUncached := {
           // FIXME: UNCOMMENT when the code gen is working

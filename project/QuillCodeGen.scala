@@ -43,7 +43,7 @@ object QuillCodeGen {
     "timestamp"   -> "LocalDateTime",
     "timestamptz" -> "OffsetDateTime",
     "interval"    -> "Duration",
-    "tstzrange"   -> "Raynge[OffsetDateTime]",
+    "tstzrange"   -> "PgRange[OffsetDateTime]",
     "json"        -> "Json",
     "jsonb"       -> "Json"
   )
@@ -87,7 +87,7 @@ object QuillCodeGen {
         val applyArgs = for (col <- columns)
           yield s"${col.asValueName}: ${col.scalaOptionType}"
 
-        val valueClasses = columns filter (_.isPk) map (_.asValueClass)
+        val valueClasses = columns filter (c => c.isPk && c.reference.isEmpty) map (_.asValueClass)
 
         s"""|/**
             |  * table $schema.$name
@@ -164,7 +164,7 @@ object QuillCodeGen {
             scalaTypeFor(scalar)
               .fold(
                 scalarError => Error(s"Unmapped: array $pgType: no mapped scalar: $scalarError"),
-                scalaScalarType => Legit(s"Seq[$scalaScalarType]")
+                scalarScalaType => Legit(s"Seq[$scalarScalaType]")
               )
 
           case EnumNamingConvention(root) =>
@@ -178,7 +178,7 @@ object QuillCodeGen {
 
           case _ =>
             (typeMap get pgType).fold(
-              Error(s"Unmapped: $pgType"): Legit[String]
+              Error(s"Unmapped: $pgType"): Legit[String] // type annotation necessary
             ) { scalaType =>
               Legit(scalaType)
             }
@@ -307,11 +307,13 @@ object QuillCodeGen {
           }
 
         val enumRs = db.createStatement executeQuery enumSql
-        val b      = List.newBuilder[(String, String)]
-        while (enumRs.next()) {
-          b += ((enumRs getString "typname") -> (enumRs getString "enumlabel"))
-        }
-        tidy(b.result) map {
+
+        val mkEnumValPair: ResultSet => (String, String) =
+          row => (row getString "typname", row getString "enumlabel")
+
+        tidy(
+          results(enumRs) map mkEnumValPair
+        ) map {
           case (key, values) =>
             (rns table key, values map (rns default _))
         }
@@ -322,9 +324,12 @@ object QuillCodeGen {
           yield {
             val es = vs map (e => s"case object $e extends $k")
             s"""|sealed trait ${k}
-                |${es mkString "\n"}
-                |""".stripMargin
+                |object ${k} {
+                |  ${es mkString "\n  "}
+                |}""".stripMargin
           }
+
+      def tab(xs: String) = xs.lines map (l => s"  $l") mkString "\n"
 
       def code =
         s"""|package ${pkg}
@@ -337,7 +342,7 @@ object QuillCodeGen {
             |  * ${java.time.ZonedDateTime.now}
             |  */
             |object Tables {
-            |  ${Tables.tables map (_.toCode) mkString "\n\n  "}
+            |  ${tab(Tables.tables map (_.toCode) mkString "\n\n")}
             |}
             |
             |${adtCode.toSeq mkString "\n\n"}
@@ -345,11 +350,9 @@ object QuillCodeGen {
 
     }
 
-    logstream println s"Starting output generation for $file..."
-
-    logstream println db
-
     val path = file.toPath
+    logstream println s"Starting output generation for $file in $path..."
+
     if (path.getParent.toFile.mkdirs) logstream println s"qcg: created dirs for $path"
 
     Files write (path, Tables.code.getBytes)
@@ -362,27 +365,17 @@ object QuillCodeGen {
     System.err.println(s"[${Console.YELLOW}warn${Console.RESET}] $msg")
 
   def results(rs: ResultSet): Stream[ResultSet] = {
-    val nonEmpty = rs.first()
-    // logstream println s"init: iter($rs) nonEmpty == ${nonEmpty}"
-    if (nonEmpty) {
-      rs.previous()
-      val iter = new Iterator[ResultSet] {
-        var first = true;
-        def hasNext =
-          first ||
-            /* val ret = */ !rs.isLast()
-        // logstream println s"iter($rs)::hasNext hn=${ret}"
-        // ret
+    val nonEmpty = rs.next()
+    if (nonEmpty)
+      new Iterator[ResultSet] {
+        private var first = true; // heh the semicolon is a subconscious tic - I'll keep it...
+        def hasNext       = first || !rs.isLast()
         def next() = {
-          first = false
-          rs.next()
-          // val hn = !rs.isLast()
-          // logstream println s"iter($rs)::next hn=${hn}"
+          if (first) first = false else rs.next()
           rs
         }
-      }
-      iter.toStream
-    } else Stream.empty
+      }.toStream
+    else Stream.empty
   }
 }
 // ---
@@ -467,21 +460,25 @@ object CamelCaser {
 }
 object DepluralizerImplicit {
 
-  private val RxId  = """(\w+)(?i:sheep|series|as|is|us)""".r
-  private val RxXes = """(\w+)(x|ss|z|ch|sh)es""".r
-  private val RxIes = """(\w+)ies""".r
-  private val RxS   = """(\w+)s""".r
-  private val RxEn  = """(\w+x)en""".r
+  object StringDepluralizer {
+
+    val RuleId  = """(\w+)(?i:sheep|series|is|us)""".r
+    val RuleXes = """(\w+)(x|ss|z|ch|sh)es""".r
+    val RuleIes = """(\w+)ies""".r
+    val RuleEn  = """(\w+x)en""".r
+    val RuleS   = """(\w+)s""".r
+  }
 
   implicit class StringDepluralizer(val s: String) extends AnyVal {
+    import StringDepluralizer._
 
     def depluralize = s match {
-      case RxId("pizz")  => s"Pizza"  // exceptional Pizza
-      case RxId(t)       => t         // t is its own plural
-      case RxXes(t, end) => s"$t$end" // maybe lops off the final "es"
-      case RxIes(t)      => s"${t}y"  // parties => party
-      case RxEn(t)       => t         // oxen => ox
-      case RxS(t)        => t         // cars => car
+      case "pizzas"        => "Pizza"   // exceptional Pizza
+      case RuleId(t)       => t         // t is its own plural
+      case RuleXes(t, end) => s"$t$end" // maybe lops off the final "es"
+      case RuleIes(t)      => s"${t}y"  // parties => party
+      case RuleEn(t)       => t         // oxen => ox
+      case RuleS(t)        => t         // cars => car
       case _ =>
         throw new IllegalArgumentException(
           s"sorry - we seem to need a new depluralize() rule for $s"
@@ -530,7 +527,7 @@ object PkConst {
   type PkConst = String // Refined PkTag
   // val PK_NAME        = "pk_name"
 
-  // getPrimaryKeys
+  // getPrimaryKeys()
   val TABLE_CAT: PkConst   = "TABLE_CAT"   // table catalog (may be null)
   val TABLE_SCHEM: PkConst = "TABLE_SCHEM" // table schema (may be null)
   val COLUMN_NAME: PkConst = "COLUMN_NAME" // column name

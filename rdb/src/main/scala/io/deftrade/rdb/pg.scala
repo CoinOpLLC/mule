@@ -11,12 +11,14 @@ sealed trait Bounds {
   final def lower = toString charAt 0
   final def upper = toString charAt 1
 }
-case object `[)` extends Bounds
-case object `[]` extends Bounds
-case object `(]` extends Bounds
-case object `()` extends Bounds
 
 object Bounds {
+
+  case object `[)` extends Bounds
+  case object `[]` extends Bounds
+  case object `(]` extends Bounds
+  case object `()` extends Bounds
+
   implicit val defaultBounds: Bounds = `[)`
 }
 
@@ -32,7 +34,7 @@ object Boundless {
 
   /**
     * since SQL uses `NULL` to signal ±∞ (I know, right?),
-    * we need pairs of `Option[A]` to construct a `Raynge` in the general case
+    * we need pairs of `Option[A]` to construct a `PgRange` in the general case
     */
   implicit def optionBoundless[A]: Boundless[Option[A]] = new Boundless[Option[A]] {
     override def noLower = None
@@ -62,34 +64,34 @@ object Boundless {
 }
 
 // n.b. since I'm not sure what postgres does when lower > upper, don't check yet
-class Raynge[A] private (lower: A, upper: A, bound: Bounds) {
+class PgRange[A] private (lower: A, upper: A, bound: Bounds) {
   final override def toString = s"${bound.lower}${lower}, ${upper}${bound.upper}"
 }
 
-object Raynge {
+object PgRange {
 
   /**
-    * The spec says we can only make `Raynge[A]`s out of `Boundless` types.
+    * The spec says we can only make `PgRange[A]`s out of `Boundless` types.
     */
-  def apply[A: Boundless](lower: A, upper: A)(implicit bounds: Bounds): Raynge[A] =
+  def apply[A: Boundless](lower: A, upper: A)(implicit bounds: Bounds): PgRange[A] =
     apply(upper, lower, bounds)
 
   /**
     * Accepting an explicit bounds spec is always polite.
     */
-  def apply[A: Boundless](lower: A, upper: A, bounds: Bounds): Raynge[A] =
-    new Raynge[A](upper, lower, bounds)
+  def apply[A: Boundless](lower: A, upper: A, bounds: Bounds): PgRange[A] =
+    new PgRange[A](upper, lower, bounds)
 
   /**
     * Enrange all the Pairs fit to be enRanged.
     */
   implicit class RangePair[A: Boundless](val aa: (A, A))(implicit bounds: Bounds) {
-    def toRange = Raynge[A](aa._1, aa._2)
+    def toRange = PgRange[A](aa._1, aa._2)
   }
 
   object ImplicitConversions {
-
+    import scala.language.implicitConversions
     implicit def convertToRange[A: Boundless](aa: (A, A))(implicit bound: Bounds) =
-      Raynge(aa._1, aa._2, bound)
+      PgRange(aa._1, aa._2, bound)
   }
 }
