@@ -7,6 +7,19 @@ package rdb
 // URLParser.parse("jdbc:postgresql://localhost:5233/my_database?user=postgres&password=somepassword")
 // val connection: Connection = new PostgreSQLConnection(configuration)
 
+import enumeratum.{ Enum, EnumEntry }
+
+trait CatsOrder[EE <: EnumEntry] { _: Enum[EE] =>
+  import cats.Order
+  import cats.instances.int._
+  implicit lazy val catsOrder: Order[EE] = Order by indexOf
+}
+
+trait StdOrdering[EE <: EnumEntry] { _: Enum[EE] =>
+  import scala.math.Ordering
+  implicit lazy val stdOrdering: Ordering[EE] = Ordering by indexOf
+}
+
 sealed trait Bounds {
   final def lower = toString charAt 0
   final def upper = toString charAt 1

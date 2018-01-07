@@ -51,6 +51,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
           "cats.Eq",
           "java.util.UUID",
           "java.time.{LocalDateTime, OffsetDateTime, Duration}",
+          "enumeratum.{Enum, EnumEntry}",
           "io.circe.Json"
         ),
         qcgOutFileName := "GeneratedQuillCode.scala",

@@ -301,6 +301,8 @@ object QuillCodeGen {
              |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
              |""".stripMargin
 
+        // FIXME: I deeply suspect this doesn't preserve order, which is how pg defines enum order
+        // (this is the place to enforce that)
         def tidy[K, V](kvs: Traversable[(K, V)]): K Map Traversable[V] =
           kvs groupBy (_._1) map {
             case (k, kvs) => (k, kvs map (_._2))
@@ -319,13 +321,20 @@ object QuillCodeGen {
         }
       }
 
-      def adtCode =
+      def orderingMixin: String = "CatsOrder"
+
+      def e8mCode =
         for ((k, vs) <- enumMap)
           yield {
             val es = vs map (e => s"case object $e extends $k")
-            s"""|sealed trait ${k}
-                |object ${k} {
+            s"""|sealed trait ${k} extends EnumEntry
+                |
+                |object $k extends Enum[$k] with $orderingMixin[$k] {
+                |
                 |  ${es mkString "\n  "}
+                |
+                |  val values = findValues
+                |
                 |}""".stripMargin
           }
 
@@ -342,10 +351,11 @@ object QuillCodeGen {
             |  * ${java.time.ZonedDateTime.now}
             |  */
             |object Tables {
-            |  ${tab(Tables.tables map (_.toCode) mkString "\n\n")}
+            |
+            |${tab(Tables.tables map (_.toCode) mkString "\n\n")}
             |}
             |
-            |${adtCode.toSeq mkString "\n\n"}
+            |${e8mCode.toSeq mkString "\n\n"}
          """.stripMargin
 
     }
@@ -361,19 +371,17 @@ object QuillCodeGen {
     log success s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
   }
 
-  def results(rs: ResultSet): Stream[ResultSet] = {
-    val nonEmpty = rs.next()
-    if (nonEmpty)
+  def results(rs: ResultSet): Stream[ResultSet] =
+    if (rs.next())
       new Iterator[ResultSet] {
-        private var first = true; // heh the semicolon is a subconscious tic - I'll keep it...
-        def hasNext       = first || !rs.isLast()
+        private[this] var first = true; // heh the semicolon is a subconscious tic - I'll keep it...
+        def hasNext             = first || !rs.isLast()
         def next() = {
           if (first) first = false else rs.next()
           rs
         }
       }.toStream
     else Stream.empty
-  }
 }
 // ---
 
