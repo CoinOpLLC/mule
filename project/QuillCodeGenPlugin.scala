@@ -10,10 +10,6 @@ object QuillCodeGenPlugin extends AutoPlugin {
   override def requires = org.flywaydb.sbt.FlywayPlugin
   override def trigger  = noTrigger
 
-  type FileSet           = Set[File]
-  type FileSetFunction   = FileSet => FileSet
-  type FileSetCombinator = FileSetFunction => FileSetFunction
-
   object autoImport {
 
     lazy val qcgPackage = settingKey[String](
@@ -45,11 +41,10 @@ object QuillCodeGenPlugin extends AutoPlugin {
       Seq(
         qcgPackage := "io.deftrade.rdb",
         qcgImports := Seq(
-          "io.getquill._",
-          "cats.syntax._",
-          "cats.implicits._",
-          "cats.Eq",
-          "java.util.UUID",
+          // "io.getquill._",
+          // "cats.syntax._",
+          // "cats.implicits._",
+          // "java.util.UUID",
           "java.time.{LocalDateTime, OffsetDateTime, Duration}",
           "enumeratum.{Enum, EnumEntry}",
           "io.circe.Json"
@@ -59,8 +54,9 @@ object QuillCodeGenPlugin extends AutoPlugin {
           .foldLeft(sourceManaged.value / "scala") { _ / _ }) /
           qcgOutFileName.value,
         qcgRunUncached := {
-          // FIXME: UNCOMMENT when the code gen is working
+
           // flywayMigrate.value // i.e. do the migrate. Returns Unit - pure effect
+
           _root_.io.deftrade.sbt.QuillCodeGen(
             log = streams.value.log,
             driver = flywayDriver.value, // conciously coupling to Flyway config
@@ -77,8 +73,11 @@ object QuillCodeGenPlugin extends AutoPlugin {
 
           import FilesInfo.{ exists, lastModified } // these are the flags we care about
 
+          type FileSetXform      = Set[File] => Set[File]
+          type FileSetCombinator = FileSetXform => FileSetXform
+
           // named; sbt forbids invoking tasks within anon functions
-          def doTheThing: FileSet = {
+          def doTheThing: Set[File] = {
             qcgRunUncached.value
             Set(qcgOutFile.value)
           }
@@ -90,7 +89,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
           val tag = streams.value.cacheDirectory / "gen-quill-code"
           val cache: FileSetCombinator =
             FileFunction.cached(tag, lastModified, exists)
-          val cachedQcg: FileSetFunction = cache { _ => // n.b. we use inSet only to trigger
+          val cachedQcg: FileSetXform = cache { _ => // n.b. we use inSet only to trigger
             doTheThing
           }
 

@@ -27,16 +27,17 @@ object QuillCodeGen {
   // @inline def Legit[A](legit: Legit[A]): Option[A] = Right unapply legit
 
   val defaultTypeMap = Map(
-    "serial"      -> "Int",
-    "bigserial"   -> "Long",
-    "money"       -> "BigDecimal",
+    // "money"       -> "BigDecimal", // no. Cast out because of entanglment with locale (lc_stuff)
     "int2"        -> "Short",
     "int4"        -> "Int",
-    "serial4"     -> "Int",
     "int8"        -> "Long",
+    "serial"      -> "Int",
+    "serial4"     -> "Int",
+    "bigserial"   -> "Long",
     "serial8"     -> "Long",
     "float8"      -> "Double",
     "numeric"     -> "BigDecimal",
+    "decimal"     -> "BigDecimal",
     "varchar"     -> "String",
     "text"        -> "String",
     "bool"        -> "Boolean",
@@ -301,8 +302,6 @@ object QuillCodeGen {
              |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
              |""".stripMargin
 
-        // FIXME: I deeply suspect this doesn't preserve order, which is how pg defines enum order
-        // (this is the place to enforce that)
         def tidy[K, V](kvs: Traversable[(K, V)]): K Map Traversable[V] =
           kvs groupBy (_._1) map {
             case (k, kvs) => (k, kvs map (_._2))
@@ -371,6 +370,7 @@ object QuillCodeGen {
     log success s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
   }
 
+  // this only works because it's ~lazy~ non-strict. like me.
   def results(rs: ResultSet): Stream[ResultSet] =
     if (rs.next())
       new Iterator[ResultSet] {

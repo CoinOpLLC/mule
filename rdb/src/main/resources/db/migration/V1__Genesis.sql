@@ -9,15 +9,12 @@
  * - entity id within the domain model has no naming convention...
  *   however a single non-unique index ending in _eid indicates an entity id on the column(s) referenced
  *
- * - 'id' is a distinguished name and always serial4 or serial8 primary key
+ * - 'id serial' is then a distinguished name and always serial4 or serial8 primary key
  *   guaranteed ascending as time evolves
  *
- * - optional ts: timestamptz field when recording time of state change is necessary
+ * - 'span tstzrange' indicates when the field is valid
  *
- * - 'validity' as a concept is the responsibility of the domain model! no global
- *   (repository methods return the latest record for a given entity id)
- *   up to model to determine if this is valid
- *   prefix function isValid to be defined on record
+ * - use views to get queries for "valid" or "current" rows
  *
  */
 
@@ -26,7 +23,7 @@ http://stackoverflow.com/questions/1884758/generate-ddl-programmatically-on-post
 http://stackoverflow.com/questions/1771543/postgresql-updating-an-enum-type
 */
 --
--- PIENET = a reactive pizza service
+-- PIENET = human-free reactive pizza service
 --  - online ordering
 --  - robotic kitchens
 --  - drone delivered
@@ -72,7 +69,7 @@ create table pizzas (
 
   name varchar(126) not null, -- this is the entity identity for the domain model
   toppings pizza_topping_e[] not null,
-  meta jsonb not null,
+  meta jsonb default('{}') not null,
 
   span tstzrange not null
 );
@@ -84,48 +81,68 @@ create index pizzas_span on pizzas using gist(span);
 drop table if exists users cascade;
 create table users (
 
-  id serial8 primary key,
+  id UUID primary key,
 
-  user_name varchar(126) not null,        -- domain model must ensure uniqueness within domain
+  email varchar(126) not null,            -- how we're all known now; new email -> new user
   signup timestamptz not null,            -- never changes for a given user name
-  meta jsonb not null,                    -- can change
+
+  -- n.b. two ways of defaulting to empty; two different motivations
+  default_location jsonb default null,    -- can change for a given email
+  meta jsonb default('{}') not null,      -- can change for a given email
 
   span tstzrange not null
 );
-create index users_user_name_dk on users(user_name);
+create index users_email_dk on users(email);
 create index users_meta on users using gin (meta);
 create index users_span on users using gist(span);
-
-drop table if exists root_orders cascade;
-create table root_orders (
-  uuid UUID primary key,
-  user_id int8 references users(id) not null
-);
 
 drop table if exists orders cascade;
 create table orders (
 
   id serial8 primary key,
 
-  uuid UUID references root_orders not null,
+  user_id UUID references users(id) not null,
 
-  deliver_to jsonb not null,
-  est_delivery interval not null,
-  status order_status_e not null
+  deliver_to jsonb default null, -- NULL indicates use default user location
+  est_wait interval not null,
+  status order_status_e default('submitted') not null
 
 );
-create index orders_uuid_dk on orders(uuid);
 create index orders_deliver_to on orders using gin(deliver_to);
+
 --
--- all payments recorded here, including change (negative amount).
--- a btc addr may be used only once per order
+-- users direct payments to go to these addrs
+--
+drop table if exists pienet_btc_addrs;
+create table pienet_btc_addrs (
+  addr varchar(36) primary key,
+  span tstzrange not null
+);
+create index pienet_btc_addrs_span on pienet_btc_addrs using gist(span);
+
+--
+-- users direct change to go to these addrs
+--
+drop table if exists user_btc_addrs;
+create table user_btc_addrs (
+  user_id uuid references users(id),
+  addr varchar(36) not null,
+  span tstzrange not null,
+  primary key (user_id, addr)
+);
+create index user_btc_addrs_span_user_id_dk on user_btc_addrs(user_id);
+create index user_btc_addrs_span on user_btc_addrs using gist(span);
+
+--
+-- all payments (BTC transactions) recorded here
 --
 drop table if exists payments cascade;
 create table payments (
   order_id int8 references orders(id) not null,
-  btc_addr varchar(35) not null,
-  amount money not null, -- negative means change returned to user
-  primary key (order_id, btc_addr)
+  pay_to varchar(36) not null,
+  amount decimal not null,
+  change_to varchar(36) not null,
+  change decimal not null -- negative means change returned to user
 );
 create index payments_order_id_dk on payments(order_id);
 --
@@ -138,10 +155,10 @@ create table order_items (
   id serial8 primary key,
 
   pizza_id int4 references pizzas(id) not null,
-  pizza_size pizza_size_e not null,
-  quantity int2 default 1 not null,
-  unit_price money default (1.0) not null, -- in BTC - negative indicates order not yet quoted
-  requests jsonb not null
+  pizza_size pizza_size_e default ('slice') not null,
+  quantity int2 default 1 not null, -- 32K pizzas ought to be enough for anyone
+  unit_price decimal default (-1.0) not null, -- in BTC - negative indicates order not yet quoted
+  requests jsonb default ('{}')
 );
 create index order_items_pizza_id_dk on order_items(pizza_id);
 
