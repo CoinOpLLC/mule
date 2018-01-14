@@ -19,7 +19,7 @@ import scala.util.Try
 import scala.util.matching.Regex
 
 package io {
-  package object deftrade extends MyWay with MyTime {
+  package object deftrade extends MyWay /*with MyTime */ {
 
     import _impl._
 
@@ -67,66 +67,221 @@ package io {
       def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
     }
 
-    trait MyTime {
+    object time { me =>
 
-      // TODO: typeclass for date based vs time based (and DateTime has both) - in fact for all field...
+      import java.time._
+      import chrono.{ Chronology, IsoChronology }
+      import java.time.{ temporal => jtt }
+      import jtt.{ ChronoUnit, TemporalAmount, TemporalUnit }, ChronoUnit._
 
-      // import java.{ time => jt }
-      //
-      // type Clock         = jt.Clock
-      // type Month         = jt.Month
-      // type Year          = jt.Year
-      // type DayOfWeek     = jt.DayOfWeek
-      // type LocalTime     = jt.LocalTime
-      // type Instant       = jt.Instant
-      // type YearMonth     = jt.YearMonth
-      // type Duration      = jt.Duration
-      // type LocalDate     = jt.LocalDate
-      // type LocalDateTime = jt.LocalDateTime
-      // type ZonedDateTime = jt.ZonedDateTime
-      // type Period        = jt.Period
-      // type ZoneId        = jt.ZoneId
-      // type ZoneOffset    = jt.ZoneOffset
-      //
-      // // FIXME: concordance with scala.concurrent etc...
-      // type TimeUnit = java.util.concurrent.TimeUnit
-      //
-      // // let's see if we can do without these...
-      // // type IsoChronology = jt.chrono.IsoChronology
-      // // type Chronology    = jt.chrono.Chronology
-      //
-      // type TemporalAccessor = jt.temporal.TemporalAccessor
-      // type Temporal         = jt.temporal.Temporal
-      // type TemporalAmount   = jt.temporal.TemporalAmount
-      //
-      // type TemporalUnit      = jt.temporal.TemporalUnit
-      // type ChronoUnit        = jt.temporal.ChronoUnit
-      // type IsoChronUnit      = jt.temporal.IsoFields
-      // type TemporalAdjuster  = jt.temporal.TemporalAdjuster
-      // type TemporalAdjusters = jt.temporal.TemporalAdjusters
-      //
-      // type DateTimeFormatter = jt.format.DateTimeFormatter
-      // type FormatStyle       = jt.format.FormatStyle
-      //
-      // import jt.Month._
-      // val January: jt.Month   = JANUARY
-      // val February: jt.Month  = FEBRUARY
-      // val March: jt.Month     = MARCH
-      // val May: jt.Month       = MAY
-      // val April: jt.Month     = APRIL
-      // val June: jt.Month      = JUNE
-      // val July: jt.Month      = JULY
-      // val August: jt.Month    = AUGUST
-      // val September: jt.Month = SEPTEMBER
-      // val October: jt.Month   = OCTOBER
-      // val November: jt.Month  = NOVEMBER
-      // val December: jt.Month  = DECEMBER
-      //
-      // def apply(month: Int): Month                 = jt.Month of month
-      // def apply(accessor: TemporalAccessor): Month = jt.Month from accessor
-      //
-      // def unapply(month: Month): Option[Int] = Some(month.getValue)
+      implicit def integral2long[N: Integral](n: N) = implicitly[Integral[N]] toLong n
+      implicit def integral2int[N: Integral](n: N)  = implicitly[Integral[N]] toInt n
 
+      def duration[N: Integral](unit: ChronoUnit)(n: N) = Duration of (n, unit)
+      def duration(seconds: Long, nanos: Int)           = Duration ofSeconds seconds withNanos nanos
+
+      def hours[N: Integral](n: N)   = duration(HOURS)(n)
+      def minutes[N: Integral](n: N) = duration(MINUTES)(n)
+      def seconds[N: Integral](n: N) = duration(SECONDS)(n)
+      def millis[N: Integral](n: N)  = duration(MILLIS)(n)
+      def nanos[N: Integral](n: N)   = duration(NANOS)(n)
+
+      def period(years: Int, months: Int, days: Int) = Period of (years, months, days)
+
+      def years[N: Integral](y: N)  = period(y, 0, 0)
+      def months[N: Integral](m: N) = period(0, m, 0)
+      def days[N: Integral](d: N)   = period(0, 0, d)
+      def weeks[N: Integral](w: N)  = days((w: Int) * 7)
+
+      object DurationOf {
+        def unapply(d: Duration) = Option((d.getSeconds, d.getNano))
+      }
+
+      object PeriodOf {
+        def unapply(p: Period) = Option((p.getYears, p.getMonths, p.getDays))
+      }
+
+      // TODO: low level DSL not worth it. Only higher level or domain specific.
+
+      // implicit def jt8Integral[N: Integral](n: N) = Jt8Integral(n)
+
+      implicit class Jt8Integral(val n: Long) extends AnyVal {
+
+        def hour: Duration    = me.hours(n)
+        def hours: Duration   = me.hours(n)
+        def minute: Duration  = me.minutes(n)
+        def minutes: Duration = me.minutes(n)
+        def second: Duration  = me.seconds(n)
+        def seconds: Duration = me.seconds(n)
+        def milli: Duration   = me.millis(n)
+        def millis: Duration  = me.millis(n)
+        def nano: Duration    = me.nanos(n)
+        def nanos: Duration   = me.nanos(n)
+
+        def day: Period    = me.days(n)
+        def days: Period   = me.days(n)
+        def week: Period   = me.weeks(n)
+        def weeks: Period  = me.weeks(n)
+        def month: Period  = me.months(n)
+        def months: Period = me.months(n)
+        def year: Period   = me.years(n)
+        def years: Period  = me.years(n)
+      }
+
+      implicit class SweetLocalDateTime(val ldt: LocalDateTime) extends AnyVal with Ordered[LocalDateTime] {
+
+        def year: Int              = ldt.getYear
+        def dayOfMonth: Int        = ldt.getDayOfMonth
+        def month: Month           = ldt.getMonth
+        def monthValue: Int        = ldt.getMonthValue
+        def dayOfWeek: DayOfWeek   = ldt.getDayOfWeek
+        def dayOfYear: Int         = ldt.getDayOfYear
+        def hour: Int              = ldt.getHour
+        def minute: Int            = ldt.getMinute
+        def second: Int            = ldt.getSecond
+        def nano: Int              = ldt.getNano
+        def chronology: Chronology = ldt.getChronology
+
+        def +(amount: Period): LocalDateTime   = ldt plus amount
+        def -(amount: Period): LocalDateTime   = ldt minus amount
+        def +(amount: Duration): LocalDateTime = ldt plus amount
+        def -(amount: Duration): LocalDateTime = ldt minus amount
+
+        def -(end: LocalDateTime): Duration = Duration between (ldt, end)
+
+        override def compare(that: LocalDateTime): Int = ldt compareTo that
+      }
+
+      implicit class SweetLocalDate(val ld: LocalDate) extends AnyVal with Ordered[LocalDate] {
+
+        def year: Int              = ld.getYear
+        def dayOfMonth: Int        = ld.getDayOfMonth
+        def month: Month           = ld.getMonth
+        def monthValue: Int        = ld.getMonthValue
+        def dayOfWeek: DayOfWeek   = ld.getDayOfWeek
+        def dayOfYear: Int         = ld.getDayOfYear
+        def chronology: Chronology = ld.getChronology
+
+        def +(amount: Period): LocalDate = ld plus amount
+        def -(amount: Period): LocalDate = ld minus amount
+
+        /**
+          * @return the period from this date until other, exclusive end date
+          * @see java.time.LocalDate.until(ChronoLocalDate)
+          */
+        def -(end: LocalDate): Period = ld until end
+
+        override def compare(that: LocalDate): Int = ld compareTo that
+      }
+
+      implicit class SweetLocalTime(val lt: LocalTime) extends AnyVal with Ordered[LocalTime] {
+
+        def hour: Int   = lt.getHour
+        def minute: Int = lt.getMinute
+        def second: Int = lt.getSecond
+        def nano: Int   = lt.getNano
+
+        def +(duration: Duration): LocalTime = lt plus duration
+        def -(duration: Duration): LocalTime = lt minus duration
+
+        override def compare(that: LocalTime): Int = lt compareTo that
+      }
+
+      implicit class SweetZonedDateTime(val zdt: ZonedDateTime) extends AnyVal with Ordered[ZonedDateTime] {
+
+        def year: Int            = zdt.getYear
+        def dayOfMonth: Int      = zdt.getDayOfMonth
+        def month: Month         = zdt.getMonth
+        def monthValue: Int      = zdt.getMonthValue
+        def dayOfWeek: DayOfWeek = zdt.getDayOfWeek
+        def dayOfYear: Int       = zdt.getDayOfYear
+        def hour: Int            = zdt.getHour
+        def minute: Int          = zdt.getMinute
+        def second: Int          = zdt.getSecond
+        def nano: Int            = zdt.getNano
+        def zone: ZoneId         = zdt.getZone
+        def offset: ZoneOffset   = zdt.getOffset
+
+        def localDate: LocalDate         = zdt.toLocalDate
+        def localTime: LocalTime         = zdt.toLocalTime
+        def localDateTime: LocalDateTime = zdt.toLocalDateTime
+
+        def +(amount: Period): ZonedDateTime   = zdt plus amount
+        def -(amount: Period): ZonedDateTime   = zdt minus amount
+        def +(amount: Duration): ZonedDateTime = zdt plus amount
+        def -(amount: Duration): ZonedDateTime = zdt minus amount
+
+        def -(other: ZonedDateTime): Duration = Duration between (zdt, other)
+
+        def chronology: Chronology                      = zdt.getChronology
+        override def compare(other: ZonedDateTime): Int = zdt compareTo other
+      }
+
+      implicit class SweetInstant(val i: Instant) extends Ordered[Instant] {
+
+        def nano: Int         = i.getNano
+        def epochSecond: Long = i.getEpochSecond
+
+        def -(amount: Long, unit: TemporalUnit): SweetInstant = i minus (amount, unit)
+        def +(amount: Long, unit: TemporalUnit): SweetInstant = i plus (amount, unit)
+        def +(amount: TemporalAmount): SweetInstant           = i plus amount
+        def -(amount: TemporalAmount): SweetInstant           = i minus amount
+
+        override def compare(that: Instant): Int = i compareTo that
+      }
+
+      implicit class SweetDuration(val d: Duration) extends AnyVal with Ordered[Duration] {
+
+        import scala.concurrent.duration.{ FiniteDuration, NANOSECONDS, SECONDS }
+
+        def nanos: Long   = d.toNanos
+        def millis: Long  = d.toMillis
+        def seconds: Long = d.getSeconds
+        def minutes: Long = d.toMinutes
+        def hours: Long   = d.toHours
+        def days: Long    = d.toDays
+
+        def -(other: Duration): Duration = d minus other
+        def +(other: Duration): Duration = d plus other
+        def /(divisor: Long): Duration   = d dividedBy divisor
+        def *(scalar: Long): Duration    = d multipliedBy scalar
+
+        def toFiniteDuration: FiniteDuration =
+          d.getNano match {
+            case 0 =>
+              FiniteDuration(d.getSeconds, SECONDS)
+            case nanos =>
+              FiniteDuration(d.getSeconds, SECONDS) + FiniteDuration(nanos.toLong, NANOSECONDS)
+          }
+
+        override def compare(other: Duration): Int = d.compareTo(other)
+      }
+
+      implicit class SweetPeriod(val p: Period) extends AnyVal with Ordered[Period] {
+
+        def days: Int                 = p.getDays
+        def months: Int               = p.getMonths
+        def years: Int                = p.getYears
+        def chronology: IsoChronology = p.getChronology
+
+        def -(other: TemporalAmount): Period = p minus other
+        def +(other: TemporalAmount): Period = p plus other
+        def *(scalar: Int): Period           = p multipliedBy scalar
+
+        override def compare(that: Period): Int = (p minus that).getDays
+      }
+
+      implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal with Ordered[YearMonth] {
+
+        def year: Int       = ym.getYear
+        def month: Month    = ym.getMonth
+        def monthValue: Int = ym.getMonthValue
+
+        def -(amount: Period): YearMonth = ym minus amount
+        def +(amount: Period): YearMonth = ym plus amount
+
+        override def compare(other: YearMonth): Int = ym compareTo other
+      }
     }
 
     object _impl {

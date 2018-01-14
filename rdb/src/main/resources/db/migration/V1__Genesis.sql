@@ -157,7 +157,7 @@ create table order_items (
   pizza_id int4 references pizzas(id) not null,
   pizza_size pizza_size_e default ('slice') not null,
   quantity int2 default 1 not null, -- 32K pizzas ought to be enough for anyone
-  unit_price decimal default (-1.0) not null, -- in BTC - negative indicates order not yet quoted
+  unit_price decimal default -1.0 not null, -- in BTC - negative indicates order not yet quoted
   requests jsonb default ('{}')
 );
 create index order_items_pizza_id_dk on order_items(pizza_id);

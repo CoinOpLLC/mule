@@ -142,7 +142,12 @@ object QuillCodeGen {
     }
 
     /** */
-    case class ColumnType(pgType: String, scalaType: String, columnSize: Int, decimalDigits: Int, columnDef: Option[String])
+    case class ColumnType(jdbcType: String,
+                          pgType: String,
+                          scalaType: String,
+                          columnSize: Int,
+                          decimalDigits: Int,
+                          columnDef: Option[String])
     object ColumnType {
 
       // Data source dependent type name, for a UDT the type name is fully qualified
@@ -187,6 +192,7 @@ object QuillCodeGen {
 
         scalaTypeFor(pgType) map { scalaType =>
           ColumnType(
+            jdbcType = jdbcTypeToString(row getInt "DATA_TYPE"),
             pgType = pgType,
             scalaType = scalaType,
             columnSize = row getInt "COLUMN_SIZE", // for varchar?
@@ -365,8 +371,9 @@ object QuillCodeGen {
     if (path.getParent.toFile.mkdirs) log info s"qcg: created dirs for $path"
 
     Files write (path, Tables.code.getBytes)
-
     db.close()
+
+    log info Tables.tables.toString
     log success s"Done! Wrote to ${file.toURI} (${System.currentTimeMillis() - startTime}ms)"
   }
 
@@ -953,3 +960,50 @@ object PkConst {
 //     |""".stripMargin
 //   }
 // }
+
+object jdbcTypeToString {
+
+  import java.sql.Types._
+
+  def apply(jdbcType: Int) = jdbcType match {
+    case ARRAY                   => s"jdbc:array" // 2003
+    case BIGINT                  => s"jdbc:bigint" // -5
+    case BINARY                  => s"jdbc:binary" // -2
+    case BIT                     => s"jdbc:bit" // -7
+    case BLOB                    => s"jdbc:blob" // 2004
+    case BOOLEAN                 => s"jdbc:boolean" // 16
+    case CHAR                    => s"jdbc:char" // 1
+    case CLOB                    => s"jdbc:clob" // 2005
+    case DATALINK                => s"jdbc:datalink" // 70
+    case DATE                    => s"jdbc:date" // 91
+    case DECIMAL                 => s"jdbc:decimal" // 3
+    case DISTINCT                => s"jdbc:distinct" // 2001
+    case DOUBLE                  => s"jdbc:double" // 8
+    case FLOAT                   => s"jdbc:float" // 6
+    case INTEGER                 => s"jdbc:integer" // 4
+    case JAVA_OBJECT             => s"jdbc:java_object" // 2000
+    case LONGNVARCHAR            => s"jdbc:longnvarchar" // -16
+    case LONGVARBINARY           => s"jdbc:longvarbinary" // -4
+    case LONGVARCHAR             => s"jdbc:longvarchar" // -1
+    case NCHAR                   => s"jdbc:nchar" // -15
+    case NCLOB                   => s"jdbc:nclob" // 2011
+    case NULL                    => s"jdbc:null" // 0
+    case NUMERIC                 => s"jdbc:numeric" // 2
+    case NVARCHAR                => s"jdbc:nvarchar" // -9
+    case OTHER                   => s"jdbc:other" // 1111
+    case REAL                    => s"jdbc:real" // 7
+    case REF                     => s"jdbc:ref" // 2006
+    case REF_CURSOR              => s"jdbc:ref_cursor" // 2012
+    case ROWID                   => s"jdbc:rowid" // -8
+    case SMALLINT                => s"jdbc:smallint" // 5
+    case SQLXML                  => s"jdbc:sqlxml" // 2009
+    case STRUCT                  => s"jdbc:struct" // 2002
+    case TIME                    => s"jdbc:time" // 92
+    case TIME_WITH_TIMEZONE      => s"jdbc:time_with_timezone" // 2013
+    case TIMESTAMP               => s"jdbc:timestamp" // 93
+    case TIMESTAMP_WITH_TIMEZONE => s"jdbc:timestamp_with_timezone" // 2014
+    case TINYINT                 => s"jdbc:tinyint" // -6
+    case VARBINARY               => s"jdbc:varbinary" // -3
+    case VARCHAR                 => s"jdbc:varchar" // 12
+  }
+}

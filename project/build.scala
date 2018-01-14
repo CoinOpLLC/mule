@@ -17,7 +17,6 @@ object Version {
   val Squants        = "1.3.0"
   val Circe          = "0.8.0"
   val Fansi          = "0.2.5"
-  val Time4S         = "1.5"
   val AkkaHttp       = "10.0.11"
   val HttpSession    = "0.5.3"
   val Ammonite       = "0.8.3"
@@ -45,8 +44,6 @@ object Deps {
   val spire = "org.typelevel" %% "spire" % Spire
 
   val squants = "org.typelevel" %% "squants" % Squants
-
-  val time4s = "com.markatta" %% "timeforscala" % Time4S
 
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
@@ -121,8 +118,7 @@ object Deps {
       reflection,
       scompiler,
       xml, // FIXME: check the state of available alternatives
-      conf, // we believe our opinions are worthy of opinionating
-      time4s, // FIXME: remove this dependency
+      conf,
       fansi, // can't help myself
       scalatest // pre-scoped to Test configuration
     )

@@ -17,16 +17,15 @@
 package io.deftrade
 package wip
 
+import io.deftrade.time._
+
 import java.{ time => jt }
 import jt.{ temporal => jtt }
+import jt._, jtt._
 
 import scala.util.Try
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ duration => scd }
-
-import com.markatta.timeforscala._
-import com.markatta.timeforscala.Month.{ January, March }
-import com.markatta.timeforscala.TimeExpressions._
 
 import cats.Order
 import cats.data.Reader
@@ -37,19 +36,19 @@ import enumeratum._, values._
 object Time4SExample {
 
   // java.time.Duration
-  val d1 = Duration(seconds = 20, nanos = 1)
-  val d2 = Hours(10)
-  val d3 = Minutes(10)
-  val d4 = Seconds(10)
-  val d5 = Millis(10)
-  val d6 = Nanos(10)
+  val d1 = duration(seconds = 20, nanos = 1)
+  val d2 = hours(10)
+  val d3 = minutes(10)
+  val d4 = seconds(10)
+  val d5 = millis(10)
+  val d6 = nanos(10)
 
   // java.time.Perod
-  val p1 = Period(years = 1, months = 2, days = 3)
-  val p2 = Days(10)
-  val p3 = Weeks(10)
-  val p4 = Months(10)
-  val p5 = Years(10)
+  val p1 = period(years = 1, months = 2, days = 3)
+  val p2 = days(10)
+  val p3 = weeks(10)
+  val p4 = months(10)
+  val p5 = years(10)
 
   val oldRule = Years(1) + Days(1)
   // val severanceRule = Weeks(2) per Year(10) // how to do this?
