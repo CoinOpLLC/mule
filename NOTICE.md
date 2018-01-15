@@ -13,9 +13,16 @@ CoinOp LLC (http://www.coinopllc.com/).
 =========================================================================
 
 A portion of DefTrade (QuillCodeGen.scala) is derived from code developed
-by Ólafur Páll Geirsson for scala-db-codegen, available at
+by Ólafur Páll Geirsson for `scala-db-codegen`, available at
 <https://github.com/olafurpg/scala-db-codegen>, and licensed under
 the Apache License 2.0.
+
+=========================================================================
+
+A portion of DefTrade (java.time wrappers for idiomatic scala usage) is
+adapted from code developed by Johan Andrén for `timeforscala`, available
+at <https://github.com/johanandren/timeforscala>, and licensed under the
+Apache License 2.0.
 
 =========================================================================
 
