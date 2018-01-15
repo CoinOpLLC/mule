@@ -6,7 +6,7 @@ in this case for the `DefTrade` distribution.
 
 -----
 
-`DefTrade`
+`DefTrade`  
 Copyright 2017, 2018 CoinOp LLC
 
 `DefTrade` includes software developed by [CoinOp LLC](http://www.coinopllc.com/).
