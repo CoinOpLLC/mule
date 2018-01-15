@@ -67,15 +67,28 @@ package io {
       def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
     }
 
-    object time { me =>
+    trait LowPrioImplicits {
+      implicit def integral2int[N: Integral](n: N) = implicitly[Integral[N]] toInt n
+    }
 
-      import java.time._
-      import chrono.{ Chronology, IsoChronology }
+    object time extends LowPrioImplicits { me =>
+
+      import java.time._, chrono.{ Chronology, IsoChronology }, format.DateTimeFormatter
       import java.time.{ temporal => jtt }
-      import jtt.{ ChronoUnit, TemporalAmount, TemporalUnit }, ChronoUnit._
+      import jtt._, ChronoUnit._
 
       implicit def integral2long[N: Integral](n: N) = implicitly[Integral[N]] toLong n
-      implicit def integral2int[N: Integral](n: N)  = implicitly[Integral[N]] toInt n
+
+      def clockDefaultZone                      = Clock.systemDefaultZone
+      def clockDefaultUTC                       = Clock.systemUTC
+      def clockFrozen(i: Instant, zone: ZoneId) = Clock fixed (i, zone)
+
+      def clock(zone: ZoneId) = Clock system zone
+
+      implicit class SweetClock(val base: Clock) extends AnyVal {
+        def offset(d: Duration) = Clock offset (base, d)
+        def tick(d: Duration)   = Clock tick (base, d)
+      }
 
       def duration[N: Integral](unit: ChronoUnit)(n: N) = Duration of (n, unit)
       def duration(seconds: Long, nanos: Int)           = Duration ofSeconds seconds withNanos nanos
@@ -101,11 +114,78 @@ package io {
         def unapply(p: Period) = Option((p.getYears, p.getMonths, p.getDays))
       }
 
+      implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
+        def adjusted(ta: TemporalAdjuster) = value `with` ta
+      }
+
+      object TemporalAdjuster {
+        type HM[A] = A => A
+        type HMLD  = HM[LocalDate]
+
+        def apply(adjust: HMLD): TemporalAdjuster = new TemporalAdjuster {
+          // justification: creating an instance of a java lib class; this is what the doc says: throw.
+          @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+          override def adjustInto(t: Temporal): Temporal = t match {
+            case ld: LocalDate => ld |> adjust
+            case _ =>
+              throw new DateTimeException(
+                s"only args of type LocalDate are accepted; found ${t.getClass}"
+              )
+          }
+        }
+
+        @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+        def unapply(ta: jtt.TemporalAdjuster): Option[HM[LocalDate]] =
+          Some(
+            localDate =>
+              // justification for this downcast:
+              // per the `TemporalAdjuster` javadocs, and I quote:
+              // > The returned object must have the same observable type as the input object
+              // i.e., skating on thin ice; assuming this is obeyed.
+              (ta adjustInto localDate).asInstanceOf[LocalDate]
+          )
+      }
+
+      // This name is free in Value Land, because it's occupied by a lone j8 interface in Type Land
+      object TemporalQuery {
+        import jtt.{ TemporalQueries => TQs }
+        import cats._
+        import cats.syntax._
+        import cats.implicits._
+        type TQ[+R] = LocalDate => R
+        // consider R := LocalDate => LocalDate... !
+        // in other words: A TQ[LocalDate => LocalDate] Query produces an Adjuster from a LocalDate
+        type TA = TQ[TemporalAdjuster.HMLD]
+
+        def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
+          override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
+            case ld: LocalDate => (ld |> tq).some
+            case _             => none
+          }
+        }
+
+        def chronology: TQ[Option[Chronology]]  = lift(_ query TQs.chronology)
+        def precision: TQ[Option[TemporalUnit]] = lift(_ query TQs.precision)
+
+        def localDate: TQ[Option[LocalDate]] = lift(_ query TQs.localDate)
+        def localTime: TQ[Option[LocalTime]] = lift(_ query TQs.localTime)
+
+        def offset: TQ[Option[ZoneOffset]] = lift(_ query TQs.offset)
+        def zoneId: TQ[Option[ZoneId]]     = lift(_ query TQs.zoneId)
+        def zone: TQ[Either[Option[ZoneOffset], ZoneId]] = _ query TQs.zone match {
+          case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
+          case zid if zid != null => zid.asRight // actual ZoneId
+          case _                  => none.asLeft // not applicable - zone makes no sense
+        }
+
+        private def lift[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
+      }
+
       // TODO: low level DSL not worth it. Only higher level or domain specific.
 
       // implicit def jt8Integral[N: Integral](n: N) = Jt8Integral(n)
 
-      implicit class Jt8Integral(val n: Long) extends AnyVal {
+      implicit class J8TimeLong(val n: Long) extends AnyVal {
 
         def hour: Duration    = me.hours(n)
         def hours: Duration   = me.hours(n)
@@ -126,6 +206,24 @@ package io {
         def months: Period = me.months(n)
         def year: Period   = me.years(n)
         def years: Period  = me.years(n)
+      }
+
+      // LocalDateTime
+
+      def localDateTime               = LocalDateTime.now
+      def localDateTime(zone: ZoneId) = LocalDateTime now zone
+      def localDateTime(clock: Clock) = LocalDateTime now clock
+
+      def localDateTime(ta: TemporalAccessor) = LocalDateTime from ta
+
+      def localDateTime(iso8601: String) = LocalDateTime parse iso8601
+
+      def localDateTime(s: String, fmt: DateTimeFormatter) = LocalDateTime parse (s, fmt)
+
+      def localDateTime(ld: LocalDate, lt: LocalTime) = LocalDateTime of (ld, lt)
+
+      object LocalDateTimeOf {
+        def unapply(dt: LocalDateTime) = Option((dt.toLocalDate, dt.toLocalTime))
       }
 
       implicit class SweetLocalDateTime(val ldt: LocalDateTime) extends AnyVal with Ordered[LocalDateTime] {
@@ -152,6 +250,22 @@ package io {
         override def compare(that: LocalDateTime): Int = ldt compareTo that
       }
 
+      // LocalDate
+
+      def localDate               = LocalDate.now
+      def localDate(clock: Clock) = LocalDate now clock
+      def localDate(zone: ZoneId) = LocalDate now zone
+
+      def localDate(ta: TemporalAccessor)              = LocalDate from ta
+      def localDate(iso8601: String)                   = LocalDate parse iso8601
+      def localDate(fmt: DateTimeFormatter)(s: String) = LocalDate parse (s, fmt)
+
+      def localDate(year: Int, month: Month, day: Int) = LocalDate of (year, month, day)
+      def localDate(year: Int, month: Int, day: Int)   = LocalDate of (year, month, day)
+
+      object LocalDateOf {
+        def unapply(ld: LocalDate) = Option((ld.year, ld.month, ld.dayOfMonth))
+      }
       implicit class SweetLocalDate(val ld: LocalDate) extends AnyVal with Ordered[LocalDate] {
 
         def year: Int              = ld.getYear
@@ -165,13 +279,25 @@ package io {
         def +(amount: Period): LocalDate = ld plus amount
         def -(amount: Period): LocalDate = ld minus amount
 
-        /**
-          * @return the period from this date until other, exclusive end date
-          * @see java.time.LocalDate.until(ChronoLocalDate)
-          */
         def -(end: LocalDate): Period = ld until end
 
         override def compare(that: LocalDate): Int = ld compareTo that
+      }
+
+      def localTime               = LocalTime.now
+      def localTime(clock: Clock) = LocalTime now clock
+      def localTime(zone: ZoneId) = LocalTime now zone
+
+      def localTime(hour: Int, minute: Int, second: Int): LocalTime =
+        LocalTime of (hour, minute, second, 0)
+
+      def localTime(hour: Int, minute: Int, second: Int, nano: Int): LocalTime =
+        LocalTime of (hour, minute, second, nano)
+
+      object LocalTimeOf {
+        def unapply(lt: LocalTime): Option[(Int, Int, Int, Int)] =
+          Some((lt.getHour, lt.getMinute, lt.getSecond, lt.getNano))
+
       }
 
       implicit class SweetLocalTime(val lt: LocalTime) extends AnyVal with Ordered[LocalTime] {
@@ -186,6 +312,9 @@ package io {
 
         override def compare(that: LocalTime): Int = lt compareTo that
       }
+
+      def zonedDateTime(ld: LocalDate, lt: LocalTime, zone: ZoneId) =
+        ZonedDateTime of (ld, lt, zone)
 
       implicit class SweetZonedDateTime(val zdt: ZonedDateTime) extends AnyVal with Ordered[ZonedDateTime] {
 
@@ -206,10 +335,10 @@ package io {
         def localTime: LocalTime         = zdt.toLocalTime
         def localDateTime: LocalDateTime = zdt.toLocalDateTime
 
-        def +(amount: Period): ZonedDateTime   = zdt plus amount
-        def -(amount: Period): ZonedDateTime   = zdt minus amount
-        def +(amount: Duration): ZonedDateTime = zdt plus amount
-        def -(amount: Duration): ZonedDateTime = zdt minus amount
+        def +(p: Period): ZonedDateTime   = zdt plus p
+        def -(p: Period): ZonedDateTime   = zdt minus p
+        def +(d: Duration): ZonedDateTime = zdt plus d
+        def -(d: Duration): ZonedDateTime = zdt minus d
 
         def -(other: ZonedDateTime): Duration = Duration between (zdt, other)
 
@@ -271,19 +400,51 @@ package io {
         override def compare(that: Period): Int = (p minus that).getDays
       }
 
+      def yearMonth               = YearMonth.now
+      def yearMonth(clock: Clock) = YearMonth now clock
+      def yearMonth(zone: ZoneId) = YearMonth now zone
+
+      def yearMonth(s: String)                         = YearMonth parse s
+      def yearMonth(s: String, fmt: DateTimeFormatter) = YearMonth parse (s, fmt)
+
+      def yearMonth(year: Int, month: Int)      = YearMonth of (year, month)
+      def yearMonth(year: Int, month: Month)    = YearMonth of (year, month)
+      def yearMonth(temporal: TemporalAccessor) = YearMonth from (temporal)
+
+      object YearMonthOf {
+        def unapply(ym: YearMonth): Option[(Int, Month)] =
+          Some((ym.getYear, ym.getMonth))
+      }
+
       implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal with Ordered[YearMonth] {
 
         def year: Int       = ym.getYear
         def month: Month    = ym.getMonth
         def monthValue: Int = ym.getMonthValue
 
-        def -(amount: Period): YearMonth = ym minus amount
-        def +(amount: Period): YearMonth = ym plus amount
+        def -(amount: Period) = ym minus amount
+        def +(amount: Period) = ym plus amount
 
         override def compare(other: YearMonth): Int = ym compareTo other
       }
-    }
 
+      import collection.JavaConverters._
+
+      def zoneId(s: String)                                = ZoneId of s
+      def zoneId(s: String, aliasMap: Map[String, String]) = ZoneId of (s, aliasMap.asJava)
+      def zoneId(prefix: String, offset: ZoneOffset)       = ZoneId ofOffset (prefix, offset)
+      def zoneId(ta: TemporalAccessor)                     = ZoneId from ta
+
+      final lazy val zoneIdMap: Map[String, String] = ZoneId.SHORT_IDS.asScala.toMap
+
+      final val GmtZoneId = ZoneId of "GMT"
+      final val UtcZoneId = ZoneId of "UTC"
+      final val UtZoneId  = ZoneId of "UT"
+      final val ZZoneId   = ZoneId of "Z"
+
+      object ZoneIdOf {}
+
+    }
     object _impl {
 
       def notice(

@@ -17,8 +17,9 @@
 package io.deftrade
 package wip
 
-//import java.time.LocalDate
-import com.markatta.timeforscala.LocalDate
+import io.deftrade.time.{ localDate, localDateTime }
+
+import java.time.LocalDate
 
 import cats.Eq
 import cats.instances.int._
@@ -211,7 +212,7 @@ object PureConfigExample {
   val confDate   = parseString(s"""{ date: 2011-12-03 }""")
   val configDate = loadConfig[ConfDate](confDate)
 
-  configDate === ConfDate(LocalDate("2011-12-03")).asRight |> assertOrElse(configDate.toString)
+  configDate === ConfDate(localDate("2011-12-03")).asRight |> assertOrElse(configDate.toString)
 
   val root = "my.random.example"
   val config = ConfigFactory.parseString(
@@ -238,7 +239,7 @@ object PureConfigExample {
     1033,
     // "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXyω",  // see what I did there? Check it.
     "RacrqvWjuu4KVmnTG9b6xyZMTP7jnXy3",
-    ScheduleSettings(i"10", i"120", ConfDate(LocalDate("1979-07-04")), greeting = Greeting.Aloha)
+    ScheduleSettings(i"10", i"120", ConfDate(localDate("1979-07-04")), greeting = Greeting.Aloha)
   )
 
 }
