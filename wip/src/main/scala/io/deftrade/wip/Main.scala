@@ -53,7 +53,5 @@ object Main extends App {
    * OK do moar things.
    */
   PureConfigExample |> discardValue
-  Time4SExample     |> discardValue
   SpireExamples     |> discardValue
-  SyntaxForwardTime |> discardValue
 }

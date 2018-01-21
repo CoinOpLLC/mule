@@ -16,12 +16,9 @@
 
 import scala.language.implicitConversions
 import scala.util.Try
-import scala.util.matching.Regex
 
 package io {
   package object deftrade extends MyWay /*with MyTime */ {
-
-    import _impl._
 
     /**
       * Civilized function invocation.
@@ -388,10 +385,8 @@ package io {
         def nano: Int         = i.getNano
         def epochSecond: Long = i.getEpochSecond
 
-        def -(amount: Long, unit: TemporalUnit): SweetInstant = i minus (amount, unit)
-        def +(amount: Long, unit: TemporalUnit): SweetInstant = i plus (amount, unit)
-        def +(amount: TemporalAmount): SweetInstant           = i plus amount
-        def -(amount: TemporalAmount): SweetInstant           = i minus amount
+        def +(amount: TemporalAmount): SweetInstant = i plus amount
+        def -(amount: TemporalAmount): SweetInstant = i minus amount
 
         override def compare(that: Instant): Int = i compareTo that
       }
@@ -437,6 +432,24 @@ package io {
         override def compare(that: Period): Int = (p minus that).getDays
       }
 
+      type Year = java.time.Year
+
+      def year               = Year.now
+      def year(clock: Clock) = Year now clock
+      def year(zone: ZoneId) = Year now zone
+
+      def year(s: String)                         = Year parse s
+      def year(s: String, fmt: DateTimeFormatter) = Year parse (s, fmt)
+
+      def year(isoYear: Int)               = Year of isoYear
+      def year(temporal: TemporalAccessor) = Year from temporal
+
+      object YearOf {
+        def unapply(year: Year): Option[Int] = Some(year get ChronoField.YEAR)
+      }
+
+      type YearMonth = java.time.YearMonth
+
       def yearMonth               = YearMonth.now
       def yearMonth(clock: Clock) = YearMonth now clock
       def yearMonth(zone: ZoneId) = YearMonth now zone
@@ -446,11 +459,21 @@ package io {
 
       def yearMonth(year: Int, month: Int)      = YearMonth of (year, month)
       def yearMonth(year: Int, month: Month)    = YearMonth of (year, month)
-      def yearMonth(temporal: TemporalAccessor) = YearMonth from (temporal)
+      def yearMonth(temporal: TemporalAccessor) = YearMonth from temporal
 
       object YearMonthOf {
         def unapply(ym: YearMonth): Option[(Int, Month)] =
           Some((ym.getYear, ym.getMonth))
+      }
+
+      implicit class SweetYear(val y: Year) extends AnyVal with Ordered[Year] {
+        def year: Int = y get ChronoField.YEAR
+
+        def -(amount: Period) = y minus amount
+        def +(amount: Period) = y plus amount
+
+        override def compare(other: Year): Int = y compareTo other
+
       }
 
       implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal with Ordered[YearMonth] {
@@ -466,6 +489,8 @@ package io {
       }
 
       import collection.JavaConverters._
+
+      type ZoneId = java.time.ZoneId
 
       def zoneId(s: String)                                = ZoneId of s
       def zoneId(s: String, aliasMap: Map[String, String]) = ZoneId of (s, aliasMap.asJava)
@@ -489,11 +514,15 @@ package io {
       type ZoneRulesException               = java.time.zone.ZoneRulesException
 
     }
-    object _impl {
+    object camelTo {
 
       val uppers    = 'A' to 'Z'
       val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
 
+      def apply(sep: String)(name: String): String = {
+        val osc = maybeSepFrom(sep)
+        (name |> splitCaps(osc) |> bustHumps(osc)).mkString
+      }
       def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
           .foldLeft(Seq.empty[Char]) { (b, a) =>
@@ -517,15 +546,13 @@ package io {
               a +: b
           }
         }
+
       def maybeSepFrom(s: String): Option[Char] = s match {
         case "_" => Some('_')
         case "-" => Some('-')
         case _   => None
       }
-      def camelTo(sep: String)(name: String): String = {
-        val osc = maybeSepFrom(sep)
-        (name |> splitCaps(osc) |> bustHumps(osc)).mkString
-      }
+
     }
   }
 }

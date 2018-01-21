@@ -18,12 +18,11 @@ package io.deftrade
 package wip
 
 import java.{ time => jt }, jt.{ temporal => jtt }
-import jt.{ DayOfWeek, Month, Year }, Month.{ JANUARY => January, MARCH => March } // if you must
+import jt.{ DayOfWeek, Month }, Month.{ JANUARY => January } // if you must
 import jtt.{ ChronoUnit, Temporal, TemporalAdjusters }, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
 
 import io.deftrade.time._
 
-import scala.util.Try
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ duration => scd }
 
@@ -31,9 +30,9 @@ import cats.Order
 import cats.data.Reader
 import cats.implicits._
 
-import enumeratum._, values._
+import enumeratum._ //, values._
 
-object Time4SExample {
+object TimeExample {
 
   // java.time.Duration
   val d1 = duration(seconds = 20, nanos = 1)
@@ -50,8 +49,7 @@ object Time4SExample {
   val p4 = months(10)
   val p5 = years(10)
 
-  val oldRule = years(1) + days(1)
-  // val severanceRule = Weeks(2) per Year(10) // how to do this?
+  val oldRule     = years(1) + days(1)
   val quarterYear = months(12 / 4)
 
   // java.time.LocalDate
@@ -76,37 +74,18 @@ object Time4SExample {
   val ym1 = yearMonth(2015, 1)
   val ym2 = yearMonth(2015, Month.JANUARY)
 
-// java.time.Duration
-  assert(minutes(20) - minutes(10) == minutes(10))
-  assert(seconds(10) + seconds(10) == seconds(20))
-  assert(duration(Minutes)(20) / 5 == duration(ChronoUnit.MINUTES)(4))
-  assert(duration(Hours)(10) * 5 == duration(ChronoUnit.HOURS)(50))
-
-// java.time.Period
-  assert(days(1) + days(1) == days(2))
-  assert(months(2) - months(1) == months(1))
-
-// java.time.LocalTime
-  assert(localTime(20, 30, 0) + minutes(5) == localTime(20, 35, 0))
-  assert(localTime(20, 30, 0) - minutes(5) == localTime(20, 25, 0))
-
-// java.time.LocalDate
-  assert(localDate(2015, Month.JANUARY, 1) + months(2) == localDate(2015, Month.MARCH, 1))
-  assert(localDate(2015, Month.MARCH, 1) - months(2) == localDate(2015, Month.JANUARY, 1))
-
-}
-
-/**
-  * If (if!) we ever have to mix / convert between these types, this is how.
-  */
-object SyntaxForwardTime {
+// }
+//
+// /**
+//   * If (if!) we ever have to mix / convert between scala.concurrent.duration, this is how.
+//   */
+// object SyntaxForwardTime {
 
   implicit val scdDurationEq = cats.Eq.fromUniversalEquals[scd.Duration]
   implicit val durationEq    = cats.Eq.fromUniversalEquals[Duration]
   implicit val periodEq      = cats.Eq.fromUniversalEquals[Period]
 
   val t2fd: scd.Duration = 2.seconds.toFiniteDuration
-  t2fd === scd.Duration(t2fd.toString) |> assert
 
   val t1 = 1.nano
   val t2 = 2.millis
@@ -119,8 +98,6 @@ object SyntaxForwardTime {
   val t8 = 7.months
   val t9 = 2.years
 
-  1.year + 1.day === period(years = 1, days = 1, months = 0) |> assert
-
   val x = 19.hours + 47.minutes
 
   import squants.{ time => st }
@@ -128,17 +105,15 @@ object SyntaxForwardTime {
   val wwDays    = st.Days(5)
   val wwSeconds = wwDays.toSeconds / 3
 
-  import io.deftrade.time.TemporalAdjuster // FIXME: awkward
   // third tuesday
   val TemporalAdjuster(firstTuesday) = TemporalAdjusters firstInMonth DayOfWeek.WEDNESDAY
-  val thirdTuesday                   = TemporalAdjuster { firstTuesday andThen (_ plus 2.weeks) }
+  val thirdTuesday                   = TemporalAdjuster { firstTuesday andThen (_ + 2.weeks) }
 
   def squantsToJavaTime(from: st.Time): Duration = nanos(from.toNanoseconds.toLong)
 
-  // Money4S |> discardValue
 }
 
-// issue: can I just go ahead and make these Durations?
+// issue: can I just go ahead and make these ValueEnum[Duration]
 sealed abstract class Tenor(val code: String) extends EnumEntry
 object Tenor extends Enum[Tenor] {
 
@@ -146,6 +121,7 @@ object Tenor extends Enum[Tenor] {
   case object SpotNext     extends Tenor("SN") // one dat later
   case object Overnight    extends Tenor("ON") // one day later
   case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
+  case object Mañana       extends Tenor("MÑ") // nonstandard
   // issue: might need a **pair** of dates as state for the algebra... but do we?
   // TomorrowNext increments both cursors, in effect... why, exactly?!
   // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
@@ -188,8 +164,6 @@ object WorkTime {
 
   val today     = localDate
   val yesterday = today - 1.day
-
-  yesterday < today |> assert
 
   // stick with ISO and be rigorous about others
   // TODO: make use of locale?
@@ -236,8 +210,6 @@ object WorkTime {
   // `TemporalQuery` is the way to do the "is this a working day or not" thing.
   // Just build an immutable list of `WorkWeek`s out as far as you can.
 
-  import io.deftrade.time.TemporalQuery.TQ
-
   implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
 
   type TqReader[R] = Reader[LocalDate, Option[R]]
@@ -246,21 +218,20 @@ object WorkTime {
   def workDay(ld: LocalDate)(implicit wy: WorkYear): Boolean = wy workDay ld
 
   sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
-    import io.deftrade.time.TemporalAdjuster // FIXME, awkward
 
     final def temporalAdjuster: jtt.TemporalAdjuster = TemporalAdjuster(adjuster)
-    final def adjuster: LocalDate => LocalDate       = _adj(delta, sameMonth)
+    final def adjuster: LocalDate => LocalDate       = adjust(delta, sameMonth)
 
-    private def _adj(d: Period, sm: Boolean): LocalDate => LocalDate = {
-      case ld if workDay(ld) && sm && (ld + d).getMonth === ld.getMonth =>
-        ld + d
-      case ld if workDay(ld) && sm =>
-        ld |> _adj(delta.negated, false)
-      case ld if workDay(ld) =>
-        ld + d
-      case ld =>
-        val dd = if (d.isNegative) d - 1.day else d + 1.day
-        ld |> _adj(dd, sm)
+    private def adjust(d: Period, sameMonth: Boolean): LocalDate => LocalDate = { ld: LocalDate =>
+      val dd = ld + d
+      ld match {
+        case ld if workDay(dd) && sameMonth =>
+          if (dd.getMonth === ld.getMonth) dd else ld |> adjust(delta.negated, false)
+        case _ if workDay(dd) => dd
+        case ld =>
+          val succDay = if (d.isNegative) d - 1.day else d + 1.day
+          ld |> adjust(succDay, sameMonth)
+      }
     }
   }
 

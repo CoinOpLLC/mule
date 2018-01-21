@@ -99,6 +99,46 @@ class TraverseSpec extends FlatSpec with Matchers {
 
   // FIXME: test FormValidation
 }
+
 /**
   * TODO: proper tests for the Writer Monad stuff
   */
+class TimeSpec extends FlatSpec with Matchers {
+
+  import io.deftrade.time._
+  import java.time.Month
+  import java.time.temporal.ChronoUnit, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
+
+  "j8 date/time factory methods" should "work" in {
+
+    // java.time.Duration
+    assert(minutes(20) - minutes(10) == minutes(10))
+    assert(seconds(10) + seconds(10) == seconds(20))
+    assert(duration(Minutes)(20) / 5 == duration(ChronoUnit.MINUTES)(4))
+    assert(duration(Hours)(10) * 5 == duration(ChronoUnit.HOURS)(50))
+
+    // java.time.Period
+    assert(days(1) + days(1) == days(2))
+    assert(months(2) - months(1) == months(1))
+
+    // java.time.LocalTime
+    assert(localTime(20, 30, 0) + minutes(5) == localTime(20, 35, 0))
+    assert(localTime(20, 30, 0) - minutes(5) == localTime(20, 25, 0))
+
+    // java.time.LocalDate
+    assert(localDate(2015, Month.JANUARY, 1) + months(2) == localDate(2015, Month.MARCH, 1))
+    assert(localDate(2015, Month.MARCH, 1) - months(2) == localDate(2015, Month.JANUARY, 1))
+  }
+
+  it should "work some more" in {
+    import io.deftrade.wip.TimeExample._
+    import scala.concurrent.{ duration => scd }
+    assert(1.year + 1.day === period(years = 1, days = 1, months = 0))
+    assert(t2fd === scd.Duration(t2fd.toString))
+
+    import io.deftrade.wip.WorkTime._
+    assert(yesterday < today)
+
+  }
+
+}
