@@ -7,6 +7,7 @@ object Version {
   val Scala          = "2.12.4"
   val Xml            = "1.0.6"
   val ScalaTest      = "3.0.4"
+  val ScalaCheck     = "1.13.5"
   val TypesafeConfig = "1.3.2"
   val Cats           = "1.0.0-RC1"
   val Quicklens      = "1.4.11"
@@ -79,8 +80,10 @@ object Deps {
     "com.github.pureconfig" %% "pureconfig-squants",
   ) map (_ % PureConfig)
 
-  val scalatest = "org.scalatest" %% "scalatest" % ScalaTest % Test
-  // val scalactic = "org.scalactic" %% "scalactic" % ScalaTest // sic - versions track
+  val testers = Seq(
+    "org.scalatest"  %% "scalatest"  % ScalaTest,
+    "org.scalacheck" %% "scalacheck" % ScalaCheck
+  ) map (_ % Test)
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
@@ -119,8 +122,7 @@ object Deps {
       scompiler,
       xml, // FIXME: check the state of available alternatives
       conf,
-      fansi, // can't help myself
-      scalatest // pre-scoped to Test configuration
+      fansi // can't help myself
     )
 }
 

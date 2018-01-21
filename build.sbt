@@ -34,15 +34,15 @@ lazy val flyway = Seq(
 lazy val macros = project
   .settings(common)
   .settings(
-    libraryDependencies ++= quills ++
-      Seq(reflection, scompiler, scalatest)
+    libraryDependencies ++= quills ++ testers ++
+      Seq(reflection, scompiler)
   )
 
 lazy val core = project
   .dependsOn(macros)
   .settings(common)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
   )
 
 // rdb := relational data base
@@ -60,7 +60,7 @@ lazy val wip = project
   .dependsOn(core)
   .settings(common)
   .settings(
-    libraryDependencies ++= httplibs ++ Seq(scalatest)
+    libraryDependencies ++= httplibs ++ testers
   )
 
 // top level project - TODO: eventually this should only aggregate (no active dev)

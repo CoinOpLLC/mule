@@ -77,7 +77,12 @@ package io {
       import java.time.{ temporal => jtt }
       import jtt._, ChronoUnit._
 
+      // FIXME: how the hell is a lib client supposed to buy into this bs
       implicit def integral2long[N: Integral](n: N) = implicitly[Integral[N]] toLong n
+
+      // Clock
+
+      type Clock = java.time.Clock
 
       def clockDefaultZone                      = Clock.systemDefaultZone
       def clockDefaultUTC                       = Clock.systemUTC
@@ -90,6 +95,10 @@ package io {
         def tick(d: Duration)   = Clock tick (base, d)
       }
 
+      // Duration
+
+      type Duration = java.time.Duration
+
       def duration[N: Integral](unit: ChronoUnit)(n: N) = Duration of (n, unit)
       def duration(seconds: Long, nanos: Int)           = Duration ofSeconds seconds withNanos nanos
 
@@ -98,6 +107,10 @@ package io {
       def seconds[N: Integral](n: N) = duration(SECONDS)(n)
       def millis[N: Integral](n: N)  = duration(MILLIS)(n)
       def nanos[N: Integral](n: N)   = duration(NANOS)(n)
+
+      // Period
+
+      type Period = java.time.Period
 
       def period(years: Int, months: Int, days: Int) = Period of (years, months, days)
 
@@ -117,6 +130,8 @@ package io {
       implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
         def adjusted(ta: TemporalAdjuster) = value `with` ta
       }
+
+      type TemporalAdjuster = java.time.temporal.TemporalAdjuster
 
       object TemporalAdjuster {
         type HM[A] = A => A
@@ -146,12 +161,13 @@ package io {
           )
       }
 
+      type TemporalQuery[R] = java.time.temporal.TemporalQuery[R]
+
       // This name is free in Value Land, because it's occupied by a lone j8 interface in Type Land
       object TemporalQuery {
         import jtt.{ TemporalQueries => TQs }
-        import cats._
-        import cats.syntax._
-        import cats.implicits._
+        import cats._, implicits._ // FIXME choke down on that bat son
+
         type TQ[+R] = LocalDate => R
         // consider R := LocalDate => LocalDate... !
         // in other words: A TQ[LocalDate => LocalDate] Query produces an Adjuster from a LocalDate
@@ -210,6 +226,8 @@ package io {
 
       // LocalDateTime
 
+      type LocalDateTime = java.time.LocalDateTime
+
       def localDateTime               = LocalDateTime.now
       def localDateTime(zone: ZoneId) = LocalDateTime now zone
       def localDateTime(clock: Clock) = LocalDateTime now clock
@@ -252,6 +270,8 @@ package io {
 
       // LocalDate
 
+      type LocalDate = java.time.LocalDate
+
       def localDate               = LocalDate.now
       def localDate(clock: Clock) = LocalDate now clock
       def localDate(zone: ZoneId) = LocalDate now zone
@@ -284,6 +304,10 @@ package io {
         override def compare(that: LocalDate): Int = ld compareTo that
       }
 
+      // LocalTime
+
+      type LocalTime = java.time.LocalTime
+
       def localTime               = LocalTime.now
       def localTime(clock: Clock) = LocalTime now clock
       def localTime(zone: ZoneId) = LocalTime now zone
@@ -312,6 +336,10 @@ package io {
 
         override def compare(that: LocalTime): Int = lt compareTo that
       }
+
+      // ZonedDateTime
+
+      type ZonedDateTime = java.time.ZonedDateTime
 
       def zonedDateTime(ld: LocalDate, lt: LocalTime, zone: ZoneId) =
         ZonedDateTime of (ld, lt, zone)
@@ -345,6 +373,15 @@ package io {
         def chronology: Chronology                      = zdt.getChronology
         override def compare(other: ZonedDateTime): Int = zdt compareTo other
       }
+
+      type Instant = java.time.Instant
+
+      def instant                   = Instant.now()
+      def instant(clock: Clock)     = Instant now clock
+      def instant(epochMilli: Long) = Instant ofEpochMilli epochMilli
+      def instant(epochSecond: Long, nanoAdjustment: Long) =
+        Instant ofEpochSecond (epochSecond, nanoAdjustment)
+      def instant(text: CharSequence) = Instant parse text
 
       implicit class SweetInstant(val i: Instant) extends Ordered[Instant] {
 
@@ -443,6 +480,13 @@ package io {
       final val ZZoneId   = ZoneId of "Z"
 
       object ZoneIdOf {}
+
+      // Exceptions
+
+      type DateTimeException                = java.time.DateTimeException
+      type DateTimeParseException           = java.time.format.DateTimeParseException
+      type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
+      type ZoneRulesException               = java.time.zone.ZoneRulesException
 
     }
     object _impl {
