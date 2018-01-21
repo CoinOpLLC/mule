@@ -17,9 +17,9 @@
 package io.deftrade
 package wip
 
-import java.{ time => jt }, jt.{ temporal => jtt }, jt._, jtt._
-import Month.{ JANUARY => January, MARCH => March } // if you must
-import ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
+import java.{ time => jt }, jt.{ temporal => jtt }
+import jt.{ DayOfWeek, Month, Year }, Month.{ JANUARY => January, MARCH => March } // if you must
+import jtt.{ ChronoUnit, Temporal, TemporalAdjusters }, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
 
 import io.deftrade.time._
 
@@ -217,8 +217,6 @@ object WorkTime {
   object WorkYear {
 
     import WorkTimeConf._
-
-    import jt.DayOfWeek
 
     lazy val workWeek: WorkWeek =
       SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY

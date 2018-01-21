@@ -193,3 +193,17 @@ object Args {
       |import java.{time => jt}
       |""".stripMargin
 }
+
+object License {
+  def notice(
+      distname: String,
+      version: String,
+      entity: String,
+      lic: String,
+      licShort: String
+  ): String =
+    s"""The CoinOp DefTrade distribution bundles $distname $version, copyright $entity,
+  |which is available under $lic.
+  |For details, see licenses/$entity-$distname.$licShort.""".stripMargin
+
+}

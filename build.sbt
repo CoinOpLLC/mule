@@ -68,3 +68,6 @@ lazy val mule = (project in file("."))
 // .dependsOn(core, rdb, wip)
   .dependsOn(core, rdb)
   .settings(common)
+  .settings(
+    libraryDependencies ++= testers
+  )

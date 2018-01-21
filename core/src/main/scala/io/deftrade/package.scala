@@ -491,39 +491,8 @@ package io {
     }
     object _impl {
 
-      def notice(
-          distname: String,
-          version: String,
-          entity: String,
-          lic: String,
-          licShort: String
-      ): String =
-        s"""The CoinOp DefTrade distribution bundles $distname $version, copyright $entity,
-      |which is available under $lic.
-      |For details, see licenses/$entity-$distname.$licShort.""".stripMargin
-
-      //
-
-      object camelTo {
-
-        // Our Gold standard (for testing): yet another take on an old fav:
-        // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22
-
-        // splits off strings of capital letters leaving one...
-        private val rx1 = """([A-Z]+)([A-Z][a-z])""".r
-
-        // splits transition from lower -> upper case
-        private val rx2 = """([a-z\d])([A-Z])""".r
-
-        private def delimit(rx: Regex)(s: String): String = rx replaceAllIn (s, "$1•$2")
-
-        def apply(sep: String)(name: String): String =
-          (name |> delimit(rx1) |> delimit(rx2)) split "•" mkString sep
-      }
-
-      def shouldDamnWellBeIdentiyTestMe(s: String): String = camelTo("")(s)
-
-      private val (uppers, nonUppers) = ('A' to 'Z', ('a' to 'z') ++ ('0' to '9'))
+      val uppers    = 'A' to 'Z'
+      val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
 
       def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
@@ -553,7 +522,7 @@ package io {
         case "-" => Some('-')
         case _   => None
       }
-      def camelToo(sep: String)(name: String): String = {
+      def camelTo(sep: String)(name: String): String = {
         val osc = maybeSepFrom(sep)
         (name |> splitCaps(osc) |> bustHumps(osc)).mkString
       }
