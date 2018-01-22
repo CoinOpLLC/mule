@@ -504,7 +504,7 @@ package io {
       final val UtZoneId  = ZoneId of "UT"
       final val ZZoneId   = ZoneId of "Z"
 
-      object ZoneIdOf {}
+      object ZoneIdOf {} // TODO: finish ZoneId including sugar
 
       // Exceptions
 

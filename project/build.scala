@@ -187,10 +187,9 @@ object Args {
   )
 
   lazy val initialCommands = //"""ammonite.Main().run()"""
-    """import wut._
-      |import cats._
-      |import cats.implicits._
-      |import java.{time => jt}
+    """import io.deftrade._, time._
+      |import cats._, implicits._
+      |
       |""".stripMargin
 }
 

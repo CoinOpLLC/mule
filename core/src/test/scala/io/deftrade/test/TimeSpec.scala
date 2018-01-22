@@ -9,7 +9,7 @@ class TimeFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyCh
 
   "time" should "move forward" in {
     val today = localDateTime
-    val later = 3.hours + 33.minutes + 33.seconds + 333.nanos
+    val later = 33.hours + 33.minutes + 33.seconds + 33.millis + 33.nanos
     (today + later) should be > today
   }
 
@@ -42,7 +42,7 @@ class TimePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
 class CamelCasePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
 
   // the method under test
-  import io.deftrade._impl.camelTo
+  import io.deftrade.camelTo
 
   // Our Gold standard (for testing): yet another take on an old fav:
   // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22

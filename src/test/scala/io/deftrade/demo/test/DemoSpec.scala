@@ -1,7 +1,13 @@
 package demo
 package test
 
+import org.scalatest._
+
 /**
   * Unit tests for the integration demo.
   */
-object DemoSpec // FIXME: minimum viable step is to run Demo.main
+class DemoSpec extends FlatSpec with Matchers {
+  "Demo" should "run to completion" in {
+    Demo main Array.empty[String]
+  }
+}
