@@ -1,9 +1,12 @@
 import Deps._
 
 lazy val common = Seq(
-  organization                            := "io.deftrade",
-  organizationName                        := "CoinOp LLC",
-  scalaVersion                            := Version.Scala,
+  organization     := "io.deftrade",
+  organizationName := "CoinOp LLC",
+  // scalaVersion                            := Version.Scala,
+  scalaVersion                            := "2.12.4-bin-typelevel-4",
+  scalaOrganization                       := "org.typelevel",
+  scalacOptions                           += "-Yliteral-types",
   scalacOptions                           ++= Args.allScalaCflags,
   scalacOptions in (Compile, console)     --= Args.nonConsoleScalaCflags.to[Seq],
   scalacOptions in (Test, console)        := (scalacOptions in (Compile, console)).value,
@@ -12,7 +15,7 @@ lazy val common = Seq(
   crossPaths                              := false,
   cancelable                              := true,
   scalafmtOnCompile                       := true,
-  initialCommands in (Test, console)      := Args.initialCommands,
+  initialCommands in (console)            := Args.initialCommands,
   ensimeIgnoreMissingDirectories          := true,
   startYear                               := Some(2017),
   licenses                                += ("Apache-2.0", Args.alv2url),

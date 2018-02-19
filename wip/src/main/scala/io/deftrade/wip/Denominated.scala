@@ -42,16 +42,31 @@ import refined.auto._
 
 /*
  * This is an old pattern actually; Effective Java maybe? Enums as factories...
- * and another oldie: phantom types for the value class, to allow it to carry the currency "masslessly"
+ * and another oldie: phantom types for the value class,
+ * to allow it to carry the currency "masslessly"
  */
-final case class D9d[N, +D <: Denomination] private[model] (val value: N) extends AnyVal // with Ordered[N] FIXME
-object D9d {
-  implicit def eq[N: Numeric, D <: Denomination]                  = Eq.fromUniversalEquals[D9d[N, D]]
-  def apply[D <: Denomination, N: Numeric](d: D)(n: N): D9d[N, D] = d d9d n
-  // def apply[D <: Denomination, N: Numeric](d: D): N => D9d[N, d.type] = n => D9d(n)
+final case class Money[N, C <: Currency] private[model] (val amount: N) extends AnyVal {
+  def denomination(implicit d: Denomination[C]): Denomination[C] = d
+  // override def toString                                          = s"""${denomination.code}($amount)"""
 }
 
-sealed trait Denomination extends EnumEntry { denomination =>
+object Money {
+
+  implicit def eq[N: Numeric, C <: Currency] = Eq.fromUniversalEquals[Money[N, C]]
+
+  implicit def monoid[N: Numeric, C <: Currency] = new Monoid[Money[N, C]] {
+    type DN = Money[N, C]
+    val N                                  = implicitly[Numeric[N]]
+    override def combine(a: DN, b: DN): DN = Money[N, C](N.plus(a.amount, b.amount))
+    override lazy val empty: DN            = Money[N, C](N.zero)
+  }
+}
+
+sealed trait Currency
+sealed trait Cross[C <: Currency, CN <: Currency] {}
+
+sealed trait DenominationBase extends EnumEntry
+sealed trait Denomination[C <: Currency] extends DenominationBase { denomination =>
 
   private val jc = java.util.Currency getInstance denomination.entryName
 
@@ -61,68 +76,42 @@ sealed trait Denomination extends EnumEntry { denomination =>
   def displayName: String = jc.getDisplayName
   def symbol: String      = jc.getSymbol
 
-  type ExchangeRate <: { def apply(bid: Double, ask: Double): Nothing }
-  def /(base: Denomination): ExchangeRate = ???
+  // factory for denominated - only way to create.
+  def apply[N: Numeric](n: N) = Money[N, C](n)
 
-  final case class Denominated[N](val amount: N) /* extends AnyVal */ {
-    type AmountType = N
-    def currency: Denomination = denomination
-    override def toString      = s"""${currency.code}($amount)"""
-  }
-  def apply[N: Numeric](n: N) = Denominated(n)
-
-  import Denomination.{ EUR, USD }
-  def d9d[N: Numeric](n: N) = D9d[N, denomination.type](n)
-
-  implicit def eq[N: Numeric]: Eq[Denominated[N]] = Eq.fromUniversalEquals[Denominated[N]]
-
-  implicit def monoid[N: Numeric] = new Monoid[Denominated[N]] {
-    type DN = Denominated[N]
-    val N                                  = implicitly[Numeric[N]]
-    override def combine(a: DN, b: DN): DN = Denominated[N](N.plus(a.amount, b.amount))
-    override lazy val empty: DN            = Denominated[N](N.zero)
-  }
+  def /[CB <: Currency](base: Denomination[CB]): Cross[C, CB] = ???
 }
 
-object Denomination extends Enum[Denomination] {
+object Denomination extends Enum[DenominationBase] {
 
   val values = findValues
 
-  case object USD extends Denomination
-  case object EUR extends Denomination
-  // case object XYZ extends Denomination // FIXME doesn't find problem b/c lazy init
+  trait USD       extends Currency
+  case object USD extends Denomination[USD]
 
-  implicit def eqN[N: Numeric]: Eq[N] = Eq.fromUniversalEquals[N]
-  implicit def eqD[D <: Denomination] = Eq.fromUniversalEquals[D]
+  trait EUR       extends Currency
+  case object EUR extends Denomination[EUR]
 
-}
+  implicit def eqN[N: Numeric]: Eq[N]     = Eq.fromUniversalEquals[N]
+  implicit def eqD[D <: DenominationBase] = Eq.fromUniversalEquals[D]
 
-object Denominated {
-  // def apply[N: Numeric](d: Denomination): N => d.Denominated[N]  = n => d(n)
-  def apply[N: Numeric](d: Denomination)(n: N): d.Denominated[N] = d.Denominated(n)
 }
 
 object Examples {
+
   import Denomination._
 
-  val d     = Denomination withName "EUR"
-  val eurF  = Denominated[Int](d) _
-  val eur20 = 20 |> eurF
+  val eur   = EUR // Denomination withName "EUR"
+  val eurF  = eur[Double] _
+  val eur20 = 20.0 |> eurF
 
-  val buxxf: Int => USD.Denominated[Int] = Denominated[Int](USD)
-  val buxx                               = 20 |> buxxf
-  val bx2                                = 20 |> buxxf
-  buxx === bx2 |> assert
+  val d20 = USD(20)
+  val d21 = USD(21)
 
-  val d20 = D9d(USD)(20)
-  val d21 = D9d(USD)(21)
+  val e20 = EUR(20)
 
-  val e20 = D9d(EUR)(20)
+  def funge[C <: Currency](den: Denomination[C]): Money[Double, C] = den(19.47)
 
-  val d2: Denomination = USD
-  val usdF             = d2.d9d[Int] _
-
-  val usd100 = 100 |> usdF
 }
 
 private[model] object UglyTypeDefs {

@@ -8,6 +8,29 @@ import spire.syntax.order._
 
 trait Logos {
 
+  trait EmanationLike {
+
+    protected def m: Int
+    protected def n: Int
+
+    protected def al: Char
+    protected def om: Char
+
+    final lazy val alpha: Int => Char = i => alphas(i % m) // TODO: s is unsigned; i is not.
+    final lazy val omega: Int => Char = i => omegas(i % n)
+
+    private lazy val alphas: Seq[Char] = al until (al + m).toChar
+    private lazy val omegas: Seq[Char] = om until (om + n).toChar
+  }
+
+  case class Emanation(m: Int, n: Int, al: Char, om: Char) extends EmanationLike
+
+  /**
+    * m: number of shells
+    * n: coeficient of theta (omega := i theta; theta := nth root of unity)
+    */
+  def emanation(m: Int, n: Int) = Emanation(m, n, 'a', '0')
+
   type Point = Complex[Real]
 
   def enc(p: Point): String  = s"${real(p)},${imag(p)}"
@@ -15,12 +38,16 @@ trait Logos {
   def imag(p: Point): String = s"${p.imag}"
 
   sealed trait Graphic { self =>
-    def svg = self match {
-      case Circle(c, r) =>
+    final val TissueThin = 0.05
+    def svg = self match { // TODO: add this with a typeclass
+      case Circle(c, r, d) =>
         <circle
           cx={c.real.toString}
           cy={c.imag.toString}
-          r={r.toDouble.toString} />
+          r={r.toString}
+            style={s"""
+              opacity: ${d * TissueThin};
+              stroke-opacity: ${d * TissueThin};"""} />
 
       case Line(p, q)        => <line x1={real(p)} y1={imag(p)} x2={real(q)} y2={imag(q)} />
       case Triangle(a, b, c) => <polygon points={s"${enc(a)} ${enc(b)} ${enc(c)}"} />
@@ -32,41 +59,70 @@ trait Logos {
 
   case class Triangle(a: Point, b: Point, c: Point) extends Graphic
 
-  case class Circle(center: Point, radius: Real) extends Graphic {
+  case class Circle(center: Point, radius: Real, depth: Int) extends Graphic {
+
     def spawn(n: Int) =
       for (root <- Complex rootsOfUnity n)
         yield copy(center = center + root)
   }
 
-  def emanate(n: Int)(cs: Set[Circle]): Set[Circle] =
-    for {
-      c <- cs
-      e <- c spawn n if e.center.abs > c.center.abs
-    } yield e
+  def emanate(n: Int)(cs: Seq[Circle]): Seq[Circle] = {
 
-  val seed = Set(Circle(Complex(zero, zero), one))
+    val raws: Seq[Circle] =
+      for {
+        c <- cs
+        e <- c spawn n if e.center.abs > c.center.abs
+      } yield e
 
-  def shells(n: Int)(len: Int): List[Set[Circle]] = List.iterate(seed, len)(emanate(n))
+    ((raws groupBy identity) map { case (k, vs) => k copy (depth = k.depth * vs.size) }).toList
+
+  }
+
+  val seed = Seq(Circle(Complex(zero, zero), one, 1))
+
+  def shells(n: Int)(len: Int): Seq[Seq[Circle]] = Seq.iterate(seed, len)(emanate(n))
+
+  def sortByOmega(gs: Seq[Circle]) = gs sortWith { (l, r) =>
+    val (_, lt) = l.center.asPolarTuple
+    val (_, rt) = r.center.asPolarTuple
+    lt < rt
+  }
+
+  def write(gs: Seq[Graphic]) = Files write (Logos.path, svg(gs).toString.getBytes)
+
+  // ---
+
+  // TODO: look at this closer - it blows up around h9 or so..
+  def sortDistanceToOrigin(gs: Seq[Circle]) = gs sortWith { (l, r) =>
+    val (lr, lt) = l.center.asPolarTuple
+    val (rr, rt) = r.center.asPolarTuple
+    lr < rr || lt < rt
+  }
+
+  protected val path = Paths get "target/logos.svg"
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def svg(gs: Seq[Graphic]) =
-    <svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 400 400" id="wut">
+  protected def svg(gs: Seq[Graphic]) =
+    <svg viewBox="-8 -8 16 16"
+    xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns="http://www.w3.org/2000/svg">
     <style>
     /* <![CDATA[ */
     circle {
-      fill: none;
-      stroke: black;
-      /*stroke-width: 1px;*/ /* Note: The value of a pixel depends
-      on the view box */
+      fill: grey;
+      stroke: none;
+      // stroke-width: .05;
+    }
+    polygon {
+      fill: gold;
+      stroke: none;
+      // stroke-width: .05;
     }
     /* ]]> */
     </style>
-    <g id="planeZed">
-    { gs map (_.svg) }
-    </g>
+    <g>{ gs map (_.svg) }</g>
     </svg>
 
-  def write(gs: Seq[Graphic]) = Files write (Logos.path, svg(gs).toString.getBytes)
 }
 
 // scala> List.tabulate(10)(k => shells(6)(k).fold(Set.empty)(_ ++ _).size)
@@ -74,7 +130,25 @@ trait Logos {
 
 object Logos extends Logos {
 
-  val path = Paths get "target/logos.svg"
+  def sigilEpsilon: Seq[Graphic] = {
+    val center = Complex(zero, zero)
+    val ps     = Complex rootsOfUnity [Real] 6
+    val male   = ps(0) * .5
+    val female = male * -1
+    val r      = one * .1
+
+    Seq[Graphic](
+      Triangle(ps(0), ps(1), ps(2)),
+      Triangle(ps(3), ps(4), ps(5)),
+      Triangle(ps(4), ps(5), ps(0)),
+      Triangle(ps(0), ps(2), center),
+      Triangle(ps(0), ps(4), center),
+      Triangle(ps(3), ps(1), center),
+      Triangle(ps(3), ps(5), center),
+      Circle(male, r, 1),
+      Circle(female, r, 1)
+    )
+  }
 
   object Names {
     val colors = List(

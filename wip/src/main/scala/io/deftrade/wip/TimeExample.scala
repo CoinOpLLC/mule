@@ -294,19 +294,20 @@ object WorkTime {
 
 // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
 // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
+//   private val jc = java.util.Currency getInstance denomination.entryName
+//
+//   def code: String        = jc.getCurrencyCode
+//   def numericCode: Int    = jc.getNumericCode
+//   def fractionDigits: Int = jc.getDefaultFractionDigits
+//   def displayName: String = jc.getDisplayName
+//   def symbol: String      = jc.getSymbol
 object Money4S {
 
-  def showme[T <: AnyRef](t: T): Unit = println(t)
-
   import squants.{ market => sm }
+  import squants.{ Dozen, Each }
+  import squants.market.USD
 
   implicit val moneyContext = sm.defaultMoneyContext
-
-  val doubleEagle  = sm.Money(20)
-  val silverTalent = 15 * 12 * sm.Money(1, sm.XAG)
-
-  import java.{ util => ju }
-  val javabux = ju.Currency.getAvailableCurrencies
 
 }
 
