@@ -6,10 +6,8 @@ import cats.syntax.show._
 
 import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
 
-import ClassPerCurrency.{ Currency, Moneta }
-// import PhantomTypePerCurrency._
-import Moneta._
-import Currency._
+import ClassPerCurrency.Moneta, Moneta._
+// import PhantomTypePerCurrency._, Moneta._
 
 class MoneySpec extends FlatSpec {
 
@@ -22,7 +20,11 @@ class MoneySpec extends FlatSpec {
     val eurF  = eur[Double] _
     val eur20 = 20.0 |> eurF
     val e20   = EUR(20.00)
+
     assert(eur20 === e20)
+
+    assert(eur20 * 2 > e20)
+    assert(eur20 + eur20 > e20)
 
     type Dollar = USD[Double]
 
@@ -31,7 +33,7 @@ class MoneySpec extends FlatSpec {
 
     assert(d20 !== d21)
     assert(d20 < d21)
-    assert((d20 compare d21) === -1)
+    assert((d20 max d21) === d21)
 
     // def funge[C <: Currency](den: Moneta[C]): Money[Double, C] = den(19.47)
     def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
