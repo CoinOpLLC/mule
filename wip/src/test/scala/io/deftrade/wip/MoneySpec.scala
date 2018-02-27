@@ -1,19 +1,19 @@
 package io.deftrade
 package wip
 
-import scala.language.higherKinds
-import cats.syntax.show._
-
 import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
 
-import ClassPerCurrency.Moneta, Moneta._
-// import PhantomTypePerCurrency._, Moneta._
+// import ClassPerCurrency.Moneta
+import PhantomTypePerCurrency.Monetary
 
 class MoneySpec extends FlatSpec {
 
-  "Money" should "be created elastically" in {
+  import cats.syntax.show._
+  import cats.syntax.order.{ catsSyntaxOrder, catsSyntaxPartialOrder }
 
-    import cats.syntax.order.{ catsSyntaxOrder, catsSyntaxPartialOrder }
+  import Monetary._
+
+  "Money" should "be created elastically" in {
 
     val eur = EUR // Moneta withName "EUR"
     // val eurF  = (d: Double) => eur(d)
@@ -26,7 +26,9 @@ class MoneySpec extends FlatSpec {
     assert(eur20 * 2 > e20)
     assert(eur20 + eur20 > e20)
 
-    type Dollar = USD[Double]
+    // import scala.language.higherKinds
+    // type Dollar = USD[Double] // ClassPerCurrency
+    type Dollar = Money[Double, USD] // PhantomTypePerCurrency
 
     val d20: Dollar = USD(20.00)
     val d21: Dollar = USD(21.00)
@@ -35,13 +37,13 @@ class MoneySpec extends FlatSpec {
     assert(d20 < d21)
     assert((d20 max d21) === d21)
 
-    // def funge[C <: Currency](den: Moneta[C]): Money[Double, C] = den(19.47)
-    def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
+    def funge[C <: Currency](den: Monetary[C]): Money[Double, C] = den(19.47)
+    // def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
 
     assert(USD(19.47) === funge[USD](USD))
 
-    val usd               = USD
-    val buck: USD[Double] = usd(1.0)
+    val usd          = USD
+    val buck: Dollar = usd(1.0)
     assert(buck === USD(1.0))
     assert(buck + buck === USD(2.0))
 
