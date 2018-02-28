@@ -135,11 +135,15 @@ object PhantomTypePerCurrency {
       * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, priced in `XYZ`.
       */
     final case class Cross[CA <: Currency, CB <: Currency, N]()(implicit
+                                                                MA: Monetary[CA],
                                                                 MB: Monetary[CB],
                                                                 N: Fractional[N],
                                                                 P: Pricing[N, CA, CB]) {
-      def buy(ma: Money[N, CA])  = MB apply (N times (ma.amount, P.ask))
-      def sell(ma: Money[N, CA]) = MB apply (N times (ma.amount, P.bid))
+      def buy(ma: Money[N, CA]): Money[N, CB]  = MB apply (N times (ma.amount, P.ask))
+      def sell(ma: Money[N, CA]): Money[N, CB] = MB apply (N times (ma.amount, P.bid))
+      def quote: (Money[N, CB], Money[N, CB])  = (buy(oneA), sell(oneA))
+
+      private lazy val oneA: Money[N, CA] = MA apply N.one
     }
 
     final case class SimplePricing[N: Fractional, CA <: Currency, CB <: Currency](val bid: N, val ask: N) extends Pricing[N, CA, CB]
@@ -157,10 +161,8 @@ object PhantomTypePerCurrency {
       /**
         * implicit context to provide pricing
         */
-      def /[CB <: Currency: Monetary, N: Fractional](base: Monetary[CB]): Cross[C, CB, N] = {
-        val N = implicitly[Fractional[N]]
-        import N._
-        implicit val pricing = SimplePricing[N, C, CB](one + one + one, one + one) // FIXME!
+      def /[CB <: Currency, N](mb: Monetary[CB])(implicit MA: Monetary[C], N: Fractional[N], P: Pricing[N, C, CB]): Cross[C, CB, N] = {
+        implicit val MB = mb
         Cross[C, CB, N]
       }
     }
