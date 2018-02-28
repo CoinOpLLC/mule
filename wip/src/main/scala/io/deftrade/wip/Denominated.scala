@@ -60,6 +60,17 @@ private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
   final def symbol: String      = jc.getSymbol
 
 }
+
+/**
+  * - `Pricing` behaves well as a mixin
+  * - "Orderly market" invariant: `ask` < `bid`.
+  * - modelling disorderly markets: not everything that comes at you down the wire makes sense.
+  */
+trait Pricing[N] {
+  def ask: N
+  def bid: N
+}
+
 object PhantomTypePerCurrency {
   // design 1: phantom types
   // problem: toString (only one java class serves as a box - the restriction is entirely a compile time scala typesystem thing.
@@ -77,7 +88,8 @@ object PhantomTypePerCurrency {
       def -(rhs: MNY)(implicit N: Fractional[N]): MNY = Money(N minus (amount, rhs.amount))
       def *(scale: N)(implicit N: Fractional[N]): MNY = Money(N times (scale, amount))
       def /(rhs: MNY)(implicit N: Fractional[N]): N   = N div (amount, rhs.amount)
-      def unary_-(implicit N: Fractional[N]): MNY     = Money(N negate amount)
+      // def /(rhs: N)(implicit N: Fractional[N]): MNY   = Money(N div (amount, rhs))
+      def unary_-(implicit N: Fractional[N]): MNY = Money(N negate amount)
     }
 
     import cats.kernel.{ Monoid, Order }
@@ -104,16 +116,51 @@ object PhantomTypePerCurrency {
       }
     }
 
-    sealed trait Cross[CA <: Currency, CB <: Currency] {
-      def buy(cb: CB): CA  = ???
-      def sell(ca: CA): CB = ???
+    sealed trait Context[C <: Currency] {
+      def default: Monetary[C]
     }
+
+    object Context {
+      def apply[C <: Currency: Monetary]: Context[C] = new Context[C] { def default = implicitly }
+    }
+
+    /**
+      * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
+      * One or more Market(s) determine this price.
+      * - A design that doesnt' abstract over `Pricing`, including live data, is useless.
+      * - otoh dead simple immutable for testing / demo also required
+      * Three letter codes: 26 ^ 3 = 17576
+      * over two hundred assigned; several "dead" currencies (not reused)
+      * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, priced in `XYZ`.
+      */
+    class Cross[CA <: Currency, CB <: Currency, N: Fractional] { _: Pricing[N] =>
+      val N = implicitly[Fractional[N]]
+      import N.mkNumericOps
+      final def buy(ma: Money[N, CA])  = Money[N, CB](ma.amount * ask)
+      final def sell(ma: Money[N, CA]) = Money[N, CB](ma.amount * bid)
+    }
+
+    class SimplePricing[N: Fractional](val bid: N, val ask: N) extends Pricing[N]
+
+    final case class SimplePricedCross[CA <: Currency, CB <: Currency, N: Fractional](
+        val ask: N,
+        val bid: N
+    ) extends Cross[CA, CB, N]
+        with Pricing[N]
 
     sealed trait Monetary[C <: Currency] extends MonetaryLike {
 
       // final type CurrencyType = C
-      def apply[N: Fractional](n: N)                          = Money[N, C](n)
-      def /[CB <: Currency](base: Monetary[CB]): Cross[C, CB] = new Cross[C, CB] {}
+      def apply[N: Fractional](n: N) = Money[N, C](n)
+
+      /**
+        * implicit context to provide pricing
+        */
+      def /[CB <: Currency, N: Fractional](base: Monetary[CB]): Cross[C, CB, N] = {
+        val N = implicitly[Fractional[N]]
+        import N._
+        SimplePricedCross[C, CB, N](one + one + one, one + one) // FIXME!
+      }
     }
 
     def apply[C <: Currency: Monetary]: Monetary[C] = implicitly
@@ -128,16 +175,17 @@ object PhantomTypePerCurrency {
     case object EUR  extends Monetary[EUR]
     implicit val eur: Monetary[EUR] = EUR
 
+    implicit def context = Context[USD] // FIXME: type annotation problems...
   }
 }
 
+// design 2:
+// make each Monetary a separate case class
+// gets hung up on `import Monetary._`, which imports all the verboten `apply` instances
+// without the necessary `Fractional` context bound on `N`. And so overloading can't resolve.
+// -> and so devolves back to the same need for a Show[Currency] class as phantom type
+// (design 1)
 object ClassPerCurrency {
-  // design 2:
-  // make each Monetary a separate case class
-  // gets hung up on `import Monetary._`, which imports all the verboten `apply` instances
-  // without the necessary `Fractional` context bound on `N`. And so overloading can't resolve.
-  // -> and so devolves back to the same need for a Show[Currency] class as phantom type
-  // (design 1)
 
   import scala.language.higherKinds
 

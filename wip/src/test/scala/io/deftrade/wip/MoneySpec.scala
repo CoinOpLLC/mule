@@ -40,7 +40,7 @@ class MoneySpec extends FlatSpec {
     def funge[C <: Currency](den: Monetary[C]): Money[Double, C] = den(19.47)
     // def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
 
-    assert(USD(19.47) === funge[USD](USD))
+    assert(USD(19.47) === funge(USD))
 
     val usd          = USD
     val buck: Dollar = usd(1.0)
