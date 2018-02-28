@@ -61,16 +61,6 @@ private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
 }
 
-/**
-  * - `Pricing` behaves well as a mixin
-  * - "Orderly market" invariant: `ask` < `bid`.
-  * - modelling disorderly markets: not everything that comes at you down the wire makes sense.
-  */
-trait Pricing[N] {
-  def ask: N
-  def bid: N
-}
-
 object PhantomTypePerCurrency {
   // design 1: phantom types
   // problem: toString (only one java class serves as a box - the restriction is entirely a compile time scala typesystem thing.
@@ -80,6 +70,17 @@ object PhantomTypePerCurrency {
   object Monetary extends Enum[MonetaryLike] {
 
     sealed trait Currency
+
+    /**
+      * - `Pricing` behaves well as a mixin
+      * - "Orderly market" invariant: `ask` < `bid`.
+      * - modelling disorderly markets: not everything that comes at you down the wire makes sense.
+      */
+    trait Pricing[N, CA <: Currency, CB <: Currency] { // two phantom types
+      def ask: N
+      def bid: N
+    }
+
     final case class Money[N, C <: Currency] private[Money] (val amount: N) extends AnyVal {
 
       type MNY = Money[N, C]
@@ -127,26 +128,26 @@ object PhantomTypePerCurrency {
     /**
       * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
       * One or more Market(s) determine this price.
-      * - A design that doesnt' abstract over `Pricing`, including live data, is useless.
+      * - A design that doesnt' abstract over `Pricing`, **including live data**, is useless.
       * - otoh dead simple immutable for testing / demo also required
       * Three letter codes: 26 ^ 3 = 17576
       * over two hundred assigned; several "dead" currencies (not reused)
       * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, priced in `XYZ`.
       */
-    class Cross[CA <: Currency, CB <: Currency, N: Fractional] { _: Pricing[N] =>
-      val N = implicitly[Fractional[N]]
-      import N.mkNumericOps
-      final def buy(ma: Money[N, CA])  = Money[N, CB](ma.amount * ask)
-      final def sell(ma: Money[N, CA]) = Money[N, CB](ma.amount * bid)
+    final case class Cross[CA <: Currency, CB <: Currency, N]()(implicit
+                                                                MB: Monetary[CB],
+                                                                N: Fractional[N],
+                                                                P: Pricing[N, CA, CB]) {
+      def buy(ma: Money[N, CA])  = MB apply (N times (ma.amount, P.ask))
+      def sell(ma: Money[N, CA]) = MB apply (N times (ma.amount, P.bid))
     }
 
-    class SimplePricing[N: Fractional](val bid: N, val ask: N) extends Pricing[N]
+    final case class SimplePricing[N: Fractional, CA <: Currency, CB <: Currency](val bid: N, val ask: N) extends Pricing[N, CA, CB]
 
-    final case class SimplePricedCross[CA <: Currency, CB <: Currency, N: Fractional](
-        val ask: N,
-        val bid: N
-    ) extends Cross[CA, CB, N]
-        with Pricing[N]
+    final case class LiveMarketPricing[N: Fractional, CA <: Currency, CB <: Currency](cfg: String) extends Pricing[N, CA, CB] {
+      def bid: N = ???
+      def ask: N = ???
+    }
 
     sealed trait Monetary[C <: Currency] extends MonetaryLike {
 
@@ -156,10 +157,11 @@ object PhantomTypePerCurrency {
       /**
         * implicit context to provide pricing
         */
-      def /[CB <: Currency, N: Fractional](base: Monetary[CB]): Cross[C, CB, N] = {
+      def /[CB <: Currency: Monetary, N: Fractional](base: Monetary[CB]): Cross[C, CB, N] = {
         val N = implicitly[Fractional[N]]
         import N._
-        SimplePricedCross[C, CB, N](one + one + one, one + one) // FIXME!
+        implicit val pricing = SimplePricing[N, C, CB](one + one + one, one + one) // FIXME!
+        Cross[C, CB, N]
       }
     }
 
