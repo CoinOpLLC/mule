@@ -139,14 +139,16 @@ object PhantomTypePerCurrency {
                                                                 MB: Monetary[CB],
                                                                 N: Fractional[N],
                                                                 P: Pricing[N, CA, CB]) {
+
       def buy(ma: Money[N, CA]): Money[N, CB]  = MB apply (N times (ma.amount, P.ask))
       def sell(ma: Money[N, CA]): Money[N, CB] = MB apply (N times (ma.amount, P.bid))
-      def quote: (Money[N, CB], Money[N, CB])  = (buy(oneA), sell(oneA))
+
+      def quote: (Money[N, CB], Money[N, CB]) = (buy(oneA), sell(oneA))
 
       private lazy val oneA: Money[N, CA] = MA apply N.one
     }
 
-    final case class SimplePricing[N: Fractional, CA <: Currency, CB <: Currency](val bid: N, val ask: N) extends Pricing[N, CA, CB]
+    final case class SimplePricing[N: Fractional, CA <: Currency, CB <: Currency](val ask: N, val bid: N) extends Pricing[N, CA, CB]
 
     final case class LiveMarketPricing[N: Fractional, CA <: Currency, CB <: Currency](cfg: String) extends Pricing[N, CA, CB] {
       def bid: N = ???

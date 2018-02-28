@@ -49,6 +49,15 @@ class MoneySpec extends FlatSpec {
 
     assert(buck.show === "USD  1.00 ")
 
+    implicit def eurusdStaticPrice: Pricing[BigDecimal, EUR, USD] = SimplePricing(1.23, 1.22)
+
+    lazy val eurusd: Cross[EUR, USD, BigDecimal] = EUR / USD
+
+    val buxRequired = eurusd buy eur(100.0)
+    val buxReceived = eurusd sell eur(100.0)
+
+    assert(buxReceived < buxRequired)
+
   }
 }
 class MoneyPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
