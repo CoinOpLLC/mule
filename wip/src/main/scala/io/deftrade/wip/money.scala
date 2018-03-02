@@ -62,6 +62,8 @@ object Financial {
   import Numeric.{ BigDecimalIsFractional, DoubleIsFractional }
   import Ordering.{ BigDecimalOrdering, DoubleOrdering }
 
+  def apply[N: Financial]: Financial[N] = implicitly
+
   trait DoubleIsFinancial extends Financial[Double] with DoubleIsFractional with DoubleOrdering
   implicit object DoubleIsFinancial extends DoubleIsFinancial {
     @inline def fromBigDecimal(bd: BigDecimal): Double = bd.toDouble
@@ -137,7 +139,7 @@ object PhantomTypePerCurrency {
     implicit def monoid[N: Financial, C <: Currency] = new Monoid[Money[N, C]] {
       type MNY = Money[N, C]
       override def combine(a: MNY, b: MNY): MNY = a + b
-      override def empty: MNY                   = Money(implicitly[Financial[N]].zero)
+      override def empty: MNY                   = Money(Financial[N].zero)
     }
 
     implicit def showMoney[C <: Currency: Monetary, N: Financial]: Show[Money[N, C]] =
@@ -148,7 +150,7 @@ object PhantomTypePerCurrency {
       def apply[N: Financial, C <: Currency: Monetary](m: Money[N, C]): String = {
         val MC   = Monetary[C]
         val fmt  = s"%${flags}.${MC.defaultFractionDigits}f"
-        val sfmt = if (implicitly[Financial[N]].signum(m.amount) < 0) fmt else s" $fmt "
+        val sfmt = if (Financial[N].signum(m.amount) < 0) fmt else s" $fmt "
         s"${MC.currencyCode} ${m.amount formatted sfmt}"
       }
     }
@@ -323,7 +325,7 @@ object ClassPerCurrency {
       def apply[N: Financial, C[?] <: Currency[?]: Monetary](m: C[N]): String = {
         val MC   = Monetary[C]
         val fmt  = s"%${flags}.${MC.defaultFractionDigits}f"
-        val sfmt = if (implicitly[Financial[N]].signum(m.amount) < 0) fmt else s" $fmt "
+        val sfmt = if (Financial[N].signum(m.amount) < 0) fmt else s" $fmt "
         s"${MC.currencyCode} ${m.amount formatted sfmt}"
       }
     }
