@@ -33,16 +33,20 @@ import cats.Show
 /**
 
    requirements for currency / money:
-   - take inspiration from `squants.market`
+   - scalazzi-9000-complient™, cats-friendly™
+   - take _inspiration_ from `squants.market` (emphasis _mine_)
+   - comprehend the best of other FOSS offerings (esp the moribund ones!)
+   -  these chaps https://github.com/Appendium/objectlabkit
+   -  but lose the whole "is market convention" thing - yagni
    - separate types for each currency (no addition across currencies! domain modeling dictates!)
-   - minimal to no overhead (value classes on [N: Numeric])
+   - minimal to no overhead (value classes on [N: Fractional])
     - can summon implicit Monetary[Currency] typeclass instance given a currency instance
-   - `enumeratum` lib for denominations (supported currencies)
+   - use `enumeratum` lib for denominations (supported currencies)
    - exploit java Currency support
-   - abstract over currencies for single implicit `Monoid` function
+   - abstract over currencies for single implicit `cats.Monoid` function
    - monetary enum as factory pattern - can use to make currency
     (Turns out, this runs into limits to abstraction.)
-   - no dependencies other than algebra
+   - no dependencies other than `typelevel algebra`
 
    todo: treatment of what's expected to be imported implicitly
 
@@ -53,11 +57,16 @@ private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
   // def apply[N: Fractional](n: N): Money[N, CurrencyType]
   final private lazy val jc = java.util.Currency getInstance monetary.entryName
 
-  final def code: String        = jc.getCurrencyCode
-  final def numericCode: Int    = jc.getNumericCode
-  final def fractionDigits: Int = jc.getDefaultFractionDigits
-  final def displayName: String = jc.getDisplayName
-  final def symbol: String      = jc.getSymbol
+  final def currencyCode: String       = jc.getCurrencyCode
+  final def numericCode: Int           = jc.getNumericCode
+  final def defaultFractionDigits: Int = jc.getDefaultFractionDigits
+  final def displayName: String        = jc.getDisplayName
+  final def symbol: String             = jc.getSymbol
+
+  final def rounding: BigDecimal.RoundingMode.RoundingMode = monetary.entryName match {
+    case "JPY" => BigDecimal.RoundingMode.DOWN
+    case _     => BigDecimal.RoundingMode.HALF_UP
+  }
 
 }
 
@@ -71,16 +80,6 @@ object PhantomTypePerCurrency {
 
     sealed trait Currency
 
-    /**
-      * - `Pricing` behaves well as a mixin
-      * - "Orderly market" invariant: `ask` < `bid`.
-      * - modelling disorderly markets: not everything that comes at you down the wire makes sense.
-      */
-    trait Pricing[N, CA <: Currency, CB <: Currency] { // two phantom types
-      def ask: N
-      def bid: N
-    }
-
     final case class Money[N, C <: Currency] private[Money] (val amount: N) extends AnyVal {
 
       type MNY = Money[N, C]
@@ -93,6 +92,25 @@ object PhantomTypePerCurrency {
       def unary_-(implicit N: Fractional[N]): MNY = Money(N negate amount)
     }
 
+    /**
+      * - `Pricing` can come from a variety of sources.
+      * - "Orderly market" invariant: `ask` < `bid`.
+      * - must model disorderly markets: not everything that comes at you down the wire makes sense.
+      */
+    abstract class Pricing[N, CA <: Currency, CB <: Currency](implicit N: Fractional[N]) {
+
+      def ask: N
+      def bid: N
+
+      import N._
+
+      final val half = one / (one + one) // FIXME: must be a better way
+
+      @inline final def spread: N = ask - bid
+      @inline final def mid: N    = bid + half * spread
+
+    }
+
     import cats.kernel.{ Monoid, Order }
 
     implicit def orderN[N: Fractional]: Order[N]                         = Order.fromOrdering[N]
@@ -101,7 +119,7 @@ object PhantomTypePerCurrency {
     implicit def monoid[N: Fractional, C <: Currency] = new Monoid[Money[N, C]] {
       type MNY = Money[N, C]
       override def combine(a: MNY, b: MNY): MNY = a + b
-      override lazy val empty: MNY              = Money(implicitly[Fractional[N]].zero)
+      override def empty: MNY                   = Money(implicitly[Fractional[N]].zero)
     }
 
     implicit def showMoney[C <: Currency: Monetary, N: Fractional]: Show[Money[N, C]] =
@@ -110,10 +128,10 @@ object PhantomTypePerCurrency {
     object Format {
       val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
       def apply[N: Fractional, C <: Currency: Monetary](m: Money[N, C]): String = {
-        val DC   = Monetary[C]
-        val fmt  = s"%${flags}.${DC.fractionDigits}f"
+        val MC   = Monetary[C]
+        val fmt  = s"%${flags}.${MC.defaultFractionDigits}f"
         val sfmt = if (implicitly[Fractional[N]].signum(m.amount) < 0) fmt else s" $fmt "
-        s"${DC.code} ${m.amount formatted sfmt}"
+        s"${MC.currencyCode} ${m.amount formatted sfmt}"
       }
     }
 
@@ -139,13 +157,18 @@ object PhantomTypePerCurrency {
                                                                 MB: Monetary[CB],
                                                                 N: Fractional[N],
                                                                 P: Pricing[N, CA, CB]) {
+      import N._, P._
 
-      def buy(ma: Money[N, CA]): Money[N, CB]  = MB apply (N times (ma.amount, P.ask))
-      def sell(ma: Money[N, CA]): Money[N, CB] = MB apply (N times (ma.amount, P.bid))
+      def buy(ma: Money[N, CA]): Money[N, CB]   = MB(ma.amount * ask)
+      def sell(ma: Money[N, CA]): Money[N, CB]  = MB(ma.amount * bid)
+      def apply(ma: Money[N, CA]): Money[N, CB] = MB(ma.amount * mid)
 
-      def quote: (Money[N, CB], Money[N, CB]) = (buy(oneA), sell(oneA))
+      def quote: (Money[N, CB], Money[N, CB])    = (buy(MA(one)), sell(MA(one)))
+      def cross: Option[Monetary[_ <: Currency]] = ???
 
-      private lazy val oneA: Money[N, CA] = MA apply N.one
+      def description: String = s"""
+          |Quoter buys  ${MA} and sells ${MB} at ${bid}
+          |Quoter sells ${MA} and buys  ${MB} at ${ask}""".stripMargin
     }
 
     final case class SimplePricing[N: Fractional, CA <: Currency, CB <: Currency](val ask: N, val bid: N) extends Pricing[N, CA, CB]
@@ -154,6 +177,26 @@ object PhantomTypePerCurrency {
       def bid: N = ???
       def ask: N = ???
     }
+
+    // final case class FakeMarketPricing[N, CA <: Currency, CB <: Currency](
+    //     quotes: (N, N)*
+    // )(
+    //     implicit MA: Monetary[CA],
+    //     MB: Monetary[CB],
+    //     N: Fractional[N]
+    // ) {
+    //   import N._
+    //   var qs                 = quotes.toList
+    //   var (ask, bid): (N, N) = (zero, zero)
+    //   def tick = {
+    //     bid = qs.head._1
+    //     ask = qs.head._2
+    //     qs = qs.tail
+    //   }
+    //   def buy(ma: Money[N, CA]): Money[N, CB]  = { tick; MB(ma.amount * ask) }
+    //   def sell(ma: Money[N, CA]): Money[N, CB] = { tick; MB(ma.amount * bid) }
+    //   def quote: (Money[N, CB], Money[N, CB])  = { tick; (buy(MA(one)), sell(MA(one))) }
+    // }
 
     sealed trait Monetary[C <: Currency] extends MonetaryLike {
 
@@ -171,15 +214,18 @@ object PhantomTypePerCurrency {
 
     def apply[C <: Currency: Monetary]: Monetary[C] = implicitly
 
-    val values = findValues
+    // standard major currency order - can we find another reference?
+    // "EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "NOK", "SEK", "JPY"
 
-    sealed trait USD extends Currency
-    case object USD  extends Monetary[USD]
-    implicit val usd: Monetary[USD] = USD
+    val values = findValues
 
     sealed trait EUR extends Currency
     case object EUR  extends Monetary[EUR]
     implicit val eur: Monetary[EUR] = EUR
+
+    sealed trait USD extends Currency
+    case object USD  extends Monetary[USD]
+    implicit val usd: Monetary[USD] = USD
 
     implicit def context = Context[USD] // FIXME: type annotation problems...
   }
@@ -201,11 +247,11 @@ object ClassPerCurrency {
 
       def amount: N
 
-      final def code: String = { // principle of least ghastliness
+      final def currencyCode: String = { // principle of least ghastliness
         val cs = getClass.toString
         cs substring (cs lastIndexOf '$') + 1
       }
-      final override def toString: String = s"$code(${amount.toString})"
+      final override def toString: String = s"$currencyCode(${amount.toString})"
     }
 
     implicit class CurrencyOps[C[?] <: Currency[?]: Monetary, N: Fractional](lhs: C[N]) {
@@ -251,10 +297,10 @@ object ClassPerCurrency {
       val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
 
       def apply[N: Fractional, C[?] <: Currency[?]: Monetary](m: C[N]): String = {
-        val DC   = Monetary[C]
-        val fmt  = s"%${flags}.${DC.fractionDigits}f"
+        val MC   = Monetary[C]
+        val fmt  = s"%${flags}.${MC.defaultFractionDigits}f"
         val sfmt = if (implicitly[Fractional[N]].signum(m.amount) < 0) fmt else s" $fmt "
-        s"${DC.code} ${m.amount formatted sfmt}"
+        s"${MC.currencyCode} ${m.amount formatted sfmt}"
       }
     }
     def values = findValues

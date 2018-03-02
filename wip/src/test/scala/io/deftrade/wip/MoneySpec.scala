@@ -48,9 +48,11 @@ class MoneySpec extends FlatSpec {
     assert(buck + buck === USD(2.0))
 
     assert(buck.show === "USD  1.00 ")
+    assert((-buck).show === "USD (1.00)")
 
     implicit def eurusdStaticPrice: Pricing[BigDecimal, EUR, USD] = SimplePricing(1.23, 1.22)
 
+    // FIXME: awkward; type inference won't work cleanly
     lazy val eurusd: Cross[EUR, USD, BigDecimal] = EUR / USD
 
     val buxRequired = eurusd buy eur(100.0)
