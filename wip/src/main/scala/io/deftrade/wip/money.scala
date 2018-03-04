@@ -53,9 +53,57 @@ import cats.Show
    todo: treatment of what's expected to be imported implicitly
 
   */
+/**
+
+financially useful big decimal scaling utilities
+notes from reviewing objectlabkit
+
+val DefaultInverseScale = 20
+val OneScaled = ONE setScale DefaultInverseScale
+
+  * set to `scale`, using `rounding`
+  * `divide` and `inverse` using `scale` and `rounding`
+
+  * `calculateWeight` -> ?! magic scale of 9? wtf
+
+  * `roundToScaleX andThen roundToScaleY` 🤔 (why HALF_UP baked in?)
+  *
+
+  general strategy on division: set scale to 20, then set it back to what makes sense for result
+  on conversion: we take the scale and rounding of the result currency
+
+  */
+/**
+  * - `Pricing` is a typeclass
+  * - can come from a variety of sources including live market
+  * - "Orderly market" invariant: `ask` < `bid`.
+  * - must model disorderly markets: not everything that comes at you down the wire makes sense.
+  * - note: the types parameters `A` and `B` are effectively *phantom types*
+  *   - used summon a pricing instance (e.g. Pricing[SomeShadySpeculativeInstrument, CHF]))
+  */
+trait Pricing[A, B] {
+
+  def ask: BigDecimal
+  def bid: BigDecimal
+
+  def tick: BigDecimal
+
+  @inline final def spread = ask - bid
+  @inline final def mid    = bid + spread / 2
+
+}
+
 sealed trait Financial[N] extends Fractional[N] {
+  import BigDecimal.RoundingMode, RoundingMode.RoundingMode
   def fromBigDecimal(bd: BigDecimal): N
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
+
+  /**
+    * Someday, maybe, "as if by" will be the operative words.
+    * But today, we go with "literally".
+    */
+  final def round(n: N, scale: Int, rounding: RoundingMode): N =
+    toBigDecimal(n).setScale(scale, rounding) |> fromBigDecimal
 }
 object Financial {
 
@@ -68,7 +116,15 @@ object Financial {
   implicit object DoubleIsFinancial extends DoubleIsFinancial {
     @inline def fromBigDecimal(bd: BigDecimal): Double = bd.toDouble
   }
-  trait BigDecimalIsFinancial extends Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering
+
+  trait BigDecimalIsFinancial extends Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering {
+
+    override def plus(x: BigDecimal, y: BigDecimal): BigDecimal =
+      super.plus(x, y).setScale(x.scale)
+
+    override def minus(x: BigDecimal, y: BigDecimal): BigDecimal =
+      super.minus(x, y).setScale(x.scale)
+  }
   implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial {
     @inline def fromBigDecimal(bd: BigDecimal): BigDecimal       = bd
     @inline override def toBigDecimal(n: BigDecimal): BigDecimal = n
@@ -81,11 +137,16 @@ private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
   // def apply[N: Financial](n: N): Money[N, CurrencyType]
   final private lazy val jc = java.util.Currency getInstance monetary.entryName
 
-  final def currencyCode: String       = jc.getCurrencyCode
-  final def numericCode: Int           = jc.getNumericCode
-  final def defaultFractionDigits: Int = jc.getDefaultFractionDigits
-  final def displayName: String        = jc.getDisplayName
-  final def symbol: String             = jc.getSymbol
+  final def currencyCode: String = jc.getCurrencyCode
+  final def numericCode: Int     = jc.getNumericCode
+  final def defaultFractionDigits: Int = jc.getDefaultFractionDigits match {
+    case -1 => 4 // typical use case is unit-of-account; just need decent default
+    case fd => fd
+  }
+  final def pipScale: Int       = defaultFractionDigits + 2
+  final def pip: BigDecimal     = BigDecimal(0L, scale = pipScale).ulp // idiom for the idiom gods
+  final def displayName: String = jc.getDisplayName
+  final def symbol: String      = jc.getSymbol
 
   final def rounding: BigDecimal.RoundingMode.RoundingMode = monetary.entryName match {
     case "JPY" => BigDecimal.RoundingMode.DOWN
@@ -115,22 +176,6 @@ object PhantomTypePerCurrency {
       // def /(rhs: N)(implicit N: Financial[N]): MNY   = Money(N div (amount, rhs))
       def unary_-(implicit N: Financial[N]): MNY = Money(N negate amount)
     }
-
-    /**
-      * - `Pricing` can come from a variety of sources.
-      * - "Orderly market" invariant: `ask` < `bid`.
-      * - must model disorderly markets: not everything that comes at you down the wire makes sense.
-      */
-    trait Pricing[CA <: Currency, CB <: Currency] {
-
-      def ask: BigDecimal
-      def bid: BigDecimal
-
-      @inline final def spread = ask - bid
-      @inline final def mid    = bid + spread / 2
-
-    }
-
     import cats.kernel.{ Monoid, Order }
 
     implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
@@ -197,11 +242,15 @@ object PhantomTypePerCurrency {
           |Quoter sells ${MA} and buys  ${MB} at ${ask}""".stripMargin
     }
 
-    final case class SimplePricing[CA <: Currency, CB <: Currency](val ask: BigDecimal, val bid: BigDecimal) extends Pricing[CA, CB]
+    final case class SimplePricing[CA <: Currency, CB <: Currency: Monetary](val ask: BigDecimal, val bid: BigDecimal)
+        extends Pricing[CA, CB] {
+      def tick: BigDecimal = Monetary[CB].pip
+    }
 
-    final case class LiveMarketPricing[CA <: Currency, CB <: Currency](cfg: String) extends Pricing[CA, CB] {
-      def bid: BigDecimal = ???
-      def ask: BigDecimal = ???
+    final case class LiveMarketPricing[CA <: Currency, CB <: Currency: Monetary](cfg: String) extends Pricing[CA, CB] {
+      def bid: BigDecimal  = ???
+      def ask: BigDecimal  = ???
+      def tick: BigDecimal = Monetary[CB].pip / 10 // this is a thing now
     }
 
     // final case class FakeMarketPricing[N, CA <: Currency, CB <: Currency](
