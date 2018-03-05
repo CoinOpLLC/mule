@@ -165,47 +165,41 @@ object PhantomTypePerCurrency {
 
     sealed trait Currency
 
-    final case class Money[N, C <: Currency] private[Money] (val amount: N) extends AnyVal {
+    final class Money[N, C] private[Money] (val amount: N) extends AnyVal {
 
       type MNY = Money[N, C]
 
-      def +(rhs: MNY)(implicit N: Financial[N]): MNY = Money(N plus (amount, rhs.amount))
-      def -(rhs: MNY)(implicit N: Financial[N]): MNY = Money(N minus (amount, rhs.amount))
-      def *(scale: N)(implicit N: Financial[N]): MNY = Money(N times (scale, amount))
-      def /(rhs: MNY)(implicit N: Financial[N]): N   = N div (amount, rhs.amount)
-      // def /(rhs: N)(implicit N: Financial[N]): MNY   = Money(N div (amount, rhs))
-      def unary_-(implicit N: Financial[N]): MNY = Money(N negate amount)
+      def +(rhs: MNY)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N plus (amount, rhs.amount))
+      def -(rhs: MNY)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N minus (amount, rhs.amount))
+      def *(scale: N)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N times (scale, amount))
+      def /(rhs: MNY)(implicit N: Financial[N]): N               = N div (amount, rhs.amount)
+      def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money[N, C](N negate amount)
+    }
+    object Money {
+      def apply[N: Financial, C: Monetary](amount: N) = new Money[N, C](amount)
     }
     import cats.kernel.{ Monoid, Order }
 
     implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
     implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
 
-    implicit def monoid[N: Financial, C <: Currency] = new Monoid[Money[N, C]] {
+    implicit def monoid[N: Financial, C: Monetary] = new Monoid[Money[N, C]] {
       type MNY = Money[N, C]
       override def combine(a: MNY, b: MNY): MNY = a + b
       override def empty: MNY                   = Money(Financial[N].zero)
     }
 
-    implicit def showMoney[C <: Currency: Monetary, N: Financial]: Show[Money[N, C]] =
+    implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
       Show show (Format apply _)
 
     object Format {
       val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
-      def apply[N: Financial, C <: Currency: Monetary](m: Money[N, C]): String = {
+      def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
         val MC   = Monetary[C]
         val fmt  = s"%${flags}.${MC.defaultFractionDigits}f"
         val sfmt = if (Financial[N].signum(m.amount) < 0) fmt else s" $fmt "
         s"${MC.currencyCode} ${m.amount formatted sfmt}"
       }
-    }
-
-    sealed trait Context[C <: Currency] {
-      def default: Monetary[C]
-    }
-
-    object Context {
-      def apply[C <: Currency: Monetary]: Context[C] = new Context[C] { def default = implicitly }
     }
 
     /**
@@ -217,10 +211,10 @@ object PhantomTypePerCurrency {
       * over two hundred assigned; several "dead" currencies (not reused)
       * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, priced in `XYZ`.
       */
-    final case class Cross[CA <: Currency, CB <: Currency]()(implicit
-                                                             MA: Monetary[CA],
-                                                             MB: Monetary[CB],
-                                                             P: Pricing[CA, CB]) {
+    final case class Cross[CA, CB]()(implicit
+                                     MA: Monetary[CA],
+                                     MB: Monetary[CB],
+                                     P: Pricing[CA, CB]) {
       import P._
 
       def buy[N](ma: Money[N, CA])(implicit N: Financial[N]): Money[N, CB] =
@@ -273,21 +267,21 @@ object PhantomTypePerCurrency {
     //   def quote: (Money[N, CB], Money[N, CB])  = { tick; (buy(MA(one)), sell(MA(one))) }
     // }
 
-    sealed trait Monetary[C <: Currency] extends MonetaryLike {
+    sealed trait Monetary[C] extends MonetaryLike { self =>
 
-      // final type CurrencyType = C
+      private[this] implicit val C  = self // this is all regrettably clever
       def apply[N: Financial](n: N) = Money[N, C](n)
 
       /**
         * implicit context to provide pricing
         */
-      def /[CB <: Currency, N](mb: Monetary[CB])(implicit MA: Monetary[C], P: Pricing[C, CB]): Cross[C, CB] = {
-        implicit val MB = mb
+      def /[CB](cb: Monetary[CB])(implicit P: Pricing[C, CB]): Cross[C, CB] = {
+        implicit val CB = cb
         Cross[C, CB]
       }
     }
 
-    def apply[C <: Currency: Monetary]: Monetary[C] = implicitly
+    def apply[C: Monetary]: Monetary[C] = implicitly
 
     // standard major currency order - can we find another reference?
     // "EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "NOK", "SEK", "JPY"
@@ -301,8 +295,6 @@ object PhantomTypePerCurrency {
     sealed trait USD extends Currency
     case object USD  extends Monetary[USD]
     implicit val usd: Monetary[USD] = USD
-
-    implicit def context = Context[USD] // FIXME: type annotation problems...
   }
 }
 
@@ -396,6 +388,20 @@ object ClassPerCurrency {
 
   }
 }
+
+/*
+
+# [XBR: Precision, Decimals and Units 1.0](http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html)
+
+> 6.3
+...Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).
+
+This suggests a Rational type e.g. from spire
+
+7.4 Representing Exact Monetary Amounts
+
+
+ */
 
 // private[wip] object UglyTypeDefs {
 //   type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
