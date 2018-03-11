@@ -24,7 +24,7 @@ import enumeratum._
 // import eu.timepit.refined
 // import refined.api.Refined
 // import refined.W
-import cats.kernel.{ Monoid, Order }
+import cats.kernel.{ instances, CommutativeGroup, Monoid, Order }, instances.{ BigDecimalGroup, DoubleGroup }
 import cats.Show
 // import refined.collection._
 // import refined.numeric._
@@ -74,14 +74,14 @@ val OneScaled = ONE setScale DefaultInverseScale
 
   */
 /**
-  * - `Pricing` is a typeclass
+  * - `PricedIn` is a binary typeclass: `A PricedIn B`. The domain vocabulary usage supports this.
   * - can come from a variety of sources including live market
   * - "Orderly market" invariant: `ask` < `bid`.
   * - must model disorderly markets: not everything that comes at you down the wire makes sense.
   * - note: the types parameters `A` and `B` are effectively *phantom types*
-  *   - used summon a pricing instance (e.g. Pricing[SomeShadySpeculativeInstrument, CHF]))
+  *   - used summon a pricing instance (e.g. PricedIn[SomeShadySpeculativeInstrument, CHF]))
   */
-trait Pricing[A, B] {
+trait PricedIn[A, B] {
 
   def ask: BigDecimal
   def bid: BigDecimal
@@ -93,7 +93,7 @@ trait Pricing[A, B] {
 
 }
 
-sealed trait Financial[N] extends Fractional[N] {
+sealed trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[N] {
   import BigDecimal.RoundingMode, RoundingMode.RoundingMode
   def fromBigDecimal(bd: BigDecimal): N
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
@@ -112,25 +112,33 @@ object Financial {
 
   def apply[N: Financial]: Financial[N] = implicitly
 
-  trait DoubleIsFinancial extends Financial[Double] with DoubleIsFractional with DoubleOrdering
-  implicit object DoubleIsFinancial extends DoubleIsFinancial {
-    @inline def fromBigDecimal(bd: BigDecimal): Double = bd.toDouble
+  class DoubleIsFinancial extends DoubleGroup with Financial[Double] with DoubleIsFractional with DoubleOrdering {
+    def fromBigDecimal(bd: BigDecimal): Double = bd.toDouble
   }
+  implicit object DoubleIsFinancial extends DoubleIsFinancial
 
-  trait BigDecimalIsFinancial extends Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering {
+  /**
+    * left operand scale is "sticky" for those operations {+, -, *} that
+    * ultimately result in Money.
+    */
+  class BigDecimalIsFinancial extends BigDecimalGroup with Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering {
 
     override def plus(x: BigDecimal, y: BigDecimal): BigDecimal =
       super.plus(x, y).setScale(x.scale)
 
     override def minus(x: BigDecimal, y: BigDecimal): BigDecimal =
       super.minus(x, y).setScale(x.scale)
+
+    override def times(x: BigDecimal, y: BigDecimal): BigDecimal =
+      super.times(x, y).setScale(x.scale)
+
+    def fromBigDecimal(bd: BigDecimal): BigDecimal       = bd
+    override def toBigDecimal(n: BigDecimal): BigDecimal = n
   }
-  implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial {
-    @inline def fromBigDecimal(bd: BigDecimal): BigDecimal       = bd
-    @inline override def toBigDecimal(n: BigDecimal): BigDecimal = n
-  }
+  implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial
 }
 
+/** Hobbson's polymorphism ftm lol */
 private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
   // type CurrencyType <: Currency
@@ -163,20 +171,20 @@ object PhantomTypePerCurrency {
 
   object Monetary extends Enum[MonetaryLike] {
 
-    sealed trait Currency
-
     final class Money[N, C] private[Money] (val amount: N) extends AnyVal {
 
       type MNY = Money[N, C]
 
-      def +(rhs: MNY)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N plus (amount, rhs.amount))
-      def -(rhs: MNY)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N minus (amount, rhs.amount))
-      def *(scale: N)(implicit N: Financial[N], C: Monetary[C])  = Money[N, C](N times (scale, amount))
-      def /(rhs: MNY)(implicit N: Financial[N]): N               = N div (amount, rhs.amount)
-      def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money[N, C](N negate amount)
+      private def mny(n: N): MNY = new Money[N, C](n)
+
+      def +(rhs: MNY)(implicit N: Financial[N])    = mny(N plus (amount, rhs.amount))
+      def -(rhs: MNY)(implicit N: Financial[N])    = mny(N minus (amount, rhs.amount))
+      def *(scale: N)(implicit N: Financial[N])    = mny(N times (scale, amount))
+      def /(rhs: MNY)(implicit N: Financial[N]): N = N div (amount, rhs.amount)
+      def unary_-(implicit N: Financial[N]): MNY   = mny(N negate amount)
     }
     object Money {
-      def apply[N: Financial, C: Monetary](amount: N) = new Money[N, C](amount)
+      def apply[N: Financial, C: Monetary](amount: N) = new Money[N, C](amount) // .round
     }
     import cats.kernel.{ Monoid, Order }
 
@@ -205,7 +213,7 @@ object PhantomTypePerCurrency {
     /**
       * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
       * One or more Market(s) determine this price.
-      * - A design that doesnt' abstract over `Pricing`, **including live data**, is useless.
+      * - A design that doesnt' abstract over `PricedIn`, **including live data**, is useless.
       * - otoh dead simple immutable for testing / demo also required
       * Three letter codes: 26 ^ 3 = 17576
       * over two hundred assigned; several "dead" currencies (not reused)
@@ -214,7 +222,7 @@ object PhantomTypePerCurrency {
     final case class Cross[CA, CB]()(implicit
                                      MA: Monetary[CA],
                                      MB: Monetary[CB],
-                                     P: Pricing[CA, CB]) {
+                                     P: PricedIn[CA, CB]) {
       import P._
 
       def buy[N](ma: Money[N, CA])(implicit N: Financial[N]): Money[N, CB] =
@@ -236,12 +244,11 @@ object PhantomTypePerCurrency {
           |Quoter sells ${MA} and buys  ${MB} at ${ask}""".stripMargin
     }
 
-    final case class SimplePricing[CA <: Currency, CB <: Currency: Monetary](val ask: BigDecimal, val bid: BigDecimal)
-        extends Pricing[CA, CB] {
+    final case class SimplePricing[CA, CB: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends PricedIn[CA, CB] {
       def tick: BigDecimal = Monetary[CB].pip
     }
 
-    final case class LiveMarketPricing[CA <: Currency, CB <: Currency: Monetary](cfg: String) extends Pricing[CA, CB] {
+    final case class LiveMarketPricing[CA, CB: Monetary](cfg: String) extends PricedIn[CA, CB] {
       def bid: BigDecimal  = ???
       def ask: BigDecimal  = ???
       def tick: BigDecimal = Monetary[CB].pip / 10 // this is a thing now
@@ -269,21 +276,30 @@ object PhantomTypePerCurrency {
 
     sealed trait Monetary[C] extends MonetaryLike { self =>
 
-      private[this] implicit val C  = self // this is all regrettably clever
-      def apply[N: Financial](n: N) = Money[N, C](n)
+      // intent: grant to `Monetary[C]` exclusive license to create `Money[N, C]` instances.
+      private[this] implicit val C: Monetary[C] = self // this is all regrettably clever
+      def apply[N: Financial](n: N)             = Money apply [N, C] n
 
       /**
         * implicit context to provide pricing
         */
-      def /[CB](cb: Monetary[CB])(implicit P: Pricing[C, CB]): Cross[C, CB] = {
+      def /[CB](cb: Monetary[CB])(implicit P: C PricedIn CB): Cross[C, CB] = {
         implicit val CB = cb
         Cross[C, CB]
       }
     }
 
+    /**
+      * FIXME: Not sure that this has a use, actually.
+      */
+    sealed trait Currency
+
+    /**
+      * Given a currency (phantom) type, get a `Monetary` instance.
+      */
     def apply[C: Monetary]: Monetary[C] = implicitly
 
-    // standard major currency order - can we find another reference?
+    // TODO: standard major currency order - can we find a reference other than objectlabkit?
     // "EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "NOK", "SEK", "JPY"
 
     val values = findValues

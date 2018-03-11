@@ -30,7 +30,7 @@ object TypeclassStuff {
   import cats.instances.boolean._
   import cats.instances.tuple._
 
-  import model._
+  import model.Api._
 
   import Kats._
 
@@ -63,7 +63,7 @@ object TypeclassStuff {
   val o1 = Order.legacy(555.550001, 78345)
   val o2 = Order.legacy(168.020660, 186283)
 
-  (o1 |+| o2) === Order(-2, -2, 264628, 723.570661, None) |> assertOrElse((o1 |+| o2).toString)
+  (o1 |+| o2) === Order(-2, -2, 264628, BigDecimal(723.570661), None) |> assertOrElse((o1 |+| o2).toString)
 
   val map1 = Map("a" -> 1, "b" -> 2)
   val map2 = Map("b" -> 3, "d" -> 4)

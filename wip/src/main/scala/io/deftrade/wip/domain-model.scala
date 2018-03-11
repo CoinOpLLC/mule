@@ -18,82 +18,117 @@ package io.deftrade
 package wip
 package model
 
-import cats.{ Eq, Monoid }
-import cats.syntax.all._
-import cats.{ instances => ci }
-import ci.int._, ci.string._, ci.double._, ci.boolean._, ci.bigDecimal._, ci.long._
-import ci.option._, ci.tuple._, ci.list._, ci.set._, ci.map._
-
-import enumeratum._
-import enumeratum.values._
+import cats.{ Eq, Monoid, Order => CatsOrder }
+import cats.implicits._
+// import enumeratum._
+// import enumeratum.values._
 
 import eu.timepit.refined
 import refined.api.Refined
 import refined.W
-import refined.collection._
+// import refined.collection._
 import refined.numeric._
 import refined.auto._
 
 // import squants.{ Each, market => sm }
 // import sm.Money
 
-object api {
+import io.deftrade.wip.{ Financial, PhantomTypePerCurrency }, PhantomTypePerCurrency.Monetary, Monetary._
+trait Api {
 
-  type ItemId    = Long
-  type AccountId = Long
-  type Comment   = String
+  type ClientId
+  final implicit def ClientIdHasEq: Eq[ClientId] = implicitly
 
-  // implicit val moneyContext = sm.defaultMoneyContext
+  type AccountId
+  final implicit def AccountIdHasEq: Eq[AccountId] = implicitly
 
-  // val doubleEagle = sm.Money(20)
+  type AssetId
+  final implicit def AssetIdHasEq: Eq[AssetId] = implicitly
 
-  type AssetId = Long Refined Interval.Closed[W.`100000`, W.`100099`]
-  // type AssetId     = String
-  type AccountRole = String
-  type ClientId    = String
-  // type Quantity = Long Refined NonNegative
-  type Quantity = Double
-  // type Price    = sm.Price[squants.Dimensionless]
-  type Price = Double
-  // price and quantity need `Monoids`.
-  type Position = (Quantity, Price)
-  type Folio    = Map[AssetId, Position]
-  type Account  = Map[AccountId, Folio]
-  type Client   = Map[ClientId, Map[AccountRole, AccountId]]
+  type Quantity
+  implicit def QuantityIsFinancial: Financial[Quantity]
 
-  implicit val accountMonoid = Monoid[Account]
+  final type Position = (AssetId, Quantity)
 
+  type MonetaryAmount
+  implicit def MonetaryAmountIsFinancial: Financial[MonetaryAmount]
+
+  // this smells like a repository
+  def price(id: AssetId): MonetaryAmount = ???
+
+  final def value[C: Monetary](pos: Position): Money[MonetaryAmount, C] = pos match {
+    case (asset, quantity) =>
+      val q = QuantityIsFinancial toBigDecimal quantity
+      val p = MonetaryAmountIsFinancial toBigDecimal price(asset)
+      Money(MonetaryAmountIsFinancial fromBigDecimal (p * q))
+  }
+
+  final type Folio   = AssetId Map Position
+  final type Account = AccountId Map Folio
+  final implicit lazy val accountMonoid: Monoid[Account] = implicitly
+
+  type AccountRole
+  final type Client = Map[ClientId, Map[AccountRole, AccountId]]
+
+  type Remark = String
 }
 
-import api._
+object Api extends Api {
 
-final case class AnotherWayToDoTypesafeId(val value: Long) extends AnyVal
+  type ClientId = Long Refined Interval.Closed[W.`100000`, W.`100099`]
 
-case class Order(
-    account: AccountId,
-    item: ItemId,
-    quantity: Long,
-    totalCost: BigDecimal,
-    comment: Option[Comment]
-)
-object Order {
+  object ClientId {
+    implicit lazy val eq = Eq.fromUniversalEquals[ClientId]
+  }
+  type AccountId = Long
+  type AssetId   = Long
 
-  type Tpl = (AccountId, ItemId, Long, BigDecimal, Option[Comment])
+  type Quantity = Double
+  override implicit lazy val QuantityIsFinancial: Financial[Quantity] =
+    Financial.DoubleIsFinancial
 
-  def legacy(bd: BigDecimal, q: Long): Order = apply(-1, -1, q, bd, None)
+  type MonetaryAmount = BigDecimal
+  override implicit lazy val MonetaryAmountIsFinancial: Financial[MonetaryAmount] =
+    Financial.BigDecimalIsFinancial
 
-  val tuple: Order => Tpl   = Order.unapply(_).fold(???)(identity) // honest, at least...
-  val untuple: Tpl => Order = tpl => tpl |> (Order.apply(_, _, _, _, _)).tupled
+  type AccountRole = String // or an enum!
 
-  implicit val eq    = Eq.fromUniversalEquals[Order]
-  implicit val order = cats.Order by tuple
-  implicit val monoid = new Monoid[Order] {
+  case class Order(
+      account: AccountId,
+      asset: AssetId,
+      quantity: Quantity,
+      totalCost: MonetaryAmount,
+      remark: Option[Remark]
+  )
+  object Order {
 
-    def combine(a: Order, b: Order): Order = tuple(a) |+| tuple(b) |> untuple
+    type Tpl = (AccountId, AssetId, Quantity, MonetaryAmount, Option[Remark])
 
-    lazy val empty: Order = Monoid[Tpl].empty |> untuple
+    def legacy(bd: BigDecimal, q: Long): Order =
+      apply(
+        -1,
+        -1,
+        (QuantityIsFinancial fromBigDecimal BigDecimal(q)),
+        MonetaryAmountIsFinancial fromBigDecimal bd,
+        None
+      )
+
+    val tuple: Order => Tpl   = Order.unapply(_).fold(???)(identity) // honest, at least...
+    val untuple: Tpl => Order = tpl => tpl |> (Order.apply(_, _, _, _, _)).tupled
+
+    // implicit val eq       = Eq.fromUniversalEquals[Order]
+    implicit val ordering = CatsOrder by tuple
+
+    implicit val monoid = new Monoid[Order] {
+
+      def combine(a: Order, b: Order): Order = tuple(a) |+| tuple(b) |> untuple
+
+      lazy val empty: Order = Monoid[Tpl].empty |> untuple
+    }
   }
 }
+
+final case class AnotherWayToDoTypesafeId(val value: Long) extends AnyVal
 
 object MuhDomain {
   lazy val db = Db(
