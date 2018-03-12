@@ -54,13 +54,14 @@ trait Api {
   implicit def MonetaryAmountIsFinancial: Financial[MonetaryAmount]
 
   // this smells like a repository
-  def price(id: AssetId): MonetaryAmount = ???
+  def price[C: Monetary](id: AssetId): Money[MonetaryAmount, C] = ???
 
-  final def value[C: Monetary](pos: Position): Money[MonetaryAmount, C] = pos match {
+  def price[C: Monetary](pos: Position): Money[MonetaryAmount, C] = pos match {
     case (asset, quantity) =>
-      val q = QuantityIsFinancial toBigDecimal quantity
-      val p = MonetaryAmountIsFinancial toBigDecimal price(asset)
-      Money(MonetaryAmountIsFinancial fromBigDecimal (p * q))
+      // FIXME this is the true expression of what I was thinking. Not sure it's what we want.
+      val q = MonetaryAmountIsFinancial fromBigDecimal (QuantityIsFinancial toBigDecimal quantity)
+      val p = price[C](asset)
+      p * q
   }
 
   final type Folio   = AssetId Map Position
@@ -126,33 +127,4 @@ object Api extends Api {
       lazy val empty: Order = Monoid[Tpl].empty |> untuple
     }
   }
-}
-
-final case class AnotherWayToDoTypesafeId(val value: Long) extends AnyVal
-
-object MuhDomain {
-  lazy val db = Db(
-    Map(
-      1 -> "dade",
-      2 -> "kate",
-      3 -> "margo"
-    ),
-    Map(
-      "dade"  -> "zerocool",
-      "kate"  -> "acidburn",
-      "margo" -> "secret"
-    )
-  )
-
-  lazy val fd = Map(
-    "Alice"   -> "37",
-    "Bob"     -> "23",
-    "Carol"   -> "42",
-    "Dave"    -> "27",
-    "Jaimie"  -> "33",
-    "Kerry"   -> "18",
-    "Leslie"  -> "31",
-    "Terry"   -> "19",
-    "Mallory" -> "67"
-  )
 }

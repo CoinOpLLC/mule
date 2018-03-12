@@ -26,7 +26,32 @@ package wip
 
 import cats.implicits._
 
-import model._
+object MuhDomain {
+  lazy val db = Db(
+    Map(
+      1 -> "dade",
+      2 -> "kate",
+      3 -> "margo"
+    ),
+    Map(
+      "dade"  -> "zerocool",
+      "kate"  -> "acidburn",
+      "margo" -> "secret"
+    )
+  )
+
+  lazy val fd = Map(
+    "Alice"   -> "37",
+    "Bob"     -> "23",
+    "Carol"   -> "42",
+    "Dave"    -> "27",
+    "Jaimie"  -> "33",
+    "Kerry"   -> "18",
+    "Leslie"  -> "31",
+    "Terry"   -> "19",
+    "Mallory" -> "67"
+  )
+}
 
 object TreeStuff {
 
