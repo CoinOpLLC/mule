@@ -50,7 +50,7 @@ class MoneySpec extends FlatSpec {
     assert(buck.show === "USD  1.00 ")
     assert((-buck).show === "USD (1.00)")
 
-    implicit def eurusdStaticPrice: PricedIn[EUR, USD] = SimplePricing(1.23, 1.22)
+    implicit def eurusdStaticPrice: QuotedIn[EUR, USD] = SimpleQuote(1.23, 1.22)
 
     lazy val eurusd = EUR / USD
 

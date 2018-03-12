@@ -74,14 +74,14 @@ val OneScaled = ONE setScale DefaultInverseScale
 
   */
 /**
-  * - `PricedIn` is a binary typeclass: `A PricedIn B`. The domain vocabulary usage supports this.
+  * - `QuotedIn` is a binary typeclass: `A QuotedIn B`. The domain vocabulary usage supports this.
   * - can come from a variety of sources including live market
   * - "Orderly market" invariant: `ask` < `bid`.
   * - must model disorderly markets: not everything that comes at you down the wire makes sense.
   * - note: the types parameters `A` and `B` are effectively *phantom types*
-  *   - used summon a pricing instance (e.g. PricedIn[SomeShadySpeculativeInstrument, CHF]))
+  *   - used summon a pricing instance (e.g. QuotedIn[SomeShadySpeculativeInstrument, CHF]))
   */
-trait PricedIn[A, B] {
+trait QuotedIn[A, B] {
 
   def ask: BigDecimal
   def bid: BigDecimal
@@ -97,6 +97,8 @@ sealed trait Financial[N] extends Fractional[N] with Ordering[N] with Commutativ
   import BigDecimal.RoundingMode, RoundingMode.RoundingMode
   def fromBigDecimal(bd: BigDecimal): N
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
+
+  def to[R: Financial](n: N): R = Financial[R].fromBigDecimal(toBigDecimal(n))
 
   /**
     * Someday, maybe, "as if by" will be the operative words.
@@ -213,66 +215,41 @@ object PhantomTypePerCurrency {
     /**
       * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
       * One or more Market(s) determine this price.
-      * - A design that doesnt' abstract over `PricedIn`, **including live data**, is useless.
+      * - A design that doesnt' abstract over `QuotedIn`, **including live data**, is useless.
       * - otoh dead simple immutable for testing / demo also required
       * Three letter codes: 26 ^ 3 = 17576
       * over two hundred assigned; several "dead" currencies (not reused)
       * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, priced in `XYZ`.
       */
-    final case class Cross[CA, CB]()(implicit
-                                     MA: Monetary[CA],
-                                     MB: Monetary[CB],
-                                     P: PricedIn[CA, CB]) {
+    final case class Rate[CCY1, CCY2]()(implicit
+                                        CCY1: Monetary[CCY1],
+                                        CCY2: Monetary[CCY2],
+                                        P: QuotedIn[CCY1, CCY2]) {
       import P._
 
-      def buy[N](ma: Money[N, CA])(implicit N: Financial[N]): Money[N, CB] =
-        MB(N.fromBigDecimal(N.toBigDecimal(ma.amount) * ask))
+      def buy[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
+        CCY2(N.fromBigDecimal(N.toBigDecimal(ma.amount) * ask))
 
-      def sell[N](ma: Money[N, CA])(implicit N: Financial[N]): Money[N, CB] =
-        MB(N.fromBigDecimal(N.toBigDecimal(ma.amount) * bid))
+      def sell[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
+        CCY2(N.fromBigDecimal(N.toBigDecimal(ma.amount) * bid))
 
-      def apply[N](ma: Money[N, CA])(implicit N: Financial[N]): Money[N, CB] =
-        MB(N.fromBigDecimal(N.toBigDecimal(ma.amount) * mid))
+      def apply[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
+        CCY2(N.fromBigDecimal(N.toBigDecimal(ma.amount) * mid))
 
-      def quote[N](implicit N: Financial[N]): (Money[N, CB], Money[N, CB]) =
-        (buy(MA(N.one)), sell(MA(N.one)))
+      def quote[N](implicit N: Financial[N]): (Money[N, CCY2], Money[N, CCY2]) =
+        (buy(CCY1(N.one)), sell(CCY1(N.one)))
 
       def cross: Option[Monetary[_ <: Currency]] = ???
 
       def description: String = s"""
-          |Quoter buys  ${MA} and sells ${MB} at ${bid}
-          |Quoter sells ${MA} and buys  ${MB} at ${ask}""".stripMargin
+          |Quoter buys  ${CCY1} and sells ${CCY2} at ${bid}
+          |Quoter sells ${CCY1} and buys  ${CCY2} at ${ask}""".stripMargin
     }
 
-    final case class SimplePricing[CA, CB: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends PricedIn[CA, CB] {
-      def tick: BigDecimal = Monetary[CB].pip
+    final case class SimpleQuote[CCY1, CCY2: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[CCY1, CCY2] {
+      def tick: BigDecimal = Monetary[CCY2].pip
+      // def tick: BigDecimal = Monetary[CCY2].pip / 10 // this is a thing now
     }
-
-    final case class LiveMarketPricing[CA, CB: Monetary](cfg: String) extends PricedIn[CA, CB] {
-      def bid: BigDecimal  = ???
-      def ask: BigDecimal  = ???
-      def tick: BigDecimal = Monetary[CB].pip / 10 // this is a thing now
-    }
-
-    // final case class FakeMarketPricing[N, CA <: Currency, CB <: Currency](
-    //     quotes: (N, N)*
-    // )(
-    //     implicit MA: Monetary[CA],
-    //     MB: Monetary[CB],
-    //     N: Financial[N]
-    // ) {
-    //   import N._
-    //   var qs                 = quotes.toList
-    //   var (ask, bid): (N, N) = (zero, zero)
-    //   def tick = {
-    //     bid = qs.head._1
-    //     ask = qs.head._2
-    //     qs = qs.tail
-    //   }
-    //   def buy(ma: Money[N, CA]): Money[N, CB]  = { tick; MB(ma.amount * ask) }
-    //   def sell(ma: Money[N, CA]): Money[N, CB] = { tick; MB(ma.amount * bid) }
-    //   def quote: (Money[N, CB], Money[N, CB])  = { tick; (buy(MA(one)), sell(MA(one))) }
-    // }
 
     sealed trait Monetary[C] extends MonetaryLike { self =>
 
@@ -283,15 +260,12 @@ object PhantomTypePerCurrency {
       /**
         * implicit context to provide pricing
         */
-      def /[CB](cb: Monetary[CB])(implicit P: C PricedIn CB): Cross[C, CB] = {
-        implicit val CB = cb
-        Cross[C, CB]
+      def /[CCY2](cb: Monetary[CCY2])(implicit P: C QuotedIn CCY2): Rate[C, CCY2] = {
+        implicit val CCY2 = cb
+        Rate[C, CCY2]
       }
     }
 
-    /**
-      * FIXME: Not sure that this has a use, actually.
-      */
     sealed trait Currency
 
     /**
@@ -352,14 +326,25 @@ object ClassPerCurrency {
         Monetary[C] apply (N times (scale, rhs.amount))
     }
 
-    trait Cross[Cn[?] <: Currency[?], Cd[?] <: Currency[?]]
+// from https://www.markettraders.com/blog/easily-calculate-cross-currency-rates/
+// https://en.wikipedia.org/wiki/ISO_4217
+// https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies
+// Euro-EUR
+// British Pound GBP
+// Australian Dollar-AUD
+// New Zealand Dollar-NZD
+// US Dollar-USD
+// Canadian Dollar-CAD
+// Canadian Dollar-CHF
+// Japanese Yen-JPY
+    trait Rate[Cn[?] <: Currency[?], Cd[?] <: Currency[?]]
 
     sealed trait Monetary[C[?] <: Currency[?]] extends MonetaryLike { self =>
 
       def apply[N: Financial](n: N): C[N]
 
-      final def /[C2[?] <: Currency[?]](base: Monetary[C2]): Cross[C, C2] =
-        new Cross[C, C2] {}
+      final def /[C2[?] <: Currency[?]](base: Monetary[C2]): Rate[C, C2] =
+        new Rate[C, C2] {}
     }
 
     implicit def showMoney[C[?] <: Currency[?]: Monetary, N: Financial]: Show[C[N]] =
