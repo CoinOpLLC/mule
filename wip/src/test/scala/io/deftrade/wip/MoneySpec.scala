@@ -23,7 +23,7 @@ class MoneySpec extends FlatSpec {
 
     assert(eur20 === e20)
 
-    assert(eur20 * 2 > e20)
+    assert(eur20 * 2.0 > e20)
     assert(eur20 + eur20 > e20)
 
     // import scala.language.higherKinds
