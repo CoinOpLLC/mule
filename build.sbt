@@ -63,7 +63,7 @@ lazy val wip = project
   .dependsOn(core)
   .settings(common)
   .settings(
-    libraryDependencies ++= httplibs ++ testers
+    libraryDependencies ++= httplibs ++ testers ++ Seq(opengamma)
   )
 
 // top level project - TODO: eventually this should only aggregate (no active dev)

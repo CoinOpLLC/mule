@@ -92,6 +92,11 @@ trait QuotedIn[A, CCY] {
 
   def tick: BigDecimal
 
+  def isDerived: Boolean = false
+
+  type CrossType
+  def cross: Option[CrossType] = None
+
   @inline final def spread = ask - bid
   @inline final def mid    = bid + spread / 2
 
@@ -103,7 +108,8 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
 
   final def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
-  final def to[R: Financial](n: N): R   = n |> toBigDecimal              |> Financial[R].fromBigDecimal
+
+  final def to[R: Financial](n: N): R = n |> toBigDecimal |> Financial[R].fromBigDecimal
 
   /**
     * Someday, maybe, "as if by" will be the operative words.
@@ -235,49 +241,52 @@ object PhantomTypePerCurrency {
       * over two hundred assigned; several "dead" currencies (not reused)
       * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
       */
-    implicit def iq[C1: Monetary, C2: Monetary](implicit Q: C1 QuotedIn C2): C2 QuotedIn C1 =
+    implicit def inverseQuote[C1: Monetary, C2: Monetary](implicit Q: C1 QuotedIn C2): C2 QuotedIn C1 =
       new QuotedIn[C2, C1] {
-        def bid  = 1 / Q.ask
-        def ask  = 1 / Q.bid
-        def tick = BigDecimal(1E-34)
+        def bid                = 1 / Q.ask
+        def ask                = 1 / Q.bid
+        def tick               = Q.tick * mid
+        override def isDerived = true
       }
 
-    implicit def xq[C1: Monetary, CX: Monetary, C2: Monetary](
-        implicit Q1X: C1 QuotedIn CX,
+    implicit def crossQuote[C1: Monetary, CX, C2: Monetary](
+        implicit CX: Monetary[CX],
+        Q1X: C1 QuotedIn CX,
         QX2: CX QuotedIn C2
     ): C1 QuotedIn C2 = new QuotedIn[C1, C2] {
-      def bid  = Q1X.bid * QX2.bid
-      def ask  = Q1X.ask * QX2.ask
-      def tick = BigDecimal(1E-34)
+      def bid                = Q1X.bid * QX2.bid
+      def ask                = Q1X.ask * QX2.ask
+      def tick               = QX2.tick * mid
+      override def isDerived = true
+      type CrossType = Monetary[CX]
+      override def cross: Option[CrossType] = Some(CX)
     }
 
-    final case class Rate[CCY1, CCY2]()(implicit
-                                        CCY1: Monetary[CCY1],
-                                        CCY2: Monetary[CCY2],
-                                        Q: QuotedIn[CCY1, CCY2]) {
+    final case class Rate[C1, C2]()(implicit
+                                    C1: Monetary[C1],
+                                    C2: Monetary[C2],
+                                    Q: C1 QuotedIn C2) {
       import Q._
 
-      def apply[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
-        CCY2(((ma.amount |> N.toBigDecimal) * mid) |> N.fromBigDecimal)
+      def apply[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
+        C2(((ma.amount |> N.toBigDecimal) * mid) |> N.fromBigDecimal)
 
-      def buy[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
-        CCY2(((ma.amount |> N.toBigDecimal) * ask) |> N.fromBigDecimal)
+      def buy[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
+        C2(((ma.amount |> N.toBigDecimal) * ask) |> N.fromBigDecimal)
 
-      def sell[N](ma: Money[N, CCY1])(implicit N: Financial[N]): Money[N, CCY2] =
-        CCY2(((ma.amount |> N.toBigDecimal) * bid) |> N.fromBigDecimal)
+      def sell[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
+        C2(((ma.amount |> N.toBigDecimal) * bid) |> N.fromBigDecimal)
 
-      def quote[N](implicit N: Financial[N]): (Money[N, CCY2], Money[N, CCY2]) =
-        (buy(CCY1(N.one)), sell(CCY1(N.one)))
-
-      def cross: Option[Monetary[_ <: Currency]] = ???
+      def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) =
+        (buy(C1(N.one)), sell(C1(N.one)))
 
       def description: String = s"""
-          |Quoter buys  ${CCY1} and sells ${CCY2} at ${bid}
-          |Quoter sells ${CCY1} and buys  ${CCY2} at ${ask}""".stripMargin
+          |Quoter buys  ${C1} and sells ${C2} at ${bid}
+          |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
     }
 
-    final case class SimpleQuote[CCY1, CCY2: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[CCY1, CCY2] {
-      def tick: BigDecimal = Monetary[CCY2].pip //  / 10 // this is a thing now
+    final case class SimpleQuote[C1, C2: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[C1, C2] {
+      def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
     }
 
     sealed trait Monetary[C] extends MonetaryLike { self =>
@@ -290,9 +299,9 @@ object PhantomTypePerCurrency {
       /**
         * implicit context to provide pricing
         */
-      def /[CCY2](cb: Monetary[CCY2])(implicit Q: C QuotedIn CCY2): Rate[C, CCY2] = {
-        implicit val CCY2 = cb
-        Rate[C, CCY2]
+      def /[C2](cb: Monetary[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+        implicit val C2 = cb
+        Rate[C, C2]
       }
     }
 

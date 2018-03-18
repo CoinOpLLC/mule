@@ -23,6 +23,7 @@ object Version {
   val Ammonite       = "0.8.3"
   val Quill          = "2.3.1"
   val PgJdbc         = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+  val OpenGamma      = "1.4.0"
 
   // val PgJdbc = "9.4-1201-jdbc41"
 }
@@ -45,6 +46,8 @@ object Deps {
   val spire = "org.typelevel" %% "spire" % Spire
 
   val squants = "org.typelevel" %% "squants" % Squants
+
+  val opengamma = "com.opengamma.strata" % "strata-measure" % OpenGamma
 
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html

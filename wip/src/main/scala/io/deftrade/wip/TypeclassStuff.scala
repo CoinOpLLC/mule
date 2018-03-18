@@ -23,12 +23,7 @@ package wip
 object TypeclassStuff {
 
   import cats.{ Eq, Monoid, Show }
-  import cats.syntax.all._
-  import cats.instances.int._
-  import cats.instances.string._
-  import cats.instances.option._
-  import cats.instances.boolean._
-  import cats.instances.tuple._
+  import cats.implicits._
 
   import model.Api._
 
@@ -58,12 +53,10 @@ object TypeclassStuff {
 
   def sum[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
 
-  import cats.instances.map._
-
   val o1 = Order.legacy(555.550001, 78345)
   val o2 = Order.legacy(168.020660, 186283)
 
-  (o1 |+| o2) === Order(-2, -2, 264628, BigDecimal(723.570661), None) |> assertOrElse((o1 |+| o2).toString)
+  (o1 |+| o2) === Order.legacy(BigDecimal(723.570661), 264628) |> assertOrElse((o1 |+| o2).toString)
 
   val map1 = Map("a" -> 1, "b" -> 2)
   val map2 = Map("b" -> 3, "d" -> 4)
@@ -75,8 +68,8 @@ object TypeclassStuff {
   val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
   val mmm  = m1 |+| m1_a |+| m2
   mmm === Map(
-    4958 -> Order(-1, -1, 123456, 666.880033, None),
-    1337 -> Order(-2, -2, 264628, 723.570661, None)
+    4958 -> Order.legacy(666.880033, 123456),
+    1337 -> Order.legacy(723.570661, 264628)
   ) |> assertOrElse(mmm.toString)
 
   import Kats.maru
