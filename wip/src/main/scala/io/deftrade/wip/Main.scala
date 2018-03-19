@@ -17,9 +17,7 @@
 package io.deftrade
 package wip
 
-import cats.instances.int._
-
-import cats.syntax.all._
+import cats._, implicits._
 
 /**
   * Do: all the things.
@@ -35,6 +33,7 @@ object Main extends App {
 
   val izSaem = (xs zip oxs) forall {
     case (r, Some(l)) => r === l
+    case _            => ???
   }
 
   izSaem |> assert
@@ -42,7 +41,6 @@ object Main extends App {
   /*
    * [cracks knuckles] OK now do all the (FP) things.
    */
-  TypeclassStuff        |> discardValue
   TreeStuff             |> discardValue
   StateMonadStuff       |> discardValue
   MonadTransformerStuff |> discardValue

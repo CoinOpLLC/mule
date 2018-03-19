@@ -43,31 +43,31 @@ trait Api {
   implicit def AssetIdHasEq: Eq[AssetId]
 
   type Quantity
-  def QuantityIsFinancial: Financial[Quantity]
-
-  final type Position = AssetId => Quantity
-
-  final type Positions = Map[AssetId, Quantity]
+  implicit def QuantityIsFinancial: Financial[Quantity]
 
   type MonetaryAmount
   implicit def MonetaryAmountIsFinancial: Financial[MonetaryAmount]
 
-  // this smells like a repository
+  final type Position = (AssetId, Quantity)
+
+  // FIXME: this smells like a repository
   def price[C: Monetary](id: AssetId): Money[MonetaryAmount, C] = ???
 
-  def price[C: Monetary](position: Position): AssetId => Money[MonetaryAmount, C] =
-    asset => {
-      // FIXME this is the true expression of what I was thinking. Not sure it's what we want.
+  def price[C: Monetary](position: Position): Money[MonetaryAmount, C] = position match {
+    case (asset, quantity) =>
       val q = MonetaryAmountIsFinancial fromBigDecimal (
-        QuantityIsFinancial toBigDecimal position(asset)
+        QuantityIsFinancial toBigDecimal quantity
       )
       val p = price[C](asset)
       p * q
-    }
+  }
 
-  final type Folio   = Map[AssetId, Position]
+  // n.b the algebraic relationship between Position and Folio
+  final type Folio = Map[AssetId, Quantity]
+  final implicit def folioMonoid = Monoid[Folio]
+
   final type Account = Map[AccountId, Folio]
-  implicit def accountMonoid: Monoid[Account]
+  final implicit def accountMonoid = Monoid[Account]
 
   type AccountRole
   final type Client = Map[ClientId, Map[AccountRole, AccountId]]
@@ -75,11 +75,10 @@ trait Api {
 
 object Api extends Api {
 
-  type ClientId = Long Refined Interval.Closed[W.`100000`, W.`100099`]
-
+  type ClientId = Long Refined Interval.Closed[W.`100000100000`, W.`100000999999`]
   implicit def ClientIdHasEq = Eq.fromUniversalEquals[ClientId]
-  final case class AccountId(val id: Long) extends AnyVal
 
+  final case class AccountId(val id: Long) extends AnyVal
   object AccountId {
     def reserved = AccountId(-1L)
   }
@@ -89,7 +88,6 @@ object Api extends Api {
   object AssetId {
     def reserved = AssetId(-1L)
   }
-
   implicit def AssetIdHasEq = Eq.fromUniversalEquals[AssetId]
 
   type Quantity = Double
@@ -102,16 +100,15 @@ object Api extends Api {
 
   type AccountRole = String // or an enum!
 
-  override implicit lazy val accountMonoid = Monoid[Account]
-
-  // reader, writer, state,
+  // reader, writer, state monad transformer
 
   final case class OrderId(val id: Long) extends AnyVal
 
-  type Order          = OrderId => Map[AccountId, Positions]
-  type QuotedOrder[C] = (Order, Money[MonetaryAmount, C])
+  type Order          = (OrderId, Map[AccountId, Folio])
+  type Orders         = Map[OrderId, Map[AccountId, Folio]]
+  type QuotedOrder[C] = (Orders, Money[MonetaryAmount, C])
   implicit def qoMonoid[C: Monetary] = Monoid[QuotedOrder[C]]
-  implicit def qoEq[C: Monetary]     = Eq.fromUniversalEquals[QuotedOrder[C]]
+  // implicit def qoEq[C: Monetary]     = Eq.fromUniversalEquals[QuotedOrder[C]]
 
   object Order {
 

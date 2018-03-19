@@ -141,4 +141,76 @@ class TimeSpec extends FlatSpec with Matchers {
 
   }
 
+  "domain Order stuff" should "work" in {
+    // import cats.{ Eq, Monoid }
+    import cats.instances.all._
+    import cats.syntax.monoid._
+    import model.Api._
+
+    val o1 = Order.legacy(555.550001, 78345)
+    val o2 = Order.legacy(168.020660, 186283)
+
+    val o12 = o1 |+| o2
+
+    assert(o12 === Order.legacy(BigDecimal(723.570661), 264628))
+
+    val m1   = Map(1337 -> o1)
+    val m1_a = Map(1337 -> o2)
+    val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
+    val mmm  = m1 |+| m1_a |+| m2
+    assert(
+      mmm === Map(
+        4958 -> Order.legacy(666.880033, 123456),
+        1337 -> Order.legacy(723.570661, 264628)
+      )
+    )
+
+  }
+
+  "typeclass examples" should "work" in {
+    import cats.{ Monoid }
+    import cats.instances.all._
+    import cats.syntax.{ monoid, option }, option._, monoid._
+
+    import Kats._
+
+    import Printable._
+
+    import scala.Predef.{ assert => affirm }
+
+    /*
+     * Exercises 1.2.5:  Cat Show
+     */
+    //
+    // another lame comment
+
+    123 === 123 |> affirm
+
+    assert(1.some !== None)
+
+    val map1 = Map("a" -> 1, "b" -> 2)
+    val map2 = Map("b" -> 3, "d" -> 4)
+    val mm   = map1 |+| map2
+    mm === Map("a" -> 1, "b" -> (2 + 3), "d" -> 4) |> affirm
+    Monoid[String].combine("foo", "bar") === "foobar" |> affirm
+
+    // def sum[A: Monoid](xs: List[A]): A = xs.foldLeft(Monoid[A].empty)(_ |+| _)
+    //
+    // implicit val kittehShow = Show show [Kitteh] (_.format)
+    // implicit val kittehEq   = Eq.fromUniversalEquals[Kitteh]
+    // Note you get tuples for free.
+    assert((maru === ara, maru !== ara) === ((false, true)))
+
+    import Printable.format
+
+    // Printable print "hello"
+    format("hello") === "\"hello\""                                      |> affirm
+    format(true) === "yes"                                               |> affirm
+    format(Box(maru)) === "\"Box(Kitteh(Maru,9,Scottish Fold,Kibble))\"" |> affirm
+
+    import Codec.{ decode, encode }
+    encode(Box(123)) === "123"                |> affirm
+    decode[Box[Int]]("618") === Box(618).some |> affirm
+  }
+
 }
