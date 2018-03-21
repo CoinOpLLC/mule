@@ -54,12 +54,7 @@ trait Api {
   def price[C: Monetary](id: AssetId): Money[MonetaryAmount, C] = ???
 
   def price[C: Monetary](position: Position): Money[MonetaryAmount, C] = position match {
-    case (asset, quantity) =>
-      val q = MonetaryAmountIsFinancial fromBigDecimal (
-        QuantityIsFinancial toBigDecimal quantity
-      )
-      val p = price[C](asset)
-      p * q
+    case (asset, quantity) => price[C](asset) * quantity
   }
 
   // n.b the algebraic relationship between Position and Folio
@@ -104,9 +99,14 @@ object Api extends Api {
 
   final case class OrderId(val id: Long) extends AnyVal
 
-  type Order          = (OrderId, Map[AccountId, Folio])
+  type Order          = (OrderId, AccountId, Folio)
   type Orders         = Map[OrderId, Map[AccountId, Folio]]
   type QuotedOrder[C] = (Orders, Money[MonetaryAmount, C])
+
+  def combine(o: Order, account: Account): Account = o match {
+    case (_, accountId, folio) => account |+| Map(accountId -> folio)
+  }
+
   implicit def qoMonoid[C: Monetary] = Monoid[QuotedOrder[C]]
   // implicit def qoEq[C: Monetary]     = Eq.fromUniversalEquals[QuotedOrder[C]]
 

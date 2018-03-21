@@ -32,6 +32,18 @@ import cats.Show
 
 import BigDecimal.RoundingMode._
 
+// from https://www.markettraders.com/blog/easily-calculate-cross-currency-rates/
+// https://en.wikipedia.org/wiki/ISO_4217
+// https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies
+// Euro-EUR
+// British Pound GBP
+// Australian Dollar-AUD
+// New Zealand Dollar-NZD
+// US Dollar-USD
+// Canadian Dollar-CAD
+// Canadian Dollar-CHF
+// Japanese Yen-JPY
+
 /**
 
    requirements for currency / money:
@@ -53,26 +65,6 @@ import BigDecimal.RoundingMode._
    (e.g. banks, and long/short credit hedge funds, which aren't much different)
 
    todo: treatment of what's expected to be imported implicitly
-
-  */
-/**
-
-financially useful big decimal scaling utilities
-notes from reviewing objectlabkit
-
-val DefaultInverseScale = 20
-val OneScaled = ONE setScale DefaultInverseScale
-
-  * set to `scale`, using `rounding`
-  * `divide` and `inverse` using `scale` and `rounding`
-
-  * `calculateWeight` -> ?! magic scale of 9? wtf
-
-  * `roundToScaleX andThen roundToScaleY` 🤔 (why HALF_UP baked in?)
-  *
-
-  general strategy on division: set scale to 20, then set it back to what makes sense for result
-  on conversion: we take the scale and rounding of the result currency
 
   */
 /**
@@ -267,15 +259,9 @@ object PhantomTypePerCurrency {
                                     C2: Monetary[C2],
                                     Q: C1 QuotedIn C2) {
       import Q._
-
-      def apply[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
-        C2(((ma.amount |> N.toBigDecimal) * mid) |> N.fromBigDecimal)
-
-      def buy[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
-        C2(((ma.amount |> N.toBigDecimal) * ask) |> N.fromBigDecimal)
-
-      def sell[N](ma: Money[N, C1])(implicit N: Financial[N]): Money[N, C2] =
-        C2(((ma.amount |> N.toBigDecimal) * bid) |> N.fromBigDecimal)
+      @inline def buy[N: Financial](m1: Money[N, C1]): Money[N, C2]   = convert(m1, ask)
+      @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2]  = convert(m1, bid)
+      @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
 
       def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) =
         (buy(C1(N.one)), sell(C1(N.one)))
@@ -283,6 +269,11 @@ object PhantomTypePerCurrency {
       def description: String = s"""
           |Quoter buys  ${C1} and sells ${C2} at ${bid}
           |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
+
+      private def convert[N: Financial](m1: Money[N, C1], rate: BigDecimal): Money[N, C2] = {
+        val N = Financial[N]
+        C2(m1.amount |> N.toBigDecimal |> (_ * rate) |> N.fromBigDecimal)
+      }
     }
 
     final case class SimpleQuote[C1, C2: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[C1, C2] {
@@ -292,9 +283,9 @@ object PhantomTypePerCurrency {
     sealed trait Monetary[C] extends MonetaryLike { self =>
 
       // grant of exclusive license to create `Money[N, C]` instances
-      // is hearby made `Monetary[C]` (this is all regrettably clever)
+      // is hearby made to `Monetary[C]` (this is all regrettably clever)
       private[this] implicit def C: Monetary[C] = self
-      def apply[N: Financial](n: N)             = Money apply [N, C] n
+      def apply[N: Financial](n: N)             = Money[N, C](n)
 
       /**
         * implicit context to provide pricing
@@ -366,17 +357,6 @@ object ClassPerCurrency {
         Monetary[C] apply (N times (scale, rhs.amount))
     }
 
-// from https://www.markettraders.com/blog/easily-calculate-cross-currency-rates/
-// https://en.wikipedia.org/wiki/ISO_4217
-// https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies
-// Euro-EUR
-// British Pound GBP
-// Australian Dollar-AUD
-// New Zealand Dollar-NZD
-// US Dollar-USD
-// Canadian Dollar-CAD
-// Canadian Dollar-CHF
-// Japanese Yen-JPY
     trait Rate[Cn[?] <: Currency[?], Cd[?] <: Currency[?]]
 
     sealed trait Monetary[C[?] <: Currency[?]] extends MonetaryLike { self =>

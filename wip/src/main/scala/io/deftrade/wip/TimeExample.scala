@@ -19,7 +19,7 @@ package wip
 
 import java.{ time => jt }, jt.{ temporal => jtt }
 import jt.{ DayOfWeek, Month }, Month.{ JANUARY => January } // if you must
-import jtt.{ ChronoUnit, Temporal, TemporalAdjusters }, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
+import jtt.{ Temporal, TemporalAdjusters }
 
 import io.deftrade.time._
 
@@ -113,42 +113,12 @@ object TimeExample {
 
 }
 
-// issue: can I just go ahead and make these ValueEnum[Duration]
-sealed abstract class Tenor(val code: String) extends EnumEntry
-object Tenor extends Enum[Tenor] {
-
-  case object Spot         extends Tenor("SP") // zero days later
-  case object SpotNext     extends Tenor("SN") // one dat later
-  case object Overnight    extends Tenor("ON") // one day later
-  case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
-  case object Mañana       extends Tenor("MÑ") // nonstandard
-  // issue: might need a **pair** of dates as state for the algebra... but do we?
-  // TomorrowNext increments both cursors, in effect... why, exactly?!
-  // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
-
-  lazy val values = findValues
-
-}
-// TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
-
-final case class WorkDay(val n: Int) extends AnyVal
-
-// TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
-
-sealed trait SpotLag extends EnumEntry // T_0, T_1, T_2
-
-sealed trait DayCountConvention extends EnumEntry //
-//ACT_[360|365|ACT]
-// CONV_30_360, CONV_360E_[ISDA|IMSA]
-// others?
-// idea: build the calc func into this trait?
-
-sealed trait ImmPeriod extends EnumEntry {
-  def indexes: SortedSet[Int] // BitSet // [0], [0,2], [2,3], [0,1,2,3]
-}
-
-object ImmPeriod {
-  def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
+object WorkTimeConf {
+  val daysOff = Seq(
+    (12, 25),
+    (1, 1),
+    (7, 4)
+  ) map { case (m, d) => (2018, m, d) }
 }
 
 object WorkTime {
@@ -162,8 +132,9 @@ object WorkTime {
   implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
   implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
-  val today     = localDate
-  val yesterday = today - 1.day
+  def yesterday = today - 1.day
+  def today     = localDate
+  def tomorrow  = today + 1.day
 
   // stick with ISO and be rigorous about others
   // TODO: make use of locale?
@@ -176,16 +147,6 @@ object WorkTime {
   final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
     def workDay(ld: LocalDate): Boolean =
       (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
-  }
-
-  object WorkTimeConf {
-
-    val daysOff = Seq(
-      (12, 25),
-      (1, 1),
-      (7, 4)
-    ) map { case (m, d) => (2017, m, d) }
-
   }
 
   object WorkYear {
@@ -210,6 +171,7 @@ object WorkTime {
   // `TemporalQuery` is the way to do the "is this a working day or not" thing.
   // Just build an immutable list of `WorkWeek`s out as far as you can.
 
+  // FIXME: this really belongs in core
   implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
 
   type TqReader[R] = Reader[LocalDate, Option[R]]
@@ -272,6 +234,72 @@ object WorkTime {
   // this should enrich LocalDate...
   def plusWorkDays(day: LocalDate, offset: Int): LocalDate = ???
 }
+
+// issue: can I just go ahead and make these ValueEnum[Duration]
+sealed abstract class Tenor(val code: String) extends EnumEntry
+object Tenor extends Enum[Tenor] {
+
+  case object Spot         extends Tenor("SP") // zero days later
+  case object SpotNext     extends Tenor("SN") // one dat later
+  case object Overnight    extends Tenor("ON") // one day later
+  case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
+  // issue: might need a **pair** of dates as state for the algebra... but do we?
+  // TomorrowNext increments both cursors, in effect... why, exactly?!
+  // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
+
+  lazy val values = findValues
+
+}
+// TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
+// TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
+
+// from Objectkitlab - homolog in opengamma?
+sealed trait SpotLag extends EnumEntry
+object SpotLag extends Enum[SpotLag] {
+  def values = findValues
+  case object T_0 extends SpotLag
+  case object T_1 extends SpotLag
+  case object T_2 extends SpotLag
+}
+
+import WorkTime.WorkYear
+sealed trait DayCount extends EnumEntry {
+  def apply(start: LocalDate, end: LocalDate): Int
+  def yearFraction(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double
+}
+//ACT_[360|365|ACT]
+// CONV_30_360, CONV_360E_[ISDA|IMSA]
+object DayCount extends Enum[DayCount] {
+
+  lazy val values = findValues
+
+  case object ACT_ACT_ISDA extends DayCount {
+    def apply(start: LocalDate, end: LocalDate): Int = ???
+    def yearFraction(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double =
+      if (end.year === start.year) {
+        (end.dayOfYear - start.dayOfYear) / start.year.toDouble
+      } else {
+        val startYearFraction =
+          (start.lengthOfYear - start.dayOfYear + 1) / start.lengthOfYear
+        val endYearFraction = (end.dayOfYear - 1) / end.lengthOfYear
+        val wholeYears      = (end.year - start.year - 1).toDouble
+        startYearFraction + wholeYears + endYearFraction
+      }
+  }
+  case object CONV_30_360 extends DayCount {
+    def apply(start: LocalDate, end: LocalDate): Int                                  = ???
+    def yearFraction(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double = ???
+  }
+}
+
+sealed trait ImmPeriod extends EnumEntry {
+  def indexes: SortedSet[Int] // BitSet // [0], [0,2], [1,3], [0,1,2,3]
+}
+
+object ImmPeriod {
+  def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
+}
+
 // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
 // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
 
@@ -294,22 +322,6 @@ object WorkTime {
 
 // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
 // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
-//   private val jc = java.util.Currency getInstance denomination.entryName
-//
-//   def code: String        = jc.getCurrencyCode
-//   def numericCode: Int    = jc.getNumericCode
-//   def fractionDigits: Int = jc.getDefaultFractionDigits
-//   def displayName: String = jc.getDisplayName
-//   def symbol: String      = jc.getSymbol
-object Money4S {
-
-  import squants.{ market => sm }
-  import squants.{ Dozen, Each }
-  import squants.market.USD
-
-  implicit val moneyContext = sm.defaultMoneyContext
-
-}
 
 object FansiCrap {
   import fansi.Color.{ LightMagenta }
