@@ -1,5 +1,5 @@
 package io.deftrade
-package wip
+package money
 
 import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
 

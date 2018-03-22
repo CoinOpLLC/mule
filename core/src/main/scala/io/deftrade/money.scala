@@ -15,7 +15,7 @@
  */
 
 package io.deftrade
-package wip
+package money
 
 import enumeratum._
 // import enumeratum.values._
@@ -139,7 +139,7 @@ object Financial {
 }
 
 /** Hobbson's polymorphism ftm lol */
-private[wip] sealed trait MonetaryLike extends EnumEntry { monetary =>
+private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
   // type CurrencyType <: Currency
   // def apply[N: Financial](n: N): Money[N, CurrencyType]

@@ -30,7 +30,7 @@ import refined.W
 import refined.numeric._
 // import refined.auto._
 
-import io.deftrade.wip.{ Financial, PhantomTypePerCurrency }, PhantomTypePerCurrency.Monetary, Monetary._
+import io.deftrade.money.{ Financial, PhantomTypePerCurrency }, PhantomTypePerCurrency.Monetary, Monetary._
 trait Api {
 
   type ClientId

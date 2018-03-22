@@ -136,7 +136,7 @@ class TimeSpec extends FlatSpec with Matchers {
     assert(1.year + 1.day === period(years = 1, days = 1, months = 0))
     assert(t2fd === scd.Duration(t2fd.toString))
 
-    import io.deftrade.wip.WorkTime._
+    import io.deftrade.time.work._
     assert(yesterday < today)
 
   }

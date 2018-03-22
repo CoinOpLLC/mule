@@ -15,10 +15,9 @@
  */
 
 import scala.language.implicitConversions
-import scala.util.Try
 
 package io {
-  package object deftrade extends MyWay /*with MyTime */ {
+  package object deftrade extends Api /*with MyTime */ {
 
     /**
       * Civilized function invocation.
@@ -45,37 +44,11 @@ package io {
       def noSpaces: String = s filterNot (" \n\r\t" contains _)
     }
 
-    /**
-      * This is who we are, it's what we do.
-      */
-    trait MyWay {
-
-      /**
-        * Suppresses warnings from wart remover for cases were the value is intentionally discarded.
-        */
-      val discardValue: Any => Unit = (_: Any) => ()
-
-      /**
-        * See [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/), and also [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).
-        */
-      type Seq[+A] = scala.collection.immutable.Seq[A]
-      val Seq = scala.collection.immutable.Seq
-
-      def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
-    }
-
-    trait LowPrioImplicits {
-      implicit def integral2int[N: Integral](n: N) = implicitly[Integral[N]] toInt n
-    }
-
-    object time extends LowPrioImplicits { me =>
+    object time { self =>
 
       import java.time._, chrono.{ Chronology, IsoChronology }, format.DateTimeFormatter
       import java.time.{ temporal => jtt }
       import jtt._, ChronoUnit._
-
-      // FIXME: how the hell is a lib client supposed to buy into this bs
-      implicit def integral2long[N: Integral](n: N) = implicitly[Integral[N]] toLong n
 
       // Clock
 
@@ -96,14 +69,14 @@ package io {
 
       type Duration = java.time.Duration
 
-      def duration[N: Integral](unit: ChronoUnit)(n: N) = Duration of (n, unit)
-      def duration(seconds: Long, nanos: Int)           = Duration ofSeconds seconds withNanos nanos
+      def duration(unit: ChronoUnit)(n: Long) = Duration of (n, unit)
+      def duration(seconds: Long, nanos: Int) = Duration ofSeconds seconds withNanos nanos
 
-      def hours[N: Integral](n: N)   = duration(HOURS)(n)
-      def minutes[N: Integral](n: N) = duration(MINUTES)(n)
-      def seconds[N: Integral](n: N) = duration(SECONDS)(n)
-      def millis[N: Integral](n: N)  = duration(MILLIS)(n)
-      def nanos[N: Integral](n: N)   = duration(NANOS)(n)
+      def hours(n: Long)   = duration(HOURS)(n)
+      def minutes(n: Long) = duration(MINUTES)(n)
+      def seconds(n: Long) = duration(SECONDS)(n)
+      def millis(n: Long)  = duration(MILLIS)(n)
+      def nanos(n: Long)   = duration(NANOS)(n)
 
       // Period
 
@@ -111,10 +84,10 @@ package io {
 
       def period(years: Int, months: Int, days: Int) = Period of (years, months, days)
 
-      def years[N: Integral](y: N)  = period(y, 0, 0)
-      def months[N: Integral](m: N) = period(0, m, 0)
-      def days[N: Integral](d: N)   = period(0, 0, d)
-      def weeks[N: Integral](w: N)  = days((w: Int) * 7)
+      def years(y: Int)  = period(y, 0, 0)
+      def months(m: Int) = period(0, m, 0)
+      def days(d: Int)   = period(0, 0, d)
+      def weeks(w: Int)  = days((w: Int) * 7)
 
       object DurationOf {
         def unapply(d: Duration) = Option((d.getSeconds, d.getNano))
@@ -194,33 +167,32 @@ package io {
         private def lift[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
       }
 
-      // TODO: low level DSL not worth it. Only higher level or domain specific.
-
-      // implicit def jt8Integral[N: Integral](n: N) = Jt8Integral(n)
-
       implicit class J8TimeLong(val n: Long) extends AnyVal {
 
-        def hour: Duration    = me.hours(n)
-        def hours: Duration   = me.hours(n)
-        def minute: Duration  = me.minutes(n)
-        def minutes: Duration = me.minutes(n)
-        def second: Duration  = me.seconds(n)
-        def seconds: Duration = me.seconds(n)
-        def milli: Duration   = me.millis(n)
-        def millis: Duration  = me.millis(n)
-        def nano: Duration    = me.nanos(n)
-        def nanos: Duration   = me.nanos(n)
+        def hour: Duration    = self.hours(n)
+        def hours: Duration   = self.hours(n)
+        def minute: Duration  = self.minutes(n)
+        def minutes: Duration = self.minutes(n)
+        def second: Duration  = self.seconds(n)
+        def seconds: Duration = self.seconds(n)
+        def milli: Duration   = self.millis(n)
+        def millis: Duration  = self.millis(n)
+        def nano: Duration    = self.nanos(n)
+        def nanos: Duration   = self.nanos(n)
 
-        def day: Period    = me.days(n)
-        def days: Period   = me.days(n)
-        def week: Period   = me.weeks(n)
-        def weeks: Period  = me.weeks(n)
-        def month: Period  = me.months(n)
-        def months: Period = me.months(n)
-        def year: Period   = me.years(n)
-        def years: Period  = me.years(n)
       }
 
+      implicit class J8TimeInt(val n: Int) extends AnyVal {
+
+        def day: Period    = self.days(n)
+        def days: Period   = self.days(n)
+        def week: Period   = self.weeks(n)
+        def weeks: Period  = self.weeks(n)
+        def month: Period  = self.months(n)
+        def months: Period = self.months(n)
+        def year: Period   = self.years(n)
+        def years: Period  = self.years(n)
+      }
       // LocalDateTime
 
       type LocalDateTime = java.time.LocalDateTime
@@ -513,46 +485,230 @@ package io {
       type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
       type ZoneRulesException               = java.time.zone.ZoneRulesException
 
-    }
-    object camelTo {
+      object money {
 
-      val uppers    = 'A' to 'Z'
-      val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
+        import io.deftrade.time.work.WorkYear
 
-      def apply(sep: String)(name: String): String = {
-        val osc = maybeSepFrom(sep)
-        (name |> splitCaps(osc) |> bustHumps(osc)).mkString
-      }
-      def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
-        name
-          .foldLeft(Seq.empty[Char]) { (b, a) =>
-            (a, b) match { // yeah just flip your head around, it's easier, trust me
-              case (c, h +: g +: t)
-                  if (uppers contains g) &&
-                    (uppers contains h) &&
-                    (nonUppers contains c) => // sep between g and h
-                sep.fold(c +: h +: g +: t)(c +: h +: _ +: g +: t)
-              case _ => a +: b
-            }
+        import scala.collection.immutable.SortedSet
+        import scala.concurrent.{ duration => scd }
+
+        import cats.Order
+        import cats.data.Reader
+        import cats.implicits._
+
+        import enumeratum._ //, values._
+
+        // issue: can I just go ahead and make these ValueEnum[Duration]
+        sealed abstract class Tenor(val code: String) extends EnumEntry
+        object Tenor extends Enum[Tenor] {
+
+          case object Spot         extends Tenor("SP") // zero days later
+          case object SpotNext     extends Tenor("SN") // one dat later
+          case object Overnight    extends Tenor("ON") // one day later
+          case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
+          // issue: might need a **pair** of dates as state for the algebra... but do we?
+          // TomorrowNext increments both cursors, in effect... why, exactly?!
+          // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
+
+          lazy val values = findValues
+
+        }
+        // TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
+        // TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
+
+        // from Objectkitlab - homolog in opengamma?
+        sealed trait SpotLag extends EnumEntry
+        object SpotLag extends Enum[SpotLag] {
+          def values = findValues
+          case object T_0 extends SpotLag
+          case object T_1 extends SpotLag
+          case object T_2 extends SpotLag
+        }
+
+        sealed trait DayCount extends EnumEntry {
+          def days(start: LocalDate, end: LocalDate): Int
+          def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double
+        }
+        //ACT_[360|365|ACT]
+        // CONV_30_360, CONV_360E_[ISDA|IMSA]
+        object DayCount extends Enum[DayCount] {
+
+          lazy val values = findValues
+
+          case object ACT_ACT_ISDA extends DayCount {
+            def days(start: LocalDate, end: LocalDate): Int = ???
+            def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double =
+              if (end.year === start.year) {
+                (end.dayOfYear - start.dayOfYear) / start.year.toDouble
+              } else {
+                val startYearFraction =
+                  (start.lengthOfYear - start.dayOfYear + 1) / start.lengthOfYear
+                val wholeYears      = (end.year - start.year - 1).toDouble
+                val endYearFraction = (end.dayOfYear - 1) / end.lengthOfYear
+                startYearFraction + wholeYears + endYearFraction
+              }
           }
-          .reverse
-
-      def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
-        name.foldRight(Seq.empty[Char]) { (a, b) =>
-          (a, b) match {
-            case (c, h +: _) if (nonUppers contains c) && (uppers contains h) =>
-              sep.fold(a +: b)(a +: _ +: b)
-            case _ =>
-              a +: b
+          case object CONV_30_360 extends DayCount {
+            def days(start: LocalDate, end: LocalDate): Int                            = ???
+            def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double = ???
           }
         }
 
-      def maybeSepFrom(s: String): Option[Char] = s match {
-        case "_" => Some('_')
-        case "-" => Some('-')
-        case _   => None
-      }
+        sealed trait ImmPeriod extends EnumEntry {
+          def indexes: SortedSet[Int] // BitSet // [0], [0,2], [1,3], [0,1,2,3]
+        }
 
+        object ImmPeriod {
+          def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
+        }
+
+        // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
+        // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
+
+        // issue to get correct by construction: dealing with `DayOfWeek` int values across `Locale`s
+
+        // 2 `WeekField`s of note: ISO and SundayStart (used in Asia)
+        // otherwise use `Locale`
+
+        // scala>   val dow = ISO.dayOfWeek
+        // dow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[MONDAY,4]]
+        //
+        // scala>   val sow = jtt.WeekFields.SUNDAY_START.dayOfWeek
+        // sow: java.time.temporal.TemporalField = DayOfWeek[WeekFields[SUNDAY,1]]
+        //
+        // scala> today get dow
+        // res108: Int = 6
+        //
+        // scala> today get sow
+        // res109: Int = 7
+
+        // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
+        // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
+      }
+      object work {
+
+        import cats._, implicits._, data._
+        import enumeratum._
+        import scala.collection.SortedSet
+        import jtt.WeekFields
+
+        object WorkTimeConf {
+          val daysOff = Seq(
+            (12, 25),
+            (1, 1),
+            (7, 4)
+          ) map { case (m, d) => (2018, m, d) }
+        }
+
+        val iso: WeekFields        = WeekFields.ISO
+        val dow: jtt.TemporalField = iso.dayOfWeek
+
+        // n.b.: all `jtt.Temporal`s are also `Comparable`
+        implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
+        implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
+
+        def yesterday = today - 1.day
+        def today     = localDate
+        def tomorrow  = today + 1.day
+
+        // stick with ISO and be rigorous about others
+        // TODO: make use of locale?
+        type WorkWeek = SortedSet[DayOfWeek]
+        type Holidays = SortedSet[LocalDate]
+
+        /**
+          * do some configure-with-code here...
+          */
+        final case class WorkYear(workWeek: WorkWeek, holidays: Holidays) {
+          def workDay(ld: LocalDate): Boolean =
+            (workWeek contains ld.dayOfWeek) && !(holidays contains ld)
+        }
+
+        object WorkYear {
+
+          import WorkTimeConf._
+
+          lazy val workWeek: WorkWeek =
+            SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
+
+          private def mkLD: (Int, Int, Int) => LocalDate = localDate(_, _, _)
+
+          lazy val holidays: Holidays = SortedSet.empty[LocalDate] ++ (daysOff map mkLD.tupled)
+
+          implicit lazy val workYear: WorkYear = WorkYear(workWeek, holidays)
+
+        }
+
+        // need to define an ordering on DayOfWeek. Which would be great.
+        // TODO: when does the week roll around?
+        // TODO: what about that succ stuff from scalaz?
+
+        // `TemporalQuery` is the way to do the "is this a working day or not" thing.
+        // Just build an immutable list of `WorkWeek`s out as far as you can.
+
+        // FIXME: this really belongs in core
+        implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
+
+        type TqReader[R] = Reader[LocalDate, Option[R]]
+        type TaReader[R] = Reader[LocalDate, R]
+
+        def workDay(ld: LocalDate)(implicit wy: WorkYear): Boolean = wy workDay ld
+
+        sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
+
+          final def temporalAdjuster: jtt.TemporalAdjuster = TemporalAdjuster(adjuster)
+          final def adjuster: LocalDate => LocalDate       = adjust(delta, sameMonth)
+
+          private def adjust(d: Period, sameMonth: Boolean): LocalDate => LocalDate = { ld: LocalDate =>
+            val dd = ld + d
+            ld match {
+              case ld if workDay(dd) && sameMonth =>
+                if (dd.getMonth === ld.getMonth) dd else ld |> adjust(delta.negated, false)
+              case _ if workDay(dd) => dd
+              case ld =>
+                val succDay = if (d.isNegative) d - 1.day else d + 1.day
+                ld |> adjust(succDay, sameMonth)
+            }
+          }
+        }
+
+        object SeekWorkDay extends Enum[SeekWorkDay] {
+
+          case object Next          extends SeekWorkDay(delta = 1.day, sameMonth = false)
+          case object NextSameMonth extends SeekWorkDay(delta = 1.day, sameMonth = true)
+          case object Prev          extends SeekWorkDay(delta = -1.day, sameMonth = false)
+          case object PrevSameMonth extends SeekWorkDay(delta = -1.day, sameMonth = true)
+
+          lazy val values = findValues
+        }
+        import SeekWorkDay._
+
+        @annotation.tailrec
+        def moveByWorkDays(nwds: Int)(ld: LocalDate): LocalDate = nwds match {
+          case n if n == 0 => ld |> Next.adjuster
+          case n =>
+            val (adjuster, delta) = if (n < 0) (Prev.adjuster, -1.day) else (Next.adjuster, 1.day)
+            val movedByOne        = ld + delta |> adjuster
+            n match {
+              case 1 => movedByOne
+              case n => moveByWorkDays(n - 1)(movedByOne)
+            }
+        }
+
+        val adjustWorkDay: LocalDate => LocalDate = moveByWorkDays(0)
+        val prevWorkDay: LocalDate => LocalDate   = moveByWorkDays(-1)
+
+        // there is quite a bit to critique here - not very efficient.
+        val sameMonthAdjustWorkDay: LocalDate => LocalDate =
+          (for {
+            twd <- Reader(identity: LocalDate => LocalDate)
+            nwd <- Reader(adjustWorkDay)
+            pwd <- Reader(prevWorkDay)
+          } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
+
+        // this should enrich LocalDate...
+        def plusWorkDays(day: LocalDate, offset: Int): LocalDate = ???
+      }
     }
   }
 }
