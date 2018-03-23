@@ -517,17 +517,25 @@ package io {
         // TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
         // TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
 
+        // maybe we should have `exactly` one ChronoUnit per Frequency
+
         sealed abstract class Tenor(p: String) extends EnumEntry {
+
           import Tenor._
+
           final val period = Period parse 'P' +: p // parse exception is effectily compile-time
+
           final lazy val field: Map[ChronoUnit, Int] = {
             val values = (rx findFirstMatchIn p).fold(??? /* sic */ )(identity).subgroups map {
               case s if s != null => s.toInt
               case _              => 0
             }
-            (ymwd zip values).toMap
+            ((ymwd zip values) filter (_ match { case (_, v) => v =!= 0 })).toMap
           }
+
+          override def toString: String = 'T' +: p
         }
+
         object Tenor {
 
           import jtt.ChronoUnit._
@@ -536,27 +544,29 @@ package io {
           private val rx =
             s"\\A${(ymwd map (x => s"(?:(\\d+)${x.toString.head})?")).mkString}\\z".r
 
-          case object T_SPOT      extends Tenor("0D")
-          case object T_OVERNIGHT extends Tenor("1D")
-          case object T1D         extends Tenor("1D")
-          case object T2D         extends Tenor("2D")
-          case object T1W         extends Tenor("1W")
-          case object T1M         extends Tenor("1M")
-          case object T2M         extends Tenor("2M")
-          case object T3M         extends Tenor("3M")
-          case object T6M         extends Tenor("6M")
-          case object T9M         extends Tenor("9M")
-          case object T1Y         extends Tenor("1Y")
-          case object T2Y         extends Tenor("2Y")
-          case object T3Y         extends Tenor("3Y")
-          case object T4Y         extends Tenor("4Y")
-          case object T5Y         extends Tenor("5Y")
-          case object T7Y         extends Tenor("7Y")
-          case object T10Y        extends Tenor("10Y")
-          case object T20Y        extends Tenor("20Y")
-          case object T30Y        extends Tenor("30Y")
-          case object T50Y        extends Tenor("50Y")
+          case object T_SPOT            extends Tenor("0D")
+          case object T_OVERNIGHT       extends Tenor("1D")
+          case object T1D               extends Tenor("1D")
+          case object T2D               extends Tenor("2D")
+          case object T1W               extends Tenor("1W")
+          case object T1M               extends Tenor("1M")
+          case object T2M               extends Tenor("2M")
+          case object T3M               extends Tenor("3M")
+          case object T6M               extends Tenor("6M")
+          case object T9M               extends Tenor("9M")
+          case object T1Y               extends Tenor("1Y")
+          case object T2Y               extends Tenor("2Y")
+          case object T3Y               extends Tenor("3Y")
+          case object T4Y               extends Tenor("4Y")
+          case object T5Y               extends Tenor("5Y")
+          case object T7Y               extends Tenor("7Y")
+          case object T10Y              extends Tenor("10Y")
+          case object T20Y              extends Tenor("20Y")
+          case object T30Y              extends Tenor("30Y")
+          case object T50Y              extends Tenor("50Y")
+          case class TCustom(p: String) extends Tenor(p)
         }
+
         // from Objectkitlab - homolog in opengamma?
         sealed trait SpotLag extends EnumEntry
         object SpotLag extends Enum[SpotLag] {
