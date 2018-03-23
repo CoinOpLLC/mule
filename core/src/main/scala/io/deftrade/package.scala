@@ -496,11 +496,12 @@ package io {
         import cats.data.Reader
         import cats.implicits._
 
-        import enumeratum._ //, values._
+        import enumeratum._, values._
 
-        // issue: can I just go ahead and make these ValueEnum[Duration]
-        sealed abstract class Tenor(val code: String) extends EnumEntry
-        object Tenor extends Enum[Tenor] {
+        // issue: can I just go ahead and make these ValueEnum[Duration]? I don't see *why*.
+
+        sealed abstract class CashTenor(override val entryName: String) extends EnumEntry
+        object CashTenor extends Enum[CashTenor] {
 
           case object Spot         extends Tenor("SP") // zero days later
           case object SpotNext     extends Tenor("SN") // one dat later
@@ -516,6 +517,46 @@ package io {
         // TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
         // TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
 
+        sealed abstract class Tenor(p: String) extends EnumEntry {
+          import Tenor._
+          final val period = Period parse 'P' +: p // parse exception is effectily compile-time
+          final lazy val field: Map[ChronoUnit, Int] = {
+            val values = (rx findFirstMatchIn p).fold(??? /* sic */ )(identity).subgroups map {
+              case s if s != null => s.toInt
+              case _              => 0
+            }
+            (ymwd zip values).toMap
+          }
+        }
+        object Tenor {
+
+          import jtt.ChronoUnit._
+
+          private val ymwd = List(YEARS, MONTHS, WEEKS, DAYS)
+          private val rx =
+            s"\\A${(ymwd map (x => s"(?:(\\d+)${x.toString.head})?")).mkString}\\z".r
+
+          case object T_SPOT      extends Tenor("0D")
+          case object T_OVERNIGHT extends Tenor("1D")
+          case object T1D         extends Tenor("1D")
+          case object T2D         extends Tenor("2D")
+          case object T1W         extends Tenor("1W")
+          case object T1M         extends Tenor("1M")
+          case object T2M         extends Tenor("2M")
+          case object T3M         extends Tenor("3M")
+          case object T6M         extends Tenor("6M")
+          case object T9M         extends Tenor("9M")
+          case object T1Y         extends Tenor("1Y")
+          case object T2Y         extends Tenor("2Y")
+          case object T3Y         extends Tenor("3Y")
+          case object T4Y         extends Tenor("4Y")
+          case object T5Y         extends Tenor("5Y")
+          case object T7Y         extends Tenor("7Y")
+          case object T10Y        extends Tenor("10Y")
+          case object T20Y        extends Tenor("20Y")
+          case object T30Y        extends Tenor("30Y")
+          case object T50Y        extends Tenor("50Y")
+        }
         // from Objectkitlab - homolog in opengamma?
         sealed trait SpotLag extends EnumEntry
         object SpotLag extends Enum[SpotLag] {
