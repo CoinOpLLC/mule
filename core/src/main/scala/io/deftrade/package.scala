@@ -268,6 +268,9 @@ package io {
         def +(amount: Period): LocalDate = ld plus amount
         def -(amount: Period): LocalDate = ld minus amount
 
+        def +(wpp: money.ProxiedPeriod): LocalDate = ld plus wpp.period
+        def -(wpp: money.ProxiedPeriod): LocalDate = ld minus wpp.period
+
         def -(end: LocalDate): Period = ld until end
 
         override def compare(that: LocalDate): Int = ld compareTo that
@@ -514,7 +517,15 @@ package io {
           lazy val values = findValues
 
         }
-        // TODO: implicitly enrich LocalDate such that it comprehends the addition of a tenor.
+        // from Objectkitlab - homolog in opengamma?
+        sealed trait SpotLag extends EnumEntry
+        object SpotLag extends Enum[SpotLag] {
+          def values = findValues
+          case object T_0 extends SpotLag
+          case object T_1 extends SpotLag
+          case object T_2 extends SpotLag
+        }
+
         // TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
 
         // maybe we should have `exactly` one ChronoUnit per Frequency
@@ -577,30 +588,24 @@ package io {
 
         sealed abstract class Frequency(override val pspec: String) extends ProxiedPeriod
         object Frequency extends Enum[Frequency] {
-          case object F1D  extends Frequency("P1D")  //  364 / Y
-          case object F1W  extends Frequency("P1W")  //  52
-          case object F2W  extends Frequency("P2W")  //  26
-          case object F4W  extends Frequency("P4W")  //  13
-          case object F13W extends Frequency("P13W") //  4
-          case object F26W extends Frequency("P26W") //  2
-          case object F52W extends Frequency("P52W") //  1
-          case object F1M  extends Frequency("P1M")  //  12
-          case object F2M  extends Frequency("P2M")  //  6
-          case object F3M  extends Frequency("P3M")  //  4
-          case object F4M  extends Frequency("P4M")  //  3
-          case object F6M  extends Frequency("P6M")  //  2
-          case object F12M extends Frequency("P12M") //  1
+          private lazy val kalpa: String = (LocalDate.MAX - LocalDate.MIN).toString
+          case object F_TERM extends Frequency(kalpa)  //  0
+          case object F1D    extends Frequency("P1D")  //  364 / Y
+          case object F1W    extends Frequency("P1W")  //  52
+          case object F2W    extends Frequency("P2W")  //  26
+          case object F4W    extends Frequency("P4W")  //  13
+          case object F13W   extends Frequency("P13W") //  4
+          case object F26W   extends Frequency("P26W") //  2
+          case object F52W   extends Frequency("P52W") //  1
+          case object F1M    extends Frequency("P1M")  //  12
+          case object F2M    extends Frequency("P2M")  //  6
+          case object F3M    extends Frequency("P3M")  //  4
+          case object F4M    extends Frequency("P4M")  //  3
+          case object F6M    extends Frequency("P6M")  //  2
+          case object F12M   extends Frequency("P12M") //  1
 
           lazy val values = findValues
-        }
 
-        // from Objectkitlab - homolog in opengamma?
-        sealed trait SpotLag extends EnumEntry
-        object SpotLag extends Enum[SpotLag] {
-          def values = findValues
-          case object T_0 extends SpotLag
-          case object T_1 extends SpotLag
-          case object T_2 extends SpotLag
         }
 
         sealed trait DayCount extends EnumEntry {
