@@ -519,24 +519,24 @@ package io {
 
         // maybe we should have `exactly` one ChronoUnit per Frequency
 
-        sealed abstract class Tenor(p: String) extends EnumEntry {
+        trait ProxiedPeriod extends EnumEntry {
+          import ProxiedPeriod._
 
-          import Tenor._
+          def pspec: String
 
-          final val period = Period parse 'P' +: p // parse exception is effectily compile-time
+          final val period = Period parse pspec // parse exception is effectily compile-time
 
           final lazy val field: Map[ChronoUnit, Int] = {
-            val values = (rx findFirstMatchIn p).fold(??? /* sic */ )(identity).subgroups map {
+            val values = (rx findFirstMatchIn pspec).fold(??? /* sic */ )(identity).subgroups map {
               case s if s != null => s.toInt
               case _              => 0
             }
             ((ymwd zip values) filter (_ match { case (_, v) => v =!= 0 })).toMap
           }
 
-          override def toString: String = 'T' +: p
+          override def toString: String = 'T' +: (pspec drop 1)
         }
-
-        object Tenor {
+        object ProxiedPeriod {
 
           import jtt.ChronoUnit._
 
@@ -544,27 +544,54 @@ package io {
           private val rx =
             s"\\A${(ymwd map (x => s"(?:(\\d+)${x.toString.head})?")).mkString}\\z".r
 
-          case object T_SPOT            extends Tenor("0D")
-          case object T_OVERNIGHT       extends Tenor("1D")
-          case object T1D               extends Tenor("1D")
-          case object T2D               extends Tenor("2D")
-          case object T1W               extends Tenor("1W")
-          case object T1M               extends Tenor("1M")
-          case object T2M               extends Tenor("2M")
-          case object T3M               extends Tenor("3M")
-          case object T6M               extends Tenor("6M")
-          case object T9M               extends Tenor("9M")
-          case object T1Y               extends Tenor("1Y")
-          case object T2Y               extends Tenor("2Y")
-          case object T3Y               extends Tenor("3Y")
-          case object T4Y               extends Tenor("4Y")
-          case object T5Y               extends Tenor("5Y")
-          case object T7Y               extends Tenor("7Y")
-          case object T10Y              extends Tenor("10Y")
-          case object T20Y              extends Tenor("20Y")
-          case object T30Y              extends Tenor("30Y")
-          case object T50Y              extends Tenor("50Y")
-          case class TCustom(p: String) extends Tenor(p)
+        }
+
+        sealed abstract class Tenor(override val pspec: String) extends ProxiedPeriod
+
+        object Tenor extends Enum[Tenor] {
+          case object T_SPOT      extends Tenor("P0D")
+          case object T_OVERNIGHT extends Tenor("P1D")
+          case object T1D         extends Tenor("P1D")
+          case object T2D         extends Tenor("P2D")
+          case object T1W         extends Tenor("P1W")
+          case object T1M         extends Tenor("P1M")
+          case object T2M         extends Tenor("P2M")
+          case object T3M         extends Tenor("P3M")
+          case object T6M         extends Tenor("P6M")
+          case object T9M         extends Tenor("P9M")
+          case object T1Y         extends Tenor("P1Y")
+          case object T2Y         extends Tenor("P2Y")
+          case object T3Y         extends Tenor("P3Y")
+          case object T4Y         extends Tenor("P4Y")
+          case object T5Y         extends Tenor("P5Y")
+          case object T7Y         extends Tenor("P7Y")
+          case object T10Y        extends Tenor("P10Y")
+          case object T20Y        extends Tenor("P20Y")
+          case object T30Y        extends Tenor("P30Y")
+          case object T50Y        extends Tenor("P50Y")
+          case class TCustom(p: String) extends Tenor(p) {
+            // FIXME: `require(period >= 0)`
+          }
+          lazy val values = findValues
+        }
+
+        sealed abstract class Frequency(override val pspec: String) extends ProxiedPeriod
+        object Frequency extends Enum[Frequency] {
+          case object F1D  extends Frequency("P1D")  //  364 / Y
+          case object F1W  extends Frequency("P1W")  //  52
+          case object F2W  extends Frequency("P2W")  //  26
+          case object F4W  extends Frequency("P4W")  //  13
+          case object F13W extends Frequency("P13W") //  4
+          case object F26W extends Frequency("P26W") //  2
+          case object F52W extends Frequency("P52W") //  1
+          case object F1M  extends Frequency("P1M")  //  12
+          case object F2M  extends Frequency("P2M")  //  6
+          case object F3M  extends Frequency("P3M")  //  4
+          case object F4M  extends Frequency("P4M")  //  3
+          case object F6M  extends Frequency("P6M")  //  2
+          case object F12M extends Frequency("P12M") //  1
+
+          lazy val values = findValues
         }
 
         // from Objectkitlab - homolog in opengamma?
