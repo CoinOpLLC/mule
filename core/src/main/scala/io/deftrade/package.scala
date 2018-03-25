@@ -14,35 +14,24 @@
  * limitations under the License.
  */
 
-import scala.language.implicitConversions
+package io
 
-package io {
-  package object deftrade extends Api /*with MyTime */ {
+package object deftrade extends deftrade.Api /*with MyTime */ {
 
-    /**
-      * Civilized function invocation.
-      */
-    implicit def pipeToFunction1[A](a: A) = PipeToFunction1(a)
+  /**
+    * Civilized function invocation.
+    */
+  // implicit class PipeToFunction1[A](val a: A) extends AnyVal {
+  //   def |>[B](f: A => B): B = f(a)
+  //   def p2f1[B](f: A => B): B = a |> f
+  // }
 
-    def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+}
 
-    def camelToSnake(name: String): String  = camelTo(name)("_")
-    def camelToHyphen(name: String): String = camelTo(name)("-")
-    def camelToDot(name: String): String    = camelTo(name)(".")
-    def camelToWord(name: String): String   = camelTo(name)(" ")
+package deftrade {
 
+  final case class SweetString(val s: String) extends AnyVal {
+    def noSpaces: String = s filterNot (" \n\r\t" contains _)
   }
 
-  package deftrade {
-
-    final case class PipeToFunction1[A](val a: A) extends AnyVal {
-      def |>[B](f: A => B): B = f(a)
-      def p2f1[B](f: A => B): B = a |> f
-    }
-
-    final case class SweetString(val s: String) extends AnyVal {
-      def noSpaces: String = s filterNot (" \n\r\t" contains _)
-    }
-
-  }
 }

@@ -430,10 +430,10 @@ package object time {
 
   final lazy val zoneIdMap: Map[String, String] = ZoneId.SHORT_IDS.asScala.toMap
 
-  final val GmtZoneId = ZoneId of "GMT"
-  final val UtcZoneId = ZoneId of "UTC"
-  final val UtZoneId  = ZoneId of "UT"
-  final val ZZoneId   = ZoneId of "Z"
+  final val ZoneIdGmt = ZoneId of "GMT"
+  final val ZoneIdUtc = ZoneId of "UTC"
+  final val ZoneIdUt  = ZoneId of "UT"
+  final val ZoneIdZ   = ZoneId of "Z"
 
   object ZoneIdOf {} // TODO: finish ZoneId including sugar
 

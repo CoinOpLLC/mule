@@ -1,18 +1,31 @@
-package io
-
-import scala.util.Try
+package io.deftrade
 
 /**
-  * This is who we are, it's what we do.
+  *
   */
+final class PipeToFunction1[A](val a: A) extends AnyVal {
+  def |>[B](f: A => B): B = f(a)
+  def p2f1[B](f: A => B): B = f(a)
+}
+
 trait Api {
 
-  import deftrade.pipeToFunction1
+  import scala.language.implicitConversions
+  import scala.util.Try
+
+  implicit def pipeToFunction1[A](a: A) = new PipeToFunction1(a)
 
   /**
     * Suppresses warnings from wart remover for cases were the value is intentionally discarded.
     */
   val discardValue: Any => Unit = (_: Any) => ()
+
+  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+
+  def camelToSnake(name: String): String  = camelTo(name)("_")
+  def camelToHyphen(name: String): String = camelTo(name)("-")
+  def camelToDot(name: String): String    = camelTo(name)(".")
+  def camelToWord(name: String): String   = camelTo(name)(" ")
 
   /**
     * Make `Seq` immutable. See:
