@@ -20,7 +20,7 @@ package wip
 import cats._, implicits._
 
 /**
-  * Do: all the things.
+  * Do all the things.
   */
 object Main extends App {
 
@@ -52,4 +52,15 @@ object Main extends App {
    */
   PureConfigExample |> discardValue
   SpireExamples     |> discardValue
+}
+
+object FansiCrap {
+  import fansi.Color.{ LightMagenta }
+  def colorme[S <: AnyRef](s: S): String = (fansi.Str(s.toString) overlay LightMagenta).render
+  def fade(n: Int) =
+    (
+      (0 to 255) map { i =>
+        fansi.Back.True(i, 255 - i, 255)(" ")
+      } grouped n map (_.mkString)
+    ) mkString "\n"
 }

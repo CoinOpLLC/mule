@@ -16,22 +16,9 @@
 
 package io
 
-package object deftrade extends deftrade.Api /*with MyTime */ {
-
-  /**
-    * Civilized function invocation.
-    */
-  // implicit class PipeToFunction1[A](val a: A) extends AnyVal {
-  //   def |>[B](f: A => B): B = f(a)
-  //   def p2f1[B](f: A => B): B = a |> f
-  // }
-
-}
-
-package deftrade {
-
-  final case class SweetString(val s: String) extends AnyVal {
-    def noSpaces: String = s filterNot (" \n\r\t" contains _)
+package object deftrade extends deftrade.Api {
+  implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
+    def |>[B](f: A => B): B = f(a)
+    def p2f1[B](f: A => B): B = f(a)
   }
-
 }

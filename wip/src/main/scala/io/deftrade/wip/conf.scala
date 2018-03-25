@@ -17,9 +17,7 @@
 package io.deftrade
 package wip
 
-import io.deftrade.time.{ localDate, localDateTime }
-
-import java.time.LocalDate
+import io.deftrade.time._
 
 import cats.Eq
 import cats.instances.int._

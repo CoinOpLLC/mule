@@ -1,31 +1,6 @@
 package io.deftrade
 
-/**
-  *
-  */
-final class PipeToFunction1[A](val a: A) extends AnyVal {
-  def |>[B](f: A => B): B = f(a)
-  def p2f1[B](f: A => B): B = f(a)
-}
-
 trait Api {
-
-  import scala.language.implicitConversions
-  import scala.util.Try
-
-  implicit def pipeToFunction1[A](a: A) = new PipeToFunction1(a)
-
-  /**
-    * Suppresses warnings from wart remover for cases were the value is intentionally discarded.
-    */
-  val discardValue: Any => Unit = (_: Any) => ()
-
-  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
-
-  def camelToSnake(name: String): String  = camelTo(name)("_")
-  def camelToHyphen(name: String): String = camelTo(name)("-")
-  def camelToDot(name: String): String    = camelTo(name)(".")
-  def camelToWord(name: String): String   = camelTo(name)(" ")
 
   /**
     * Make `Seq` immutable. See:
@@ -36,18 +11,38 @@ trait Api {
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
 
+  import scala.util.Try
   def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
 
-  object camelTo {
+  /**
+    * Informs wart remover that the value is intentionally discarded.
+    */
+  val discardValue: Any => Unit = (_: Any) => ()
+
+  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+
+  def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)
+
+  def camelToSnake(name: String): String  = CamelTo(name)("_")
+  def camelToHyphen(name: String): String = CamelTo(name)("-")
+  def camelToDot(name: String): String    = CamelTo(name)(".")
+  def camelToWord(name: String): String   = CamelTo(name)(" ")
+
+  object CamelTo extends CamelTo
+  trait CamelTo {
 
     val uppers    = 'A' to 'Z'
     val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
 
     def apply(sep: String)(name: String): String = {
       val osc = maybeSepFrom(sep)
-      (name |> splitCaps(osc) |> bustHumps(osc)).mkString
+      // (name |> splitCaps(osc) |> bustHumps(osc)).mkString
+      val bh: Seq[Char] => Seq[Char] = bustHumps(osc)(_)
+      val sc: String => Seq[Char]    = splitCaps(osc)(_)
+      // val fc2: String => Seq[Char]    = fsc andThen fbh
+      (sc andThen bh)(name).mkString
     }
-    def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
+    protected def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
       name
         .foldLeft(Seq.empty[Char]) { (b, a) =>
           (a, b) match { // yeah just flip your head around, it's easier, trust self
@@ -61,7 +56,7 @@ trait Api {
         }
         .reverse
 
-    def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
+    protected def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
       name.foldRight(Seq.empty[Char]) { (a, b) =>
         (a, b) match {
           case (c, h +: _) if (nonUppers contains c) && (uppers contains h) =>
@@ -71,23 +66,11 @@ trait Api {
         }
       }
 
-    def maybeSepFrom(s: String): Option[Char] = s match {
+    protected def maybeSepFrom(s: String): Option[Char] = s match {
       case "_" => Some('_')
       case "-" => Some('-')
       case _   => None
     }
 
   }
-
-  object FansiCrap {
-    import fansi.Color.{ LightMagenta }
-    def colorme[S <: AnyRef](s: S): String = (fansi.Str(s.toString) overlay LightMagenta).render
-    def fade(n: Int) =
-      (
-        (0 to 255) map { i =>
-          fansi.Back.True(i, 255 - i, 255)(" ")
-        } grouped n map (_.mkString)
-      ) mkString "\n"
-  }
-
 }

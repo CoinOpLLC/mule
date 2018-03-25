@@ -65,8 +65,8 @@ class CamelCasePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
   property("CamelCase: test impl against gold standard") {
     forAll { s: String =>
       whenever(true) {
-        assert(camelTo("")(s) === s)
-        assert(camelTo("•")(s) === goldCamelTo("•")(s))
+        assert(CamelTo("")(s) === s)
+        assert(CamelTo("•")(s) === goldCamelTo("•")(s))
       }
     }
   }
