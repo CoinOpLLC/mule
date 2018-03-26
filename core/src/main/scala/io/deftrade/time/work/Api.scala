@@ -3,7 +3,7 @@ package time
 package work
 
 import enumeratum._
-import cats._, implicits._, data._
+import cats._, implicits._ //, data._
 import scala.collection.SortedSet
 import java.time.{ Month, DayOfWeek, temporal => jtt }
 import jtt.{ Temporal, WeekFields }
@@ -26,39 +26,43 @@ trait Api {
   type WorkWeek = SortedSet[DayOfWeek]
   type Holidays = SortedSet[LocalDate]
 
+  // TODO: add cats stuff to io.deftrade.time?
   implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
 
-  type TqReader[R] = Reader[LocalDate, Option[R]]
-  type TaReader[R] = Reader[LocalDate, R]
-
+  def workDay(wy: WorkYear): LocalDate => Boolean            = wy workDay _
   def workDay(ld: LocalDate)(implicit wy: WorkYear): Boolean = wy workDay ld
-  import SeekWorkDay._
 
+  /**
+    * `adjust` parameter embeds both WorkYear and adjustment convention
+    * N.B. Does *not* emulate the strata-basics DaysAdjustment design
+    * (where two different adjustments can be embedded.)
+    * Instead, do this explicitly through composition, _where necessary_.
+    */
   @annotation.tailrec
-  final def moveByWorkDays(nwds: Int)(ld: LocalDate): LocalDate = nwds match {
-    case n if n == 0 => ld |> Next.adjuster
-    case n =>
-      val (adjuster, delta) = if (n < 0) (Prev.adjuster, -1.day) else (Next.adjuster, 1.day)
-      val movedByOne        = ld + delta |> adjuster
-      n match {
-        case 1 => movedByOne
-        case n => moveByWorkDays(n - 1)(movedByOne)
-      }
+  final def addWorkDays(nwds: Int, adjust: LocalDate => LocalDate)(ld: LocalDate): LocalDate = {
+    def signum     = math.signum(nwds)
+    def movedByOne = ld + signum.days |> adjust
+    nwds match {
+      case 0      => ld |> adjust
+      case 1 | -1 => movedByOne
+      case n      => addWorkDays(n - signum, adjust)(movedByOne)
+    }
   }
 
-  val adjustWorkDay: LocalDate => LocalDate = moveByWorkDays(0)
-  val prevWorkDay: LocalDate => LocalDate   = moveByWorkDays(-1)
+  final def examplePlusTenWorkDays(wy: WorkYear): LocalDate => LocalDate =
+    addWorkDays(10, WorkDay.Next adjuster (wy copy (holidays = wy.holidays + localDate(2019, 1, 1))))
 
-  // there is quite a bit to critique here - not very efficient.
-  val sameMonthAdjustWorkDay: LocalDate => LocalDate =
-    (for {
-      twd <- Reader(identity: LocalDate => LocalDate)
-      nwd <- Reader(adjustWorkDay)
-      pwd <- Reader(prevWorkDay)
-    } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
+  // type TqReader[R] = Reader[LocalDate, Option[R]]
+  // type TaReader[R] = Reader[LocalDate, R]
 
-  // this should enrich LocalDate...
-  def plusWorkDays(day: LocalDate, offset: Int): LocalDate = ???
+  // // there is quite a bit to critique here - not very efficient.
+  // val sameMonthAdjustWorkDay: LocalDate => LocalDate =
+  //   (for {
+  //     twd <- Reader(identity: LocalDate => LocalDate)
+  //     nwd <- Reader(adjustWorkDay)
+  //     pwd <- Reader(prevWorkDay)
+  //   } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
+
 }
 
 // TODO: Make this conf
@@ -100,30 +104,51 @@ object WorkYear {
 // `TemporalQuery` is the way to do the "is this a working day or not" thing.
 // Just build an immutable list of `WorkWeek`s out as far as you can.
 
-sealed abstract class SeekWorkDay private (delta: Period, sameMonth: Boolean) extends EnumEntry {
+sealed abstract class WorkDay private (signum: Int, sameMonth: Boolean) extends EnumEntry {
 
-  final def temporalAdjuster: jtt.TemporalAdjuster = io.deftrade.time.TemporalAdjuster(adjuster)
-  final def adjuster: LocalDate => LocalDate       = adjust(delta, sameMonth)
+  final def adjuster: LocalDate => LocalDate = adjuster(implicitly)
 
-  private def adjust(d: Period, sameMonth: Boolean): LocalDate => LocalDate = { ld: LocalDate =>
-    val dd = ld + d
-    ld match {
-      case ld if workDay(dd) && sameMonth =>
-        if (dd.getMonth === ld.getMonth) dd else ld |> adjust(delta.negated, false)
-      case _ if workDay(dd) => dd
-      case ld =>
-        val succDay = if (d.isNegative) d - 1.day else d + 1.day
-        ld |> adjust(succDay, sameMonth)
+  final def adjuster(wy: WorkYear): LocalDate => LocalDate =
+    signum match {
+      case 0      => identity
+      case 1 | -1 => adjust(0)(signum, sameMonth)(wy)
+      case _      => ??? // TODO: just use a trinary type here to be ironclad.
     }
-  }
+
+  final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
+
+  private def adjust(n: Int)(signum: Int, sameMonth: Boolean)(wy: WorkYear): LocalDate => LocalDate =
+    ld => {
+      val delta = (signum * n).days
+      ld + delta match {
+        case wd if wy workDay wd                        => wd
+        case hd if sameMonth && (hd.month =!= ld.month) => adjust(0)(-signum, false)(wy)(ld)
+        case _                                          => adjust(n + 1)(signum, sameMonth)(wy)(ld)
+      }
+    }
 }
 
-object SeekWorkDay extends Enum[SeekWorkDay] {
+object WorkDay extends Enum[WorkDay] {
 
-  case object Next          extends SeekWorkDay(delta = 1.day, sameMonth = false)
-  case object NextSameMonth extends SeekWorkDay(delta = 1.day, sameMonth = true)
-  case object Prev          extends SeekWorkDay(delta = -1.day, sameMonth = false)
-  case object PrevSameMonth extends SeekWorkDay(delta = -1.day, sameMonth = true)
+  case object Next         extends WorkDay(signum = 1, sameMonth = false)
+  case object ModifiedNext extends WorkDay(signum = 1, sameMonth = true)
+  case object Prev         extends WorkDay(signum = -1, sameMonth = false)
+  case object ModifiedPrev extends WorkDay(signum = -1, sameMonth = true)
+  case object WorkEveryDay extends WorkDay(signum = 0, sameMonth = false)
 
   lazy val values = findValues
+}
+
+sealed trait WorkMonth extends EnumEntry {
+  def adjust(ld: LocalDate): LocalDate = ???
+  def isMonthBased: Boolean            = ??? // TODO: when / how does this matter?
+}
+
+object WorkMonth extends Enum[WorkMonth] {
+
+  lazy val values = findValues
+
+  case object LastDay         extends WorkMonth
+  case object LastBusinessDay extends WorkMonth
+
 }

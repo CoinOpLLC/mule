@@ -105,23 +105,38 @@ trait Api {
     lazy val values = findValues
   }
 
-  sealed abstract class Frequency(override val pspec: String) extends ProxiedPeriod
+  sealed abstract class Frequency(
+      override final val pspec: String,
+      final val eventsPerYear: Int
+  ) extends ProxiedPeriod
+
+  /**
+    * Captures common `Frequency` instances. The 364 day year is financial convention.
+    */
   object Frequency extends Enum[Frequency] {
-    lazy val P_KALPA: String = (jt.LocalDate.MAX - jt.LocalDate.MIN).toString
-    case object F_TERM extends Frequency(P_KALPA) //  0
-    case object F1D    extends Frequency("P1D")   //  364 / Y
-    case object F1W    extends Frequency("P1W")   //  52
-    case object F2W    extends Frequency("P2W")   //  26
-    case object F4W    extends Frequency("P4W")   //  13
-    case object F13W   extends Frequency("P13W")  //  4
-    case object F26W   extends Frequency("P26W")  //  2
-    case object F52W   extends Frequency("P52W")  //  1
-    case object F1M    extends Frequency("P1M")   //  12
-    case object F2M    extends Frequency("P2M")   //  6
-    case object F3M    extends Frequency("P3M")   //  4
-    case object F4M    extends Frequency("P4M")   //  3
-    case object F6M    extends Frequency("P6M")   //  2
-    case object F12M   extends Frequency("P12M")  //  1
+
+    val MonthsPerYear = 12
+    val DaysPerWeek   = 7
+    val WeeksPerYear  = 52
+    val DaysPerYear   = DaysPerWeek * WeeksPerYear
+    DaysPerYear === 364 |> assert
+
+    val P_KALPA: String = (jt.LocalDate.MAX - jt.LocalDate.MIN).toString
+
+    case object F_TERM extends Frequency(P_KALPA, 0)
+    case object F1D    extends Frequency("P1D", DaysPerYear / 1)
+    case object F1W    extends Frequency("P1W", DaysPerYear / DaysPerWeek)
+    case object F2W    extends Frequency("P2W", DaysPerYear / (2 * DaysPerWeek))
+    case object F4W    extends Frequency("P4W", DaysPerYear / (4 * DaysPerWeek))
+    case object F13W   extends Frequency("P13W", WeeksPerYear / 4)
+    case object F26W   extends Frequency("P26W", WeeksPerYear / 4)
+    case object F52W   extends Frequency("P52W", WeeksPerYear / 1)
+    case object F1M    extends Frequency("P1M", MonthsPerYear / 1)
+    case object F2M    extends Frequency("P2M", MonthsPerYear / 2)
+    case object F3M    extends Frequency("P3M", MonthsPerYear / 3)
+    case object F4M    extends Frequency("P4M", MonthsPerYear / 4)
+    case object F6M    extends Frequency("P6M", MonthsPerYear / 6)
+    case object F12M   extends Frequency("P12M", MonthsPerYear / 12)
 
     lazy val values = findValues
 
