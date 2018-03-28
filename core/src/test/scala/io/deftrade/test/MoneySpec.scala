@@ -3,9 +3,6 @@ package money
 
 import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
 
-// import ClassPerCurrency.Moneta
-import PhantomTypePerCurrency.Monetary
-
 class MoneySpec extends FlatSpec {
 
   import cats.syntax.show._
