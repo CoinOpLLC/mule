@@ -18,13 +18,13 @@ package object model extends model.Api {
 
   import impl._
 
-  type EntityId = Long Refined Interval.Closed[W.`100100100100`, W.`100000999999`]
+  type EntityId = Long Refined Interval.Closed[W.`100100100100`, W.`999999999999`]
   implicit def EntityIddHasEq = Eq.fromUniversalEquals[EntityId]
 
-  type AccountId = GenericId[Long, Account]
+  type AccountId = OpaqueId[Long, Account]
   implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
 
-  type AssetId = GenericId[Long, Asset]
+  type AssetId = OpaqueId[Long, Asset]
   implicit def AssetIdHasEq = Eq.fromUniversalEquals[AssetId]
 
   type Quantity = Double
@@ -40,24 +40,40 @@ package object model extends model.Api {
   type Folio    = Map[AssetId, Quantity]
   implicit def folioMonoid = Monoid[Folio]
 
-  type FolioId = GenericId[Long, Folio]
+  type FolioId = OpaqueId[Long, Folio]
   implicit def FolioIdHasEq = Eq.fromUniversalEquals[FolioId]
 
-  type Crew         = Map[Role, Set[EntityId]]
-  type CrewedFolio  = (Crew, Folio)
-  type BoundFolio   = (FolioId, CrewedFolio)
-  type Account      = Map[FolioId, CrewedFolio]
-  type BoundAccount = (AccountId, Account)
-  type Firm         = Map[AccountId, Account]
+  type Roster  = Map[Role, Set[EntityId]]
+  type Account = Map[FolioId, (Folio, Roster)]
+  type Ledger  = Map[AccountId, Account]
 
   type EntityRoles  = Map[EntityId, Map[AccountId, Set[Role]]]
   type AccountRoles = Map[AccountId, Map[EntityId, Set[Role]]]
 
-  type Order          = Folio
-  type OrderId        = GenericId[Long, Order]
-  type QuotedOrder[C] = (Order, Money[MonetaryAmount, C])
+  type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
+  type Order      = (AccountId, Allocation, Folio)
 
-  def combine(o: Order, folio: Folio): Folio = folio |+| o
+  type Transaction = Folio // think about it
+
+  object SimpleAllocation {
+    def unapply(a: Allocation): Option[FolioId] = a.toList match {
+      case (folioId, Quantity.One) :: Nil => Some(folioId)
+      case _                              => ??? // FIXME
+    }
+  }
+
+  type OrderId        = OpaqueId[Long, Order]
+  type QuotedOrder[C] = (Transaction, Money[MonetaryAmount, C])
+
+  def combine(o: Order, ledger: Ledger): Ledger = o match {
+    case (accountId, SimpleAllocation(folioId), transaction) =>
+      ledger(accountId)(folioId) match {
+        case (folio, roster) =>
+          val updated = ((folio |+| transaction), roster)
+          ledger + (accountId -> Map(folioId -> updated))
+      }
+    case _ => ??? // FIXME
+  }
 
   // TODO: this feels like a repository
   def price[C: Monetary](id: AssetId): Money[MonetaryAmount, C] = ???

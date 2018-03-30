@@ -34,12 +34,12 @@ trait Api {
   object Role extends Enum[Role] {
 
     /**
-      * The name on the account.
+      * The the entity(s) whose names are listed on the account.
       */
     case object Principle extends Role
 
     /**
-      * Responsible for the disposition of assets in the Folio.
+      * Person(s) responsible for the disposition of assets in the Folio.
       */
     case object Manager extends Role
 
@@ -54,21 +54,26 @@ trait Api {
 
   trait Id[T] extends Any { def id: T }
 
+  object Quantity {
+    val Zero: Quantity = QuantityIsFinancial.zero
+    val One: Quantity  = QuantityIsFinancial.one
+  }
+
 }
 
 object impl {
 
-  final case class GenericId[T, P](val id: T) extends AnyVal with Id[T]
-  object GenericId {
-    implicit def eq[T: Eq, P]: Eq[GenericId[T, P]] = Eq by (_.id)
+  final case class OpaqueId[T, P](val id: T) extends AnyVal with Id[T]
+  object OpaqueId {
+    implicit def eq[T: Eq, P]: Eq[OpaqueId[T, P]] = Eq by (_.id)
   }
 
   object LongId {
-    def reserved[P] = GenericId[Long, P](Long.MinValue)
+    def reserved[P] = OpaqueId[Long, P](Long.MinValue)
   }
 
   object IntId {
-    def reserved[P] = GenericId[Int, P](Int.MinValue)
+    def reserved[P] = OpaqueId[Int, P](Int.MinValue)
   }
 
 }
