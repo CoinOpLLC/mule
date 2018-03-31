@@ -309,10 +309,6 @@ object QuillCodeGen {
              |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
              |""".stripMargin
 
-        def tidy[K, V](kvs: Traversable[(K, V)]): K Map Traversable[V] =
-          kvs groupBy (_._1) map {
-            case (k, kvs) => (k, kvs map (_._2))
-          }
 
         val enumRs = db.createStatement executeQuery enumSql
 

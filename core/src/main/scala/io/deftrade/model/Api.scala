@@ -34,12 +34,11 @@ import enumeratum._
 
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
+  * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
-trait Api {
+abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   import impl._
-
-  sealed trait Asset
 
   sealed trait Role extends EnumEntry
   object Role extends Enum[Role] {
@@ -65,36 +64,31 @@ trait Api {
     lazy val values: IndexedSeq[Role] = findValues
   }
 
-  trait Id[T] extends Any { def id: T }
+  private[model] sealed trait Id[T] extends Any { def id: T }
 
+  type Entity   = Nothing // Yet
   type EntityId = Long Refined Interval.Closed[W.`100100100100`, W.`999999999999`]
+  // type EntityId = OpaqueId[Long, Entity]
   implicit def EntityIddHasEq = Eq.fromUniversalEquals[EntityId]
 
-  type AccountId = OpaqueId[Long, Account]
-  implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
-
+  type Asset   = Nothing // yet
   type AssetId = OpaqueId[Long, Asset]
   implicit def AssetIdHasEq = Eq.fromUniversalEquals[AssetId]
 
-  type Quantity = Double
-  implicit lazy val QuantityIsFinancial: Financial[Quantity] =
-    Financial.DoubleIsFinancial
-
-  type MonetaryAmount = BigDecimal
-  implicit lazy val MonetaryAmountIsFinancial: Financial[MonetaryAmount] =
-    Financial.BigDecimalIsFinancial
-
-// n.b the algebraic relationship between Position and Folio
   type Position = (AssetId, Quantity)
   type Folio    = Map[AssetId, Quantity]
-  implicit def folioMonoid = Monoid[Folio]
-
-  type FolioId = OpaqueId[Long, Folio]
+  type FolioId  = OpaqueId[Long, Folio]
+  implicit def folioMonoid  = Monoid[Folio]
   implicit def FolioIdHasEq = Eq.fromUniversalEquals[FolioId]
 
-  type Roster  = Map[Role, Set[EntityId]]
-  type Account = Map[FolioId, (Folio, Roster)]
-  type Ledger  = Map[AccountId, Account]
+  type Roster    = Map[Role, Set[EntityId]]
+  type Account   = Map[FolioId, (Folio, Roster)]
+  type AccountId = OpaqueId[Long, Account]
+  implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
+
+// n.b the algebraic relationship between Position and Folio
+
+  type Ledger = Map[AccountId, Account]
 
   type EntityRoles  = Map[EntityId, Map[AccountId, Set[Role]]]
   type AccountRoles = Map[AccountId, Map[EntityId, Set[Role]]]
@@ -112,10 +106,11 @@ trait Api {
   // FIXME: this should be tidyFold or something. "Push" this hard.
   def rollUp(ps: List[Position]): Folio = tidy(ps) map { case (k, vs) => (k, vs.sum) }
 
-  object SingleFolioAllocation {
+  object Allocation {
 
     def apply(folioId: FolioId): Allocation = Map(folioId -> Quantity.One)
 
+    def unapplySeq = ???
     def unapply(a: Allocation): Option[FolioId] = a.toList match {
       case (folioId, Quantity.One) :: Nil => Some(folioId)
       case _                              => None
@@ -128,7 +123,7 @@ trait Api {
   type QuotedOrder[C] = (Transaction, Money[MonetaryAmount, C])
 
   def combine(o: Order, ledger: Ledger): Ledger = o match {
-    case (accountId, SingleFolioAllocation(folioId), transaction) =>
+    case (accountId, Allocation(folioId), transaction) =>
       ledger(accountId)(folioId) match {
         case (folio, roster) =>
           val updated = ((folio |+| transaction), roster)
@@ -145,9 +140,20 @@ trait Api {
   }
 
   implicit def qoMonoid[C: Monetary] = Monoid[QuotedOrder[C]]
-  // implicit def qoEq[C: Monetary]     = Eq.fromUniversalEquals[QuotedOrder[C]]
 
-  lazy val Order = impl.Order
+  object Quantity {
+    val Zero: Quantity = Financial[Quantity].zero
+    val One: Quantity  = Financial[Quantity].one
+  }
+
+  object Order {
+    import io.deftrade.money.Monetary.USD
+    def legacy(bd: BigDecimal, q: Long): QuotedOrder[USD] =
+      (
+        Map(LongId.reserved -> (Financial[Quantity] fromBigDecimal BigDecimal(q))),
+        USD(Financial[MonetaryAmount] fromBigDecimal bd)
+      )
+  }
 
 }
 
@@ -165,20 +171,6 @@ object impl {
 
   object IntId {
     def reserved[P] = OpaqueId[Int, P](Int.MinValue)
-  }
-
-  object Quantity {
-    val Zero: Quantity = QuantityIsFinancial.zero
-    val One: Quantity  = QuantityIsFinancial.one
-  }
-
-  object Order {
-    import io.deftrade.money.Monetary.USD
-    def legacy(bd: BigDecimal, q: Long): QuotedOrder[USD] =
-      (
-        Map(LongId.reserved -> (QuantityIsFinancial fromBigDecimal BigDecimal(q))),
-        USD(MonetaryAmountIsFinancial fromBigDecimal bd)
-      )
   }
 
 }
