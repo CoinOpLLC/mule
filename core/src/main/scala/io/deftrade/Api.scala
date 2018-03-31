@@ -11,6 +11,14 @@ trait Api {
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
 
+  type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
+  val IndexedSeq = scala.collection.immutable.IndexedSeq
+
+  def tidy[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
+    kvs groupBy (_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
   import scala.util.Try
   def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
 

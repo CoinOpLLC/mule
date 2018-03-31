@@ -1,4 +1,5 @@
-package io.deftrade.sbt
+package io.deftrade
+package sbt
 
 import java.io.File
 import java.nio.file.{ Files, Paths }
