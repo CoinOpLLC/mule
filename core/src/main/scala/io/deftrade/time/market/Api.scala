@@ -1,6 +1,6 @@
 package io.deftrade
 package time
-package money
+package market
 
 import io.deftrade.time.work.WorkYear
 

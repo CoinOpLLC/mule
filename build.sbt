@@ -35,6 +35,7 @@ lazy val flyway = Seq(
 )
 
 lazy val macros = project
+  .disablePlugins(org.flywaydb.sbt.FlywayPlugin)
   .settings(common)
   .settings(
     libraryDependencies ++= quills ++ testers ++
@@ -42,6 +43,7 @@ lazy val macros = project
   )
 
 lazy val core = project
+  .disablePlugins(org.flywaydb.sbt.FlywayPlugin)
   .dependsOn(macros)
   .settings(common)
   .settings(
@@ -60,6 +62,7 @@ lazy val rdb = project
 // wip := work in progress
 lazy val wip = project
 // .dependsOn(core, rdb)
+  .disablePlugins(org.flywaydb.sbt.FlywayPlugin)
   .dependsOn(core)
   .settings(common)
   .settings(
@@ -69,6 +72,7 @@ lazy val wip = project
 // top level project - TODO: eventually this should only aggregate (no active dev)
 lazy val mule = (project in file("."))
 // .dependsOn(core, rdb, wip)
+  .disablePlugins(org.flywaydb.sbt.FlywayPlugin)
   .dependsOn(core, rdb)
   .settings(common)
   .settings(

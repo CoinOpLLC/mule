@@ -9,7 +9,7 @@ object Version {
   val ScalaTest      = "3.0.4"
   val ScalaCheck     = "1.13.5"
   val TypesafeConfig = "1.3.2"
-  val Cats           = "1.0.0-RC1"
+  val Cats           = "1.0.1"
   val Quicklens      = "1.4.11"
   val PureConfig     = "0.8.0"
   val Enumeratum     = "1.5.12"
@@ -189,11 +189,11 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  lazy val initialCommands = //"""ammonite.Main().run()"""
-    """import io.deftrade._, time._
-      |import cats._, implicits._
-      |
-      |""".stripMargin
+  lazy val initialCommands = """"""
+  // """import io.deftrade._, time._
+  //   |import cats._, implicits._
+  //   |
+  //   |""".stripMargin
 }
 
 object License {

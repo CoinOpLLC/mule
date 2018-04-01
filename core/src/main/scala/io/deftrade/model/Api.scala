@@ -103,27 +103,49 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   // `Folio` := `Transaction` at rest
   // both are just sets of Positions, really
 
-  // FIXME: this should be tidyFold or something. "Push" this hard.
-  def rollUp(ps: List[Position]): Folio = tidy(ps) map { case (k, vs) => (k, vs.sum) }
+  def index[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
+    kvs groupBy (_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
+  def accumulate[K, V: Monoid](kvs: List[(K, V)]): Map[K, V] =
+    for {
+      (k, kvs) <- kvs groupBy (_._1)
+    } yield (k, kvs foldMap (_._2))
 
   object Allocation {
 
-    def apply(folioId: FolioId): Allocation = Map(folioId -> Quantity.One)
+    lazy val Q = Financial[Quantity]
+    import Q._
 
-    def unapplySeq = ???
-    def unapply(a: Allocation): Option[FolioId] = a.toList match {
-      case (folioId, Quantity.One) :: Nil => Some(folioId)
-      case _                              => None
+    def pariPassu(fids: Set[FolioId]): Allocation = {
+      val n = fids.size
+      (fids.toList zip List.fill(n)(Quantity.One / (Q fromInt n))).toMap
+    }
+    def proRata(totalShares: Long)(capTable: Map[FolioId, Long]): Map[FolioId, Quantity] =
+      capTable map {
+        case (folioId, shares) =>
+          val mySlice  = Q fromLong shares
+          val wholePie = Q fromLong totalShares
+          (folioId, mySlice / wholePie)
+      }
+
+    object Single {
+      def apply(folioId: FolioId): Allocation = Map(folioId -> Quantity.One)
+      def unapply(a: Allocation): Option[FolioId] = a.toList match {
+        case (folioId, Quantity.One) :: Nil => Some(folioId)
+        case _                              => None
+      }
     }
   }
 
-  // FIXME: do also: SingleFolio, SingleAccount
+  // TODO: `Folio`, `Account` objects with apply / unapply methods
 
   type OrderId        = OpaqueId[Long, Order]
   type QuotedOrder[C] = (Transaction, Money[MonetaryAmount, C])
 
-  def combine(o: Order, ledger: Ledger): Ledger = o match {
-    case (accountId, Allocation(folioId), transaction) =>
+  def record(o: Order, ledger: Ledger): Ledger = o match {
+    case (accountId, Allocation.Single(folioId), transaction) =>
       ledger(accountId)(folioId) match {
         case (folio, roster) =>
           val updated = ((folio |+| transaction), roster)
@@ -141,6 +163,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   implicit def qoMonoid[C: Monetary] = Monoid[QuotedOrder[C]]
 
+  /** Holds constants (stable values) useful for pattern matching */
   object Quantity {
     val Zero: Quantity = Financial[Quantity].zero
     val One: Quantity  = Financial[Quantity].one

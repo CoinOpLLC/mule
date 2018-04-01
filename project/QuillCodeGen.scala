@@ -1,11 +1,10 @@
-package io.deftrade
-package sbt
+package io.deftrade.sbt
 
 import java.io.File
 import java.nio.file.{ Files, Paths }
 import java.sql.{ Connection, DriverManager, ResultSet }
 
-import sbt.Logger
+import _root_.sbt.Logger
 
 import DepluralizerImplicit._
 
@@ -14,18 +13,17 @@ import DepluralizerImplicit._
   */
 object QuillCodeGen {
 
+  def index[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
+    kvs groupBy (_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
   type Error    = String
   type Or[R, L] = Either[L, R] // SWIDT?
   type Legit[A] = A Or Error // kawaii, ne?
 
   val Error = Left
   val Legit = Right
-
-  // @inline def Error(err: String)                       = Left apply err
-  // @inline def Error[A](legit: Legit[A]): Option[Error] = Left unappply legit
-  //
-  // @inline def Legit[A](a: A)                       = Right apply a
-  // @inline def Legit[A](legit: Legit[A]): Option[A] = Right unapply legit
 
   val defaultTypeMap = Map(
     // "money"       -> "BigDecimal", // no. Cast out because of entanglment with locale (lc_stuff)
@@ -309,13 +307,12 @@ object QuillCodeGen {
              |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
              |""".stripMargin
 
-
         val enumRs = db.createStatement executeQuery enumSql
 
         val mkEnumValPair: ResultSet => (String, String) =
           row => (row getString "typname", row getString "enumlabel")
 
-        tidy(
+        index(
           results(enumRs) map mkEnumValPair
         ) map {
           case (key, values) =>

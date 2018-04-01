@@ -102,7 +102,7 @@ addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
   */
 // resolvers += "Flyway" at "https://flywaydb.org/repo"
 resolvers += "Flyway" at "https://davidmweber.github.io/flyway-sbt.repo"
-addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0") // TODO: current version is at least 4.2.0
+addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0")
 
 /**
   * [link](url)

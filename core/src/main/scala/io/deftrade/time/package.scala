@@ -1,8 +1,8 @@
 package io.deftrade
 
-import java.time._, chrono.{ Chronology, IsoChronology }, format.DateTimeFormatter
+import java.time._, chrono.{ Chronology, IsoChronology }
 import java.time.{ temporal => jtt }
-import jtt._, ChronoUnit._
+import jtt._
 
 package object time extends time.Api {
 
@@ -74,8 +74,8 @@ package object time extends time.Api {
     def +(amount: Period): LocalDate = ld plus amount
     def -(amount: Period): LocalDate = ld minus amount
 
-    def +(wpp: money.ProxiedPeriod): LocalDate = ld plus wpp.period
-    def -(wpp: money.ProxiedPeriod): LocalDate = ld minus wpp.period
+    def +(wpp: market.ProxiedPeriod): LocalDate = ld plus wpp.period
+    def -(wpp: market.ProxiedPeriod): LocalDate = ld minus wpp.period
 
     def -(end: LocalDate): Period = ld until end
 

@@ -96,8 +96,12 @@ trait QuotedIn[A, CCY] {
 
 trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[N] {
 
+  class FinancialOps(n: N) extends FractionalOps(n)
+
   def fromBigDecimal(bd: BigDecimal): N
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
+
+  def fromLong(l: Long): N = fromBigDecimal(BigDecimal(l))
 
   final def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
 
@@ -114,6 +118,8 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   }
 }
 object Financial {
+
+  import scala.language.implicitConversions
 
   import Numeric.{ BigDecimalIsFractional, DoubleIsFractional }
   import Ordering.{ BigDecimalOrdering, DoubleOrdering }
@@ -133,12 +139,16 @@ object Financial {
     @inline final override def toBigDecimal(n: BigDecimal): BigDecimal = n
   }
 
+  // yes, this is extreme import tax avoidance
+  implicit def financialOps[N](n: N)(implicit N: Financial[N]): N.FinancialOps =
+    new N.FinancialOps(n)
+
   def apply[N: Financial]: Financial[N] = implicitly
 
   implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial
 }
 
-/** Hobbson's polymorphism ftm lol */
+/**  */
 private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
   // type CurrencyType <: Currency
