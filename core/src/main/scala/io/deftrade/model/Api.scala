@@ -17,10 +17,9 @@
 package io.deftrade
 package model
 
-import io.deftrade.money.{ Financial, Monetary }, Monetary._
+import io.deftrade.money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
 import io.deftrade.time._
-
-import cats.{ Eq, Monoid }
+import cats.{ Eq, Monad, Monoid }
 import cats.implicits._
 
 import eu.timepit.refined
@@ -32,6 +31,8 @@ import refined.numeric._
 
 import enumeratum._
 // import enumeratum.values._
+
+import scala.language.higherKinds
 
 import impl._
 
@@ -78,6 +79,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       */
     case object Subject extends Role
 
+    /**
+      * `Regulator`s are first class entities.
+      */
+    case object Regulator extends Role
+
     /** The `findValues` macro collects all `value`s in the order written. */
     lazy val values: IndexedSeq[Role] = findValues
   }
@@ -86,7 +92,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   trait Corporation
 
   type Entity   = Either[Corporation, Person]
-  type EntityId = Long Refined Interval.Closed[W.`100100100100`, W.`999999999999`]
+  type EntityId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
   // type EntityId = OpaqueId[Long, Entity]
   implicit def EntityIddHasEq = Eq.fromUniversalEquals[EntityId]
 
@@ -97,39 +103,55 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type AssetId = OpaqueId[Long, Asset]
   implicit def AssetIdHasEq = Eq.fromUniversalEquals[AssetId]
 
-  /** Price all the things. TODO: this feels like a repository */
-  def price[C: Monetary](id: AssetId): Money[MonetaryAmount, C] = ???
-
   type Position = (AssetId, Quantity)
   type Folio    = Map[AssetId, Quantity] // n.b algebraic relationship Position <=> Folio
   type Trade    = Folio // `Trade` := `Folio` in motion
   object Folio
 
   def rollUp(ps: Position*): Folio = accumulate(ps.toList)
-  def price[C: Monetary](position: Position): Money[MonetaryAmount, C] = position match {
-    case (asset, quantity) => price[C](asset) * quantity
-  }
+
+  def quote[C: Monetary](market: Market)(position: Position): Money[MonetaryAmount, C] =
+    position match {
+      case (asset, quantity) => Market.quote[C](market)(asset) * quantity
+    }
 
   type FolioId = OpaqueId[Long, Folio]
   implicit lazy val folioMonoid = Monoid[Folio]
   implicit def FolioIdHasEq     = Eq.fromUniversalEquals[FolioId]
 
-  /** Note that Roster encodes the notion of a `CapitalKey` – per `Role`! */
-  // type Roster = Map[Role, Map[EntityId, Quantity]] FIXME make this work
-  type Roster = Map[Role, Set[EntityId]]
+  /**
+    * Note that Roster encodes the notion of a `CapitalKey` – per `Role`!
+    * The meaning of this `ProRata` will depend upon the role.
+    * For the beneficial owner(s) of the assets in question the meaning is obvious.
+    * For a `Manager`, the `ProRata` could encode their voting rights – which may differ from
+    * their ownership rights.
+    */
+  type ProRata = Map[EntityId, Quantity]
+  object ProRata {}
+  implicit val monoidProRata = Monoid[ProRata] // why is this necessary to be exactly so?
+
+  type Roster = Map[Role, ProRata]
+  // type Roster = Map[Role, Set[EntityId]]
   object Roster {
     def empty: Roster = Map.empty
   }
 
   type Account   = Map[FolioId, (Folio, Roster)]
   type AccountId = OpaqueId[Long, Account]
-  object Account
+  object Account {
+    def updatedProRata(a: Account, newProRata: Map[EntityId, Quantity]): Account = ???
+  }
 
   implicit def AccountIdHasEq     = Eq.fromUniversalEquals[AccountId]
   implicit lazy val accountMonoid = Monoid[Account]
 
-  /** (The) Ledger. I know what you're thinking: `LedgerId` ftw! But no. There's only one Ledger™ */
   type Ledger = Map[AccountId, Account]
+
+  /**
+    * I know what you're thinking: There's only one Ledger™. But consider different views, with
+    * different privileges to see different things.
+    */
+  type LedgerId = OpaqueId[Long, Ledger]
   object Ledger {
 
     def recorded(ledger: Ledger)(ao: AllocatedOrder): Ledger = ao match {
@@ -196,6 +218,24 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   implicit def qoMonoid[C: Monetary] = Monoid[PricedTrade[C]]
+
+  sealed trait Exchange // a multiparty nexus
+  sealed trait Counter  // a single counterparty or market maker
+
+  type Market   = Either[Counter, Exchange]
+  type MarketId = OpaqueId[Long, Market]
+  object Market {
+
+    /** Price all the things. TODO: this feels like a repository */
+    def quote[C: Monetary](m: Market)(id: AssetId): Money[MonetaryAmount, C] =
+      Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+
+    def quotedIn[C: Monetary](m: Market)(id: AssetId): AssetId QuotedIn C = ???
+
+    // idea: use phantom types to capture sequencing constraint?
+    def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
+      ???
+  }
 
   type EntityRoles  = Map[EntityId, Map[AccountId, Set[Role]]]
   type AccountRoles = Map[AccountId, Map[EntityId, Set[Role]]]

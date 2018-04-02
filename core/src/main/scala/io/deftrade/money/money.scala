@@ -213,7 +213,7 @@ object Monetary extends Enum[MonetaryLike] {
   implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
   implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
 
-  implicit def monoid[N: Financial, C: Monetary] = new Monoid[Money[N, C]] {
+  implicit def moneyMonoid[N: Financial, C: Monetary] = new Monoid[Money[N, C]] {
     type MNY = Money[N, C]
     override def combine(a: MNY, b: MNY): MNY = a + b
     override def empty: MNY                   = Money(Financial[N].zero)
