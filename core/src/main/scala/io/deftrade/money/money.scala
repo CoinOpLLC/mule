@@ -187,20 +187,20 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
 object Monetary extends Enum[MonetaryLike] {
 
-  final class Money[N, C] private (val amount: N) extends AnyVal {
+  final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
     type MNY = Money[N, C]
 
-    def +(rhs: MNY)(implicit N: Financial[N], C: Monetary[C]) =
-      Money[N, C](N plus (amount, rhs.amount))
+    def +(rhs: MNY)(implicit N: Financial[N]) =
+      new Money[N, C](N plus (amount, rhs.amount))
 
-    def -(rhs: MNY)(implicit N: Financial[N], C: Monetary[C]) =
-      Money[N, C](N minus (amount, rhs.amount))
+    def -(rhs: MNY)(implicit N: Financial[N]) =
+      new Money[N, C](N minus (amount, rhs.amount))
 
-    def *[T](scale: T)(implicit N: Financial[N], T: Financial[T], C: Monetary[C]) =
-      Money[N, C](N times (T.to[N](scale), amount))
+    def *[S](scale: S)(implicit N: Financial[N], S: Financial[S], C: Monetary[C]) =
+      Money[N, C](N times (S.to[N](scale), amount))
 
-    def /(rhs: MNY)(implicit N: Financial[N]): N = N div (amount, rhs.amount)
+    def /(rhs: MNY)(implicit N: Financial[N]): N = N div (lhs.amount, rhs.amount)
 
     def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money(N negate amount)
   }

@@ -5,6 +5,9 @@ import java.time._, chrono.{ Chronology, IsoChronology }, format.DateTimeFormatt
 import java.time.{ temporal => jtt }
 import jtt._, ChronoUnit._
 
+/**
+  * Single-import package providing minimal scala-ideomatic bindings for java.time.
+  */
 trait Api {
 
   // Clock
@@ -51,6 +54,7 @@ trait Api {
 
   type TemporalAdjuster = java.time.temporal.TemporalAdjuster
 
+  /** */
   object TemporalAdjuster {
     type HM[A] = A => A
     type HMLD  = HM[LocalDate]
@@ -81,7 +85,10 @@ trait Api {
 
   type TemporalQuery[R] = java.time.temporal.TemporalQuery[R]
 
-  // This name is free in Value Land, because it's occupied by a lone j8 interface in Type Land
+  /**
+    * This name is free for `value`s
+    * because it's occupied by a lone j8 interface in `type` namespace`
+    */
   object TemporalQuery {
     import jtt.{ TemporalQueries => TQs }
     import cats._, implicits._ // FIXME choke down on that bat son

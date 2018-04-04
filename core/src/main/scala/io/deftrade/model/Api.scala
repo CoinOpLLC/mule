@@ -96,28 +96,74 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   // type EntityId = OpaqueId[Long, Entity]
   implicit def EntityIddHasEq = Eq.fromUniversalEquals[EntityId]
 
-  trait Stawks
-  trait Bawnds
+  sealed trait Derivative { self: Security =>
+    def underlyer: Security = ???
+    def delta: BigDecimal   = ???
+  }
 
-  type Asset   = Either[Stawks, Bawnds]
-  type AssetId = OpaqueId[Long, Asset]
-  implicit def AssetIdHasEq = Eq.fromUniversalEquals[AssetId]
+  sealed trait SymbolId extends EnumEntry { def id: String }
 
-  type Position = (AssetId, Quantity)
-  type Folio    = Map[AssetId, Quantity] // n.b algebraic relationship Position <=> Folio
-  type Trade    = Folio // `Trade` := `Folio` in motion
-  object Folio
+  object SymbolId extends Enum[SymbolId] {
 
-  def rollUp(ps: Position*): Folio = accumulate(ps.toList)
+    case class Cusip(val id: String)        extends SymbolId
+    case class Isin(val id: String)         extends SymbolId
+    case class Ric(val id: String)          extends SymbolId
+    case class Buid(val id: String)         extends SymbolId
+    case class IbContractId(val id: String) extends SymbolId
+    case class CounterId(val id: String)    extends SymbolId
 
-  def quote[C: Monetary](market: Market)(position: Position): Money[MonetaryAmount, C] =
-    position match {
-      case (asset, quantity) => Market.quote[C](market)(asset) * quantity
-    }
+    lazy val values = findValues
+  }
+
+  // TODO: use the XBRL definitions for these
+  sealed trait Security extends EnumEntry
+  object Security extends Enum[Security] {
+
+    case class Swaption(sid: SymbolId)                extends Security with Derivative
+    case class Swap(sid: SymbolId)                    extends Security with Derivative
+    case class FRA(sid: SymbolId)                     extends Security with Derivative
+    case class EquityIndexFutureOption(sid: SymbolId) extends Security with Derivative
+    case class EquityIndexOption(sid: SymbolId)       extends Security with Derivative
+    case class EquityIndexFuture(sid: SymbolId)       extends Security with Derivative
+    case class EquityVanillaOption(sid: SymbolId)     extends Security with Derivative
+    case class FxSwap(sid: SymbolId)                  extends Security with Derivative
+    case class FxVanillaOption(sid: SymbolId)         extends Security with Derivative
+    case class FxForwardSpot(sid: SymbolId)           extends Security
+    case class EquityCommon(sid: SymbolId)            extends Security
+    case class EquityPreferred(sid: SymbolId)         extends Security
+    case class DebtConvertible(sid: SymbolId)         extends Security
+    case class DebtBond(sid: SymbolId)                extends Security
+    case class DebtAmortizing(sid: SymbolId)          extends Security // Annuity?
+    case class TermDeposit(sid: SymbolId)             extends Security // DebtSimple?
+    case class BulletPayment(sid: SymbolId)           extends Security
+
+    lazy val values = findValues
+  }
+
+  type SecurityId = OpaqueId[Long, Security]
+  implicit def AssetIdHasEq = Eq.fromUniversalEquals[SecurityId]
+
+  type Position = (SecurityId, Quantity)    // '`Position` := `Trade` at rest
+  type Folio    = Map[SecurityId, Quantity] // n.b algebraic relationship Position <=> Folio
+
+  object Folio {
+    def apply(ps: Position*): Folio = accumulate(ps.toList)
+  }
 
   type FolioId = OpaqueId[Long, Folio]
-  implicit lazy val folioMonoid = Monoid[Folio]
-  implicit def FolioIdHasEq     = Eq.fromUniversalEquals[FolioId]
+  implicit def FolioIdHasEq = Eq.fromUniversalEquals[FolioId]
+
+  type Leg   = Position // `Leg` := `Position` in motion
+  type Trade = Folio    // `Trade` := `Folio` in motion
+  val Trade = Folio // gives you Trade(legs: Leg*): Trade
+
+  def quoteLeg[CCY: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
+    leg match {
+      case (security, quantity) => Market.quote[CCY](market)(security) * quantity
+    }
+
+  def quote[CCY: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
+    trade.toList foldMap quoteLeg[CCY](market)
 
   /**
     * Note that Roster encodes the notion of a `CapitalKey` – per `Role`!
@@ -128,7 +174,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     */
   type ProRata = Map[EntityId, Quantity]
   object ProRata {}
-  implicit val monoidProRata = Monoid[ProRata] // why is this necessary to be exactly so?
 
   type Roster = Map[Role, ProRata]
   // type Roster = Map[Role, Set[EntityId]]
@@ -136,23 +181,24 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def empty: Roster = Map.empty
   }
 
-  type Account   = Map[FolioId, (Folio, Roster)]
-  type AccountId = OpaqueId[Long, Account]
+  type Account = Map[FolioId, (Folio, Roster)]
   object Account {
     def updatedProRata(a: Account, newProRata: Map[EntityId, Quantity]): Account = ???
   }
 
-  implicit def AccountIdHasEq     = Eq.fromUniversalEquals[AccountId]
-  implicit lazy val accountMonoid = Monoid[Account]
-
-  type Ledger = Map[AccountId, Account]
+  type AccountId = OpaqueId[Long, Account]
+  implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
 
   /**
     * I know what you're thinking: There's only one Ledger™. But consider different views, with
     * different privileges to see different things.
     */
-  type LedgerId = OpaqueId[Long, Ledger]
+  type Ledger = Map[AccountId, Account]
   object Ledger {
+
+    // TODO: this seems to fix a divirging implicit expansion for Monoid[Account] in `foldMap` - wut
+    implicit val FolioIsMonoid   = Monoid[Folio]
+    implicit val ProRataIsMonoid = Monoid[ProRata]
 
     def recorded(ledger: Ledger)(ao: AllocatedOrder): Ledger = ao match {
       case (accountId, folioMap) =>
@@ -168,6 +214,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
         }
     }
   }
+  type LedgerId = OpaqueId[Long, Ledger]
 
   type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
   object Allocation {
@@ -217,25 +264,24 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type ExecutionId[CCY] = OpaqueId[Long, Execution[CCY]]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
-  implicit def qoMonoid[C: Monetary] = Monoid[PricedTrade[C]]
 
   sealed trait Exchange // a multiparty nexus
   sealed trait Counter  // a single counterparty or market maker
 
-  type Market   = Either[Counter, Exchange]
-  type MarketId = OpaqueId[Long, Market]
+  type Market = Either[Counter, Exchange]
   object Market {
 
     /** Price all the things. TODO: this feels like a repository */
-    def quote[C: Monetary](m: Market)(id: AssetId): Money[MonetaryAmount, C] =
+    def quote[C: Monetary](m: Market)(id: SecurityId): Money[MonetaryAmount, C] =
       Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
-    def quotedIn[C: Monetary](m: Market)(id: AssetId): AssetId QuotedIn C = ???
+    def quotedIn[C: Monetary](m: Market)(id: SecurityId): SecurityId QuotedIn C = ???
 
     // idea: use phantom types to capture sequencing constraint?
     def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
       ???
   }
+  type MarketId = OpaqueId[Long, Market]
 
   type EntityRoles  = Map[EntityId, Map[AccountId, Set[Role]]]
   type AccountRoles = Map[AccountId, Map[EntityId, Set[Role]]]
@@ -250,6 +296,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     for {
       (k, kvs) <- kvs groupBy (_._1)
     } yield (k, kvs foldMap (_._2))
+
 }
 
 object impl {
