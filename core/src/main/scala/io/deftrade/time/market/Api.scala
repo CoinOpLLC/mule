@@ -2,7 +2,7 @@ package io.deftrade
 package time
 package market
 
-import io.deftrade.time.work.WorkYear
+import io.deftrade.time.work._
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.{ duration => scd }
@@ -144,7 +144,7 @@ trait Api {
 
   sealed trait DayCount extends EnumEntry {
     def days(start: LocalDate, end: LocalDate): Int
-    def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double
+    def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double
   }
   //ACT_[360|365|ACT]
   // CONV_30_360, CONV_360E_[ISDA|IMSA]
@@ -154,7 +154,7 @@ trait Api {
 
     case object ACT_ACT_ISDA extends DayCount {
       def days(start: LocalDate, end: LocalDate): Int = ???
-      def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double =
+      def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double =
         if (end.year === start.year) {
           (end.dayOfYear - start.dayOfYear) / start.year.toDouble
         } else {
@@ -166,8 +166,8 @@ trait Api {
         }
     }
     case object CONV_30_360 extends DayCount {
-      def days(start: LocalDate, end: LocalDate): Int                            = ???
-      def years(start: LocalDate, end: LocalDate)(implicit wy: WorkYear): Double = ???
+      def days(start: LocalDate, end: LocalDate): Int                               = ???
+      def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double = ???
     }
   }
 

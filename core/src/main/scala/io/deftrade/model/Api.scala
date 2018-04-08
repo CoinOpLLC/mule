@@ -119,25 +119,75 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   sealed trait Security extends EnumEntry
   object Security extends Enum[Security] {
 
-    case class Swaption(sid: SymbolId)                extends Security with Derivative
-    case class Swap(sid: SymbolId)                    extends Security with Derivative
-    case class FRA(sid: SymbolId)                     extends Security with Derivative
+    lazy val values = findValues
+
+    // A FixedCouponBond or CapitalIndexedBond.
+    case class Bond(val sid: SymbolId) extends Security
+    // A BondFuture.
+    case class BondFuture(val sid: SymbolId) extends Security
+    // A BondFutureOption.
+    case class BondFutureOption(val sid: SymbolId) extends Security
+    // A BulletPayment.
+    case class BulletPayment(val sid: SymbolId) extends Security
+    // A product only used for calibration.
+    case class Calibration(val sid: SymbolId) extends Security
+    // Credit Default Swap (CDS)
+    case class Cds(val sid: SymbolId) extends Security
+    // CDS index
+    case class CdsIndex(val sid: SymbolId) extends Security
+    // Constant Maturity Swap (CMS)
+    case class Cms(val sid: SymbolId) extends Security
+    // A Dsf.
+    case class Dsf(val sid: SymbolId) extends Security
+    // Exchange Traded Derivative - Future (ETD)
+    case class EtdFuture(val sid: SymbolId) extends Security // FIXME: this conflicts wtih mine...
+
+    // fuckit: need the semantic equivalent of "tags" here... moar phantom types?
+
+    // Exchange Traded Derivative - Option (ETD)
+    case class EtdOption(val sid: SymbolId) extends Security
+    // Forward Rate Agreement
+    case class Fra(val sid: SymbolId) extends Security
+    // FX Non-Deliverable Forward
+    case class FxNdf(val sid: SymbolId) extends Security
+    // A FxSingle.
+    case class FxSingle(val sid: SymbolId) extends Security
+    // A FxSingleBarrierOption.
+    case class FxSingleBarrierOption(val sid: SymbolId) extends Security
+    // A FxSwap.
+    case class FxSwap(val sid: SymbolId) extends Security
+    // A FxVanillaOption.
+    case class FxVanillaOption(val sid: SymbolId) extends Security with Derivative
+    // A IborCapFloor.
+    case class IborCapFloor(val sid: SymbolId) extends Security
+    // A IborFuture.
+    case class IborFuture(val sid: SymbolId) extends Security
+    // A IborFutureOption.
+    case class IborFutureOption(val sid: SymbolId) extends Security
+    // Another kind of product, details not known.
+
+    // case class Other(val sid: SymbolId) extends Security
+    // // A Security, used where the kind of security is not known.
+    // case class Security(val sid: SymbolId) extends Security
+
+    case class DebtAmortizing(sid: SymbolId)          extends Security
+    case class DebtConvertible(sid: SymbolId)         extends Security
+    case class EquityCommon(sid: SymbolId)            extends Security
+    case class EquityPreferred(sid: SymbolId)         extends Security
     case class EquityIndexFutureOption(sid: SymbolId) extends Security with Derivative
     case class EquityIndexOption(sid: SymbolId)       extends Security with Derivative
     case class EquityIndexFuture(sid: SymbolId)       extends Security with Derivative
     case class EquityVanillaOption(sid: SymbolId)     extends Security with Derivative
-    case class FxSwap(sid: SymbolId)                  extends Security with Derivative
-    case class FxVanillaOption(sid: SymbolId)         extends Security with Derivative
-    case class FxForwardSpot(sid: SymbolId)           extends Security
-    case class EquityCommon(sid: SymbolId)            extends Security
-    case class EquityPreferred(sid: SymbolId)         extends Security
-    case class DebtConvertible(sid: SymbolId)         extends Security
-    case class DebtBond(sid: SymbolId)                extends Security
-    case class DebtAmortizing(sid: SymbolId)          extends Security // Annuity?
-    case class TermDeposit(sid: SymbolId)             extends Security // DebtSimple?
-    case class BulletPayment(sid: SymbolId)           extends Security
+    case class FxForwardSpot(sid: SymbolId)           extends Security // FIXME not sure here
 
-    lazy val values = findValues
+    // // A representation based on sensitivities.
+    case class Sensitivities(val sid: SymbolId) extends Security
+    // A Swap.
+    case class Swap(val sid: SymbolId) extends Security
+    // A Swaption.
+    case class Swaption(val sid: SymbolId) extends Security
+    // A TermDeposit.
+    case class TermDeposit(val sid: SymbolId) extends Security
   }
 
   type SecurityId = OpaqueId[Long, Security]

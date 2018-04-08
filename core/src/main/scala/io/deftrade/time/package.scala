@@ -71,6 +71,10 @@ package object time extends time.Api {
     def dayOfYear: Int         = ld.getDayOfYear
     def chronology: Chronology = ld.getChronology
 
+    def yearMonthDay = (ld.year, ld.monthValue, ld.dayOfMonth)
+    def yearMonth    = (ld.year, ld.monthValue)
+    def monthDay     = (ld.monthValue, ld.dayOfMonth)
+
     def +(amount: Period): LocalDate = ld plus amount
     def -(amount: Period): LocalDate = ld minus amount
 
