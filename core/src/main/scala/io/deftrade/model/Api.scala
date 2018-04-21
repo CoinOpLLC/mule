@@ -18,7 +18,9 @@ package io.deftrade
 package model
 
 import io.deftrade.money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
+// import io.deftrade.money._, Monetary._
 import io.deftrade.time._
+
 import cats.{ Eq, Monad, Monoid }
 import cats.implicits._
 
@@ -63,24 +65,38 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   object Role extends Enum[Role] {
 
     /**
-      * The the entity(s) whose names are listed on the account.
+      * Semantics for `Principle` are conditioned on the status of account:
+      * - responsible party (liability)
+      * - beneficial owner (asset)
       */
     case object Principle extends Role
 
     /**
-      * Person(s) responsible for the disposition of assets in the Folio.
+      * The primary delegate selected by a `Principle`.
+      * Also, simply, the entity(s) whose names are listed on the `Account`,
+      * and the primary point of contact for the `Account`.
+      * By convention a `Princple` is their own `Agent` unless otherwise specified.
+      */
+    case object Agent extends Role
+
+    /**
+      * The primary delegate selected by the `Agent`.
+      * `Entity`(s) with responsibility for, and authority over,
+      * the disposition of assets in the `Account`.
+      *
+      * In particular, `Manager`s may intitiate `Transaction`s which will settle to the `Ledger`.
+      *
+      * By convention an `Agent` is their own `Manager` unless otherwise specified.
       */
     case object Manager extends Role
 
     /**
-      * Semantics for `Subject` are conditioned on the status of account:
-      * - responsible party (liability)
-      * - beneficial owner (asset)
-      */
-    case object Subject extends Role
-
-    /**
-      * `Regulator`s are first class entities.
+      * `Regulator`s are first class entities, each with a package of rights and responsibilities
+      * which is juristiction specific.
+      * Practically, what this means is that `Regulator`s will have a (possibly limited) view
+      * into the state of the `Ledger`,
+      * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
+      * or even intitiate `Transaction`s.
       */
     case object Regulator extends Role
 
@@ -216,22 +232,51 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     trade.toList foldMap quoteLeg[CCY](market)
 
   /**
+    * The archetypical
+    */
+  type Portion = (EntityId, Quantity)
+  object Portion {
+    lazy val Q = Financial[Quantity]
+    import Q._
+    def validate(p: Portion): Boolean = {
+      val (_, q) = p
+      Q.zero <= q && q <= Q.one
+    }
+    def apply(eid: EntityId, q: Quantity): Portion = (eid, q) ensuring { p =>
+      validate(p)
+    }
+  }
+
+  /**
     * Note that Roster encodes the notion of a `CapitalKey` – per `Role`!
-    * The meaning of this `ProRata` will depend upon the role.
+    * The meaning of this `Partition` will depend upon the role.
     * For the beneficial owner(s) of the assets in question the meaning is obvious.
-    * For a `Manager`, the `ProRata` could encode their voting rights – which may differ from
+    * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
     * their ownership rights.
     */
-  type ProRata = Map[EntityId, Quantity]
-  object ProRata {}
+  type Partition = Map[EntityId, Quantity]
+  object Partition {
+    lazy val Q = Financial[Quantity]
+    def verify(p: Partition): Boolean =
+      p.values.toList.sum == Q.one // FIXME this should be ===
 
-  type Roster = Map[Role, ProRata]
-  // type Roster = Map[Role, Set[EntityId]]
+    def apply(shares: Portion*): Partition = shares.toMap ensuring (p => verify(p))
+  }
+
+  type Roster = Map[Role, Partition]
   object Roster {
     def empty: Roster = Map.empty
   }
 
-  type Account = Map[FolioId, (Folio, Roster)]
+  // TODO: is it possible to specialize Map akin to NonEmptyList such that it always
+  // contains at least an owner?
+
+  // type Account = Map[FolioId, (Folio, Roster)]
+
+  type LedgerState = Map[FolioId, Folio]
+  object LedgerState
+
+  type Account = Map[FolioId, Roster]
   object Account {
     def updatedProRata(a: Account, newProRata: Map[EntityId, Quantity]): Account = ???
   }
@@ -240,31 +285,39 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
 
   /**
-    * I know what you're thinking: There's only one Ledger™. But consider different views, with
-    * different privileges to see different things.
+    * (Runtime) invariant: `Trade`s must balance across all the `FolioId`s in the
+    * `LedgerEntry`.
     */
-  type Ledger = Map[AccountId, Account]
-  object Ledger {
+  type LedgerEntry = Map[FolioId, Trade]
+  object LedgerEntry
+
+  /**
+    * What is the `Ledger`, anyway? It's a `Log` structure, essentially – Foldable[LedgerEntry]
+    */
+  type LedgerKey = Map[AccountId, Account]
+  object LedgerKey {
 
     // TODO: this seems to fix a divirging implicit expansion for Monoid[Account] in `foldMap` - wut
-    implicit val FolioIsMonoid   = Monoid[Folio]
-    implicit val ProRataIsMonoid = Monoid[ProRata]
+    implicit val FolioIsMonoid     = Monoid[Folio]
+    implicit val PartitionIsMonoid = Monoid[Partition]
 
-    def recorded(ledger: Ledger)(ao: AllocatedOrder): Ledger = ao match {
-      case (accountId, folioMap) =>
-        folioMap.toList foldMap {
-          case (folioId, tradeFolio) =>
-            (ledger(accountId) get folioId).fold(
-              ledger + (accountId -> Map(folioId -> ((tradeFolio, Roster.empty))))
-            ) {
-              case (folio, roster) =>
-                val updatedPositions = ((folio |+| tradeFolio), roster)
-                ledger + (accountId -> Map(folioId -> updatedPositions))
+    def recorded(lk: LedgerKey)(ls: LedgerState)(ao: AllocatedOrder): LedgerState = ao match {
+      case (_, transaction) =>
+        transaction.toList foldMap {
+          case (folioId, trade) =>
+            (ls get folioId).fold(
+              ls + (folioId -> trade)
+            ) { folio =>
+              ls + (folioId -> (folio |+| trade))
             }
         }
     }
   }
-  type LedgerId = OpaqueId[Long, Ledger]
+
+  type Ledger = Seq[LedgerEntry] // if you must - but reserving the name is a good idea regardless
+  object Ledger {}
+
+  type LedgerId = OpaqueId[Long, LedgerKey Or LedgerState]
 
   type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
   object Allocation {
@@ -295,7 +348,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     }
   }
 
-  type Order   = (AccountId, Folio)
+  type Transaction = LedgerEntry
+  object Transaction
+
+  type Order   = (AccountId, Trade)
   type OrderId = OpaqueId[Long, Order]
   object Order {
     import io.deftrade.money.Monetary.USD
@@ -306,7 +362,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       )
   }
 
-  type AllocatedOrder = (AccountId, Map[FolioId, Folio])
+  type AllocatedOrder = (AccountId, Transaction)
 
   // TODO: type constructors all the way?
   // how to capture the fact that `[CCY: Monetary]`

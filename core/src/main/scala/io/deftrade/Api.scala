@@ -2,6 +2,8 @@ package io.deftrade
 
 trait Api {
 
+  type Or[A, B] = Either[B, A]
+
   /**
     * Make `Seq` immutable. See:
     * - [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/),
