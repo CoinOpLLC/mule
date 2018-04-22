@@ -45,26 +45,17 @@ import impl._
 abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   /** Domain specific tools for dealing with `Quantity`s */
-  object Quantity {
+  val Quantity = Financial[Quantity]
 
-    /**  Stable values useful for pattern matching. */
-    val Zero: Quantity = Financial[Quantity].zero
-
-    /**  Stable values useful for pattern matching. */
-    val One: Quantity = Financial[Quantity].one
-
-    /** Extractors and (any) other tools for dealing with integral quantities. */
-    object Integral {
-
-      def unapply[N: Integral](q: Quantity): Option[N] = ???
-      // TODO: etc
-    }
-  }
+  /** Domain specific tools for dealing with `MonetaryAmount`s */
+  val MonetaryAmount = Financial[MonetaryAmount]
 
   sealed trait Role extends EnumEntry
   object Role extends Enum[Role] {
 
     /**
+      * The `Entity` which is the economic actor responsible for establishing the `Account`.
+      *
       * Semantics for `Principle` are conditioned on the status of account:
       * - responsible party (liability)
       * - beneficial owner (asset)
@@ -73,8 +64,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
     /**
       * The primary delegate selected by a `Principle`.
-      * Also, simply, the entity(s) whose names are listed on the `Account`,
+      * Also, simply, the `Entity`(s) whose names are listed on the `Account`,
       * and the primary point of contact for the `Account`.
+      *
+      * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
+      * from the `Ledger`.
+      *
       * By convention a `Princple` is their own `Agent` unless otherwise specified.
       */
     case object Agent extends Role
@@ -84,7 +79,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       * `Entity`(s) with responsibility for, and authority over,
       * the disposition of assets in the `Account`.
       *
-      * In particular, `Manager`s may intitiate `Transaction`s which will settle to the `Ledger`.
+      * In particular, `Manager`s may intitiate `Transaction`s which will settle to the `Ledger`,
+      * so long as the `Position`s are already entered in the `Ledger`.
+      *
+      * (All publicly listed and traded assets are treated as entered into the `Ledger`
+      * by convention.)
       *
       * By convention an `Agent` is their own `Manager` unless otherwise specified.
       */
@@ -92,11 +91,18 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
     /**
       * `Regulator`s are first class entities, each with a package of rights and responsibilities
-      * which is juristiction specific.
+      * which is situation and juristiction specific.
+      *
       * Practically, what this means is that `Regulator`s will have a (possibly limited) view
       * into the state of the `Ledger`,
       * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
       * or even intitiate `Transaction`s.
+      *
+      * Actions of the `Regulator` may include the publishing of specific summaries of its views
+      * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
+      *
+      * N.B.: the `Regulator` need not be a governmental entity; in particular this role might
+      * be suited to a risk manager function.
       */
     case object Regulator extends Role
 
@@ -109,6 +115,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   type Entity   = Either[Corporation, Person]
   type EntityId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
+  object EntityId {
+    def next: EntityId = ???
+  }
   // type EntityId = OpaqueId[Long, Entity]
   implicit def EntityIddHasEq = Eq.fromUniversalEquals[EntityId]
 
@@ -209,9 +218,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type SecurityId = OpaqueId[Long, Security]
   implicit def AssetIdHasEq = Eq.fromUniversalEquals[SecurityId]
 
-  type Position = (SecurityId, Quantity)    // '`Position` := `Trade` at rest
-  type Folio    = Map[SecurityId, Quantity] // n.b algebraic relationship Position <=> Folio
+  type Position = (SecurityId, Quantity) // '`Position` := `Trade` at rest
+  object Position
 
+  type Folio = Map[SecurityId, Quantity] // n.b algebraic relationship Position <=> Folio
   object Folio {
     def apply(ps: Position*): Folio = accumulate(ps.toList)
   }
@@ -219,8 +229,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type FolioId = OpaqueId[Long, Folio]
   implicit def FolioIdHasEq = Eq.fromUniversalEquals[FolioId]
 
-  type Leg   = Position // `Leg` := `Position` in motion
-  type Trade = Folio    // `Trade` := `Folio` in motion
+  type Leg = Position // `Leg` := `Position` in motion
+  val Leg = Position
+
+  type Trade = Folio // `Trade` := `Folio` in motion
   val Trade = Folio // gives you Trade(legs: Leg*): Trade
 
   def quoteLeg[CCY: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
@@ -232,19 +244,19 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     trade.toList foldMap quoteLeg[CCY](market)
 
   /**
-    * The archetypical
+    * The portion of the total accorded to the identified `Entity`.
     */
-  type Portion = (EntityId, Quantity)
-  object Portion {
-    lazy val Q = Financial[Quantity]
-    import Q._
-    def validate(p: Portion): Boolean = {
+  type Share = (EntityId, Quantity)
+  object Share {
+    import Quantity._
+    def validate(p: Share): Boolean = {
       val (_, q) = p
-      Q.zero <= q && q <= Q.one
+      zero <= q && q <= one
     }
-    def apply(eid: EntityId, q: Quantity): Portion = (eid, q) ensuring { p =>
+    def apply(eid: EntityId, q: Quantity): Share = (eid, q) ensuring { p =>
       validate(p)
     }
+    def single(eid: EntityId) = Share(eid, one)
   }
 
   /**
@@ -256,22 +268,22 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     */
   type Partition = Map[EntityId, Quantity]
   object Partition {
-    lazy val Q = Financial[Quantity]
-    def verify(p: Partition): Boolean =
-      p.values.toList.sum == Q.one // FIXME this should be ===
+    def apply(shares: Share*): Either[String, Partition] = {
+      val p = accumulate(shares.toList)
+      p.values.toList.sum match {
+        case sum if sum == Quantity.one => p.asRight
+        case badsum                     => s"Partition doesn't add up: $badsum != 1.0".asLeft
+      }
+    }
+    def single(eid: EntityId): Partition = Map.empty + Share.single(eid)
 
-    def apply(shares: Portion*): Partition = shares.toMap ensuring (p => verify(p))
   }
 
   type Roster = Map[Role, Partition]
   object Roster {
-    def empty: Roster = Map.empty
+    def apply(eid: EntityId): Roster =
+      Map.empty + (Role.Principle -> Partition.single(eid))
   }
-
-  // TODO: is it possible to specialize Map akin to NonEmptyList such that it always
-  // contains at least an owner?
-
-  // type Account = Map[FolioId, (Folio, Roster)]
 
   type LedgerState = Map[FolioId, Folio]
   object LedgerState
@@ -314,7 +326,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     }
   }
 
-  type Ledger = Seq[LedgerEntry] // if you must - but reserving the name is a good idea regardless
+  type Ledger = List[LedgerEntry] // if you must - but reserving the name is a good idea regardless
   object Ledger {}
 
   type LedgerId = OpaqueId[Long, LedgerKey Or LedgerState]
@@ -322,28 +334,27 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
   object Allocation {
 
-    lazy val Q = Financial[Quantity]
-    import Q._
+    import Quantity._
 
     def allocate(allocation: Allocation)(order: Order): AllocatedOrder = ???
 
     def pariPassu(fids: Set[FolioId]): Allocation = {
       val n = fids.size
-      (fids.toList zip List.fill(n)(Quantity.One / (Q fromInt n))).toMap
+      (fids.toList zip List.fill(n)(one / fromInt(n))).toMap
     }
     def proRata(totalShares: Long)(capTable: Map[FolioId, Long]): Allocation =
       capTable map {
         case (folioId, shares) =>
-          val mySlice  = Q fromLong shares
-          val wholePie = Q fromLong totalShares
+          val mySlice  = fromLong(shares)
+          val wholePie = fromLong(totalShares)
           (folioId, mySlice / wholePie)
       }
 
     object Single {
-      def apply(folioId: FolioId): Allocation = Map(folioId -> Quantity.One)
-      def unapply(a: Allocation): Option[FolioId] = a.toList match {
-        case (folioId, Quantity.One) :: Nil => Some(folioId)
-        case _                              => None
+      def apply(folioId: FolioId): Allocation = Map(folioId -> one)
+      def unapply(a: Allocation) = a.toList match {
+        case (folioId, One) :: Nil => folioId.some
+        case _                     => none
       }
     }
   }

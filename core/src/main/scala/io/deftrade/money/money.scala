@@ -103,6 +103,10 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
 
   def fromLong(l: Long): N = fromBigDecimal(BigDecimal(l))
 
+  /** hack for pattern matching */
+  final lazy val Zero = zero
+  final lazy val One  = one
+
   final def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
 
   final def to[R: Financial](n: N): R = n |> toBigDecimal |> Financial[R].fromBigDecimal
@@ -115,6 +119,13 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   final def round[C](n: N)(implicit C: Monetary[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
+  }
+
+  /** Extractors and (any) other tools for dealing with integral quantities. */
+  object Integral {
+
+    // TODO:
+    def unapply[I: Integral](n: N): Option[I] = ???
   }
 }
 object Financial {
