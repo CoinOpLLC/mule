@@ -125,7 +125,7 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   object Integral {
 
     // TODO:
-    def unapply[I: Integral](n: N): Option[I] = ???
+    def unapply[I](n: N)(implicit I: Integral[I]): Option[I] = ???
   }
 }
 object Financial {

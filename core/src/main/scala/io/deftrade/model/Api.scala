@@ -34,6 +34,8 @@ import refined.numeric._
 import enumeratum._
 // import enumeratum.values._
 
+// import io.circe.Json
+
 import scala.language.higherKinds
 
 import opaqueid._
@@ -56,92 +58,100 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   }
   object Derivative
 
-  sealed trait UniversalSecurityId extends EnumEntry { def s: String }
-  object UniversalSecurityId extends Enum[UniversalSecurityId] {
+  sealed trait UniversalSecurityIdentifyer extends EnumEntry { def s: String }
+  object UniversalSecurityIdentifyer extends Enum[UniversalSecurityIdentifyer] {
 
-    case class Cusip(val s: String)        extends UniversalSecurityId
-    case class Isin(val s: String)         extends UniversalSecurityId
-    case class Ric(val s: String)          extends UniversalSecurityId
-    case class Buid(val s: String)         extends UniversalSecurityId
-    case class IbContractId(val s: String) extends UniversalSecurityId
-    case class HouseId(val s: String)      extends UniversalSecurityId
+    case class Cusip(s: String)        extends UniversalSecurityIdentifyer
+    case class Isin(s: String)         extends UniversalSecurityIdentifyer
+    case class Ric(s: String)          extends UniversalSecurityIdentifyer
+    case class Buid(s: String)         extends UniversalSecurityIdentifyer
+    case class IbContractId(s: String) extends UniversalSecurityIdentifyer
+    case class HouseId(s: String)      extends UniversalSecurityIdentifyer
 
     lazy val values = findValues
+
+    implicit lazy val eq = Eq.fromUniversalEquals[UniversalSecurityIdentifyer]
   }
 
+  type USI = UniversalSecurityIdentifyer
+  val USI = UniversalSecurityIdentifyer
+
   // TODO: use the XBRL definitions for these, a la OpenGamma
-  sealed trait Security extends EnumEntry { def usid: UniversalSecurityId }
+  sealed trait Security extends EnumEntry { def usi: USI }
   object Security extends Enum[Security] {
 
     lazy val values = findValues
 
     // A FixedCouponBond or CapitalIndexedBond.
-    case class Bond(val usid: UniversalSecurityId) extends Security
+    case class Bond(val usi: USI) extends Security
     // A BondFuture.
-    case class BondFuture(val usid: UniversalSecurityId) extends Security
+    case class BondFuture(val usi: USI) extends Security
     // A BondFutureOption.
-    case class BondFutureOption(val usid: UniversalSecurityId) extends Security
+    case class BondFutureOption(val usi: USI) extends Security
     // A BulletPayment.
-    case class BulletPayment(val usid: UniversalSecurityId) extends Security
+    case class BulletPayment(val usi: USI) extends Security
     // A product only used for calibration.
-    case class Calibration(val usid: UniversalSecurityId) extends Security
+    case class Calibration(val usi: USI) extends Security
     // Credit Default Swap (CDS)
-    case class Cds(val usid: UniversalSecurityId) extends Security
+    case class Cds(val usi: USI) extends Security
     // CDS index
-    case class CdsIndex(val usid: UniversalSecurityId) extends Security
+    case class CdsIndex(val usi: USI) extends Security
     // Constant Maturity Swap (CMS)
-    case class Cms(val usid: UniversalSecurityId) extends Security
+    case class Cms(val usi: USI) extends Security
     // A Dsf.
-    case class Dsf(val usid: UniversalSecurityId) extends Security
+    case class Dsf(val usi: USI) extends Security
     // Exchange Traded Derivative - Future (ETD)
-    case class EtdFuture(val usid: UniversalSecurityId) extends Security // FIXME: this conflicts wtih mine...
-
-    // fuckit: need the semantic equivalent of "tags" here... moar phantom types?
-
+    case class EtdFuture(val usi: USI) extends Security // FIXME: this conflicts wtih mine...
     // Exchange Traded Derivative - Option (ETD)
-    case class EtdOption(val usid: UniversalSecurityId) extends Security
+    case class EtdOption(val usi: USI) extends Security
     // Forward Rate Agreement
-    case class Fra(val usid: UniversalSecurityId) extends Security
+    case class Fra(val usi: USI) extends Security
     // FX Non-Deliverable Forward
-    case class FxNdf(val usid: UniversalSecurityId) extends Security
+    case class FxNdf(val usi: USI) extends Security
     // A FxSingle.
-    case class FxSingle(val usid: UniversalSecurityId) extends Security
+    case class FxSingle(val usi: USI) extends Security
     // A FxSingleBarrierOption.
-    case class FxSingleBarrierOption(val usid: UniversalSecurityId) extends Security
+    case class FxSingleBarrierOption(val usi: USI) extends Security
     // A FxSwap.
-    case class FxSwap(val usid: UniversalSecurityId) extends Security
+    case class FxSwap(val usi: USI) extends Security
     // A FxVanillaOption.
-    case class FxVanillaOption(val usid: UniversalSecurityId) extends Security with Derivative
+    case class FxVanillaOption(val usi: USI) extends Security with Derivative
     // A IborCapFloor.
-    case class IborCapFloor(val usid: UniversalSecurityId) extends Security
+    case class IborCapFloor(val usi: USI) extends Security
     // A IborFuture.
-    case class IborFuture(val usid: UniversalSecurityId) extends Security
+    case class IborFuture(val usi: USI) extends Security
     // A IborFutureOption.
-    case class IborFutureOption(val usid: UniversalSecurityId) extends Security
-    // Another kind of product, details not known.
-
-    // case class Other(val usid: UniversalSecurityId) extends Security
-    // // A Security, used where the kind of security is not known.
-    // case class Security(val usid: UniversalSecurityId) extends Security
-
-    case class DebtAmortizing(usid: UniversalSecurityId)          extends Security
-    case class DebtConvertible(usid: UniversalSecurityId)         extends Security
-    case class EquityCommon(usid: UniversalSecurityId)            extends Security
-    case class EquityPreferred(usid: UniversalSecurityId)         extends Security
-    case class EquityIndexFutureOption(usid: UniversalSecurityId) extends Security with Derivative
-    case class EquityIndexOption(usid: UniversalSecurityId)       extends Security with Derivative
-    case class EquityIndexFuture(usid: UniversalSecurityId)       extends Security with Derivative
-    case class EquityVanillaOption(usid: UniversalSecurityId)     extends Security with Derivative
-    case class FxForwardSpot(usid: UniversalSecurityId)           extends Security // FIXME not sure here
-
+    case class IborFutureOption(val usi: USI) extends Security
     // // A representation based on sensitivities.
-    case class Sensitivities(val usid: UniversalSecurityId) extends Security
+    case class Sensitivities(val usi: USI) extends Security
     // A Swap.
-    case class Swap(val usid: UniversalSecurityId) extends Security
+    case class Swap(val usi: USI) extends Security
     // A Swaption.
-    case class Swaption(val usid: UniversalSecurityId) extends Security
+    case class Swaption(val usi: USI) extends Security
     // A TermDeposit.
-    case class TermDeposit(val usid: UniversalSecurityId) extends Security
+    case class TermDeposit(val usi: USI) extends Security
+
+    case class AmortizingLoan(val usi: USI)  extends Security
+    case class ConvertibleLoan(val usi: USI) extends Security
+
+    case class CommonStock(val usi: USI)    extends Security
+    case class PreferredStock(val usi: USI) extends Security
+
+    case class StockIndexFutureOption(val usi: USI) extends Security with Derivative
+    case class StockIndexOption(val usi: USI)       extends Security with Derivative
+    case class StockIndexFuture(val usi: USI)       extends Security with Derivative
+    case class StockOption(val usi: USI)            extends Security with Derivative
+
+    case class FxForwardSpot(val usi: USI) extends Security // FIXME not sure here
+
+    implicit lazy val eq = Eq.fromUniversalEquals[Security]
+  }
+
+  object hack {
+    def foo(l: Security, r: Security) = {
+      val x: Boolean = l === r
+      x
+    }
   }
 
   type SecurityId = OpaqueId[Long, Security]
@@ -180,7 +190,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Ledger = List[LedgerEntry] // if you must - but reserving the name is a good idea regardless
   object Ledger
 
-  type LedgerState = Map[FolioId, Folio] // = LedgerEntry TODO: different concept, same type...
+  /** Nota Bene: looks like LedgerState and LedgerEntry are the same thing (and form a monoid) */
+  type LedgerState = Map[FolioId, Folio]
   object LedgerState
 
   trait Person
@@ -285,7 +296,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       }
     }
     def single(eid: EntityId): Partition = Map.empty + Share.single(eid)
-
   }
 
   type Roster = Map[Role, Partition]
@@ -293,13 +303,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def apply(eid: EntityId): Roster =
       Map.empty + (Role.Principle -> Partition.single(eid))
   }
+
   type Account = Map[FolioId, Roster]
   object Account {
     def updatedProRata(a: Account, newProRata: Map[EntityId, Quantity]): Account = ???
   }
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
-  // implicit def AccountIdHasEq = Eq.fromUniversalEquals[AccountId]
+  object AccountId
 
   type LedgerKey = Map[AccountId, Account]
   object LedgerKey {
@@ -321,7 +332,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     }
   }
 
-  type LedgerId = OpaqueId[Long, (LedgerKey, LedgerState)]
+  type LedgerId = OpaqueId[Long, LedgerKey]
   object LedgerId extends OpaqueIdC[LedgerId]
 
   type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
@@ -352,7 +363,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     }
   }
 
-  type Order = (AccountId, Trade)
+  type Order = (AccountId, EntityId, Trade)
   object Order {
     import io.deftrade.money.Monetary.USD
     def legacy(bd: BigDecimal, q: Long): PricedTrade[USD] =
@@ -366,16 +377,25 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   object OrderId extends OpaqueIdC[OrderId]
 
   type AllocatedOrder = (AccountId, Transaction)
+  object AllocatedOrder
 
   // TODO: type constructors all the way?
   // how to capture the fact that `[CCY: Monetary]`
-  type Execution[CCY]   = (OrderId, LocalDateTime, PricedTrade[CCY])
+  type Execution[CCY] = (OrderId, LocalDateTime, PricedTrade[CCY])
+  object Execution
+
   type ExecutionId[CCY] = OpaqueId[Long, Execution[CCY]]
+  class ExecutionIdC[CCY] extends OpaqueIdC[ExecutionId[CCY]]
+  // FIXME this requires custom fuzting
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
+  object PricedTrade
 
   sealed trait Exchange // a multiparty nexus
-  sealed trait Counter  // a single counterparty or market maker
+  object Exchange
+
+  sealed trait Counter // a single counterparty or market maker
+  object Counter
 
   type Market = Either[Counter, Exchange]
   object Market {
@@ -390,6 +410,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
       ???
   }
+
   type MarketId = OpaqueId[Long, Market]
   object MarketId extends OpaqueIdC[MarketId]
 
@@ -417,17 +438,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 object opaqueid {
 
   private[model] sealed trait IdTypeTraits extends Any {
-    type ValueType
-    type PhantomType
+    type Value
+    type Phantom
   }
 
   private[model] sealed trait Id[V] extends Any with IdTypeTraits {
-    final type ValueType = V
+    final type Value = V
     def id: V
   }
 
   final case class OpaqueId[V, P] private[model] (val id: V) extends AnyVal with Id[V] {
-    final type PhantomType = P
+    final type Phantom = P
   }
 
   object OpaqueId {
@@ -435,8 +456,8 @@ object opaqueid {
   }
 
   trait OpaqueIdC[OIDT <: IdTypeTraits] {
-    def apply(v: OIDT#ValueType) = OpaqueId[OIDT#ValueType, OIDT#PhantomType](v)
-    def fresh: OIDT              = ???
+    def apply(v: OIDT#Value) = OpaqueId[OIDT#Value, OIDT#Phantom](v)
+    def fresh: OIDT          = ???
   }
 
   object LongId {
