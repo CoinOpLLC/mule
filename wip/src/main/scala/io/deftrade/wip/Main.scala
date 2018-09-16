@@ -44,7 +44,7 @@ object Main extends App {
   TreeStuff             |> discardValue
   StateMonadStuff       |> discardValue
   MonadTransformerStuff |> discardValue
-  CartesianStuff        |> discardValue
+  SemigroupalStuff      |> discardValue
   TraverseStuff         |> discardValue
 
   /*

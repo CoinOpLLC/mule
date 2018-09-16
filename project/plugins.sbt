@@ -4,6 +4,15 @@
 scalafmtOnCompile in ThisBuild := true // all projects
 
 /**
+  * [Flyway database migrations tool](https://flywaydb.org/):
+  * schema roll-back, roll-forward, etc.
+  */
+addSbtPlugin("io.github.davidmweber" % "flyway-sbt" % "5.0.0")
+// resolvers += "Flyway" at "https://davidmweber.github.io/flyway-sbt.repo"
+// resolvers += "Flyway" at "https://flywaydb.org/repo"
+// addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0")
+
+/**
   * Implementing suggestions from [this post](https://pbassiner.github.io/blog/essential_sbt_plugins.html).
   *
   * settings and tasks (mostly(!)) beginWith `dependencyUpdates`
@@ -41,7 +50,7 @@ addSbtPlugin("de.heikoseeberger" % "sbt-header" % "4.0.0")
   * As with real warts, there will be blood: be prepeared.
   * [Wart Remover](http://www.wartremover.org/)
   */
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.2.1")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.3.5")
 
 /**
   * [Coursier](https://github.com/coursier/coursier#command-line)
@@ -95,14 +104,6 @@ addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
   * [Pretty class diagrams; needs graphviz](https://github.com/xuwei-k/sbt-class-diagram)
   */
 addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
-
-/**
-  * [Flyway database migrations tool](https://flywaydb.org/):
-  * schema roll-back, roll-forward, etc.
-  */
-// resolvers += "Flyway" at "https://flywaydb.org/repo"
-resolvers += "Flyway" at "https://davidmweber.github.io/flyway-sbt.repo"
-addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0")
 
 /**
   * [link](url)

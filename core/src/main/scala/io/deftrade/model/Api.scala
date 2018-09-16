@@ -315,10 +315,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type LedgerKey = Map[AccountId, Account]
   object LedgerKey {
 
-    // TODO: this seems to fix a divirging implicit expansion for Monoid[Account] in `foldMap` - wut
-    implicit val FolioIsMonoid     = Monoid[Folio]
-    implicit val PartitionIsMonoid = Monoid[Partition]
-
     def recorded(lk: LedgerKey)(ls: LedgerState)(ao: AllocatedOrder): LedgerState = ao match {
       case (_, transaction) =>
         transaction.toList foldMap {

@@ -3,11 +3,13 @@
 import sbt._
 import Keys._
 
+import _root_.io.github.davidmweber.FlywayPlugin
+
 import java.io.File
 
 object QuillCodeGenPlugin extends AutoPlugin {
 
-  override def requires = org.flywaydb.sbt.FlywayPlugin
+  override def requires = FlywayPlugin
   override def trigger  = noTrigger
 
   object autoImport {
@@ -36,7 +38,7 @@ object QuillCodeGenPlugin extends AutoPlugin {
     )
     def qcgBaseSettings: Seq[Setting[_]] = {
 
-      import org.flywaydb.sbt.FlywayPlugin.autoImport._
+      import FlywayPlugin.autoImport._
 
       Seq(
         qcgPackage := "io.deftrade.rdb",

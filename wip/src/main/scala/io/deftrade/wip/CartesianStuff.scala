@@ -20,7 +20,7 @@ package wip
 import scala.language.higherKinds
 // import scala.language.implicitConversions
 
-import cats.{ Cartesian, Eq, Id, Monad }
+import cats.{ Eq, Id, Monad, Semigroupal }
 
 import cats.data.{ Validated, NonEmptyList => NEL }
 
@@ -38,9 +38,9 @@ import cats.implicits._
 // import cats.syntax.option._
 // import cats.syntax.eq._
 
-object CartesianStuff {
+object SemigroupalStuff {
 
-  val p = Cartesian tuple3 (23.some, "oh hai".some, true.some)
+  val p = Semigroupal tuple3 (23.some, "oh hai".some, true.some)
   val q = (23.some, "oh hai".some, true.some)
 
   p === q.tupled |> assert
