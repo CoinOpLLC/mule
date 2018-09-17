@@ -158,3 +158,39 @@ object Role extends Enum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 }
+
+sealed trait Asset extends EnumEntry
+object Asset extends Enum[Asset] {
+  lazy val values = findValues
+  case object Cash                               extends Asset
+  case object AccountsReceivable                 extends Asset
+  case object LessBadDebtAllowance               extends Asset
+  case object Inventories                        extends Asset
+  case object USObligations                      extends Asset
+  case object TaxExemptSec                       extends Asset
+  case object OtherCurrent                       extends Asset
+  case object LoansToPartners                    extends Asset
+  case object MortgageAndRealEstateLoans         extends Asset
+  case object OtherInvestments                   extends Asset
+  case object BuildingsAndOtherDepreciableAssets extends Asset
+  case object LessAccumulatedDepreciation        extends Asset
+  case object DepletableAssets                   extends Asset
+  case object LessAccumulatedDepletion           extends Asset
+  case object Land                               extends Asset
+  case object IntangibleAssets                   extends Asset
+  case object LessAccumulatedAmortization        extends Asset
+  case object OtherAssets                        extends Asset
+}
+
+sealed trait Liability extends EnumEntry
+object Liability extends Enum[Liability] {
+  lazy val values = findValues
+  case object AccountsPayable        extends Liability
+  case object CurrentMortgateNotes   extends Liability
+  case object OtherCurrentLabilities extends Liability
+  case object NonrecourseLoans       extends Liability
+  case object LoansFromPartners      extends Liability
+  case object MortgageNotes          extends Liability
+  case object OtherLiabilities       extends Liability
+  case object PartnersCapital        extends Liability
+}

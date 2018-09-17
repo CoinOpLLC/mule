@@ -274,4 +274,35 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       (k, kvs) <- kvs groupBy (_._1)
     } yield (k, kvs foldMap (_._2))
 
+  /** IRS Form 1065 Schedule L ontology */
+  case class BalanceSheet private (val assets: BalanceSheet.Assets, val liabilities: BalanceSheet.Liabilities) {
+
+    import BalanceSheet._
+
+    def morph(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
+      BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
+
+    def sustain(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet = ???
+    // copy(assets = assets + (from -> -amt) + (to -> amt)) FIXME MORON
+
+    def sustain(from: Liability, to: Liability)(amt: MonetaryAmount): BalanceSheet = ???
+
+  }
+  object BalanceSheet {
+
+    def empty: BalanceSheet = BalanceSheet(Map.empty, Map.empty)
+
+    def combine(a: BalanceSheet, b: BalanceSheet): BalanceSheet = ???
+
+    type Assets      = Map[Asset, MonetaryAmount]
+    type Liabilities = Map[Liability, MonetaryAmount]
+
+    type Asset = enums.Asset
+    val Asset = enums.Asset
+
+    type Liability = enums.Liability
+    val Liability = enums.Liability
+
+  }
+
 }
