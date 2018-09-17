@@ -1,0 +1,160 @@
+package io.deftrade
+package model.enums
+
+import cats.Eq
+import enumeratum._
+// import enumeratum.values._
+
+sealed trait UniversalSecurityIdentifyer extends EnumEntry { def s: String }
+object UniversalSecurityIdentifyer extends Enum[UniversalSecurityIdentifyer] {
+
+  case class Cusip(s: String)        extends UniversalSecurityIdentifyer
+  case class Isin(s: String)         extends UniversalSecurityIdentifyer
+  case class Ric(s: String)          extends UniversalSecurityIdentifyer
+  case class Buid(s: String)         extends UniversalSecurityIdentifyer
+  case class IbContractId(s: String) extends UniversalSecurityIdentifyer
+  case class HouseId(s: String)      extends UniversalSecurityIdentifyer
+
+  lazy val values = findValues
+
+  implicit lazy val eq = Eq.fromUniversalEquals[UniversalSecurityIdentifyer]
+
+}
+
+sealed trait Derivative { self: Security =>
+  def underlyer: Security
+}
+object Derivative
+
+sealed trait Security extends EnumEntry { def usi: UniversalSecurityIdentifyer }
+
+object Security extends Enum[Security] {
+
+  type USI = UniversalSecurityIdentifyer
+
+  lazy val values = findValues
+
+  // A FixedCouponBond or CapitalIndexedBond.
+  case class Bond(val usi: USI) extends Security
+  // A BondFuture.
+  case class BondFuture(val usi: USI) extends Security
+  // A BondFutureOption.
+  case class BondFutureOption(val usi: USI) extends Security
+  // A BulletPayment.
+  case class BulletPayment(val usi: USI) extends Security
+  // A product only used for calibration.
+  case class Calibration(val usi: USI) extends Security
+  // Credit Default Swap (CDS)
+  case class Cds(val usi: USI) extends Security
+  // CDS index
+  case class CdsIndex(val usi: USI) extends Security
+  // Constant Maturity Swap (CMS)
+  case class Cms(val usi: USI) extends Security
+  // A Dsf.
+  case class Dsf(val usi: USI) extends Security
+  // Exchange Traded Derivative - Future (ETD)
+  case class EtdFuture(val usi: USI) extends Security // FIXME: this conflicts wtih mine...
+  // Exchange Traded Derivative - Option (ETD)
+  case class EtdOption(val usi: USI) extends Security
+  // Forward Rate Agreement
+  case class Fra(val usi: USI) extends Security
+  // FX Non-Deliverable Forward
+  case class FxNdf(val usi: USI) extends Security
+  // A FxSingle.
+  case class FxSingle(val usi: USI) extends Security
+  // A FxSingleBarrierOption.
+  case class FxSingleBarrierOption(val usi: USI) extends Security
+  // A FxSwap.
+  case class FxSwap(val usi: USI) extends Security
+  // A FxVanillaOption.
+  case class FxVanillaOption(val usi: USI, val underlyer: Security) extends Security with Derivative
+  // A IborCapFloor.
+  case class IborCapFloor(val usi: USI) extends Security
+  // A IborFuture.
+  case class IborFuture(val usi: USI) extends Security
+  // A IborFutureOption.
+  case class IborFutureOption(val usi: USI) extends Security
+  // // A representation based on sensitivities.
+  case class Sensitivities(val usi: USI) extends Security
+  // A Swap.
+  case class Swap(val usi: USI) extends Security
+  // A Swaption.
+  case class Swaption(val usi: USI) extends Security
+  // A TermDeposit.
+  case class TermDeposit(val usi: USI) extends Security
+
+  case class AmortizingLoan(val usi: USI)  extends Security
+  case class ConvertibleLoan(val usi: USI) extends Security
+
+  case class CommonStock(val usi: USI)    extends Security
+  case class PreferredStock(val usi: USI) extends Security
+
+  case class StockIndexFutureOption(val usi: USI, val underlyer: Security) extends Security with Derivative
+  case class StockIndexOption(val usi: USI, val underlyer: Security)       extends Security with Derivative
+  case class StockIndexFuture(val usi: USI, val underlyer: Security)       extends Security with Derivative
+  case class StockOption(val usi: USI, val underlyer: Security)            extends Security with Derivative
+
+  case class FxForwardSpot(val usi: USI) extends Security // FIXME not sure here
+
+  implicit lazy val eq = Eq.fromUniversalEquals[Security]
+}
+
+sealed trait Role extends EnumEntry
+object Role extends Enum[Role] {
+
+  /**
+    * The `Entity` which is the economic actor responsible for establishing the `Account`.
+    *
+    * Semantics for `Principle` are conditioned on the status of account:
+    * - responsible party (liability)
+    * - beneficial owner (asset)
+    */
+  case object Principle extends Role
+
+  /**
+    * The primary delegate selected by a `Principle`.
+    * Also, simply, the `Entity`(s) whose names are listed on the `Account`,
+    * and the primary point of contact for the `Account`.
+    *
+    * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
+    * from the `Ledger`.
+    *
+    * By convention a `Princple` is their own `Agent` unless otherwise specified.
+    */
+  case object Agent extends Role
+
+  /**
+    * The primary delegate selected by the `Agent`.
+    * `Entity`(s) with responsibility for, and authority over,
+    * the disposition of assets in the `Account`.
+    *
+    * In particular, `Manager`s may intitiate `Transaction`s which will settle to the `Ledger`,
+    * so long as the `Position`s are already entered in the `Ledger`.
+    *
+    * (All publicly listed and traded assets are treated as entered into the `Ledger`
+    * by convention.)
+    *
+    * By convention an `Agent` is their own `Manager` unless otherwise specified.
+    */
+  case object Manager extends Role
+
+  /**
+    * `Regulator`s are first class entities, each with a package of rights and responsibilities
+    * which is situation and juristiction specific.
+    *
+    * Practically, what this means is that `Regulator`s will have a (possibly limited) view
+    * into the state of the `Ledger`,
+    * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
+    * or even intitiate `Transaction`s.
+    *
+    * Actions of the `Regulator` may include the publishing of specific summaries of its views
+    * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
+    *
+    * N.B.: the `Regulator` need not be a governmental entity; in particular this role might
+    * be suited to a risk manager function.
+    */
+  case object Regulator extends Role
+
+  /** The `findValues` macro collects all `value`s in the order written. */
+  lazy val values: IndexedSeq[Role] = findValues
+}

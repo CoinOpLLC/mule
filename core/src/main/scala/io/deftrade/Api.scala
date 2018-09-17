@@ -1,5 +1,46 @@
 package io.deftrade
 
+/**
+ Leave these here. Opaque means opaque.
+  */
+package opaqueid {
+
+  import cats.Eq
+
+  sealed trait IdTypeTraits extends Any {
+    type Value
+    type Phantom
+  }
+
+  sealed trait Id[V] extends Any with IdTypeTraits {
+    final type Value = V
+    def id: V
+  }
+
+  final case class OpaqueId[V, P] private (val id: V) extends AnyVal with Id[V] {
+    final type Phantom = P
+  }
+
+  object OpaqueId {
+    implicit def eq[T: Eq, P]: Eq[OpaqueId[T, P]] = Eq by (_.id)
+  }
+
+  trait OpaqueIdC[OIDT <: IdTypeTraits] {
+    def apply(v: OIDT#Value) = OpaqueId[OIDT#Value, OIDT#Phantom](v)
+    def fresh: OIDT          = ???
+    def reserved: OIDT#Value = ???
+  }
+
+  object LongId {
+    def reserved[P] = OpaqueId[Long, P](Long.MinValue)
+  }
+
+  object IntId {
+    def reserved[P] = OpaqueId[Int, P](Int.MinValue)
+  }
+
+}
+
 trait Api {
 
   type Or[A, B] = Either[B, A]
@@ -78,4 +119,5 @@ trait Api {
     }
 
   }
+
 }
