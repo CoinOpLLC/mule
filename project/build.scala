@@ -4,7 +4,7 @@ import Keys._
 
 object Version {
 
-  val Scala          = "2.12.4"
+  val Scala          = "2.12.6"
   val Xml            = "1.1.0"
   val ScalaTest      = "3.0.5"
   val ScalaCheck     = "1.14.0"
@@ -18,12 +18,13 @@ object Version {
   val Squants        = "1.3.0"
   val Circe          = "0.8.0"
   val Fansi          = "0.2.5"
-  val AkkaHttp       = "10.0.11"
-  val HttpSession    = "0.5.3"
+  val Akka           = "2.5.12"
+  val AkkaHttp       = "10.1.5"
+  val HttpSession    = "0.5.5"
   val Ammonite       = "0.8.3"
   val Quill          = "2.3.1"
   val PgJdbc         = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
-  val OpenGamma      = "1.4.0"
+  val OpenGamma      = "2.0.0"
 
   // val PgJdbc = "9.4-1201-jdbc41"
 }
@@ -100,7 +101,12 @@ object Deps {
   ) map (_ % Quill)
 
   /** toolkits */
-  val akkaHttp = "com.typesafe.akka" %% "akka-http" % AkkaHttp
+  val akkaHttp   = "com.typesafe.akka" %% "akka-http"   % AkkaHttp
+  val akkaActor  = "com.typesafe.akka" %% "akka-actor"  % Akka
+  val akkaStream = "com.typesafe.akka" %% "akka-stream" % Akka
+  // If testkit used, explicitly declare dependency on akka-streams-testkit in same version as akka-actor
+  val akkaHttpTk   = "com.typesafe.akka" %% "akka-http-testkit"   % AkkaHttp % Test
+  val akkaStreamTk = "com.typesafe.akka" %% "akka-stream-testkit" % Akka     % Test
 
   val httpSession    = "com.softwaremill.akka-http-session" %% "core" % HttpSession
   val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
@@ -108,6 +114,8 @@ object Deps {
 
   lazy val httplibs = List(
     akkaHttp,
+    akkaActor,
+    akkaStream,
     httpSession,
     httpSessionJwt
   )

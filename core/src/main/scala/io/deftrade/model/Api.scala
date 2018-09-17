@@ -147,13 +147,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     implicit lazy val eq = Eq.fromUniversalEquals[Security]
   }
 
-  object hack {
-    def foo(l: Security, r: Security) = {
-      val x: Boolean = l === r
-      x
-    }
-  }
-
   type SecurityId = OpaqueId[Long, Security]
   object SecurityId extends OpaqueIdC[SecurityId]
 
@@ -431,6 +424,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
 }
 
+/**
+ Leave these here. Opaque means opaque.
+  */
 object opaqueid {
 
   private[model] sealed trait IdTypeTraits extends Any {

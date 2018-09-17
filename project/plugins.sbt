@@ -8,9 +8,6 @@ scalafmtOnCompile in ThisBuild := true // all projects
   * schema roll-back, roll-forward, etc.
   */
 addSbtPlugin("io.github.davidmweber" % "flyway-sbt" % "5.0.0")
-// resolvers += "Flyway" at "https://davidmweber.github.io/flyway-sbt.repo"
-// resolvers += "Flyway" at "https://flywaydb.org/repo"
-// addSbtPlugin("org.flywaydb" % "flyway-sbt" % "4.2.0")
 
 /**
   * Implementing suggestions from [this post](https://pbassiner.github.io/blog/essential_sbt_plugins.html).
