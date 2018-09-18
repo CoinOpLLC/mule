@@ -21,7 +21,7 @@ import io.deftrade.money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary,
 // import io.deftrade.money._, Monetary._
 import io.deftrade.time._
 
-import cats.{ Eq, Monad, Monoid }
+import cats.{ Monad, Monoid }
 import cats.implicits._
 
 import eu.timepit.refined
@@ -36,6 +36,24 @@ import refined.numeric._
 import scala.language.higherKinds
 
 import opaqueid.{ OpaqueId, OpaqueIdC }
+
+import cats.kernel.CommutativeGroup
+import cats.kernel.instances.MapMonoid
+
+package feralcats {
+
+  class MapCommutativeGroup[K, V: CommutativeGroup] extends MapMonoid[K, V] with CommutativeGroup[Map[K, V]] {
+    def inverse(a: Map[K, V]): Map[K, V] =
+      a.foldLeft(Map.empty[K, V]) { case (my, (k, x)) => my updated (k, CommutativeGroup inverse x) }
+  }
+
+  object instances {
+    implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
+      new MapCommutativeGroup[K, V]
+  }
+}
+
+import feralcats.instances._
 
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
@@ -274,28 +292,23 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       (k, kvs) <- kvs groupBy (_._1)
     } yield (k, kvs foldMap (_._2))
 
-  /** IRS Form 1065 Schedule L ontology */
+  /** `BalanceSheet` forms a commutative group */
   case class BalanceSheet private (val assets: BalanceSheet.Assets, val liabilities: BalanceSheet.Liabilities) {
 
+    /** IRS Form 1065 Schedule L ontology */
     import BalanceSheet._
 
-    def morph(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
+    def updated(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
       BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
 
-    def sustain(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet = ???
-    // copy(assets = assets + (from -> -amt) + (to -> amt)) FIXME MORON
+    def updated(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet =
+      copy(assets = assets + (from -> amt.inverse) + (to -> amt))
 
-    def sustain(from: Liability, to: Liability)(amt: MonetaryAmount): BalanceSheet = ???
+    def updated(from: Liability, to: Liability)(amt: MonetaryAmount): BalanceSheet =
+      copy(liabilities = liabilities + (from -> amt.inverse) + (to -> amt))
 
   }
   object BalanceSheet {
-
-    def empty: BalanceSheet = BalanceSheet(Map.empty, Map.empty)
-
-    def combine(a: BalanceSheet, b: BalanceSheet): BalanceSheet = ???
-
-    type Assets      = Map[Asset, MonetaryAmount]
-    type Liabilities = Map[Liability, MonetaryAmount]
 
     type Asset = enums.Asset
     val Asset = enums.Asset
@@ -303,6 +316,16 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     type Liability = enums.Liability
     val Liability = enums.Liability
 
+    type Assets      = Map[Asset, MonetaryAmount]
+    type Liabilities = Map[Liability, MonetaryAmount]
+
+    def empty: BalanceSheet = BalanceSheet(Map.empty, Map.empty)
+
+    def combine(a: BalanceSheet, b: BalanceSheet): BalanceSheet = ???
+
+    def inverse(a: BalanceSheet): BalanceSheet = ???
+
+    implicit def bsCommutativeGroup: CommutativeGroup[BalanceSheet] = ???
   }
 
 }
