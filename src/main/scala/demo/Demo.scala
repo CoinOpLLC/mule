@@ -79,6 +79,4 @@ object TimeExample {
 
 }
 
-trait Demo {}
-
-object Demo extends App with Demo {}
+object Demo extends App {}

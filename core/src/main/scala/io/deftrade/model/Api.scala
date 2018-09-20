@@ -110,8 +110,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Ledger = List[LedgerEntry] // if you must - but reserving the name is a good idea regardless
   object Ledger
 
-  /** Nota Bene: looks like LedgerState and LedgerEntry are the same thing (and form a monoid) */
-  type LedgerState = Map[FolioId, Folio]
+  type LedgerState = Map[FolioId, Folio] // = LedgerEntry
   object LedgerState
 
   trait Person
@@ -319,11 +318,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     type Assets      = Map[Asset, MonetaryAmount]
     type Liabilities = Map[Liability, MonetaryAmount]
 
-    def empty: BalanceSheet = BalanceSheet(Map.empty, Map.empty)
+    def empty = BalanceSheet(Map.empty, Map.empty)
 
-    def combine(a: BalanceSheet, b: BalanceSheet): BalanceSheet = ???
+    def combine(a: BalanceSheet, b: BalanceSheet) =
+      BalanceSheet(a.assets |+| b.assets, a.liabilities |+| b.liabilities)
 
-    def inverse(a: BalanceSheet): BalanceSheet = ???
+    def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
 
     implicit def bsCommutativeGroup: CommutativeGroup[BalanceSheet] = ???
   }

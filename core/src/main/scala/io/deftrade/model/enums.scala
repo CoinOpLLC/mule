@@ -18,7 +18,6 @@ object UniversalSecurityIdentifyer extends Enum[UniversalSecurityIdentifyer] {
   lazy val values = findValues
 
   implicit lazy val eq = Eq.fromUniversalEquals[UniversalSecurityIdentifyer]
-
 }
 
 sealed trait Derivative { self: Security =>
