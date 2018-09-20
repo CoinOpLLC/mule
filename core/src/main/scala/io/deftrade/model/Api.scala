@@ -318,14 +318,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     type Assets      = Map[Asset, MonetaryAmount]
     type Liabilities = Map[Liability, MonetaryAmount]
 
-    def empty = BalanceSheet(Map.empty, Map.empty)
+    implicit lazy val balanceSheetCommutativeGroup: CommutativeGroup[BalanceSheet] =
+      new CommutativeGroup[BalanceSheet] {
 
-    def combine(a: BalanceSheet, b: BalanceSheet) =
-      BalanceSheet(a.assets |+| b.assets, a.liabilities |+| b.liabilities)
+        override def empty = BalanceSheet(Map.empty, Map.empty)
 
-    def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
+        override def combine(a: BalanceSheet, b: BalanceSheet) =
+          BalanceSheet(a.assets combine b.assets, a.liabilities combine b.liabilities)
 
-    implicit def bsCommutativeGroup: CommutativeGroup[BalanceSheet] = ???
+        override def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
+      }
+
   }
 
 }
