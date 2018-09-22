@@ -5,97 +5,98 @@ import cats.Eq
 import enumeratum._
 // import enumeratum.values._
 
-sealed trait UniversalSecurityIdentifyer extends EnumEntry { def s: String }
-object UniversalSecurityIdentifyer extends Enum[UniversalSecurityIdentifyer] {
-
-  case class Cusip(s: String)        extends UniversalSecurityIdentifyer
-  case class Isin(s: String)         extends UniversalSecurityIdentifyer
-  case class Ric(s: String)          extends UniversalSecurityIdentifyer
-  case class Buid(s: String)         extends UniversalSecurityIdentifyer
-  case class IbContractId(s: String) extends UniversalSecurityIdentifyer
-  case class HouseId(s: String)      extends UniversalSecurityIdentifyer
+sealed trait UniversalInstrumentIdentifyer extends EnumEntry { def s: String }
+object UniversalInstrumentIdentifyer extends Enum[UniversalInstrumentIdentifyer] {
+  // TODO: each of these needs a regex refinement for the string param
+  case class Cusip(s: String)        extends UniversalInstrumentIdentifyer
+  case class Isin(s: String)         extends UniversalInstrumentIdentifyer
+  case class Ric(s: String)          extends UniversalInstrumentIdentifyer
+  case class Buid(s: String)         extends UniversalInstrumentIdentifyer
+  case class IbContractId(s: String) extends UniversalInstrumentIdentifyer
+  case class HouseId(s: String)      extends UniversalInstrumentIdentifyer
 
   lazy val values = findValues
 
-  implicit lazy val eq = Eq.fromUniversalEquals[UniversalSecurityIdentifyer]
+  implicit lazy val eq = Eq.fromUniversalEquals[UniversalInstrumentIdentifyer]
 }
 
-sealed trait Derivative { self: Security =>
-  def underlyer: Security
+sealed trait Derivative { self: Instrument =>
+  def underlyer: Instrument
 }
 object Derivative
 
-sealed trait Security extends EnumEntry { def usi: UniversalSecurityIdentifyer }
+sealed trait Instrument extends EnumEntry { def usi: UniversalInstrumentIdentifyer }
 
-object Security extends Enum[Security] {
+object Instrument extends Enum[Instrument] {
 
-  type USI = UniversalSecurityIdentifyer
+  type USI = UniversalInstrumentIdentifyer
 
   lazy val values = findValues
 
   // A FixedCouponBond or CapitalIndexedBond.
-  case class Bond(val usi: USI) extends Security
+  case class Bond(val usi: USI) extends Instrument
   // A BondFuture.
-  case class BondFuture(val usi: USI) extends Security
+  case class BondFuture(val usi: USI) extends Instrument
   // A BondFutureOption.
-  case class BondFutureOption(val usi: USI) extends Security
+  case class BondFutureOption(val usi: USI) extends Instrument
   // A BulletPayment.
-  case class BulletPayment(val usi: USI) extends Security
+  case class BulletPayment(val usi: USI) extends Instrument
   // A product only used for calibration.
-  case class Calibration(val usi: USI) extends Security
+  case class Calibration(val usi: USI) extends Instrument
   // Credit Default Swap (CDS)
-  case class Cds(val usi: USI) extends Security
+  case class Cds(val usi: USI) extends Instrument
   // CDS index
-  case class CdsIndex(val usi: USI) extends Security
+  case class CdsIndex(val usi: USI) extends Instrument
   // Constant Maturity Swap (CMS)
-  case class Cms(val usi: USI) extends Security
-  // A Dsf.
-  case class Dsf(val usi: USI) extends Security
+  case class Cms(val usi: USI) extends Instrument
+  // A Deliverable Swap Forward
+  // https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf
+  case class Dsf(val usi: USI) extends Instrument
   // Exchange Traded Derivative - Future (ETD)
-  case class EtdFuture(val usi: USI) extends Security // FIXME: this conflicts wtih mine...
+  case class EtdFuture(val usi: USI) extends Instrument // FIXME: this conflicts wtih mine...
   // Exchange Traded Derivative - Option (ETD)
-  case class EtdOption(val usi: USI) extends Security
+  case class EtdOption(val usi: USI) extends Instrument
   // Forward Rate Agreement
-  case class Fra(val usi: USI) extends Security
+  case class Fra(val usi: USI) extends Instrument
   // FX Non-Deliverable Forward
-  case class FxNdf(val usi: USI) extends Security
+  case class FxNdf(val usi: USI) extends Instrument
   // A FxSingle.
-  case class FxSingle(val usi: USI) extends Security
+  case class FxSingle(val usi: USI) extends Instrument
   // A FxSingleBarrierOption.
-  case class FxSingleBarrierOption(val usi: USI) extends Security
+  case class FxSingleBarrierOption(val usi: USI) extends Instrument
   // A FxSwap.
-  case class FxSwap(val usi: USI) extends Security
+  case class FxSwap(val usi: USI) extends Instrument
   // A FxVanillaOption.
-  case class FxVanillaOption(val usi: USI, val underlyer: Security) extends Security with Derivative
+  case class FxVanillaOption(val usi: USI, val underlyer: Instrument) extends Instrument with Derivative
   // A IborCapFloor.
-  case class IborCapFloor(val usi: USI) extends Security
+  case class IborCapFloor(val usi: USI) extends Instrument
   // A IborFuture.
-  case class IborFuture(val usi: USI) extends Security
+  case class IborFuture(val usi: USI) extends Instrument
   // A IborFutureOption.
-  case class IborFutureOption(val usi: USI) extends Security
+  case class IborFutureOption(val usi: USI) extends Instrument
   // // A representation based on sensitivities.
-  case class Sensitivities(val usi: USI) extends Security
+  case class Sensitivities(val usi: USI) extends Instrument
   // A Swap.
-  case class Swap(val usi: USI) extends Security
+  case class Swap(val usi: USI) extends Instrument
   // A Swaption.
-  case class Swaption(val usi: USI) extends Security
+  case class Swaption(val usi: USI) extends Instrument
   // A TermDeposit.
-  case class TermDeposit(val usi: USI) extends Security
+  case class TermDeposit(val usi: USI) extends Instrument
 
-  case class AmortizingLoan(val usi: USI)  extends Security
-  case class ConvertibleLoan(val usi: USI) extends Security
+  case class AmortizingLoan(val usi: USI)  extends Instrument
+  case class ConvertibleLoan(val usi: USI) extends Instrument
 
-  case class CommonStock(val usi: USI)    extends Security
-  case class PreferredStock(val usi: USI) extends Security
+  case class CommonStock(val usi: USI)    extends Instrument
+  case class PreferredStock(val usi: USI) extends Instrument
 
-  case class StockIndexFutureOption(val usi: USI, val underlyer: Security) extends Security with Derivative
-  case class StockIndexOption(val usi: USI, val underlyer: Security)       extends Security with Derivative
-  case class StockIndexFuture(val usi: USI, val underlyer: Security)       extends Security with Derivative
-  case class StockOption(val usi: USI, val underlyer: Security)            extends Security with Derivative
+  case class StockIndexFutureOption(val usi: USI, val underlyer: Instrument) extends Instrument with Derivative
+  case class StockIndexOption(val usi: USI, val underlyer: Instrument)       extends Instrument with Derivative
+  case class StockIndexFuture(val usi: USI, val underlyer: Instrument)       extends Instrument with Derivative
+  case class StockOption(val usi: USI, val underlyer: Instrument)            extends Instrument with Derivative
 
-  case class FxForwardSpot(val usi: USI) extends Security // FIXME not sure here
+  case class FxForwardSpot(val usi: USI) extends Instrument // FIXME not sure here
 
-  implicit lazy val eq = Eq.fromUniversalEquals[Security]
+  implicit lazy val eq = Eq.fromUniversalEquals[Instrument]
 }
 
 sealed trait Role extends EnumEntry
