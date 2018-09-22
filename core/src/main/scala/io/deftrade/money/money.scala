@@ -94,6 +94,10 @@ trait QuotedIn[A, CCY] {
 
 }
 
+object QuotedIn {
+  def apply = ???
+}
+
 trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[N] {
 
   class FinancialOps(n: N) extends FractionalOps(n)
@@ -243,8 +247,6 @@ object Monetary extends Enum[MonetaryLike] {
     }
   }
 
-  // The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD.[5]
-
   /**
     * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
     * One or more Market(s) determine this price.
@@ -253,6 +255,7 @@ object Monetary extends Enum[MonetaryLike] {
     * Three letter codes: 26 ^ 3 = 17576
     * over two hundred assigned; several "dead" currencies (not reused)
     * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
+    * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD.[5]
     */
   implicit def inverseQuote[C1: Monetary, C2: Monetary](implicit Q: C1 QuotedIn C2): C2 QuotedIn C1 =
     new QuotedIn[C2, C1] {
