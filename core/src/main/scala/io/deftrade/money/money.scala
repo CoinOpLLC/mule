@@ -223,16 +223,18 @@ object Monetary extends Enum[MonetaryLike] {
     def apply[N: Financial, C: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
   }
-  import cats.kernel.{ Monoid, Order }
+  import cats.kernel.{ CommutativeGroup, Order }
 
   implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
   implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
 
-  implicit def moneyMonoid[N: Financial, C: Monetary] = new Monoid[Money[N, C]] {
-    type MNY = Money[N, C]
-    override def combine(a: MNY, b: MNY): MNY = a + b
-    override def empty: MNY                   = Money(Financial[N].zero)
-  }
+  implicit def moneyCommutativeGroup[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
+    new CommutativeGroup[Money[N, C]] {
+      type MNY = Money[N, C]
+      override def combine(a: MNY, b: MNY): MNY = a + b
+      override def empty: MNY                   = Money(Financial[N].zero)
+      override def inverse(a: MNY): MNY         = Money(Financial[N] inverse a.amount)
+    }
 
   implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
     Show show (Format apply _)

@@ -67,24 +67,25 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   val MonetaryAmount = Financial[MonetaryAmount]
 
-  type USI = enums.UniversalSecurityIdentifyer
-  val USI = enums.UniversalSecurityIdentifyer
+  type UII = enums.UniversalInstrumentIdentifyer
+  val UII = enums.UniversalInstrumentIdentifyer
 
   // TODO: use the XBRL definitions for these, a la OpenGamma
-  type Security = enums.Security
-  val Security = enums.Security
+  type Instrument = enums.Instrument
+  val Instrument = enums.Instrument
 
-  type SecurityId = OpaqueId[Long, Security]
-  object SecurityId extends OpaqueIdC[SecurityId]
+  type InstrumentId = OpaqueId[Long, Instrument]
+  object InstrumentId extends OpaqueIdC[InstrumentId]
 
-  type Position = (SecurityId, Quantity)
+  type Position = (InstrumentId, Quantity)
   object Position
 
   type Leg = Position // `Leg` := `Position` in motion
   val Leg = Position
 
-  type Folio = Map[SecurityId, Quantity] // n.b algebraic relationship Position <=> Folio
+  type Folio = Map[InstrumentId, Quantity] // n.b algebraic relationship Position <=> Folio
   object Folio {
+    def empty: Folio                = Map.empty
     def apply(ps: Position*): Folio = accumulate(ps.toList)
   }
 
@@ -110,8 +111,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Ledger = List[LedgerEntry] // if you must - but reserving the name is a good idea regardless
   object Ledger
 
-  type LedgerState = Map[FolioId, Folio] // = LedgerEntry
-  object LedgerState
+  type Folios = Map[FolioId, Folio] // = LedgerEntry
+  object Folios {
+    def empty: Folios                        = Map.empty
+    def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
+    def get(folioId: FolioId): Option[Folio] = ???
+  }
+  type LedgerState = Folios
+  val LedgerState = Folios
 
   trait Person
   trait Corporation
@@ -125,17 +132,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   /**
     * The portion of the total accorded to the identified `Entity`.
     */
-  type Share = (EntityId, Quantity)
+  type Share[K] = (K, Quantity)
   object Share {
     import Quantity._
-    def validate(p: Share): Boolean = {
+    def validate[K](p: Share[K]): Boolean = {
       val (_, q) = p
       zero <= q && q <= one
     }
-    def apply(eid: EntityId, q: Quantity): Share = (eid, q) ensuring { p =>
+    def apply[K](k: K, q: Quantity): Share[K] = (k, q) ensuring { p =>
       validate(p)
     }
-    def single(eid: EntityId) = Share(eid, one)
+    def single[K](k: K) = Share(k, one)
   }
 
   /**
@@ -145,81 +152,74 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
     * their ownership rights.
     */
-  type Partition = Map[EntityId, Quantity]
+  type Partition[K] = Map[K, Quantity]
   object Partition {
-    def apply(shares: Share*): Either[String, Partition] = {
+    import Quantity._
+    def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
       val p = accumulate(shares.toList)
       p.values.toList.sum match {
-        case sum if sum == Quantity.one => p.asRight
-        case badsum                     => s"Partition doesn't add up: $badsum != 1.0".asLeft
+        case sum if sum == one => p.asRight
+        case badsum            => s"Partition doesn't add up: $badsum != 1.0".asLeft
       }
     }
-    def single(eid: EntityId): Partition = Map.empty + Share.single(eid)
+    def single[K](k: K): Partition[K] = Map.empty + Share.single[K](k)
+
+    def proRata[K](totalShares: Quantity)(capTable: Map[K, Quantity]): Partition[K] =
+      capTable map { case (k, mySlice) => (k, mySlice / totalShares) }
+
+    def pariPassu[K](ks: Set[K]): Partition[K] = {
+      val n = ks.size
+      (ks.toList zip List.fill(n)(one / fromInt(n))).toMap
+    }
+
+    object Single {
+      def unapply[K](p: Partition[K]): Option[K] = p.toList match {
+        case (k, One) :: Nil => k.some
+        case _               => none
+      }
+    }
   }
 
   type Role = enums.Role
   val Role = enums.Role
 
-  type Roster = Map[Role, Partition]
+  type Roster = Map[Role, Set[EntityId]]
   object Roster {
     def apply(eid: EntityId): Roster =
-      Map.empty + (Role.Principle -> Partition.single(eid))
+      Map.empty + (Role.Principle -> Set(eid))
   }
 
-  type Account = Map[FolioId, Roster]
-  object Account {
-    def updatedProRata(a: Account, newProRata: Map[EntityId, Quantity]): Account = ???
-  }
+  case class Account(subs: Partition[AccountId])
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
-  object AccountId
+  object AccountId {}
 
-  type LedgerKey = Map[AccountId, Account]
-  object LedgerKey {
+  type Accounts = Map[AccountId, (FolioId, Roster)]
 
-    def recorded(lk: LedgerKey)(ls: LedgerState)(ao: AllocatedOrder): LedgerState = ao match {
-      case (_, transaction) =>
-        transaction.toList foldMap {
-          case (folioId, trade) =>
-            (ls get folioId).fold(
-              ls + (folioId -> trade)
-            ) { folio =>
-              ls + (folioId -> (folio |+| trade))
+  object Accounts {}
+
+  def recorded[C: Monetary](accounts: Accounts)(fs: Folios, ex: Execution[C]): Folios =
+    ex match {
+      case Execution(oid, _, (trade, _)) =>
+        (Orders get oid) match {
+          case Some((aid, _, _)) =>
+            accounts(aid) match {
+              case (folioId, roster) =>
+                // TODO: check roster permissions
+                roster |> discardValue
+                fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
             }
+          case _ => error
         }
     }
-  }
 
-  type LedgerId = OpaqueId[Long, LedgerKey]
-  object LedgerId extends OpaqueIdC[LedgerId]
+  def error = ???
 
-  type Allocation = Map[FolioId, Quantity] // must sum to 1... TODO typesafe normalization?
-  object Allocation {
+  type LedgerKey = Accounts
+  val LedgerKey = Accounts
 
-    import Quantity._
-
-    def allocate(allocation: Allocation)(order: Order): AllocatedOrder = ???
-
-    def pariPassu(fids: Set[FolioId]): Allocation = {
-      val n = fids.size
-      (fids.toList zip List.fill(n)(one / fromInt(n))).toMap
-    }
-    def proRata(totalShares: Long)(capTable: Map[FolioId, Long]): Allocation =
-      capTable map {
-        case (folioId, shares) =>
-          val mySlice  = fromLong(shares)
-          val wholePie = fromLong(totalShares)
-          (folioId, mySlice / wholePie)
-      }
-
-    object Single {
-      def apply(folioId: FolioId): Allocation = Map(folioId -> one)
-      def unapply(a: Allocation) = a.toList match {
-        case (folioId, One) :: Nil => folioId.some
-        case _                     => none
-      }
-    }
-  }
+  // type LedgerId = OpaqueId[Long, LedgerKey]
+  // object LedgerId extends OpaqueIdC[LedgerId]
 
   type Order = (AccountId, EntityId, Trade)
   object Order {
@@ -234,13 +234,25 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type OrderId = OpaqueId[Long, Order]
   object OrderId extends OpaqueIdC[OrderId]
 
-  type AllocatedOrder = (AccountId, Transaction)
-  object AllocatedOrder
+  /**
+    * Repository of Orders
+    * FIXME: this is hacked in to compile for now. Belongs in rdb module.
+    */
+  object Orders {
+    def get(oid: OrderId): Option[Order] = ???
+  }
+
+  type Allocation = Partition[AccountId]
+  object Allocation {
+
+    def allocate[C](allocation: Allocation)(ex: Execution[C]): List[Execution[C]] = ???
+
+  }
 
   // TODO: type constructors all the way?
   // how to capture the fact that `[CCY: Monetary]`
-  type Execution[CCY] = (OrderId, LocalDateTime, PricedTrade[CCY])
-  object Execution
+  case class Execution[CCY: Monetary](oid: OrderId, ldt: LocalDateTime, pt: PricedTrade[CCY])
+  // object Execution
 
   type ExecutionId[CCY] = OpaqueId[Long, Execution[CCY]]
   class ExecutionIdC[CCY] extends OpaqueIdC[ExecutionId[CCY]]
@@ -259,10 +271,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   object Market {
 
     /** Price all the things. TODO: this feels like a repository */
-    def quote[C: Monetary](m: Market)(id: SecurityId): Money[MonetaryAmount, C] =
+    def quote[C: Monetary](m: Market)(id: InstrumentId): Money[MonetaryAmount, C] =
       Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
-    def quotedIn[C: Monetary](m: Market)(id: SecurityId): SecurityId QuotedIn C = ???
+    def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
 
     // idea: use phantom types to capture sequencing constraint?
     def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
@@ -318,14 +330,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     type Assets      = Map[Asset, MonetaryAmount]
     type Liabilities = Map[Liability, MonetaryAmount]
 
-    def empty = BalanceSheet(Map.empty, Map.empty)
+    implicit lazy val balanceSheetCommutativeGroup: CommutativeGroup[BalanceSheet] =
+      new CommutativeGroup[BalanceSheet] {
 
-    def combine(a: BalanceSheet, b: BalanceSheet) =
-      BalanceSheet(a.assets |+| b.assets, a.liabilities |+| b.liabilities)
+        override def empty = BalanceSheet(Map.empty, Map.empty)
 
-    def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
+        override def combine(a: BalanceSheet, b: BalanceSheet) =
+          BalanceSheet(a.assets combine b.assets, a.liabilities combine b.liabilities)
 
-    implicit def bsCommutativeGroup: CommutativeGroup[BalanceSheet] = ???
+        override def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
+      }
+
   }
 
 }
