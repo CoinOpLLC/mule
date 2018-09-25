@@ -16,8 +16,8 @@ object Version {
   val Enumeratum     = "1.5.13"
   val Spire          = "0.16.0"
   val Refined        = "0.9.2"
-  val Squants        = "1.3.0"
   val Circe          = "0.8.0"
+  val Cormorant      = "0.0.7"
   val Fansi          = "0.2.5"
   val Akka           = "2.5.12"
   val AkkaHttp       = "10.1.5"
@@ -26,6 +26,7 @@ object Version {
   val Quill          = "2.3.1"
   val PgJdbc         = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
   val OpenGamma      = "2.0.0"
+  // val Squants        = "1.3.0"
 
   // val PgJdbc = "9.4-1201-jdbc41"
 }
@@ -92,6 +93,15 @@ object Deps {
     "org.scalacheck" %% "scalacheck" % ScalaCheck
   ) map (_ % Test)
 
+  val cormorants = Seq(
+    "io.chrisdavenport" %% "cormorant-core",
+    "io.chrisdavenport" %% "cormorant-generic",
+    "io.chrisdavenport" %% "cormorant-parser",
+    "io.chrisdavenport" %% "cormorant-fs2",
+    "io.chrisdavenport" %% "cormorant-http4s",
+    "io.chrisdavenport" %% "cormorant-refined"
+  ) map (_ % Cormorant)
+
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi" % Fansi
@@ -129,7 +139,8 @@ object Deps {
       catsEffect,
       quicklens,
       spire,
-    )
+    ) ++ cormorants
+
   lazy val misclibs =
     List(
       reflection,
