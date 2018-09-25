@@ -17,12 +17,14 @@
 package io.deftrade
 package model
 
-import io.deftrade.money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
-// import io.deftrade.money._, Monetary._
-import io.deftrade.time._
+import opaqueid.{ OpaqueId, OpaqueIdC }
+import time._
+import money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
 
 import cats.{ Monad, Monoid }
 import cats.implicits._
+import cats.kernel.CommutativeGroup
+import feralcats.instances._
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -34,26 +36,6 @@ import refined.numeric._
 // import io.circe.Json
 
 import scala.language.higherKinds
-
-import opaqueid.{ OpaqueId, OpaqueIdC }
-
-import cats.kernel.CommutativeGroup
-import cats.kernel.instances.MapMonoid
-
-package feralcats {
-
-  class MapCommutativeGroup[K, V: CommutativeGroup] extends MapMonoid[K, V] with CommutativeGroup[Map[K, V]] {
-    def inverse(a: Map[K, V]): Map[K, V] =
-      a.foldLeft(Map.empty[K, V]) { case (my, (k, x)) => my updated (k, CommutativeGroup inverse x) }
-  }
-
-  object instances {
-    implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
-      new MapCommutativeGroup[K, V]
-  }
-}
-
-import feralcats.instances._
 
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
@@ -112,11 +94,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   object Ledger
 
   type Folios = Map[FolioId, Folio] // = LedgerEntry
-  object Folios {
-    def empty: Folios                        = Map.empty
-    def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
-    def get(folioId: FolioId): Option[Folio] = ???
-  }
+
   type LedgerState = Folios
   val LedgerState = Folios
 
@@ -189,22 +167,20 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       Map.empty + (Role.Principle -> Set(eid))
   }
 
-  case class Account(subs: Partition[AccountId])
+  case class Account(folioId: FolioId, roster: Roster, subs: Partition[AccountId])
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
   object AccountId {}
 
-  type Accounts = Map[AccountId, (FolioId, Roster)]
-
-  object Accounts {}
+  type Accounts = Map[AccountId, Account]
 
   def recorded[C: Monetary](accounts: Accounts)(fs: Folios, ex: Execution[C]): Folios =
     ex match {
       case Execution(oid, _, (trade, _)) =>
-        (Orders get oid) match {
+        (Orders getOpen oid) match {
           case Some((aid, _, _)) =>
             accounts(aid) match {
-              case (folioId, roster) =>
+              case Account(folioId, roster, _) =>
                 // TODO: check roster permissions
                 roster |> discardValue
                 fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
@@ -214,12 +190,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     }
 
   def error = ???
-
-  type LedgerKey = Accounts
-  val LedgerKey = Accounts
-
-  // type LedgerId = OpaqueId[Long, LedgerKey]
-  // object LedgerId extends OpaqueIdC[LedgerId]
 
   type Order = (AccountId, EntityId, Trade)
   object Order {
@@ -233,14 +203,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   type OrderId = OpaqueId[Long, Order]
   object OrderId extends OpaqueIdC[OrderId]
-
-  /**
-    * Repository of Orders
-    * FIXME: this is hacked in to compile for now. Belongs in rdb module.
-    */
-  object Orders {
-    def get(oid: OrderId): Option[Order] = ???
-  }
 
   type Allocation = Partition[AccountId]
   object Allocation {
@@ -256,7 +218,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   type ExecutionId[CCY] = OpaqueId[Long, Execution[CCY]]
   class ExecutionIdC[CCY] extends OpaqueIdC[ExecutionId[CCY]]
-  // FIXME this requires custom fuzting
+  // TODO this requires completion and refactoring.
+  object ExecutionIdCusd extends ExecutionIdC[Monetary.USD]
+  object ExecutionIdCeur extends ExecutionIdC[Monetary.EUR]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
@@ -270,15 +234,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Market = Either[Counter, Exchange]
   object Market {
 
-    /** Price all the things. TODO: this feels like a repository */
+    /** Price all the things. */
     def quote[C: Monetary](m: Market)(id: InstrumentId): Money[MonetaryAmount, C] =
-      Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
-
-    def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
-
-    // idea: use phantom types to capture sequencing constraint?
-    def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
-      ???
+      Monetary[C] apply (Financial[MonetaryAmount] from Markets.quotedIn(m)(id).mid)
   }
 
   type MarketId = OpaqueId[Long, Market]
@@ -340,7 +298,33 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
         override def inverse(a: BalanceSheet) = BalanceSheet(a.assets.inverse, a.liabilities.inverse)
       }
+  }
 
+  /**
+    * Repositories.
+    * FIXME: this is hacked in to compile for now.
+    */
+  object Orders {
+    def get(oid: OrderId): Option[Order]     = ???
+    def getOpen(oid: OrderId): Option[Order] = ???
+    def all: Stream[Order]                   = ???
+  }
+
+  object Executions {}
+
+  object Accounts {}
+
+  object Folios {
+    def empty: Folios = Map.empty
+    // def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
+    // def get(folioId: FolioId): Option[Folio] = ???
+  }
+  object Markets {
+    def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
+
+    // idea: use phantom types to capture sequencing constraint?
+    def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
+      ???
   }
 
 }
