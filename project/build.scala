@@ -11,6 +11,8 @@ object Version {
   val TypesafeConfig = "1.3.3"
   val Cats           = "1.2.0"
   val CatsEffect     = "1.0.0"
+  val CatsTime       = "0.0.3"
+  val CatsScalaCheck = "0.1.0"
   val Quicklens      = "1.4.11"
   val PureConfig     = "0.9.2"
   val Enumeratum     = "1.5.13"
@@ -45,6 +47,8 @@ object Deps {
   val cats = "org.typelevel" %% "cats-core" % Cats
 
   val catsEffect = "org.typelevel" %% "cats-effect" % CatsEffect
+
+  val catsTime = "io.chrisdavenport" %% "cats-time" % CatsTime
 
   val quicklens = "com.softwaremill.quicklens" %% "quicklens" % Quicklens
 
@@ -89,8 +93,9 @@ object Deps {
   ) map (_ % PureConfig)
 
   val testers = Seq(
-    "org.scalatest"  %% "scalatest"  % ScalaTest,
-    "org.scalacheck" %% "scalacheck" % ScalaCheck
+    "org.scalatest"     %% "scalatest"       % ScalaTest,
+    "org.scalacheck"    %% "scalacheck"      % ScalaCheck,
+    "io.chrisdavenport" %% "cats-scalacheck" % CatsScalaCheck
   ) map (_ % Test)
 
   val cormorants = Seq(
@@ -137,6 +142,7 @@ object Deps {
     List(
       cats,
       catsEffect,
+      catsTime,
       quicklens,
       spire,
     ) ++ cormorants
