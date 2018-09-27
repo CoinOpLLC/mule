@@ -37,7 +37,7 @@ package object time extends time.Api {
     def years: Period  = time.years(n)
   }
 
-  implicit class SweetLocalDateTime(val ldt: LocalDateTime) extends AnyVal with Ordered[LocalDateTime] {
+  implicit class SweetLocalDateTime(val ldt: LocalDateTime) extends AnyVal {
 
     def year: Int              = ldt.getYear
     def dayOfMonth: Int        = ldt.getDayOfMonth
@@ -58,10 +58,9 @@ package object time extends time.Api {
 
     def -(end: LocalDateTime): Duration = Duration between (ldt, end)
 
-    override def compare(that: LocalDateTime): Int = ldt compareTo that
   }
 
-  implicit class SweetLocalDate(val ld: LocalDate) extends AnyVal with Ordered[LocalDate] {
+  implicit class SweetLocalDate(val ld: LocalDate) extends AnyVal {
 
     def year: Int              = ld.getYear
     def dayOfMonth: Int        = ld.getDayOfMonth
@@ -82,11 +81,9 @@ package object time extends time.Api {
     def -(wpp: market.ProxiedPeriod): LocalDate = ld minus wpp.period
 
     def -(end: LocalDate): Period = ld until end
-
-    override def compare(that: LocalDate): Int = ld compareTo that
   }
 
-  implicit class SweetLocalTime(val lt: LocalTime) extends AnyVal with Ordered[LocalTime] {
+  implicit class SweetLocalTime(val lt: LocalTime) extends AnyVal {
 
     def hour: Int   = lt.getHour
     def minute: Int = lt.getMinute
@@ -95,12 +92,9 @@ package object time extends time.Api {
 
     def +(duration: Duration): LocalTime = lt plus duration
     def -(duration: Duration): LocalTime = lt minus duration
-
-    override def compare(that: LocalTime): Int = lt compareTo that
   }
 
-  implicit class SweetZonedDateTime(val zdt: ZonedDateTime) extends AnyVal with Ordered[ZonedDateTime] {
-
+  implicit class SweetZonedDateTime(val zdt: ZonedDateTime) extends AnyVal {
     def year: Int            = zdt.getYear
     def dayOfMonth: Int      = zdt.getDayOfMonth
     def month: Month         = zdt.getMonth
@@ -125,11 +119,10 @@ package object time extends time.Api {
 
     def -(other: ZonedDateTime): Duration = Duration between (zdt, other)
 
-    def chronology: Chronology                      = zdt.getChronology
-    override def compare(other: ZonedDateTime): Int = zdt compareTo other
+    def chronology: Chronology = zdt.getChronology
   }
 
-  implicit class SweetDuration(val d: Duration) extends AnyVal with Ordered[Duration] {
+  implicit class SweetDuration(val d: Duration) extends AnyVal {
 
     import scala.concurrent.duration.{ FiniteDuration, NANOSECONDS, SECONDS }
 
@@ -153,9 +146,8 @@ package object time extends time.Api {
           FiniteDuration(d.getSeconds, SECONDS) + FiniteDuration(nanos.toLong, NANOSECONDS)
       }
 
-    override def compare(other: Duration): Int = d.compareTo(other)
   }
-  implicit class SweetPeriod(val p: Period) extends AnyVal with Ordered[Period] {
+  implicit class SweetPeriod(val p: Period) extends AnyVal {
 
     def days: Int                 = p.getDays
     def months: Int               = p.getMonths
@@ -166,19 +158,15 @@ package object time extends time.Api {
     def +(other: TemporalAmount): Period = p plus other
     def *(scalar: Int): Period           = p multipliedBy scalar
 
-    override def compare(that: Period): Int = (p minus that).getDays
   }
-  implicit class SweetYear(val y: Year) extends AnyVal with Ordered[Year] {
+  implicit class SweetYear(val y: Year) extends AnyVal {
     def year: Int = y get ChronoField.YEAR
 
     def -(amount: Period) = y minus amount
     def +(amount: Period) = y plus amount
-
-    override def compare(other: Year): Int = y compareTo other
-
   }
 
-  implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal with Ordered[YearMonth] {
+  implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal {
 
     def year: Int       = ym.getYear
     def month: Month    = ym.getMonth
@@ -187,11 +175,12 @@ package object time extends time.Api {
     def -(amount: Period) = ym minus amount
     def +(amount: Period) = ym plus amount
 
-    override def compare(other: YearMonth): Int = ym compareTo other
   }
 
   implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
     def adjusted(ta: TemporalAdjuster) = value `with` ta
   }
+
+  // implicit def shoTemporal[T <: Temporal with Comparable[T]] = ShowHashOrder[T]
 
 }

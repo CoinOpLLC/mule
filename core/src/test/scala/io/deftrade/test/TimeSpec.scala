@@ -1,11 +1,15 @@
 package io.deftrade
 package test
 
+import cats.implicits._
+import cats.syntax.eq._
+
 import org.scalatest._, prop._
 
 class TimeFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
 
   import io.deftrade.time._
+  import implicits._
 
   "time" should "move forward" in {
     val today = localDateTime
@@ -55,8 +59,6 @@ class TimeSpec extends FlatSpec with Matchers {
 
   "domain Order stuff" should "work" in {
     // import cats.{ Eq, Monoid }
-    import cats.instances.all._
-    import cats.syntax.monoid._
     import model._
 
     val o1 = Order.legacy(555.550001, 78345)
@@ -64,7 +66,7 @@ class TimeSpec extends FlatSpec with Matchers {
 
     val o12 = o1 |+| o2
 
-    assert(o12 === Order.legacy(BigDecimal(723.570661), 264628))
+    assert(o12 == Order.legacy(BigDecimal(723.570661), 264628))
 
     val m1   = Map(1337 -> o1)
     val m1_a = Map(1337 -> o2)

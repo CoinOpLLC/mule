@@ -87,11 +87,11 @@ trait Api {
 
   /**
     * This name is free for `value`s
-    * because it's occupied by a lone j8 interface in `type` namespace`
+    * because it is occupied only by a lone java interface in `type` namespace`
     */
   object TemporalQuery {
     import jtt.{ TemporalQueries => TQs }
-    import cats._, implicits._ // FIXME choke down on that bat son
+    import cats.implicits._
 
     type TQ[+R] = LocalDate => R
     // consider R := LocalDate => LocalDate... !
@@ -266,4 +266,14 @@ trait Api {
   type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
   type ZoneRulesException               = java.time.zone.ZoneRulesException
 
+  object implicits {
+
+    trait DefHash[T] extends cats.Hash[T] { override def hash(x: T): Int    = x.hashCode }
+    trait DefShow[T] extends cats.Show[T] { override def show(x: T): String = x.toString }
+
+    implicit lazy val shoLocalDateTime =
+      new DefShow[LocalDateTime] with DefHash[LocalDateTime] with cats.Order[LocalDateTime] {
+        override def compare(x: LocalDateTime, y: LocalDateTime): Int = x compareTo y
+      }
+  }
 }

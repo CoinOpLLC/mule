@@ -3,7 +3,8 @@ package time
 package work
 
 import enumeratum._
-import cats._, implicits._ //, data._
+import cats._
+import cats.implicits._
 import scala.collection.SortedSet
 import java.time.{ Month, DayOfWeek, temporal => jtt }
 import jtt.{ Temporal /*, WeekFields */ }

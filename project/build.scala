@@ -11,6 +11,7 @@ object Version {
   val TypesafeConfig = "1.3.3"
   val Cats           = "1.2.0"
   val CatsEffect     = "1.0.0"
+  val Fuiid          = "0.1.2"
   val CatsTime       = "0.0.3"
   val CatsScalaCheck = "0.1.0"
   val Quicklens      = "1.4.11"
@@ -98,6 +99,13 @@ object Deps {
     "io.chrisdavenport" %% "cats-scalacheck" % CatsScalaCheck
   ) map (_ % Test)
 
+  val fuiids = Seq(
+    "io.chrisdavenport" %% "fuuid", // core
+    "io.chrisdavenport" %% "fuuid-circe", // Circe integration
+    "io.chrisdavenport" %% "fuuid-http4s", // Http4s integration
+    "io.chrisdavenport" %% "fuuid-doobie" // Doobie integration
+  ) map (_ % Fuiid)
+
   val cormorants = Seq(
     "io.chrisdavenport" %% "cormorant-core",
     "io.chrisdavenport" %% "cormorant-generic",
@@ -145,7 +153,7 @@ object Deps {
       catsTime,
       quicklens,
       spire,
-    ) ++ cormorants
+    ) ++ cormorants ++ fuiids
 
   lazy val misclibs =
     List(
