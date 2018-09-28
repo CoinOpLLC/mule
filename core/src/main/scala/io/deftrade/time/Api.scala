@@ -1,7 +1,7 @@
 package io.deftrade
 package time
 
-import java.time._, chrono.{ Chronology, IsoChronology }, format.DateTimeFormatter
+import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt._, ChronoUnit._
 
@@ -90,8 +90,8 @@ trait Api {
     * because it is occupied only by a lone java interface in `type` namespace`
     */
   object TemporalQuery {
+    import cats.implicits._ // n.b. this is "just syntax sugar" here but it's _very_ sweet...
     import jtt.{ TemporalQueries => TQs }
-    import cats.implicits._
 
     type TQ[+R] = LocalDate => R
     // consider R := LocalDate => LocalDate... !
@@ -271,8 +271,16 @@ trait Api {
     trait DefHash[T] extends cats.Hash[T] { override def hash(x: T): Int    = x.hashCode }
     trait DefShow[T] extends cats.Show[T] { override def show(x: T): String = x.toString }
 
+    abstract class FormatShow[TA <: TemporalAccessor](val formatter: DateTimeFormatter, tq: TemporalAccessor => TA) extends DefShow[TA] {
+      override def show(x: TA): String = formatter format x
+
+      // TODO: refactor this where it belongs (i.e. will pick up operator)
+      def parse(s: String): Result[TA] = Result { tq(formatter parse s) }
+    }
+
     implicit lazy val shoLocalDateTime =
-      new DefShow[LocalDateTime] with DefHash[LocalDateTime] with cats.Order[LocalDateTime] {
+      new FormatShow[LocalDateTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime.from(_)) with DefHash[LocalDateTime]
+      with cats.Order[LocalDateTime] {
         override def compare(x: LocalDateTime, y: LocalDateTime): Int = x compareTo y
       }
   }

@@ -17,8 +17,31 @@
 package io
 
 package object deftrade extends deftrade.Api {
+
   implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
     def p2f1[B](f: A => B): B = f(a)
   }
+
+  type Or[A, B] = Either[B, A]
+
+  case class Fail(msg: String)
+  type Result[T] = Either[Fail, T]
+  object Result {
+    def apply[T](unsafe: => T): Result[T] =
+      safe(unsafe).toEither.left map (x => Fail(s"${x.getClass}: ${x.getMessage}"))
+  }
+
+  /**
+    * Make `Seq` immutable. See:
+    * - [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/),
+    * and also
+    * - [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).
+    */
+  type Seq[+A] = scala.collection.immutable.Seq[A]
+  val Seq = scala.collection.immutable.Seq
+
+  type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
+  val IndexedSeq = scala.collection.immutable.IndexedSeq
+
 }

@@ -59,22 +59,9 @@ package feralcats {
 
 trait Api {
 
-  type Or[A, B] = Either[B, A]
-
-  /**
-    * Make `Seq` immutable. See:
-    * - [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/),
-    * and also
-    * - [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).
-    */
-  type Seq[+A] = scala.collection.immutable.Seq[A]
-  val Seq = scala.collection.immutable.Seq
-
-  type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
-  val IndexedSeq = scala.collection.immutable.IndexedSeq
-
   import scala.util.Try
   def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
+  def safe[T](f: => T): Try[T]           = Try { f }
 
   /**
     * Informs wart remover that the value is intentionally discarded.

@@ -80,6 +80,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   /**
     * (Runtime) invariant: `Trade`s must balance across all the `FolioId`s in the
     * `LedgerEntry`.
+    * FIXME: where do the dates enter in?
+    * FIXME: recording valuations of priced trades
     */
   type LedgerEntry = Map[FolioId, Trade]
   object LedgerEntry
@@ -192,6 +194,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   def error = ???
 
   type Order = (AccountId, EntityId, Trade)
+  // type Order[MA, CCY] = (AccountId, EntityId, OffsetDateTime, Trade, Option[Money[MA, CCY]])
+  // implied buy / sell, limit / market
+  // FIXME: need a date time field
+  // FIXME: need a price field (Option) ()
   object Order {
     import io.deftrade.money.Monetary.USD
     def legacy(bd: BigDecimal, q: Long): PricedTrade[USD] =
