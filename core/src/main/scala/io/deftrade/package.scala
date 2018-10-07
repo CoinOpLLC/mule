@@ -23,14 +23,7 @@ package object deftrade extends deftrade.Api {
     def p2f1[B](f: A => B): B = f(a)
   }
 
-  type Or[A, B] = Either[B, A]
-
-  case class Fail(msg: String)
   type Result[T] = Either[Fail, T]
-  object Result {
-    def apply[T](unsafe: => T): Result[T] =
-      safe(unsafe).toEither.left map (x => Fail(s"${x.getClass}: ${x.getMessage}"))
-  }
 
   /**
     * Make `Seq` immutable. See:

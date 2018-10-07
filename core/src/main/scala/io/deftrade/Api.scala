@@ -57,11 +57,17 @@ package feralcats {
   }
 }
 
+final case class Fail(msg: String) extends AnyVal
+object Result {
+  def apply[T](unsafe: => T): Result[T] =
+    safe(unsafe).toEither.left map (x => Fail(s"${x.getClass}: ${x.getMessage}"))
+}
+
 trait Api {
 
   import scala.util.Try
-  def safe[T, R](f: T => R): T => Try[R] = t => Try { f(t) }
-  def safe[T](f: => T): Try[T]           = Try { f }
+
+  def safe[T](f: => T) = Try { f }
 
   /**
     * Informs wart remover that the value is intentionally discarded.

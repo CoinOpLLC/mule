@@ -77,28 +77,39 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type FolioId = OpaqueId[Long, Folio]
   object FolioId extends OpaqueIdC[FolioId]
 
+  // Need to express `Foldable` relation between `Position` and `Folio`
+  // (also, and indentically, between `Leg` and `Trade`)
+  //
+
+  // FIXME: if we use instances of this type a parameters for recording trades, we're doing double entry! ;)
+
+  // need some kind of map from folio (account) Roles (AR, Inventory, Revenue, JoeThePlumber, Cash) to concrete FolioIds
+
+  case class LedgerKey(debit: FolioId, credit: FolioId)
+
   /**
     * (Runtime) invariant: `Trade`s must balance across all the `FolioId`s in the
     * `LedgerEntry`.
     * FIXME: where do the dates enter in?
     * FIXME: recording valuations of priced trades
     */
-  type LedgerEntry = Map[FolioId, Trade]
-  object LedgerEntry
+  type JournalEntry = Map[FolioId, Trade]
+  object JournalEntry
 
-  type Transaction = LedgerEntry
-  val Transaction = LedgerEntry
+  type Transaction = JournalEntry
+  val Transaction = JournalEntry
 
   /**
-    * What is the `Ledger`, anyway? It's a `Log` structure, essentially – Foldable[LedgerEntry]
+    * FIXME: What is the `Ledger`, anyway?
+    It's a `Log` structure, essentially – `Foldable[JournalEntry]`
     */
-  type Ledger = List[LedgerEntry] // if you must - but reserving the name is a good idea regardless
-  object Ledger
+  type Journal = List[JournalEntry]
+  object Journal
 
   type Folios = Map[FolioId, Folio] // = LedgerEntry
 
-  type LedgerState = Folios
-  val LedgerState = Folios
+  type Ledger = Folios
+  val Ledger = Folios
 
   trait Person
   trait Corporation
