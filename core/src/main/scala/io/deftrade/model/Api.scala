@@ -21,7 +21,7 @@ import opaqueid.{ OpaqueId, OpaqueIdC }
 import time._
 import money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
 
-import cats.{ Monad, Monoid }
+import cats.{ Foldable, Monad, Monoid }
 import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
@@ -59,20 +59,16 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type InstrumentId = OpaqueId[Long, Instrument]
   object InstrumentId extends OpaqueIdC[InstrumentId]
 
+  type Instruments = Map[InstrumentId, Instrument]
+
   type Position = (InstrumentId, Quantity)
   object Position
-
-  type Leg = Position // `Leg` := `Position` in motion
-  val Leg = Position
 
   type Folio = Map[InstrumentId, Quantity] // n.b algebraic relationship Position <=> Folio
   object Folio {
     def empty: Folio                = Map.empty
     def apply(ps: Position*): Folio = accumulate(ps.toList)
   }
-
-  type Trade = Folio // `Trade` := `Folio` in motion
-  val Trade = Folio // gives you `apply`: Trade(legs: Leg*): Trade
 
   type FolioId = OpaqueId[Long, Folio]
   object FolioId extends OpaqueIdC[FolioId]
@@ -108,9 +104,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   type Folios = Map[FolioId, Folio] // = LedgerEntry
 
-  type Ledger = Folios
-  val Ledger = Folios
-
   trait Person
   trait Corporation
 
@@ -120,21 +113,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type EntityId = OpaqueId[Long, Entity]
   object EntityId extends OpaqueIdC[EntityId]
 
-  /**
-    * The portion of the total accorded to the identified `Entity`.
-    */
-  type Share[K] = (K, Quantity)
-  object Share {
-    import Quantity._
-    def validate[K](p: Share[K]): Boolean = {
-      val (_, q) = p
-      zero <= q && q <= one
-    }
-    def apply[K](k: K, q: Quantity): Share[K] = (k, q) ensuring { p =>
-      validate(p)
-    }
-    def single[K](k: K) = Share(k, one)
-  }
+  type Entities = Map[EntityId, Entity]
 
   /**
     * Note that Roster encodes the notion of a `CapitalKey` – per `Role`!
@@ -145,6 +124,23 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     */
   type Partition[K] = Map[K, Quantity]
   object Partition {
+
+    /**
+      * The portion of the total accorded to the identified `Entity`.
+      */
+    type Share[K] = (K, Quantity)
+    object Share {
+      import Quantity._
+      def validate[K](p: Share[K]): Boolean = {
+        val (_, q) = p
+        zero <= q && q <= one
+      }
+      def apply[K](k: K, q: Quantity): Share[K] = (k, q) ensuring { p =>
+        validate(p)
+      }
+      def single[K](k: K) = Share(k, one)
+    }
+
     import Quantity._
     def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
       val p = accumulate(shares.toList)
@@ -174,35 +170,38 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Role = enums.Role
   val Role = enums.Role
 
+  /**
+    * justification: can't know / can't be responsible for Partition on the entities (i.e. is
+  it 50-50? 98-1-1? etc...). This is especially true for non-principle roles like `Regulator`.
+    */
   type Roster = Map[Role, Set[EntityId]]
   object Roster {
     def apply(eid: EntityId): Roster =
       Map.empty + (Role.Principle -> Set(eid))
   }
 
-  case class Account(folioId: FolioId, roster: Roster, subs: Partition[AccountId])
+  case class Account(folioId: FolioId, roster: Roster, subs: Set[AccountId])
+  object Account {
+    def simple(fid: FolioId, eid: EntityId): Account =
+      Account(fid, Roster(eid), Set.empty)
+  }
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
   object AccountId {}
 
   type Accounts = Map[AccountId, Account]
 
-  def recorded[C: Monetary](accounts: Accounts)(fs: Folios, ex: Execution[C]): Folios =
-    ex match {
-      case Execution(oid, _, (trade, _)) =>
-        (Orders getOpen oid) match {
-          case Some((aid, _, _)) =>
-            accounts(aid) match {
-              case Account(folioId, roster, _) =>
-                // TODO: check roster permissions
-                roster |> discardValue
-                fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
-            }
-          case _ => error
-        }
-    }
+  /**
+    * aliases.
+    */
+  type Ledger = Folios
+  val Ledger = Folios
 
-  def error = ???
+  type Leg = Position // `Leg` := `Position` in motion
+  val Leg = Position
+
+  type Trade = Folio // `Trade` := `Folio` in motion
+  val Trade = Folio // gives you `apply`: Trade(legs: Leg*): Trade
 
   type Order = (AccountId, EntityId, Trade)
   // type Order[MA, CCY] = (AccountId, EntityId, OffsetDateTime, Trade, Option[Money[MA, CCY]])
@@ -221,12 +220,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type OrderId = OpaqueId[Long, Order]
   object OrderId extends OpaqueIdC[OrderId]
 
+  type Orders = Map[OrderId, Order]
+
   type Allocation = Partition[AccountId]
   object Allocation {
 
     def allocate[C](allocation: Allocation)(ex: Execution[C]): List[Execution[C]] = ???
 
   }
+
+  // FIXME: need to "back up" CCY parameterization thru `Order`
+  // FIXME: need to generalize `BalanceSheet` for any T account
 
   // TODO: type constructors all the way?
   // how to capture the fact that `[CCY: Monetary]`
@@ -238,6 +242,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   // TODO this requires completion and refactoring.
   object ExecutionIdCusd extends ExecutionIdC[Monetary.USD]
   object ExecutionIdCeur extends ExecutionIdC[Monetary.EUR]
+
+  type Executions[CCY] = Map[ExecutionId[CCY], Execution[CCY]]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
@@ -259,24 +265,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type MarketId = OpaqueId[Long, Market]
   object MarketId extends OpaqueIdC[MarketId]
 
-  def quoteLeg[CCY: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
-    leg match {
-      case (security, quantity) => Market.quote[CCY](market)(security) * quantity
-    }
-
-  def quote[CCY: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
-    trade.toList foldMap quoteLeg[CCY](market)
-
-  def index[K, V](kvs: Traversable[(K, V)]): Map[K, Traversable[V]] =
-    kvs groupBy (_._1) map {
-      case (k, kvs) => (k, kvs map (_._2))
-    }
-
-  /** N.B. that `accumulate` requires a List parameter; `index` does not. */
-  def accumulate[K, V: Monoid](kvs: List[(K, V)]): Map[K, V] =
-    for {
-      (k, kvs) <- kvs groupBy (_._1)
-    } yield (k, kvs foldMap (_._2))
+  type Markets = Map[MarketId, Market]
 
   /** `BalanceSheet` forms a commutative group */
   case class BalanceSheet private (val assets: BalanceSheet.Assets, val liabilities: BalanceSheet.Liabilities) {
@@ -317,25 +306,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       }
   }
 
-  /**
-    * Repositories.
-    * FIXME: this is hacked in to compile for now.
-    */
-  object Orders {
-    def get(oid: OrderId): Option[Order]     = ???
-    def getOpen(oid: OrderId): Option[Order] = ???
-    def all: Stream[Order]                   = ???
-  }
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //  repos lol
+  // FIXME: this is hacked in to compile for now.
+  //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  object Executions {}
-
-  object Accounts {}
-
-  object Folios {
-    def empty: Folios = Map.empty
-    // def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
-    // def get(folioId: FolioId): Option[Folio] = ???
-  }
   object Markets {
     def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
 
@@ -343,5 +318,86 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
       ???
   }
+
+  object Instruments {
+    def all: Instruments = ???
+  }
+
+  object Folios {
+
+    def empty: Folios = Map.empty
+    def all: Folios   = ???
+
+    def get(folioId: FolioId): Option[Folio] = ???
+    def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
+  }
+
+  object Entities {
+    def all: Entities = ???
+  }
+
+  object Accounts {
+    def empty: Accounts = Map.empty
+    def all: Accounts   = ???
+
+    def get(accountId: AccountId): Option[Account] = ???
+  }
+
+  object Orders {
+    def empty: Orders                    = Map.empty
+    def all: Orders                      = ???
+    def get(oid: OrderId): Option[Order] = all get oid
+
+    def open: Orders = ???
+  }
+
+  object Executions {
+    def all[CCY]: Executions[CCY] = ???
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //  global functions yay
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  def quoteLeg[CCY: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
+    leg match {
+      case (security, quantity) => Market.quote[CCY](market)(security) * quantity
+    }
+
+  def quote[CCY: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
+    trade.toList foldMap quoteLeg[CCY](market)
+
+  def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
+    as.foldLeft(Map.empty[K, List[A]]) { (acc, a) =>
+      (acc get f(a)).fold(acc + (f(a) -> List(a))) { as =>
+        acc + (f(a) -> (a +: as))
+      }
+    }
+
+  def index[F[_]: Foldable, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
+    groupBy(kvs)(_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
+  def accumulate[F[_]: Foldable, K, V: Monoid](kvs: F[(K, V)]): Map[K, V] =
+    groupBy(kvs)(_._1) map {
+      case (k, kvs) => (k, kvs foldMap (_._2))
+    }
+
+  def recorded[C: Monetary](accounts: Accounts, fs: Folios): Execution[C] => Folios = {
+    case Execution(oid, _, (trade, _)) =>
+      (Orders.open get oid) match {
+        case Some((aid, _, _)) =>
+          accounts(aid) match {
+            case Account(folioId, roster, _) =>
+              // TODO: check roster permissions
+              roster |> discardValue
+              fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
+          }
+        case _ => error
+      }
+  }
+
+  def error = ???
 
 }

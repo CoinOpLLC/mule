@@ -43,7 +43,7 @@ object Instrument extends Enum[Instrument] {
   case class BulletPayment(val usi: USI) extends Instrument
   // A product only used for calibration.
   case class Calibration(val usi: USI) extends Instrument
-  // Credit Default Swap (CDS)
+  // CreditAccount Default Swap (CDS)
   case class Cds(val usi: USI) extends Instrument
   // CDS index
   case class CdsIndex(val usi: USI) extends Instrument
@@ -105,9 +105,11 @@ object Role extends Enum[Role] {
   /**
     * The `Entity` which is the economic actor responsible for establishing the `Account`.
     *
-    * Semantics for `Principle` are conditioned on the status of account:
-    * - responsible party (liability)
-    * - beneficial owner (asset)
+    * Semantics for `Principle` are conditioned on the status of account, for examples:
+    * - beneficial owner for an asset
+    * - responsible party for a liability
+    * - shareholder for equity
+    * - business unit chief for revenue and expenses
     */
   case object Principle extends Role
 
@@ -128,7 +130,7 @@ object Role extends Enum[Role] {
     * `Entity`(s) with responsibility for, and authority over,
     * the disposition of assets in the `Account`.
     *
-    * In particular, `Manager`s may intitiate `Transaction`s which will settle to the `Ledger`,
+    * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
     * so long as the `Position`s are already entered in the `Ledger`.
     *
     * (All publicly listed and traded assets are treated as entered into the `Ledger`
@@ -159,7 +161,17 @@ object Role extends Enum[Role] {
   lazy val values: IndexedSeq[Role] = findValues
 }
 
-sealed trait Asset extends EnumEntry
+/**
+  Assets + eXpenses = eQuity + Liabilities + Income
+  A + X = Q + L + I.
+  */
+sealed trait DebitAccount extends EnumEntry
+object DebitAccount
+
+sealed trait CreditAccount extends EnumEntry
+object CreditAccount
+
+sealed trait Asset extends DebitAccount
 object Asset extends Enum[Asset] {
   lazy val values = findValues
   case object Cash                               extends Asset
@@ -182,7 +194,7 @@ object Asset extends Enum[Asset] {
   case object OtherAssets                        extends Asset
 }
 
-sealed trait Liability extends EnumEntry
+sealed trait Liability extends CreditAccount
 object Liability extends Enum[Liability] {
   lazy val values = findValues
   case object AccountsPayable        extends Liability
@@ -193,4 +205,19 @@ object Liability extends Enum[Liability] {
   case object MortgageNotes          extends Liability
   case object OtherLiabilities       extends Liability
   case object PartnersCapital        extends Liability
+}
+
+sealed trait Equity extends CreditAccount
+object Equity extends Enum[Equity] {
+  lazy val values = findValues
+}
+
+sealed trait Revenue extends CreditAccount
+object Revenue extends Enum[Revenue] {
+  lazy val values = findValues
+}
+
+sealed trait Expenses extends DebitAccount
+object Expenses extends Enum[Expenses] {
+  lazy val values = findValues
 }
