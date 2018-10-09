@@ -165,10 +165,12 @@ object Role extends Enum[Role] {
   Assets + eXpenses = eQuity + Liabilities + Income
   A + X = Q + L + I.
   */
-sealed trait DebitAccount extends EnumEntry
+sealed trait AccountType extends EnumEntry
+
+sealed trait DebitAccount extends AccountType
 object DebitAccount
 
-sealed trait CreditAccount extends EnumEntry
+sealed trait CreditAccount extends AccountType
 object CreditAccount
 
 sealed trait Asset extends DebitAccount

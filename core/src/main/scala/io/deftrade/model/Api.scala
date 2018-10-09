@@ -83,6 +83,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   case class LedgerKey(debit: FolioId, credit: FolioId)
 
+  case class AccountTypeKey(debit: enums.AccountType, credit: enums.AccountType)
+  object AccountTypeKey {
+    import enums.{ Asset, Liability }
+    lazy val PurchaseInstrument = AccountTypeKey(Asset.OtherInvestments, Asset.Cash)
+    lazy val PayBills           = AccountTypeKey(Liability.AccountsPayable, Asset.Cash)
+    // etc.
+  }
+
   /**
     * (Runtime) invariant: `Trade`s must balance across all the `FolioId`s in the
     * `LedgerEntry`.
@@ -180,10 +188,19 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       Map.empty + (Role.Principle -> Set(eid))
   }
 
-  case class Account(folioId: FolioId, roster: Roster, subs: Set[AccountId])
+  sealed trait Vault
+  object Vault {
+
+    case class SubAccounts(subs: Set[AccountId]) extends Vault
+    case class Folio(fid: FolioId)               extends Vault
+
+    def empty: Vault = SubAccounts(Set.empty)
+  }
+
+  case class Account(roster: Roster, vault: Vault)
   object Account {
     def simple(fid: FolioId, eid: EntityId): Account =
-      Account(fid, Roster(eid), Set.empty)
+      Account(Roster(eid), Vault.empty)
   }
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
@@ -355,6 +372,29 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def all[CCY]: Executions[CCY] = ???
   }
 
+  abstract class Repository[IO[_]: Monad, A, I] {
+
+    type LocalDateTimeRange
+
+    type Id    = OpaqueId[I, A]
+    type Table = Map[Id, A]
+    type Rows  = List[(Id, A)]
+
+    /** Simple Queries */
+    def empty: IO[Table]
+    def all: IO[Table]
+    def current: IO[Table]
+    def get(id: Id): IO[Option[A]]
+
+    /** Point In Time Queries */
+    def getRange(range: LocalDateTimeRange)(id: Id): Table
+    def currentAt(pit: LocalDateTime): Table // pointInTime
+
+    /** mutators record timestamp */
+    def upsert(row: (Id, A)): Unit
+    def upsert(table: Table): Result[Unit]
+  }
+
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //  global functions yay
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -384,15 +424,23 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
-  def recorded[C: Monetary](accounts: Accounts, fs: Folios): Execution[C] => Folios = {
+  def trialBalance = ???
+
+  def recorded[C: Monetary](fs: Folios, accounts: Accounts): Execution[C] => Folios = {
     case Execution(oid, _, (trade, _)) =>
       (Orders.open get oid) match {
         case Some((aid, _, _)) =>
           accounts(aid) match {
-            case Account(folioId, roster, _) =>
+            case Account(roster, vault) =>
               // TODO: check roster permissions
               roster |> discardValue
-              fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
+              vault match {
+                case Vault.Folio(folioId) =>
+                  fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
+                case Vault.SubAccounts(subs) =>
+                  subs |> discardValue
+                  ??? // wut
+              }
           }
         case _ => error
       }
