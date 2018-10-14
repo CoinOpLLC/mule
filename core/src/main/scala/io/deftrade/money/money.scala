@@ -24,7 +24,8 @@ import enumeratum._
 import eu.timepit.refined
 import refined.api.Refined
 import refined.W
-import cats.kernel.{ instances, CommutativeGroup }, instances.{ BigDecimalGroup, DoubleGroup }
+import cats.kernel.{ CommutativeGroup, Order }
+import cats.kernel.instances.{ BigDecimalGroup, DoubleGroup }
 import cats.Show
 // import refined.collection._
 // import refined.numeric._
@@ -145,7 +146,8 @@ object Financial {
   implicit object DoubleIsFinancial extends DoubleIsFinancial
 
   /**
-    * left operand scale is "sticky" for those operations {+, -, *} that
+    * How do we deal with scale and significant digits?
+    * Simple rule: the left operand scale is "sticky" for those operations {+, -, *} that
     * ultimately result in Money.
     */
   class BigDecimalIsFinancial extends BigDecimalGroup with Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering {
@@ -166,8 +168,8 @@ object Financial {
 /**  */
 private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
-  // type CurrencyType <: Currency
-  // def apply[N: Financial](n: N): Money[N, CurrencyType]
+  type CurrencyType
+  def apply[N: Financial](n: N): Monetary.Money[N, CurrencyType]
   final private lazy val jc = java.util.Currency getInstance monetary.entryName // DRY-fu
 
   final def currencyCode: String = jc.getCurrencyCode
@@ -223,7 +225,6 @@ object Monetary extends Enum[MonetaryLike] {
     def apply[N: Financial, C: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
   }
-  import cats.kernel.{ CommutativeGroup, Order }
 
   implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
   implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
@@ -308,10 +309,13 @@ object Monetary extends Enum[MonetaryLike] {
 
   sealed trait Monetary[C] extends MonetaryLike { self =>
 
-    // grant of exclusive license to create `Money[N, C]` instances
-    // is hearby made to `Monetary[C]` (this is all regrettably clever)
-    private[this] implicit def C: Monetary[C] = self
+    type CurrencyType = C
+
+    /** Grant of exclusive license to create `Money[N, C]` instances
+    is hearby made to the implicit instance of `Monetary[C]` (this is all regrettably clever).
+      */
     def apply[N: Financial](n: N)             = Money[N, C](n)
+    private[this] implicit def C: Monetary[C] = self
 
     /**
       * implicit context to provide pricing

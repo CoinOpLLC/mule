@@ -19,7 +19,8 @@ package model
 
 import opaqueid.{ OpaqueId, OpaqueIdC }
 import time._
-import money.{ Financial, Monetary, QuotedIn }, Monetary.{ Monetary, Money }
+import money._
+import Monetary.{ Monetary, Money }
 
 import cats.{ Foldable, Monad, Monoid }
 import cats.implicits._
@@ -188,13 +189,16 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       Map.empty + (Role.Principle -> Set(eid))
   }
 
+  /**
+    * `Vault` is a sum type used in its capacity as an obfuscator ;)
+    */
   sealed trait Vault
   object Vault {
 
     case class SubAccounts(subs: Set[AccountId]) extends Vault
     case class Folio(fid: FolioId)               extends Vault
 
-    def empty: Vault = SubAccounts(Set.empty)
+    def empty: Vault = SubAccounts(Set.empty) // idiom
   }
 
   case class Account(roster: Roster, vault: Vault)
@@ -220,8 +224,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type Trade = Folio // `Trade` := `Folio` in motion
   val Trade = Folio // gives you `apply`: Trade(legs: Leg*): Trade
 
-  type Order = (AccountId, EntityId, Trade)
-  // type Order[MA, CCY] = (AccountId, EntityId, OffsetDateTime, Trade, Option[Money[MA, CCY]])
+  // type Order = (AccountId, EntityId, Trade)
+  type Order = (AccountId, EntityId, LocalDateTime, Trade, money.MonetaryLike, Option[MonetaryAmount])
   // implied buy / sell, limit / market
   // FIXME: need a date time field
   // FIXME: need a price field (Option) ()
@@ -237,30 +241,25 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   type OrderId = OpaqueId[Long, Order]
   object OrderId extends OpaqueIdC[OrderId]
 
-  type Orders = Map[OrderId, Order]
+  object Orders extends SimpleRepository[cats.Id, Order, Long]
+  type Orders = Orders.Table
 
   type Allocation = Partition[AccountId]
   object Allocation {
 
-    def allocate[C](allocation: Allocation)(ex: Execution[C]): List[Execution[C]] = ???
+    def allocate(allocation: Allocation)(ex: Execution): List[Execution] = ???
 
   }
 
-  // FIXME: need to "back up" CCY parameterization thru `Order`
   // FIXME: need to generalize `BalanceSheet` for any T account
 
-  // TODO: type constructors all the way?
-  // how to capture the fact that `[CCY: Monetary]`
-  case class Execution[CCY: Monetary](oid: OrderId, ldt: LocalDateTime, pt: PricedTrade[CCY])
+  type Execution = (OrderId, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
   // object Execution
 
-  type ExecutionId[CCY] = OpaqueId[Long, Execution[CCY]]
-  class ExecutionIdC[CCY] extends OpaqueIdC[ExecutionId[CCY]]
-  // TODO this requires completion and refactoring.
-  object ExecutionIdCusd extends ExecutionIdC[Monetary.USD]
-  object ExecutionIdCeur extends ExecutionIdC[Monetary.EUR]
+  type ExecutionId = OpaqueId[Long, Execution]
+  object ExecutionId extends OpaqueIdC[ExecutionId]
 
-  type Executions[CCY] = Map[ExecutionId[CCY], Execution[CCY]]
+  type Executions = Map[ExecutionId, Execution]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
@@ -276,7 +275,13 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
     /** Price all the things. */
     def quote[C: Monetary](m: Market)(id: InstrumentId): Money[MonetaryAmount, C] =
-      Monetary[C] apply (Financial[MonetaryAmount] from Markets.quotedIn(m)(id).mid)
+      Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+
+    def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
+
+    // idea: use phantom types to capture sequencing constraint?
+    def trade[IO[_]: Monad](m: Market): Order => IO[Seq[Execution]] = _ => ???
+
   }
 
   type MarketId = OpaqueId[Long, Market]
@@ -328,13 +333,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
   // FIXME: this is hacked in to compile for now.
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  object Markets {
-    def quotedIn[C: Monetary](m: Market)(id: InstrumentId): InstrumentId QuotedIn C = ???
-
-    // idea: use phantom types to capture sequencing constraint?
-    def trade[F[_]: Monad, CCY: Monetary](m: Market): PricedTrade[CCY] => F[Seq[Execution[CCY]]] =
-      ???
-  }
+  object Markets {}
 
   object Instruments {
     def all: Instruments = ???
@@ -360,17 +359,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def get(accountId: AccountId): Option[Account] = ???
   }
 
-  object Orders {
-    def empty: Orders                    = Map.empty
-    def all: Orders                      = ???
-    def get(oid: OrderId): Option[Order] = all get oid
-
-    def open: Orders = ???
-  }
-
-  import money.Monetary.USD
-
-  object Executions extends SimpleRepository[cats.Id, Execution[USD], ExecutionId[USD]]
+  object Executions extends SimpleRepository[cats.Id, Execution, Long]
 
   abstract class Repository[IO[_]: Monad, A, I] {
 
@@ -457,17 +446,18 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   def trialBalance = ???
 
-  def recorded[CCY: Monetary](fs: Folios, accounts: Accounts): Execution[CCY] => Folios = {
-    case Execution(oid, _, (trade, _)) =>
-      (Orders.open get oid) match {
-        case Some((aid, _, _)) =>
+  def recorded[IO[_]: Monad, CCY: Monetary](fs: Folios, accounts: Accounts): Execution => IO[Folios] = {
+    case (oid, _, trade, _, _) =>
+      (Orders get oid) match {
+        case Some((aid, _, _, _, _, _)) =>
           accounts(aid) match {
             case Account(roster, vault) =>
               // TODO: check roster permissions
               roster |> discardValue
               vault match {
                 case Vault.Folio(folioId) =>
-                  fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade))
+                  // FIXME: this is just hacked to get the sigs to compile
+                  Monad[IO] pure { fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade)) }
                 case Vault.SubAccounts(subs) =>
                   subs |> discardValue
                   ??? // wut
