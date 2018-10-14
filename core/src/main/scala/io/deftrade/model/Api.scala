@@ -368,31 +368,62 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def open: Orders = ???
   }
 
-  object Executions {
-    def all[CCY]: Executions[CCY] = ???
-  }
+  import money.Monetary.USD
+
+  object Executions extends SimpleRepository[cats.Id, Execution[USD], ExecutionId[USD]]
 
   abstract class Repository[IO[_]: Monad, A, I] {
 
-    type LocalDateTimeRange
+    lazy val IO = Monad[IO]
 
     type Id    = OpaqueId[I, A]
-    type Table = Map[Id, A]
     type Rows  = List[(Id, A)]
+    type Table = Map[Id, A]
+    object Table { def empty: Table = Map.empty }
 
     /** Simple Queries */
-    def empty: IO[Table]
-    def all: IO[Table]
-    def current: IO[Table]
+    final def empty: IO[Table] = IO pure { Table.empty }
+    def rows: IO[Rows]
+    def table: IO[Table]
     def get(id: Id): IO[Option[A]]
 
-    /** Point In Time Queries */
-    def getRange(range: LocalDateTimeRange)(id: Id): Table
-    def currentAt(pit: LocalDateTime): Table // pointInTime
+    /** mutators record timestamp */
+    def upsert(row: (Id, A)): IO[Result[Unit]]
+    def upsert(table: Table): IO[Result[Unit]] = (IO pure table) flatMap { upsert(_) }
+  }
+
+  trait RepositoryImpl[IO[_], A, I] { self: Repository[IO, A, I] =>
+    def rows: IO[Rows]             = ???
+    def table: IO[Table]           = ???
+    def get(id: Id): IO[Option[A]] = ???
 
     /** mutators record timestamp */
-    def upsert(row: (Id, A)): Unit
-    def upsert(table: Table): Result[Unit]
+    def upsert(row: (Id, A)): IO[Result[Unit]] = ???
+
+  }
+
+  class SimpleRepository[IO[_]: Monad, A, I] extends Repository[IO, A, I] with RepositoryImpl[IO, A, I]
+
+  abstract class PointInTimeRepository[IO[_]: Monad, A, I] extends Repository[IO, A, I] {
+
+    type LocalDateTimeRange
+    object LocalDateTimeRange { def allOfTime: LocalDateTimeRange = ??? }
+
+    /** Simple Queries */
+    final def rows: IO[Rows]             = rowsBetween(LocalDateTimeRange.allOfTime)
+    final def table: IO[Table]           = tableAt(localDateTime)
+    final def get(id: Id): IO[Option[A]] = getAt(localDateTime)(id)
+
+    /** Point In Time Queries */
+    def tableAt(pit: LocalDateTime): IO[Table]
+    def rowsBetween(range: LocalDateTimeRange): IO[Rows]
+    def getAt(pit: LocalDateTime)(id: Id): IO[Option[A]]
+    def getBetween(range: LocalDateTimeRange)(id: Id): IO[Rows]
+
+    /** mutators record timestamp */
+    def upsertAt(pit: LocalDateTime)(row: (Id, A)): IO[Result[Unit]]
+    final def upsert(row: (Id, A)): IO[Result[Unit]] = upsertAt(localDateTime)(row)
+
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,7 +457,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   def trialBalance = ???
 
-  def recorded[C: Monetary](fs: Folios, accounts: Accounts): Execution[C] => Folios = {
+  def recorded[CCY: Monetary](fs: Folios, accounts: Accounts): Execution[CCY] => Folios = {
     case Execution(oid, _, (trade, _)) =>
       (Orders.open get oid) match {
         case Some((aid, _, _)) =>

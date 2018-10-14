@@ -31,7 +31,7 @@ object Instrument extends Enum[Instrument] {
 
   type USI = UniversalInstrumentIdentifyer
 
-  lazy val values = findValues
+  lazy val values = findValues // FIXME: test this lol... case *classes* render ambiguous
 
   // A FixedCouponBond or CapitalIndexedBond.
   case class Bond(val usi: USI) extends Instrument

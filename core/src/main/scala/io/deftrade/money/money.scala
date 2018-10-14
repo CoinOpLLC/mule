@@ -244,7 +244,7 @@ object Monetary extends Enum[MonetaryLike] {
     def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
       val C    = Monetary[C]
       val fmt  = s"%${flags}.${C.fractionDigits}f" // FIXME: this hack won't extend
-      val sfmt = if (Financial[N].signum(m.amount) < 0) fmt else s" $fmt "
+      val sfmt = if ((Financial[N] signum m.amount) < 0) fmt else s" $fmt "
       s"${C.currencyCode} ${m.amount formatted sfmt}"
     }
   }
