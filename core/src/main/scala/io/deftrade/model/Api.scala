@@ -42,7 +42,7 @@ import scala.language.higherKinds
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
   * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
-abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
+abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoApi {
 
   /** Domain specific tools for dealing with `Quantity`s */
   val Quantity = Financial[Quantity]
@@ -238,11 +238,18 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
       )
   }
 
-  type OrderId = OpaqueId[Long, Order]
-  object OrderId extends OpaqueIdC[OrderId]
+  /**
 
-  object Orders extends SimpleRepository[cats.Id, Order, Long]
-  type Orders = Orders.Table
+  this is something of an abuse of the original PiT concept, which models slowly evolving entities with identity (key) which survives updates.
+
+  `Orders` is exactly the opposite.
+
+  But the open date range for "current `Table`" models the "open orders" concept perfectly.
+
+  TODO: is this really worthwhile?
+
+    */
+  object Orders extends SimpleRepository[cats.Id, Long, Order] //with PiTRepoImpl[cats.Id, Order, Long]
 
   type Allocation = Partition[AccountId]
   object Allocation {
@@ -253,13 +260,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
 
   // FIXME: need to generalize `BalanceSheet` for any T account
 
-  type Execution = (OrderId, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
+  type Execution = (Orders.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
   // object Execution
 
-  type ExecutionId = OpaqueId[Long, Execution]
-  object ExecutionId extends OpaqueIdC[ExecutionId]
+  object Executions extends SimpleRepository[cats.Id, Execution, Long]
+  // type Executions = Executions.Table
 
-  type Executions = Map[ExecutionId, Execution]
+  // type ExecutionId = Executions.Id
+  // val ExecutionId = Executions.Id
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
@@ -357,62 +365,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] {
     def all: Accounts   = ???
 
     def get(accountId: AccountId): Option[Account] = ???
-  }
-
-  object Executions extends SimpleRepository[cats.Id, Execution, Long]
-
-  abstract class Repository[IO[_]: Monad, A, I] {
-
-    lazy val IO = Monad[IO]
-
-    type Id    = OpaqueId[I, A]
-    type Rows  = List[(Id, A)]
-    type Table = Map[Id, A]
-    object Table { def empty: Table = Map.empty }
-
-    /** Simple Queries */
-    final def empty: IO[Table] = IO pure { Table.empty }
-    def rows: IO[Rows]
-    def table: IO[Table]
-    def get(id: Id): IO[Option[A]]
-
-    /** mutators record timestamp */
-    def upsert(row: (Id, A)): IO[Result[Unit]]
-    def upsert(table: Table): IO[Result[Unit]] = (IO pure table) flatMap { upsert(_) }
-  }
-
-  trait RepositoryImpl[IO[_], A, I] { self: Repository[IO, A, I] =>
-    def rows: IO[Rows]             = ???
-    def table: IO[Table]           = ???
-    def get(id: Id): IO[Option[A]] = ???
-
-    /** mutators record timestamp */
-    def upsert(row: (Id, A)): IO[Result[Unit]] = ???
-
-  }
-
-  class SimpleRepository[IO[_]: Monad, A, I] extends Repository[IO, A, I] with RepositoryImpl[IO, A, I]
-
-  abstract class PointInTimeRepository[IO[_]: Monad, A, I] extends Repository[IO, A, I] {
-
-    type LocalDateTimeRange
-    object LocalDateTimeRange { def allOfTime: LocalDateTimeRange = ??? }
-
-    /** Simple Queries */
-    final def rows: IO[Rows]             = rowsBetween(LocalDateTimeRange.allOfTime)
-    final def table: IO[Table]           = tableAt(localDateTime)
-    final def get(id: Id): IO[Option[A]] = getAt(localDateTime)(id)
-
-    /** Point In Time Queries */
-    def tableAt(pit: LocalDateTime): IO[Table]
-    def rowsBetween(range: LocalDateTimeRange): IO[Rows]
-    def getAt(pit: LocalDateTime)(id: Id): IO[Option[A]]
-    def getBetween(range: LocalDateTimeRange)(id: Id): IO[Rows]
-
-    /** mutators record timestamp */
-    def upsertAt(pit: LocalDateTime)(row: (Id, A)): IO[Result[Unit]]
-    final def upsert(row: (Id, A)): IO[Result[Unit]] = upsertAt(localDateTime)(row)
-
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
