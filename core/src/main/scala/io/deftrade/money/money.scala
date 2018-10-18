@@ -17,6 +17,8 @@
 package io.deftrade
 package money
 
+import spire.math.{ Fractional, Integral }
+
 import enumeratum._
 // import enumeratum.values._
 
@@ -27,6 +29,10 @@ import refined.W
 import cats.kernel.{ CommutativeGroup, Order }
 import cats.kernel.instances.{ BigDecimalGroup, DoubleGroup }
 import cats.Show
+// import cats.implicits._
+
+// import spire.implicits._
+
 // import refined.collection._
 // import refined.numeric._
 // import refined.auto._
@@ -99,9 +105,11 @@ object QuotedIn {
   def apply = ???
 }
 
-trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[N] {
+trait Financial[N] extends CommutativeGroup[N] {
 
-  class FinancialOps(n: N) extends FractionalOps(n)
+  // class FinancialOps(n: N) extends FractionalOps(n)
+
+  implicit def fractional: Fractional[N]
 
   def fromBigDecimal(bd: BigDecimal): N
   def toBigDecimal(n: N): BigDecimal = BigDecimal(n.toString)
@@ -109,8 +117,8 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   def fromLong(l: Long): N = fromBigDecimal(BigDecimal(l))
 
   /** hack for pattern matching */
-  final lazy val Zero = zero
-  final lazy val One  = one
+  final def Zero(implicit F: Fractional[N]) = F.zero
+  final def One(implicit F: Fractional[N])  = F.one
 
   final def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
 
@@ -127,20 +135,19 @@ trait Financial[N] extends Fractional[N] with Ordering[N] with CommutativeGroup[
   }
 
   /** Extractors and (any) other tools for dealing with integral quantities. */
-  object Integral {
+  object IntegralIs {
 
     // TODO:
-    def unapply[I](n: N)(implicit I: Integral[I]): Option[I] = ???
+    def unapply[I](n: N)(implicit I: Integral[N]): Option[N] = ???
   }
 }
 object Financial {
 
-  import scala.language.implicitConversions
+  object wut extends DoubleGroup
 
-  import Numeric.{ BigDecimalIsFractional, DoubleIsFractional }
-  import Ordering.{ BigDecimalOrdering, DoubleOrdering }
+  class DoubleIsFinancial extends DoubleGroup with Financial[Double] {
 
-  class DoubleIsFinancial extends DoubleGroup with Financial[Double] with DoubleIsFractional with DoubleOrdering {
+    implicit def fractional                    = Fractional[Double]
     def fromBigDecimal(bd: BigDecimal): Double = bd.toDouble
   }
   implicit object DoubleIsFinancial extends DoubleIsFinancial
@@ -150,15 +157,17 @@ object Financial {
     * Simple rule: the left operand scale is "sticky" for those operations {+, -, *} that
     * ultimately result in Money.
     */
-  class BigDecimalIsFinancial extends BigDecimalGroup with Financial[BigDecimal] with BigDecimalIsFractional with BigDecimalOrdering {
+  class BigDecimalIsFinancial extends BigDecimalGroup with Financial[BigDecimal] {
 
     @inline final def fromBigDecimal(bd: BigDecimal): BigDecimal       = bd
     @inline final override def toBigDecimal(n: BigDecimal): BigDecimal = n
+    implicit def fractional                                            = Fractional[BigDecimal]
+
   }
 
   // yes, this is extreme import tax avoidance
-  implicit def financialOps[N](n: N)(implicit N: Financial[N]): N.FinancialOps =
-    new N.FinancialOps(n)
+  // implicit def financialOps[N](n: N)(implicit N: Financial[N]): N.FinancialOps =
+  //   new N.FinancialOps(n)
 
   def apply[N: Financial]: Financial[N] = implicitly
 
@@ -193,7 +202,11 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
     case "JPY" => DOWN
     case _     => HALF_UP
   }
+}
 
+object MonetaryLike {
+  import cats.instances.string._
+  implicit lazy val order: cats.Order[MonetaryLike] = cats.Order by { _.currencyCode }
 }
 
 // object PhantomTypePerCurrency {
@@ -209,31 +222,31 @@ object Monetary extends Enum[MonetaryLike] {
     type MNY = Money[N, C]
 
     def +(rhs: MNY)(implicit N: Financial[N]) =
-      new Money[N, C](N plus (amount, rhs.amount))
+      new Money[N, C](N.fractional plus (amount, rhs.amount))
 
     def -(rhs: MNY)(implicit N: Financial[N]) =
-      new Money[N, C](N minus (amount, rhs.amount))
+      new Money[N, C](N.fractional minus (amount, rhs.amount))
 
     def *[S](scale: S)(implicit N: Financial[N], S: Financial[S], C: Monetary[C]) =
-      Money[N, C](N times (S.to[N](scale), amount))
+      Money[N, C](N.fractional times (S.to[N](scale), amount))
 
-    def /(rhs: MNY)(implicit N: Financial[N]): N = N div (lhs.amount, rhs.amount)
+    def /(rhs: MNY)(implicit N: Financial[N]): N = N.fractional div (lhs.amount, rhs.amount)
 
-    def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money(N negate amount)
+    def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money(N.fractional negate amount)
   }
   object Money {
     def apply[N: Financial, C: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
   }
 
-  implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
+  // implicit def orderN[N: Financial]: Order[N]                          = Order.fromOrdering[N]
   implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
 
   implicit def moneyCommutativeGroup[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
     new CommutativeGroup[Money[N, C]] {
       type MNY = Money[N, C]
       override def combine(a: MNY, b: MNY): MNY = a + b
-      override def empty: MNY                   = Money(Financial[N].zero)
+      override def empty: MNY                   = Money(Financial[N].fractional.zero)
       override def inverse(a: MNY): MNY         = Money(Financial[N] inverse a.amount)
     }
 
@@ -245,7 +258,7 @@ object Monetary extends Enum[MonetaryLike] {
     def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
       val C    = Monetary[C]
       val fmt  = s"%${flags}.${C.fractionDigits}f" // FIXME: this hack won't extend
-      val sfmt = if ((Financial[N] signum m.amount) < 0) fmt else s" $fmt "
+      val sfmt = if ((Financial[N].fractional signum m.amount) < 0) fmt else s" $fmt "
       s"${C.currencyCode} ${m.amount formatted sfmt}"
     }
   }
@@ -291,7 +304,7 @@ object Monetary extends Enum[MonetaryLike] {
     @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
 
     def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) =
-      (buy(C1(N.one)), sell(C1(N.one)))
+      (buy(C1(N.fractional.one)), sell(C1(N.fractional.one)))
 
     def description: String = s"""
           |Quoter buys  ${C1} and sells ${C2} at ${bid}

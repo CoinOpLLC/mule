@@ -5,30 +5,31 @@ package io.deftrade
   */
 package opaqueid {
 
-  import cats.Eq
+  import cats.{ Order }
 
   sealed trait IdTypeTraits extends Any {
-    type Value
-    type Phantom
+    type KeyType
+    type PhantomType
   }
 
-  sealed trait Id[V] extends Any with IdTypeTraits {
-    final type Value = V
-    def id: V
+  sealed trait Id[K] extends Any with IdTypeTraits {
+    final type KeyType = K
+    def id: K
   }
 
-  final case class OpaqueId[V, P] private (val id: V) extends AnyVal with Id[V] {
-    final type Phantom = P
+  final case class OpaqueId[K, P] private (val id: K) extends AnyVal with Id[K] {
+    final type PhantomType = P
   }
 
   object OpaqueId {
-    implicit def eq[T: Eq, P]: Eq[OpaqueId[T, P]] = Eq by (_.id)
+    implicit def order[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.id)
   }
 
-  trait OpaqueIdC[OIDT <: IdTypeTraits] {
-    def apply(v: OIDT#Value) = OpaqueId[OIDT#Value, OIDT#Phantom](v)
-    def fresh: OIDT          = ???
-    def reserved: OIDT#Value = ???
+  abstract class OpaqueIdC[OIDT <: IdTypeTraits](implicit ev: cats.Order[OIDT#KeyType]) {
+    ev |> discardValue
+    def apply(k: OIDT#KeyType) = OpaqueId[OIDT#KeyType, OIDT#PhantomType](k)
+    def fresh: OIDT            = ???
+    def reserved: OIDT#KeyType = ???
   }
 
   object LongId {

@@ -19,6 +19,7 @@ package model
 
 import opaqueid.{ OpaqueId, OpaqueIdC }
 import time._
+import time.implicits._
 import money._
 import Monetary.{ Monetary, Money }
 
@@ -77,8 +78,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   // Need to express `Foldable` relation between `Position` and `Folio`
   // (also, and indentically, between `Leg` and `Trade`)
   //
-
-  // FIXME: if we use instances of this type a parameters for recording trades, we're doing double entry! ;)
 
   // need some kind of map from folio (account) Roles (AR, Inventory, Revenue, JoeThePlumber, Cash) to concrete FolioIds
 
@@ -151,9 +150,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     }
 
     import Quantity._
+    // import spire.math._
+    import spire.implicits._
+
+    spire.math.Fractional[Quantity] |> discardValue
+
     def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
       val p = accumulate(shares.toList)
-      p.values.toList.sum match {
+      p.values.toList.foldMap(identity) match {
         case sum if sum == one => p.asRight
         case badsum            => s"Partition doesn't add up: $badsum != 1.0".asLeft
       }
@@ -208,7 +212,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   }
 
   type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
-  object AccountId {}
+  object AccountId {
+    implicit def order: cats.Order[AccountId] = cats.Order by { _.value }
+  }
+
+  import AccountId._ // Huh. OK...
 
   type Accounts = Map[AccountId, Account]
 
@@ -229,6 +237,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   // implied buy / sell, limit / market
   // FIXME: need a date time field
   // FIXME: need a price field (Option) ()
+
   object Order {
     import io.deftrade.money.Monetary.USD
     def legacy(bd: BigDecimal, q: Long): PricedTrade[USD] =
@@ -249,7 +258,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   TODO: is this really worthwhile?
 
     */
-  object Orders extends SimpleRepository[cats.Id, Long, Order] //with PiTRepoImpl[cats.Id, Order, Long]
+  object Orders extends PointInTimeRepository[cats.Id, Long, Order] with PiTRepoImpl[cats.Id, Long, Order]
 
   type Allocation = Partition[AccountId]
   object Allocation {
@@ -261,9 +270,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   // FIXME: need to generalize `BalanceSheet` for any T account
 
   type Execution = (Orders.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
+
   // object Execution
 
-  object Executions extends SimpleRepository[cats.Id, Execution, Long]
+  object Executions extends SimpleRepository[cats.Id, Long, Execution]
   // type Executions = Executions.Table
 
   // type ExecutionId = Executions.Id

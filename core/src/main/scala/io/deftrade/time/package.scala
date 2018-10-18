@@ -181,6 +181,4 @@ package object time extends time.Api {
     def adjusted(ta: TemporalAdjuster) = value `with` ta
   }
 
-  // implicit def shoTemporal[T <: Temporal with Comparable[T]] = ShowHashOrder[T]
-
 }
