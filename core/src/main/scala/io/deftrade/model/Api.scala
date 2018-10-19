@@ -47,9 +47,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   /** Domain specific tools for dealing with `Quantity`s */
   val Quantity = Financial[Quantity]
+  import Quantity.{ fractional => QF, commutativeGroup => QCG }
 
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   val MonetaryAmount = Financial[MonetaryAmount]
+  import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
   type UII = enums.UniversalInstrumentIdentifyer
   val UII = enums.UniversalInstrumentIdentifyer
@@ -132,13 +134,13 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     */
   type Partition[K] = Map[K, Quantity]
   object Partition {
+    import QF._
 
     /**
       * The portion of the total accorded to the identified `Entity`.
       */
     type Share[K] = (K, Quantity)
     object Share {
-      import Quantity._
       def validate[K](p: Share[K]): Boolean = {
         val (_, q) = p
         zero <= q && q <= one
@@ -146,33 +148,31 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
       def apply[K](k: K, q: Quantity): Share[K] = (k, q) ensuring { p =>
         validate(p)
       }
-      def single[K](k: K) = Share(k, one)
+      def single[K](k: K) = Share(k, QF.one)
     }
-
-    import Quantity._
-    // import spire.math._
-    import spire.implicits._
-
-    spire.math.Fractional[Quantity] |> discardValue
 
     def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
       val p = accumulate(shares.toList)
       p.values.toList.foldMap(identity) match {
-        case sum if sum == one => p.asRight
-        case badsum            => s"Partition doesn't add up: $badsum != 1.0".asLeft
+        case sum if sum == QF.one => p.asRight
+        case badsum               => s"Partition doesn't add up: $badsum != 1.0".asLeft
       }
     }
     def single[K](k: K): Partition[K] = Map.empty + Share.single[K](k)
 
-    def proRata[K](totalShares: Quantity)(capTable: Map[K, Quantity]): Partition[K] =
+    def proRata[K](totalShares: Quantity)(capTable: Map[K, Quantity]): Partition[K] = {
+      import spire.implicits._
       capTable map { case (k, mySlice) => (k, mySlice / totalShares) }
+    }
 
     def pariPassu[K](ks: Set[K]): Partition[K] = {
+      import spire.implicits._
       val n = ks.size
       (ks.toList zip List.fill(n)(one / fromInt(n))).toMap
     }
 
     object Single {
+      private val One = one // HACK to obtain a stable value (upper case no less!)
       def unapply[K](p: Partition[K]): Option[K] = p.toList match {
         case (k, One) :: Nil => k.some
         case _               => none

@@ -12,11 +12,14 @@ class MoneySpec extends FlatSpec {
 
   "Money" should "be created elastically" in {
 
-    val eur = EUR // Moneta withName "EUR"
-    // val eurF  = (d: Double) => eur(d)
+    val eur   = EUR
     val eurF  = eur[Double] _
     val eur20 = 20.0 |> eurF
     val e20   = EUR(20.00)
+
+    val F = Financial[Double]
+    import F._
+    cats.kernel.Order[Money[Double, USD]]
 
     assert(eur20 === e20)
 
