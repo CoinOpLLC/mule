@@ -39,11 +39,16 @@ import refined.numeric._
 
 import scala.language.higherKinds
 
+abstract class IdC[N: cats.Order, P: cats.Eq] {
+  type Id = OpaqueId[N, P]
+  object Id extends OpaqueIdC[Id]
+}
+
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
   * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
-abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoApi {
+abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoApi { api =>
 
   /** Domain specific tools for dealing with `Quantity`s */
   val Quantity = Financial[Quantity]
@@ -69,13 +74,14 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   object Position
 
   type Folio = Map[InstrumentId, Quantity] // n.b algebraic relationship Position <=> Folio
-  object Folio {
+  object Folio extends IdC[Long, Folio] {
     def empty: Folio                = Map.empty
     def apply(ps: Position*): Folio = accumulate(ps.toList)
   }
-
-  type FolioId = OpaqueId[Long, Folio]
-  object FolioId extends OpaqueIdC[FolioId]
+  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Id, Folio] {
+    def apply(id: Folio.Id): Folio = get(id).fold(Folio.empty)(identity)
+  }
+  type Folios = Folios.Table
 
   // Need to express `Foldable` relation between `Position` and `Folio`
   // (also, and indentically, between `Leg` and `Trade`)
@@ -83,7 +89,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   // need some kind of map from folio (account) Roles (AR, Inventory, Revenue, JoeThePlumber, Cash) to concrete FolioIds
 
-  case class LedgerKey(debit: FolioId, credit: FolioId)
+  case class LedgerKey(debit: Folio.Id, credit: Folio.Id)
 
   case class AccountTypeKey(debit: enums.AccountType, credit: enums.AccountType)
   object AccountTypeKey {
@@ -94,12 +100,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   }
 
   /**
-    * (Runtime) invariant: `Trade`s must balance across all the `FolioId`s in the
+    * (Runtime) invariant: `Trade`s must balance across all the `Folio.Id`s in the
     * `LedgerEntry`.
     * FIXME: where do the dates enter in?
     * FIXME: recording valuations of priced trades
     */
-  type JournalEntry = Map[FolioId, Trade]
+  type JournalEntry = Map[Folio.Id, Trade]
   object JournalEntry
 
   type Transaction = JournalEntry
@@ -111,8 +117,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     */
   type Journal = List[JournalEntry]
   object Journal
-
-  type Folios = Map[FolioId, Folio] // = LedgerEntry
 
   trait Person
   trait Corporation
@@ -199,46 +203,45 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   sealed trait Vault
   object Vault {
 
-    case class SubAccounts(subs: Set[AccountId]) extends Vault
-    case class Folio(fid: FolioId)               extends Vault
+    case class SubAccounts(subs: Set[Account.Id]) extends Vault
+    case class Folio(fid: api.Folio.Id)           extends Vault
 
     def empty: Vault = SubAccounts(Set.empty) // idiom
   }
 
   case class Account(roster: Roster, vault: Vault)
   object Account {
-    def simple(fid: FolioId, eid: EntityId): Account =
-      Account(Roster(eid), Vault.empty)
+    type Id = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
+    object Id {
+      implicit def order: cats.Order[Id] = cats.Order by { _.value }
+    }
+    def simple(fid: Folio.Id, eid: EntityId): Account = Account(Roster(eid), Vault.empty)
+    implicit def eq                                   = cats.Eq.fromUniversalEquals[Account]
   }
 
-  type AccountId = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
-  object AccountId {
-    implicit def order: cats.Order[AccountId] = cats.Order by { _.value }
-  }
+  import Account.Id._ // Huh. OK...
 
-  import AccountId._ // Huh. OK...
-
-  type Accounts = Map[AccountId, Account]
+  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
 
   /**
     * aliases.
     */
   type Ledger = Folios
-  val Ledger = Folios
+  lazy val Ledger = Folios
 
   type Leg = Position // `Leg` := `Position` in motion
-  val Leg = Position
+  lazy val Leg = Position
 
   type Trade = Folio // `Trade` := `Folio` in motion
-  val Trade = Folio // gives you `apply`: Trade(legs: Leg*): Trade
+  lazy val Trade = Folio // gives you `apply`: Trade(legs: Leg*): Trade
 
   // type Order = (AccountId, EntityId, Trade)
-  type Order = (AccountId, EntityId, LocalDateTime, Trade, money.MonetaryLike, Option[MonetaryAmount])
+  type Order = (Account.Id, EntityId, LocalDateTime, Trade, money.MonetaryLike, Option[MonetaryAmount])
   // implied buy / sell, limit / market
   // FIXME: need a date time field
   // FIXME: need a price field (Option) ()
 
-  object Order {
+  object Order extends IdC[Long, Order] {
     import io.deftrade.money.Monetary.USD
     def legacy(bd: BigDecimal, q: Long): PricedTrade[USD] =
       (
@@ -258,9 +261,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   TODO: is this really worthwhile?
 
     */
-  object Orders extends PointInTimeRepository[cats.Id, Long, Order] with PiTRepoImpl[cats.Id, Long, Order]
+  object Orders extends SimplePointInTimeRepository[cats.Id, Order.Id, Order]
 
-  type Allocation = Partition[AccountId]
+  type Allocation = Partition[Account.Id]
   object Allocation {
 
     def allocate(allocation: Allocation)(ex: Execution): List[Execution] = ???
@@ -269,27 +272,24 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   // FIXME: need to generalize `BalanceSheet` for any T account
 
-  type Execution = (Orders.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
+  type Execution = (Order.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
+  object Execution extends IdC[Long, Execution]
 
-  // object Execution
-
-  object Executions extends SimpleRepository[cats.Id, Long, Execution]
-  // type Executions = Executions.Table
-
-  // type ExecutionId = Executions.Id
-  // val ExecutionId = Executions.Id
+  object Executions extends SimpleRepository[cats.Id, Execution.Id, Execution]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
 
-  sealed trait Exchange // a multiparty nexus
-  object Exchange
+  case class Exchange(name: String) // a multiparty nexus
+  object Exchange {
+    implicit def eq: cats.Eq[Exchange] = cats.Eq by (_.name)
+  }
 
-  sealed trait Counter // a single counterparty or market maker
+  type Counter = Unit // a single counterparty or market maker
   object Counter
 
   type Market = Either[Counter, Exchange]
-  object Market {
+  object Market extends IdC[Long, Market] {
 
     /** Price all the things. */
     def quote[C: Monetary](m: Market)(id: InstrumentId): Money[MonetaryAmount, C] =
@@ -302,10 +302,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   }
 
-  type MarketId = OpaqueId[Long, Market]
-  object MarketId extends OpaqueIdC[MarketId]
-
-  type Markets = Map[MarketId, Market]
+  type Markets = Map[Market.Id, Market]
+  object Markets extends SimplePointInTimeRepository[cats.Id, Market.Id, Market]
 
   /** `BalanceSheet` forms a commutative group */
   case class BalanceSheet private (val assets: BalanceSheet.Assets, val liabilities: BalanceSheet.Liabilities) {
@@ -351,30 +349,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   // FIXME: this is hacked in to compile for now.
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  object Markets {}
-
   object Instruments {
     def all: Instruments = ???
   }
 
-  object Folios {
-
-    def empty: Folios = Map.empty
-    def all: Folios   = ???
-
-    def get(folioId: FolioId): Option[Folio] = ???
-    def apply(folioId: FolioId): Folio       = get(folioId).fold(Folio.empty)(identity)
-  }
-
   object Entities {
     def all: Entities = ???
-  }
-
-  object Accounts {
-    def empty: Accounts = Map.empty
-    def all: Accounts   = ???
-
-    def get(accountId: AccountId): Option[Account] = ???
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -408,7 +388,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   def trialBalance = ???
 
-  def recorded[IO[_]: Monad, CCY: Monetary](fs: Folios, accounts: Accounts): Execution => IO[Folios] = {
+  def recorded[IO[_]: Monad, CCY: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = {
     case (oid, _, trade, _, _) =>
       (Orders get oid) match {
         case Some((aid, _, _, _, _, _)) =>
@@ -428,6 +408,15 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
         case _ => error
       }
   }
+
+  def ordered = ???
+  sealed trait Ordered
+
+  def executed = ???
+  sealed trait Executed
+
+  sealed trait Settled
+  def settled = ???
 
   def error = ???
 

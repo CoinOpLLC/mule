@@ -22,18 +22,15 @@ trait RepoApi {
 
     lazy val IO = Monad[IO]
 
-    type Id = OpaqueId[K, V]
-    object Id extends OpaqueIdC[Id]
-
-    type Row   = (Id, V)
+    type Row   = (K, V)
     type Rows  = List[Row]
-    type Table = Map[Id, V]
+    type Table = Map[K, V]
 
     /** Simple Queries */
     final def empty: IO[Table] = IO pure { Map.empty }
     def rows: IO[Rows]
     def table: IO[Table]
-    def get(id: Id): IO[Option[V]]
+    def get(id: K): IO[Option[V]]
 
     /** insert only - no update, no delete */
     def upsert(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]]
@@ -41,10 +38,10 @@ trait RepoApi {
   }
 
   trait RepositoryMemImpl[IO[_], K, V] { self: Repository[IO, K, V] =>
-    private var kvs: Table         = Map.empty
-    def rows: IO[Rows]             = IO pure kvs.toList
-    def table: IO[Table]           = IO pure kvs
-    def get(id: Id): IO[Option[V]] = IO pure { kvs get id }
+    private var kvs: Table        = Map.empty
+    def rows: IO[Rows]            = IO pure kvs.toList
+    def table: IO[Table]          = IO pure kvs
+    def get(id: K): IO[Option[V]] = IO pure { kvs get id }
 
     /** mutators record timestamp */
     def upsert(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]] = IO pure { Result { kvs = kvs + row } }
@@ -61,19 +58,19 @@ trait RepoApi {
     }
 
     type PitTable = Map[K, List[(LocalDateTimeRange, V)]]
-    type PitRow   = (Id, (LocalDateTimeRange, V))
+    type PitRow   = (K, (LocalDateTimeRange, V))
     type PitRows  = List[PitRow]
 
     /** Simple Queries always take from the current data stored in the `Table` */
-    final def rows: IO[Rows]             = rowsBetween(LocalDateTimeRange.all)
-    final def table: IO[Table]           = tableAt(localDateTime)
-    final def get(id: Id): IO[Option[V]] = getAt(localDateTime)(id)
+    final def rows: IO[Rows]            = rowsBetween(LocalDateTimeRange.all)
+    final def table: IO[Table]          = tableAt(localDateTime)
+    final def get(id: K): IO[Option[V]] = getAt(localDateTime)(id)
 
     /** Point In Time Queries */
     def tableAt(pit: LocalDateTime): IO[Table]
     def rowsBetween(range: LocalDateTimeRange): IO[Rows]
-    def getAt(pit: LocalDateTime)(id: Id): IO[Option[V]]
-    def getBetween(range: LocalDateTimeRange)(id: Id): IO[Rows]
+    def getAt(pit: LocalDateTime)(id: K): IO[Option[V]]
+    def getBetween(range: LocalDateTimeRange)(id: K): IO[Rows]
   }
 
   trait PiTRepoImpl[IO[_], K, V] { self: PointInTimeRepository[IO, K, V] =>
@@ -95,10 +92,10 @@ trait RepoApi {
         } yield (k, v)
       }
 
-    def getAt(pit: LocalDateTime)(id: Id): IO[Option[V]] =
+    def getAt(pit: LocalDateTime)(id: K): IO[Option[V]] =
       IO.map(tableAt(pit)) { _ get id }
 
-    def getBetween(range: LocalDateTimeRange)(id: Id): IO[Rows] =
+    def getBetween(range: LocalDateTimeRange)(id: K): IO[Rows] =
       IO.map(rowsBetween(range)) { _ filter { case (k, _) => k == id } }
 
     /** mutators record timestamp */
@@ -124,5 +121,7 @@ trait RepoApi {
       }
   }
 }
+
+class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends PointInTimeRepository[IO, K, V] with PiTRepoImpl[IO, K, V]
 
 object RepoApi extends RepoApi
