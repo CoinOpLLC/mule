@@ -5,7 +5,6 @@ import scala.language.higherKinds
 
 import io.deftrade.time._
 import io.deftrade.time.implicits._
-import io.deftrade.opaqueid._
 
 import cats._
 import cats.implicits._
@@ -21,6 +20,8 @@ trait RepoApi {
   abstract class Repository[IO[_]: Monad, K: cats.Order, V: Eq] {
 
     lazy val IO = Monad[IO]
+    lazy val K  = cats.Order[K]
+    lazy val V  = cats.Eq[V]
 
     type Row   = (K, V)
     type Rows  = List[Row]
@@ -32,8 +33,8 @@ trait RepoApi {
     def table: IO[Table]
     def get(id: K): IO[Option[V]]
 
-    /** insert only - no update, no delete */
-    def upsert(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]]
+    def delete(id: K): IO[Result[Unit]] = ???
+    def upsert(row: Row): IO[Result[Unit]]
     def upsert(table: Table): IO[Result[Unit]] = (IO pure table) flatMap { upsert(_) }
   }
 
@@ -44,7 +45,7 @@ trait RepoApi {
     def get(id: K): IO[Option[V]] = IO pure { kvs get id }
 
     /** mutators record timestamp */
-    def upsert(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]] = IO pure { Result { kvs = kvs + row } }
+    def upsert(row: Row): IO[Result[Unit]] = IO pure { Result { kvs = kvs + row } }
 
   }
 
@@ -75,6 +76,10 @@ trait RepoApi {
 
   trait PiTRepoImpl[IO[_], K, V] { self: PointInTimeRepository[IO, K, V] =>
 
+    implicit def IO_ = self.IO
+    implicit def K_  = self.K
+    implicit def V_  = self.V
+
     var cache: Table     = Map.empty
     var pitRows: PitRows = List.empty
 
@@ -99,10 +104,10 @@ trait RepoApi {
       IO.map(rowsBetween(range)) { _ filter { case (k, _) => k == id } }
 
     /** mutators record timestamp */
-    override def upsert(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]] = upsert(localDateTime)(row)
+    override def upsert(row: Row): IO[Result[Unit]] = upsert(localDateTime)(row)
 
     // pitRow discipline: for any given key, the list of (range, v) has each range perfectly ascending, with the earlierst matching key being the latest [ts, inf)
-    def upsert(pit: LocalDateTime)(row: Row)(implicit K: cats.Order[K], V: Eq[V]): IO[Result[Unit]] =
+    def upsert(pit: LocalDateTime)(row: Row): IO[Result[Unit]] =
       IO.map(tableAt(pit)) { table =>
         val (k, v)  = row
         val now     = localDateTime
@@ -120,8 +125,9 @@ trait RepoApi {
         }
       }
   }
+  case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order, V: Eq]()
+      extends PointInTimeRepository[IO, K, V]
+      with PiTRepoImpl[IO, K, V]
 }
-
-class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends PointInTimeRepository[IO, K, V] with PiTRepoImpl[IO, K, V]
 
 object RepoApi extends RepoApi

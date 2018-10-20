@@ -1,7 +1,8 @@
 package io.deftrade
 package model.enums
 
-import cats.Eq
+import cats.{ Eq, Order }
+import cats.instances.string._
 import enumeratum._
 // import enumeratum.values._
 
@@ -15,9 +16,10 @@ object UniversalInstrumentIdentifyer extends Enum[UniversalInstrumentIdentifyer]
   case class IbContractId(s: String) extends UniversalInstrumentIdentifyer
   case class HouseId(s: String)      extends UniversalInstrumentIdentifyer
 
-  lazy val values = findValues
+  lazy val values = findValues // FIXME: what the hell does this do?
 
-  implicit lazy val eq = Eq.fromUniversalEquals[UniversalInstrumentIdentifyer]
+  // implicit lazy val eq = Eq.fromUniversalEquals[UniversalInstrumentIdentifyer]
+  implicit lazy val order: Order[UniversalInstrumentIdentifyer] = Order by (_.s)
 }
 
 sealed trait Derivative { self: Instrument =>
@@ -96,7 +98,7 @@ object Instrument extends Enum[Instrument] {
 
   case class FxForwardSpot(val usi: USI) extends Instrument // FIXME not sure here
 
-  implicit lazy val eq = Eq.fromUniversalEquals[Instrument]
+  implicit lazy val order: Order[Instrument] = Order by (_.usi)
 }
 
 sealed trait Role extends EnumEntry
@@ -159,6 +161,8 @@ object Role extends Enum[Role] {
 
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
+
+  implicit lazy val eq = Eq.fromUniversalEquals[Role]
 }
 
 /**
@@ -166,6 +170,9 @@ object Role extends Enum[Role] {
   A + X = Q + L + I.
   */
 sealed trait AccountType extends EnumEntry
+object AccountType {
+  implicit lazy val eq = Eq.fromUniversalEquals[AccountType]
+}
 
 sealed trait DebitAccount extends AccountType
 object DebitAccount

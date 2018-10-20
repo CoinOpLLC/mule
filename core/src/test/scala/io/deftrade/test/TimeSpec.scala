@@ -59,25 +59,25 @@ class TimeSpec extends FlatSpec with Matchers {
 
   "domain Order stuff" should "work" in {
     // import cats.{ Eq, Monoid }
-    import model._
+    // import model._
 
-    val o1 = Order.legacy(555.550001, 78345)
-    val o2 = Order.legacy(168.020660, 186283)
+    // val o1 = Order.legacy(555.550001, 78345)
+    // val o2 = Order.legacy(168.020660, 186283)
 
-    val o12 = o1 |+| o2
-
-    assert(o12 == Order.legacy(BigDecimal(723.570661), 264628))
-
-    val m1   = Map(1337 -> o1)
-    val m1_a = Map(1337 -> o2)
-    val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
-    val mmm  = m1 |+| m1_a |+| m2
-    assert(
-      mmm === Map(
-        4958 -> Order.legacy(666.880033, 123456),
-        1337 -> Order.legacy(723.570661, 264628)
-      )
-    )
+    // val o12 = o1 |+| o2
+    //
+    // // assert(o12 == Order.legacy(BigDecimal(723.570661), 264628))
+    //
+    // val m1   = Map(1337 -> o1)
+    // val m1_a = Map(1337 -> o2)
+    // // val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
+    // val mmm = m1 |+| m1_a |+| m2
+    // assert(
+    //   mmm === Map(
+    //     4958 -> Order.legacy(666.880033, 123456),
+    //     1337 -> Order.legacy(723.570661, 264628)
+    //   )
+    // )
 
   }
 }
