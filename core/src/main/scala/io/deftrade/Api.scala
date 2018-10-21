@@ -1,68 +1,11 @@
 package io.deftrade
 
-/**
- Leave these here. Opaque means opaque.
-  */
-package opaqueid {
-
-  import cats.{ Order }
-
-  sealed trait IdTypeTraits extends Any {
-    type KeyType
-    type PhantomType
-  }
-
-  sealed trait Id[K] extends Any with IdTypeTraits {
-    final type KeyType = K
-    def id: K
-  }
-
-  final case class OpaqueId[K, P] private (val id: K) extends AnyVal with Id[K] {
-    final type PhantomType = P
-  }
-
-  object OpaqueId {
-    implicit def order[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.id)
-  }
-
-  abstract class OpaqueIdC[OIDT <: IdTypeTraits](implicit ev: cats.Order[OIDT#KeyType]) {
-    ev |> discardValue
-    def apply(k: OIDT#KeyType) = OpaqueId[OIDT#KeyType, OIDT#PhantomType](k)
-    def fresh: OIDT            = ???
-    def reserved: OIDT#KeyType = ???
-  }
-
-  object LongId {
-    def reserved[P] = OpaqueId[Long, P](Long.MinValue)
-  }
-
-  object IntId {
-    def reserved[P] = OpaqueId[Int, P](Int.MinValue)
-  }
-
-}
-
-package feralcats {
-
-  import cats.kernel.CommutativeGroup
-  import cats.kernel.instances.MapMonoid
-
-  class MapCommutativeGroup[K, V: CommutativeGroup] extends MapMonoid[K, V] with CommutativeGroup[Map[K, V]] {
-    def inverse(a: Map[K, V]): Map[K, V] =
-      a.foldLeft(Map.empty[K, V]) { case (my, (k, x)) => my updated (k, CommutativeGroup inverse x) }
-  }
-
-  object instances {
-    implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
-      new MapCommutativeGroup[K, V]
-  }
-}
-
-final case class Fail(msg: String) extends AnyVal
 object Result {
   def apply[T](unsafe: => T): Result[T] =
     safe(unsafe).toEither.left map (x => Fail(s"${x.getClass}: ${x.getMessage}"))
+  def fail[T](msg: String): Result[T] = Left(Fail(msg))
 }
+final case class Fail(msg: String) extends AnyVal
 
 trait Api {
 

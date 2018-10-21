@@ -165,6 +165,7 @@ object Role extends Enum[Role] {
   implicit lazy val eq = Eq.fromUniversalEquals[Role]
 }
 
+/** IRS Form 1065 Schedule L ontology */
 /**
   Assets + eXpenses = eQuity + Liabilities + Income
   A + X = Q + L + I.
@@ -226,7 +227,15 @@ object Revenue extends Enum[Revenue] {
   lazy val values = findValues
 }
 
-sealed trait Expenses extends DebitAccount
-object Expenses extends Enum[Expenses] {
+sealed trait Expense extends DebitAccount
+object Expense extends Enum[Expense] {
   lazy val values = findValues
+}
+
+case class AccountTypeKey(debit: AccountType, credit: AccountType)
+object AccountTypeKey {
+  // def mk(debit: AccountType, credit: AccountType): AccountKeyType = (debit, credit) {}
+  lazy val PurchaseInstrument = AccountTypeKey(Asset.OtherInvestments, Asset.Cash)
+  lazy val PayBills           = AccountTypeKey(Liability.AccountsPayable, Asset.Cash)
+  // etc.
 }

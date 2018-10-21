@@ -115,8 +115,8 @@ sealed class Financial[N: Fractional] {
   def fromLong(l: Long): N = fractional.fromLong(l)
 
   /** hack for pattern matching */
-  val Zero = fractional.zero
-  val One  = fractional.one
+  lazy val Zero = fractional.zero
+  lazy val One  = fractional.one
 
   def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
 

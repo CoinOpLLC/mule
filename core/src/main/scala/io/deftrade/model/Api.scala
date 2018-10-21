@@ -17,9 +17,11 @@
 package io.deftrade
 package model
 
-import opaqueid.{ OpaqueId, OpaqueIdC }
+import opaqueid._
+
 import time._
 import time.implicits._
+
 import money._
 import Monetary.{ Monetary, Money }
 
@@ -28,21 +30,21 @@ import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
+import spire.math.Integral
+
 import eu.timepit.refined
 import refined.api.Refined
 import refined.W
+
+import enumeratum.{ Enum, EnumEntry }
+
 // import refined.collection._
 import refined.numeric._
 // import refined.auto._
 
-// import io.circe.Json
+import io.circe.Json
 
 import scala.language.higherKinds
-
-abstract class IdC[N: cats.Order, P: cats.Eq] {
-  type Id = OpaqueId[N, P]
-  object Id extends OpaqueIdC[Id]
-}
 
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
@@ -59,10 +61,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
   type UII = enums.UniversalInstrumentIdentifyer
-  val UII = enums.UniversalInstrumentIdentifyer
 
-  // TODO: use the XBRL definitions for these, a la OpenGamma
-
+  /** TODO: use the XBRL definitions for these, a la OpenGamma */
   case class Instrument(json: String)
   object Instrument {
     type Id = enums.Instrument
@@ -96,14 +96,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
   case class LedgerKey(debit: Folio.Id, credit: Folio.Id)
   object LedgerKey
 
-  case class AccountTypeKey(debit: enums.AccountType, credit: enums.AccountType)
-  object AccountTypeKey {
-    import enums.{ Asset, Liability }
-    lazy val PurchaseInstrument = AccountTypeKey(Asset.OtherInvestments, Asset.Cash)
-    lazy val PayBills           = AccountTypeKey(Liability.AccountsPayable, Asset.Cash)
-    // etc.
-  }
-
   object FolioTypes extends SimpleRepository[cats.Id, Folio.Id, enums.AccountType]
   type FolioTypes = FolioTypes.Table
   // Map[enums.AccountType, Set[FolioId]]
@@ -127,8 +119,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     def apply[F[_]: Monad: Foldable](je: JournalEntry): F[JournalEntry] = Monad[F] pure je
   }
 
-  type Person      = Unit
-  type Corporation = Unit
+  type Person      = Json
+  type Corporation = Json
 
   type Entity = Either[Corporation, Person]
   object Entity extends IdC[Long, Entity]
@@ -183,16 +175,17 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     }
 
     object Single {
-      private val One = one // HACK to obtain a stable value (upper case no less!)
+
+      /** TODO: deal with other cases lol */
       def unapply[K](p: Partition[K]): Option[K] = p.toList match {
-        case (k, One) :: Nil => k.some
-        case _               => none
+        case (k, Quantity.One) :: Nil => k.some
+        case _                        => none
       }
     }
   }
 
   type Role = enums.Role
-  val Role = enums.Role
+  lazy val Role = enums.Role
 
   /**
     * justification: can't know / can't be responsible for Partition on the entities (i.e. is
@@ -244,11 +237,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
 
   // type Order = (AccountId, Entity.Id, Trade)
   type Order = (Account.Id, Entity.Id, LocalDateTime, Trade, money.MonetaryLike, Option[MonetaryAmount])
-  // implied buy / sell, limit / market
-  // FIXME: need a date time field
-  // FIXME: need a price field (Option) ()
-
-  object Order extends IdC[Long, Order]
+  object Order extends IdC[Long, Order] {
+    def buy[CCY: Monetary]: Order                                   = ??? // market order
+    def buy[CCY: Monetary](ask: Money[MonetaryAmount, CCY]): Order  = ???
+    def sell[CCY: Monetary]: Order                                  = ???
+    def sell[CCY: Monetary](ask: Money[MonetaryAmount, CCY]): Order = ???
+  }
 
   /**
 
@@ -269,8 +263,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     def allocate(allocation: Allocation)(ex: Execution): List[Execution] = ???
 
   }
-
-  // FIXME: need to generalize `BalanceSheet` for any T account
 
   type Execution = (Order.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
   object Execution extends IdC[Long, Execution]
@@ -306,32 +298,48 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
     SimplePointInTimeRepository[cats.Id, Market.Id, Market]()
   type Markets = Markets.Table
 
-  /** `BalanceSheet` forms a commutative group */
-  case class BalanceSheet private (val assets: BalanceSheet.Assets, val liabilities: BalanceSheet.Liabilities) {
+  type AccountType <: EnumEntry
 
-    /** IRS Form 1065 Schedule L ontology */
-    import BalanceSheet._
+  type DebitAccount <: AccountType
+  type CreditAccount <: AccountType
 
-    def updated(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
+  type Asset <: DebitAccount
+  val Asset: Enum[Asset]
+
+  type Revenue <: CreditAccount
+  val Revenue: Enum[Revenue]
+
+  type Expense <: DebitAccount
+  val Expense: Enum[Expense]
+
+  type Liability <: CreditAccount
+  val Liability: Enum[Liability]
+
+  type Equity <: CreditAccount
+  val Equity: Enum[Equity]
+
+  type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
+
+  final type Assets      = AccountMap[Asset]
+  final type Liabilities = AccountMap[Liability]
+  final type Equities    = AccountMap[Equity]
+
+  /**
+  `BalanceSheet` forms a commutative group
+
+    */
+  case class BalanceSheet private (val assets: Assets, val liabilities: Liabilities) {
+
+    def updatedGrow(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
       BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
 
     def updated(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet =
       copy(assets = assets + (from -> amt.inverse) + (to -> amt))
 
-    def updated(from: Liability, to: Liability)(amt: MonetaryAmount): BalanceSheet =
-      copy(liabilities = liabilities + (from -> amt.inverse) + (to -> amt))
-
+    // def updated(from: Liability, to: Liability)(amt: MonetaryAmount): BalanceSheet =
+    //   copy(liabilities = liabilities + (from -> amt.inverse) + (to -> amt))
   }
   object BalanceSheet {
-
-    type Asset = enums.Asset
-    val Asset = enums.Asset
-
-    type Liability = enums.Liability
-    val Liability = enums.Liability
-
-    type Assets      = Map[Asset, MonetaryAmount]
-    type Liabilities = Map[Liability, MonetaryAmount]
 
     implicit lazy val balanceSheetCommutativeGroup: CommutativeGroup[BalanceSheet] =
       new CommutativeGroup[BalanceSheet] {
@@ -374,6 +382,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
+  /** Recall the fundamental equation of accounting:
+        `DebitAccount` === `CreditAccount`
+        `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
+    */
   def trialBalance = ???
 
   def recorded[IO[_]: Monad, CCY: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = {
@@ -386,7 +398,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] extends RepoA
               roster |> discardValue
               vault match {
                 case Vault.Folio(folioId) =>
-                  // FIXME: this is just hacked to get the sigs to compile
                   Monad[IO] pure { fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade)) }
                 case Vault.SubAccounts(subs) =>
                   subs |> discardValue
