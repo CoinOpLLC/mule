@@ -23,7 +23,7 @@ package object deftrade extends deftrade.Api {
     def p2f1[B](f: A => B): B = f(a)
   }
 
-  type Result[T] = Either[Fail, T]
+  type Result[T] = cats.data.Validated[Fail, T]
 
   /**
     * Make `Seq` immutable. See:

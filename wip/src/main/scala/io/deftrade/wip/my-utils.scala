@@ -139,3 +139,13 @@ object MuhMonadInstances {
     override def map[A, B](value: Id[A])(func: A => B): Id[B] = value |> func // |> pure
   }
 }
+
+object GhoshReader {
+
+  case class Reader[R, A](run: R => A) {
+    def map[B](f: A => B): Reader[R, B] = Reader(run andThen f)
+
+    def flatMap[B](f: A => Reader[R, B]): Reader[R, B] =
+      Reader(r => run andThen f apply r run r)
+  }
+}

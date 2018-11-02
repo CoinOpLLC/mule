@@ -275,7 +275,10 @@ trait Api {
       override def show(x: TA): String = formatter format x
 
       // TODO: refactor this where it belongs (i.e. will pick up operator)
-      def parse(s: String): Result[TA] = Result { tq(formatter parse s) }
+      def parse(s: String): Either[Throwable, TA] =
+        scala.util.Try {
+          tq(formatter parse s)
+        }.toEither
     }
 
     implicit lazy val shoLocalDateTime =

@@ -52,9 +52,9 @@ object KVSadt {
   object KVS {
     implicit val kvsFunctor: Functor[KVS] = new Functor[KVS] {
       def map[A, B](a: KVS[A])(f: A => B) = a match {
-        case Put(k, v, a) => Put(k, v, f(a))
-        case Get(k, h)    => Get(k, x => f(h(x)))
-        case Delete(k, a) => Delete(k, f(a))
+        case Put(k, v, a) => Put(k, v, a |> f)
+        case Get(k, h)    => Get(k, h andThen f)
+        case Delete(k, a) => Delete(k, a |> f)
       }
     }
   }

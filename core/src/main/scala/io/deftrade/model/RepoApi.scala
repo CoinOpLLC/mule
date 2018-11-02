@@ -185,7 +185,7 @@ trait RepoApi {
         (table get k) match {
           case Some(u) =>
             Result {
-              val (pfx, sfx)        = pitRows span (_._1 =!= k) // (k, _) is `head` of sfx
+              val (_, sfx)          = pitRows span (_._1 =!= k) // (k, _) is `head` of sfx
               val (kk, (range, uu)) = sfx.headOption getOrElse ??? // tell it like it is
               assert(k === kk)
               assert(u === uu)
@@ -195,6 +195,15 @@ trait RepoApi {
               pitRows = (k, (updated, v)) :: (k, (retired, u)) :: (pitRows drop 1)
               // FIXME: and herin lies the problem: we'd like a stable-over-time id  as well
               // the better to reference `V`s without needing dates.
+              // solution:
+              type PitMap[J] = Map[J, PitRow]
+              // ^ implement this as insert-only
+              // insert has to return _two_ ids? that ain't right... !
+              // // alt semantics where library client is in charge of key generation
+              // def insert(row: Row): Result[Unit]
+              // def upsert(row: Row): Result[Boolean]
+              // def insert(row: Row): Result[J]
+              // def upsert(row: Row): Result[J]  // row._1 == J.init != return if new
             }
           case None =>
             Result.fail[Unit](s"id=$k not found")
