@@ -1,11 +1,11 @@
 package io.deftrade
 
+import cats.data.{ NonEmptyChain, Validated }
+
 /**
   * Financial entity archetypes.
   */
 package object model extends model.Api[BigDecimal, Double] {
-
-  type Result[T] = cats.data.Validated[Fail, T]
 
   type AccountType = enums.AccountType
 

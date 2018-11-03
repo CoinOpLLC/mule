@@ -1,5 +1,5 @@
 package io.deftrade
-package model
+package repos
 
 import opaqueid.OpaqueId
 
@@ -15,11 +15,12 @@ import spire.math.interval._
 
 import scala.language.higherKinds
 
-sealed abstract class RepoFail extends Product with Serializable {
+sealed abstract class Fail extends Product with Serializable {
   def msg: String
 }
-object RepoFail {
-  final case class Impl(val msg: String) extends RepoFail
+object Fail {
+  final case class Impl(val msg: String) extends Fail
+  def apply(msg: String): Fail = Impl(msg)
 }
 
 sealed trait Fresh[I] {
@@ -47,7 +48,7 @@ object Fresh {
 }
 
 /** */
-trait RepoApi {
+trait Api {
 
   abstract class Repository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] {
 
@@ -202,7 +203,7 @@ trait RepoApi {
               // FIXME: and herin lies the problem: we'd like a stable-over-time id  as well
               // the better to reference `V`s without needing dates.
               // solution:
-              type PitMap[J] = Map[J, PitRow]
+              // type PitMap[J] = Map[J, PitRow]
               // ^ implement this as insert-only
               // insert has to return _two_ ids? that ain't right... !
               // // alt semantics where library client is in charge of key generation
@@ -223,4 +224,4 @@ trait RepoApi {
       with PiTRepoImpl[IO, K, V]
 }
 
-object RepoApi extends RepoApi
+object Api extends Api

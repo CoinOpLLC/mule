@@ -1,5 +1,34 @@
 package io.deftrade
 
+sealed abstract class Fail extends Product with Serializable
+
+object Fail {
+
+  final case class Model(mf: model.Fail) extends Fail
+  def apply(mf: model.Fail): Fail = Model(mf)
+
+  final case class Repos(rf: repos.Fail) extends Fail
+  def apply(rf: repos.Fail): Fail = Repos(rf)
+
+}
+
+object Result {
+  import cats.implicits._
+  import scala.util.Try
+  import cats.data.Validated
+
+  private def _fail(msg: String)                 = Fail(model.Fail(msg))
+  private lazy val throw2fail: Throwable => Fail = x => _fail(s"${x.getClass}: ${x.getMessage}")
+
+  def fail[T](msg: String): Result[T] = _fail(msg).asLeft
+
+  def apply[T](unsafe: => T): Result[T] =
+    (Try apply unsafe).toEither.left map throw2fail
+
+  def validated[T](unsafe: => T): ResultV[T] =
+    Validated catchNonFatal unsafe leftMap throw2fail
+}
+
 trait Api {
 
   /**
