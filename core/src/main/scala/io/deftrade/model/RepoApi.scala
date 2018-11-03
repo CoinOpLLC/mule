@@ -15,6 +15,13 @@ import spire.math.interval._
 
 import scala.language.higherKinds
 
+sealed abstract class RepoFail extends Product with Serializable {
+  def msg: String
+}
+object RepoFail {
+  final case class Impl(val msg: String) extends RepoFail
+}
+
 sealed trait Fresh[I] {
   def init: I
   def next(id: I): I
@@ -37,7 +44,6 @@ object Fresh {
     def init: Id       = OpaqueId(K.zero)
     def next(id: Id)   = OpaqueId(K.plus(id.id, K.one))
   }
-
 }
 
 /** */

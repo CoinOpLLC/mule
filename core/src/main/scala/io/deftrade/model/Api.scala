@@ -46,6 +46,29 @@ import io.circe.Json
 
 import scala.language.higherKinds
 
+sealed abstract class LogicFail extends Product with Serializable { def msg: String }
+object LogicFail {
+  final case class Impl(val msg: String) extends LogicFail
+}
+
+sealed abstract class ServiceFail extends Product with Serializable { def msg: String }
+
+object Result {
+  import cats.data.Validated
+  def apply[T](unsafe: => T): Result[T] =
+    Validated catchNonFatal unsafe leftMap (x => Fail(s"${x.getClass}: ${x.getMessage}"))
+  def fail[T](msg: String): Result[T] = Validated invalid Fail(msg)
+}
+
+sealed abstract class Fail
+
+object Fail {
+  final case class Repo(rf: RepoFail)   extends Fail
+  final case class Logic(lf: LogicFail) extends Fail
+  final case class Service(lf: ServiceFail) extends Fail
+}
+// final case class Fail(msg: String) extends AnyVal
+
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
   * This shall be another: only member names whose appearence cannot be helped may appear here.

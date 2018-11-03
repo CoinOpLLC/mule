@@ -1,14 +1,5 @@
 package io.deftrade
 
-import cats.data.Validated
-
-object Result {
-  def apply[T](unsafe: => T): Result[T] =
-    Validated catchNonFatal unsafe leftMap (x => Fail(s"${x.getClass}: ${x.getMessage}"))
-  def fail[T](msg: String): Result[T] = Validated invalid Fail(msg)
-}
-final case class Fail(msg: String) extends AnyVal
-
 trait Api {
 
   /**
