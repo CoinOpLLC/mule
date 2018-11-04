@@ -62,11 +62,11 @@ object Deps {
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
-  val refined = Seq(
+  val refined = (Seq(
     "eu.timepit" %% "refined",
     "eu.timepit" %% "refined-cats",
     "eu.timepit" %% "refined-pureconfig",
-  ) map (_ % Refined)
+  ) map (_ % Refined)) :+ ("eu.timepit" %% "refined-scalacheck" % Refined % Test)
 
   val enumerata = Seq(
     "com.beachape" %% "enumeratum"       % Enumeratum,

@@ -25,8 +25,17 @@ object Result {
   def apply[T](unsafe: => T): Result[T] =
     (Try apply unsafe).toEither.left map throw2fail
 
+  def apply[R](o: Option[R]): Result[R] = o.fold(fail[R]("not found"))(_.asRight)
+
   def validated[T](unsafe: => T): ResultV[T] =
     Validated catchNonFatal unsafe leftMap throw2fail
+
+  object implicits {
+
+    implicit class OptionResult[R](val o: Option[R]) extends AnyVal {
+      def asResult: Result[R] = apply(o)
+    }
+  }
 }
 
 trait Api {

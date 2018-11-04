@@ -1,7 +1,5 @@
 package io.deftrade
 
-import cats.data.{ NonEmptyChain, Validated }
-
 /**
   * Financial entity archetypes.
   */

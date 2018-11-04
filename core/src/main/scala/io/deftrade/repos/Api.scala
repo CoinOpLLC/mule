@@ -29,9 +29,8 @@ sealed trait Fresh[I] {
 }
 object Fresh {
 
-  def apply[I: cats.Order]: Fresh[I] = ???
-
-  def apply[K: Integral, P]: Fresh[OpaqueId[K, P]] = freshK
+  // def apply[I: cats.Order]: Fresh[I]           = freshI
+  // implicit def freshI[I: cats.Order]: Fresh[I] = ???
 
   implicit def order[I: Integral]: cats.Order[I] = cats.Order fromOrdering Integral[I].toOrdering
 
@@ -39,24 +38,24 @@ object Fresh {
 
   implicit def fresh[K, P]: Fresh[K] = ??? // FIXME: enum case
 
+  def apply[K: Integral, P]: Fresh[OpaqueId[K, P]] = freshK
   implicit def freshK[K: Integral, P]: Fresh[OpaqueId[K, P]] = new Fresh[OpaqueId[K, P]] {
     type Id = OpaqueId[K, P]
-    private lazy val K = Integral[K]
-    def init: Id       = OpaqueId(K.zero)
-    def next(id: Id)   = OpaqueId(K.plus(id.id, K.one))
+    private val K = Integral[K]
+    import K.{ one, plus, zero } // TODO: infix?
+    def init: Id     = OpaqueId(zero)
+    def next(id: Id) = OpaqueId(plus(id.id, one))
   }
 }
 
 /** */
 trait Api {
 
-  abstract class Repository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] {
+  abstract class Repository[IO[_]: Monad, K: cats.Order, V: Eq] {
 
     lazy val IO = Monad[IO]
     lazy val K  = cats.Order[K]
     lazy val V  = cats.Eq[V]
-
-    lazy val FreshK = Fresh[K]
 
     type Row   = (K, V)
     type Rows  = List[Row]
@@ -67,23 +66,35 @@ trait Api {
     def rows: IO[Rows]
     def table: IO[Table]
     def get(id: K): IO[Option[V]]
+  }
 
-    def insert(v: V): IO[Result[K]]
+  trait Mutants[IO[_], K, V] { self: Repository[IO, K, V] =>
     def update(row: Row): IO[Result[Unit]]
     def delete(id: K): IO[Result[Boolean]]
   }
 
-  trait RepositoryMemImpl[IO[_], K, V] { self: Repository[IO, K, V] =>
+  abstract class AppendableRepository[IO[_]: Monad, K: cats.Order, V: Eq]()(implicit val FK: Fresh[K])
+      extends Repository[IO, K, V]
+      with Mutants[IO, K, V] {
+    def append(v: V): IO[Result[K]]
+  }
+
+  abstract class InsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends Repository[IO, K, V] with Mutants[IO, K, V] {
+    def insert(row: Row): IO[Result[Unit]]
+    def upsert(row: Row): IO[Result[Int]] = ??? // try insert, then update
+  }
+
+  trait RepositoryMemImpl[IO[_], K, V] { self: AppendableRepository[IO, K, V] =>
     private var kvs: Table        = Map.empty
-    private var k: K              = FreshK.init
+    private var k: K              = FK.init
     def rows: IO[Rows]            = IO pure kvs.toList
     def table: IO[Table]          = IO pure kvs
     def get(id: K): IO[Option[V]] = IO pure { kvs get id }
 
     /** mutators record timestamp FIXME: do they now? */
-    def insert(v: V): IO[Result[K]] = IO pure {
+    def append(v: V): IO[Result[K]] = IO pure {
       Result {
-        k = FreshK next k
+        k = FK next k
         kvs += (k -> v)
         k
       }
@@ -101,9 +112,9 @@ trait Api {
     }
   }
 
-  class SimpleRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends Repository[IO, K, V] with RepositoryMemImpl[IO, K, V]
+  class SimpleRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends AppendableRepository[IO, K, V] with RepositoryMemImpl[IO, K, V]
 
-  abstract class PointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends Repository[IO, K, V] {
+  abstract class PointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends AppendableRepository[IO, K, V] {
 
     type LocalDateTimeRange = Interval[LocalDateTime]
     object LocalDateTimeRange {
@@ -125,8 +136,8 @@ trait Api {
     def getAt(pit: LocalDateTime)(id: K): IO[Option[V]]
     def getBetween(range: LocalDateTimeRange)(id: K): IO[Rows]
 
-    final override def insert(v: V): IO[Result[K]] = insert(localDateTime)(v)
-    def insert(pit: LocalDateTime)(v: V): IO[Result[K]]
+    final override def append(v: V): IO[Result[K]] = append(localDateTime)(v)
+    def append(pit: LocalDateTime)(v: V): IO[Result[K]]
 
     final override def update(row: Row): IO[Result[Unit]] = update(localDateTime)(row)
     def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]]
@@ -144,7 +155,7 @@ trait Api {
 
     var cache: Table     = Map.empty
     var pitRows: PitRows = List.empty
-    var k: K             = FreshK.init
+    var k: K             = FK.init
 
     def tableAt(pit: LocalDateTime): IO[Table] =
       IO pure {
@@ -169,11 +180,11 @@ trait Api {
     /** mutators record timestamp
     pitRow discipline: for any given key, the list of (range, v) has each range perfectly ascending, with the earlierst matching key being the latest [ts, inf)
       */
-    override def insert(pit: LocalDateTime)(v: V): IO[Result[K]] =
+    override def append(pit: LocalDateTime)(v: V): IO[Result[K]] =
       IO.map(tableAt(pit)) { table =>
         val now     = localDateTime
         val updated = Interval.fromBounds(Closed(now), Unbound())
-        k = Fresh[K] next k
+        k = FK next k
         (table get k) match {
           case Some(u) =>
             Result.fail[K](s"id=$k already present with value $u")
