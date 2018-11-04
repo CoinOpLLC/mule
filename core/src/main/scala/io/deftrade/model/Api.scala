@@ -32,15 +32,12 @@ import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
-import eu.timepit.refined
-import refined.api.Refined
-import refined.W
-
 import enumeratum.{ Enum, EnumEntry }
 
-// import refined.collection._
-import refined.numeric._
-// import refined.auto._
+import eu.timepit.refined.{ cats => refinedCats, _ }
+import eu.timepit.refined.api.{ Refined }
+import eu.timepit.refined.numeric._
+import eu.timepit.refined.auto._
 
 import io.circe.Json
 
@@ -217,9 +214,11 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
 
   case class Account(roster: Roster, vault: Vault)
   object Account {
-    type Id = Long Refined Interval.Closed[W.`100000100100`, W.`999999999999`]
+    type IdRefinement = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+    type Id           = Long Refined IdRefinement
     object Id {
       implicit def order: cats.Order[Id] = cats.Order by { _.value }
+      implicit lazy val fresh: Fresh[Id] = StrictFresh[Id](100000100100L, id => refineV[IdRefinement](id + 1L).fold(_ => ???, identity))
     }
     def simple(fid: Folio.Id, eid: Entity.Id): Account = Account(Roster(eid), Vault.empty)
     implicit def eq                                    = cats.Eq.fromUniversalEquals[Account]

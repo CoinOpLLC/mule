@@ -25,8 +25,11 @@ object Fail {
 
 sealed trait Fresh[I] {
   def init: I
-  def next(id: I): I
+  def next: I => I
 }
+
+case class StrictFresh[I](val init: I, val next: I => I) extends Fresh[I]
+
 object Fresh {
 
   // def apply[I: cats.Order]: Fresh[I]           = freshI
@@ -43,8 +46,8 @@ object Fresh {
     type Id = OpaqueId[K, P]
     private val K = Integral[K]
     import K.{ one, plus, zero } // TODO: infix?
-    def init: Id     = OpaqueId(zero)
-    def next(id: Id) = OpaqueId(plus(id.id, one))
+    def init: Id       = OpaqueId(zero)
+    def next: Id => Id = id => OpaqueId(plus(id.id, one))
   }
 }
 
