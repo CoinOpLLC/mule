@@ -32,14 +32,9 @@ case class StrictFresh[I](val init: I, val next: I => I) extends Fresh[I]
 
 object Fresh {
 
-  // def apply[I: cats.Order]: Fresh[I]           = freshI
-  // implicit def freshI[I: cats.Order]: Fresh[I] = ???
-
-  implicit def order[I: Integral]: cats.Order[I] = cats.Order fromOrdering Integral[I].toOrdering
-
   implicit def commutativeGroup[I: Integral]: CommutativeGroup[I] = Integral[I].additive
 
-  implicit def fresh[K, P]: Fresh[K] = ??? // FIXME: enum case
+  // implicit def fresh[K, P]: Fresh[K] = ??? // FIXME: enum case
 
   def apply[K: Integral, P]: Fresh[OpaqueId[K, P]] = freshK
   implicit def freshK[K: Integral, P]: Fresh[OpaqueId[K, P]] = new Fresh[OpaqueId[K, P]] {
@@ -68,12 +63,12 @@ trait Api {
     final def empty: IO[Table] = IO pure { Map.empty }
     def rows: IO[Rows]
     def table: IO[Table]
-    def get(id: K): IO[Option[V]]
+    def get(k: K): IO[Option[V]]
   }
 
   trait Mutants[IO[_], K, V] { self: Repository[IO, K, V] =>
     def update(row: Row): IO[Result[Unit]]
-    def delete(id: K): IO[Result[Boolean]]
+    def delete(k: K): IO[Result[Boolean]]
   }
 
   abstract class AppendableRepository[IO[_]: Monad, K: cats.Order, V: Eq]()(implicit val FK: Fresh[K])
@@ -83,16 +78,19 @@ trait Api {
   }
 
   abstract class InsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends Repository[IO, K, V] with Mutants[IO, K, V] {
-    def insert(row: Row): IO[Result[Unit]]
-    def upsert(row: Row): IO[Result[Int]] = ??? // try insert, then update
+    def insert(row: Row): IO[Result[Unit]] = ???
+    def upsert(row: Row): IO[Result[Int]]  = ??? // try insert, then update
   }
 
-  trait RepositoryMemImpl[IO[_], K, V] { self: AppendableRepository[IO, K, V] =>
-    private var kvs: Table        = Map.empty
-    private var k: K              = FK.init
-    def rows: IO[Rows]            = IO pure kvs.toList
-    def table: IO[Table]          = IO pure kvs
-    def get(id: K): IO[Option[V]] = IO pure { kvs get id }
+  trait MemImpl[IO[_], K, V] { self: Repository[IO, K, V] =>
+    protected var kvs: Table     = Map.empty
+    def rows: IO[Rows]           = IO pure kvs.toList
+    def table: IO[Table]         = IO pure kvs
+    def get(k: K): IO[Option[V]] = IO pure { kvs get k }
+  }
+
+  trait RepositoryMemImpl[IO[_], K, V] extends MemImpl[IO, K, V] { self: AppendableRepository[IO, K, V] =>
+    private var k: K = FK.init
 
     /** mutators record timestamp FIXME: do they now? */
     def append(v: V): IO[Result[K]] = IO pure {
@@ -105,17 +103,30 @@ trait Api {
     def update(row: Row): IO[Result[Unit]] = IO pure {
       Result { kvs += row }
     }
-    def delete(id: K): IO[Result[Boolean]] = IO pure {
+    def delete(k: K): IO[Result[Boolean]] = IO pure {
       Result {
         implicit def V_       = self.V
         val oldKvs: Map[K, V] = kvs
-        kvs -= id
+        kvs -= k
         oldKvs === kvs
       }
     }
   }
 
-  class SimpleRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends AppendableRepository[IO, K, V] with RepositoryMemImpl[IO, K, V]
+  trait MemImplInsertable[IO[_], K, V] extends MemImpl[IO, K, V] { self: InsertableRepository[IO, K, V] =>
+
+    // Members declared in io.deftrade.repos.Api.Repository
+    def update(row: Row): IO[Result[Unit]] = ???
+
+    // Members declared in io.deftrade.repos.Api.Mutants
+    def delete(k: K): IO[Result[Boolean]] = ???
+  }
+
+  class MemAppendableRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]
+      extends AppendableRepository[IO, K, V]
+      with RepositoryMemImpl[IO, K, V]
+
+  class MemInsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends InsertableRepository[IO, K, V] with MemImplInsertable[IO, K, V]
 
   abstract class PointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends AppendableRepository[IO, K, V] {
 
@@ -129,15 +140,15 @@ trait Api {
     type PitRows  = List[PitRow]
 
     /** Simple Queries always take from the current data stored in the `Table` */
-    final override def rows: IO[Rows]            = rowsBetween(LocalDateTimeRange.all)
-    final override def table: IO[Table]          = tableAt(localDateTime)
-    final override def get(id: K): IO[Option[V]] = getAt(localDateTime)(id)
+    final override def rows: IO[Rows]           = rowsBetween(LocalDateTimeRange.all)
+    final override def table: IO[Table]         = tableAt(localDateTime)
+    final override def get(k: K): IO[Option[V]] = getAt(localDateTime)(k)
 
     /** Point In Time Queries */
     def tableAt(pit: LocalDateTime): IO[Table]
     def rowsBetween(range: LocalDateTimeRange): IO[Rows]
-    def getAt(pit: LocalDateTime)(id: K): IO[Option[V]]
-    def getBetween(range: LocalDateTimeRange)(id: K): IO[Rows]
+    def getAt(pit: LocalDateTime)(k: K): IO[Option[V]]
+    def getBetween(range: LocalDateTimeRange)(k: K): IO[Rows]
 
     final override def append(v: V): IO[Result[K]] = append(localDateTime)(v)
     def append(pit: LocalDateTime)(v: V): IO[Result[K]]
@@ -145,8 +156,8 @@ trait Api {
     final override def update(row: Row): IO[Result[Unit]] = update(localDateTime)(row)
     def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]]
 
-    final override def delete(id: K): IO[Result[Boolean]] = delete(localDateTime)(id)
-    def delete(pit: LocalDateTime)(id: K): IO[Result[Boolean]]
+    final override def delete(k: K): IO[Result[Boolean]] = delete(localDateTime)(k)
+    def delete(pit: LocalDateTime)(k: K): IO[Result[Boolean]]
 
   }
 
@@ -174,11 +185,11 @@ trait Api {
         } yield (k, v)
       }
 
-    def getAt(pit: LocalDateTime)(id: K): IO[Option[V]] =
-      IO.map(tableAt(pit)) { _ get id }
+    def getAt(pit: LocalDateTime)(k: K): IO[Option[V]] =
+      IO.map(tableAt(pit)) { _ get k }
 
-    def getBetween(range: LocalDateTimeRange)(id: K): IO[Rows] =
-      IO.map(rowsBetween(range)) { _ filter { case (k, _) => k == id } }
+    def getBetween(range: LocalDateTimeRange)(k: K): IO[Rows] =
+      IO.map(rowsBetween(range)) { _ filter { case (kk, _) => k == kk } }
 
     /** mutators record timestamp
     pitRow discipline: for any given key, the list of (range, v) has each range perfectly ascending, with the earlierst matching key being the latest [ts, inf)
@@ -230,7 +241,7 @@ trait Api {
             Result.fail[Unit](s"id=$k not found")
         }
       }
-    override def delete(pit: LocalDateTime)(id: K): IO[Result[Boolean]] = ???
+    override def delete(pit: LocalDateTime)(k: K): IO[Result[Boolean]] = ???
 
   }
   case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]()

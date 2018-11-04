@@ -72,7 +72,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
     val Id                               = enums.Instrument
     implicit def eq: cats.Eq[Instrument] = cats.Eq by (_.json)
   }
-  object Instruments extends SimplePointInTimeRepository[cats.Id, Instrument.Id, Instrument]
+  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]
   type Instruments = Instruments.Table
 
   type Position = (Instrument.Id, Quantity)
@@ -99,7 +99,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   case class LedgerKey(debit: Folio.Id, credit: Folio.Id)
   object LedgerKey
 
-  object FolioTypes extends SimpleRepository[cats.Id, Folio.Id, enums.AccountType]
+  object FolioTypes extends MemAppendableRepository[cats.Id, Folio.Id, enums.AccountType]
   type FolioTypes = FolioTypes.Table
   // Map[enums.AccountType, Set[FolioId]]
 
@@ -272,7 +272,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   type Execution = (Order.Id, LocalDateTime, Trade, MonetaryAmount, MonetaryLike)
   object Execution extends IdC[Long, Execution]
 
-  object Executions extends SimpleRepository[cats.Id, Execution.Id, Execution]
+  object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
 
   type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
