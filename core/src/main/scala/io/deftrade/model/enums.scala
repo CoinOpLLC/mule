@@ -204,7 +204,9 @@ object Asset extends Enum[Asset] {
   case object OtherAssets                        extends Asset
 }
 
-sealed trait Liability extends CreditAccount
+sealed trait LOQ extends CreditAccount
+
+sealed trait Liability extends LOQ
 object Liability extends Enum[Liability] {
   lazy val values = findValues
   case object AccountsPayable        extends Liability
@@ -217,19 +219,26 @@ object Liability extends Enum[Liability] {
   case object PartnersCapital        extends Liability
 }
 
-sealed trait Equity extends CreditAccount
-object Equity extends Enum[Equity] {
-  lazy val values = findValues
+sealed trait Equity extends LOQ
+object Equity       extends Enum[Equity] { lazy val values = findValues }
+
+object LOQ extends Enum[LOQ] {
+  lazy val values = Liability.values ++ Equity.values
 }
 
 sealed trait Revenue extends CreditAccount
-object Revenue extends Enum[Revenue] {
-  lazy val values = findValues
-}
+object Revenue       extends Enum[Revenue] { lazy val values = findValues }
 
-sealed trait Expense extends DebitAccount
-object Expense extends Enum[Expense] {
-  lazy val values = findValues
+sealed trait XOP extends DebitAccount
+
+sealed trait Expense extends XOP
+object Expense       extends Enum[Expense] { lazy val values = findValues }
+
+sealed trait Profit extends XOP
+object Profit       extends Enum[Profit] { lazy val values = findValues }
+
+object XOP extends Enum[XOP] {
+  lazy val values = Expense.values ++ Profit.values
 }
 
 case class AccountTypeKey(debit: AccountType, credit: AccountType)

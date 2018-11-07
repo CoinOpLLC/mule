@@ -1,16 +1,15 @@
 package io.deftrade
 package repos
 
-import opaqueid.OpaqueId
-
 import io.deftrade.time._
 import io.deftrade.time.implicits._
 
+import io.deftrade.opaqueid._
+
 import cats._
-import cats.kernel.CommutativeGroup
 import cats.implicits._
 
-import spire.math.{ Integral, Interval }
+import spire.math.Interval
 import spire.math.interval._
 
 import scala.language.higherKinds
@@ -21,29 +20,6 @@ sealed abstract class Fail extends Product with Serializable {
 object Fail {
   final case class Impl(val msg: String) extends Fail
   def apply(msg: String): Fail = Impl(msg)
-}
-
-sealed trait Fresh[I] {
-  def init: I
-  def next: I => I
-}
-
-case class StrictFresh[I](val init: I, val next: I => I) extends Fresh[I]
-
-object Fresh {
-
-  implicit def commutativeGroup[I: Integral]: CommutativeGroup[I] = Integral[I].additive
-
-  // implicit def fresh[K, P]: Fresh[K] = ??? // FIXME: enum case
-
-  def apply[K: Integral, P]: Fresh[OpaqueId[K, P]] = freshK
-  implicit def freshK[K: Integral, P]: Fresh[OpaqueId[K, P]] = new Fresh[OpaqueId[K, P]] {
-    type Id = OpaqueId[K, P]
-    private val K = Integral[K]
-    import K.{ one, plus, zero } // TODO: infix?
-    def init: Id       = OpaqueId(zero)
-    def next: Id => Id = id => OpaqueId(plus(id.id, one))
-  }
 }
 
 /** */
@@ -78,8 +54,8 @@ trait Api {
   }
 
   abstract class InsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends Repository[IO, K, V] with Mutants[IO, K, V] {
-    def insert(row: Row): IO[Result[Unit]] = ???
-    def upsert(row: Row): IO[Result[Int]]  = ??? // try insert, then update
+    def insert(row: Row): IO[Result[Unit]]
+    def upsert(row: Row): IO[Result[Int]] = ??? // try insert, then update
   }
 
   trait MemImpl[IO[_], K, V] { self: Repository[IO, K, V] =>
@@ -87,19 +63,6 @@ trait Api {
     def rows: IO[Rows]           = IO pure kvs.toList
     def table: IO[Table]         = IO pure kvs
     def get(k: K): IO[Option[V]] = IO pure { kvs get k }
-  }
-
-  trait RepositoryMemImpl[IO[_], K, V] extends MemImpl[IO, K, V] { self: AppendableRepository[IO, K, V] =>
-    private var k: K = FK.init
-
-    /** mutators record timestamp FIXME: do they now? */
-    def append(v: V): IO[Result[K]] = IO pure {
-      Result {
-        k = FK next k
-        kvs += (k -> v)
-        k
-      }
-    }
     def update(row: Row): IO[Result[Unit]] = IO pure {
       Result { kvs += row }
     }
@@ -113,18 +76,27 @@ trait Api {
     }
   }
 
+  trait MemImplAppendable[IO[_], K, V] extends MemImpl[IO, K, V] { self: AppendableRepository[IO, K, V] =>
+    private var k: K = FK.init
+
+    /** mutators record timestamp FIXME: do they now? */
+    def append(v: V): IO[Result[K]] = IO pure {
+      Result {
+        k = FK next k
+        kvs += (k -> v)
+        k
+      }
+    }
+  }
+
   trait MemImplInsertable[IO[_], K, V] extends MemImpl[IO, K, V] { self: InsertableRepository[IO, K, V] =>
 
-    // Members declared in io.deftrade.repos.Api.Repository
-    def update(row: Row): IO[Result[Unit]] = ???
-
-    // Members declared in io.deftrade.repos.Api.Mutants
-    def delete(k: K): IO[Result[Boolean]] = ???
+    def insert(row: Row): IO[Result[Unit]] = IO pure Result { kvs += row }
   }
 
   class MemAppendableRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]
       extends AppendableRepository[IO, K, V]
-      with RepositoryMemImpl[IO, K, V]
+      with MemImplAppendable[IO, K, V]
 
   class MemInsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends InsertableRepository[IO, K, V] with MemImplInsertable[IO, K, V]
 
@@ -161,7 +133,7 @@ trait Api {
 
   }
 
-  trait PiTRepoImpl[IO[_], K, V] { self: PointInTimeRepository[IO, K, V] =>
+  trait MemImplPiT[IO[_], K, V] { self: PointInTimeRepository[IO, K, V] =>
 
     implicit def IO_ = self.IO
     implicit def K_  = self.K
@@ -246,7 +218,7 @@ trait Api {
   }
   case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]()
       extends PointInTimeRepository[IO, K, V]
-      with PiTRepoImpl[IO, K, V]
+      with MemImplPiT[IO, K, V]
 }
 
 object Api extends Api
