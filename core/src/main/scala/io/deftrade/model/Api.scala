@@ -312,20 +312,28 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   type Debit <: AccountType
   type Credit <: AccountType
 
+  type LOQ <: Credit // Liability Or eQuity
+  val LOQ: Enum[LOQ]
+
+  type XOP <: Debit
+
   type Asset <: Debit
   val Asset: Enum[Asset]
 
-  type Expense <: Debit
+  type Expense <: XOP
   val Expense: Enum[Expense]
 
-  type Liability <: Credit
+  type Liability <: LOQ
   val Liability: Enum[Liability]
 
-  type Equity <: Credit
+  type Equity <: LOQ
   val Equity: Enum[Equity]
 
   type Revenue <: Credit
   val Revenue: Enum[Revenue]
+
+  type Profit <: XOP
+  val Profit: Enum[Profit]
 
   type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
 
@@ -351,11 +359,15 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   }
   object Balance {
 
-    private def _mk[D <: Debit, C <: Credit]: Balance[D, C]             = (Balance apply [D, C] (_, _)).tupled
-    private def _ex[D <: Debit, C <: Credit](tb: Balance[D, C]): (D, C) = (Balance unapply tb).fold(???)(identity)
+    private def _mk[D <: Debit, C <: Credit]: ((AccountMap[D], AccountMap[C])) => Balance[D, C] =
+      (Balance apply [D, C] (_, _)).tupled
+    private def _ex[D <: Debit, C <: Credit](tb: Balance[D, C]): (AccountMap[D], AccountMap[C]) =
+      (Balance unapply tb).fold(???)(identity)
 
     def empty[D <: Debit, C <: Credit] = Balance[D, C](Map.empty, Map.empty)
-    implicit def trialBalanceCommutativeGroup[D <: Debit, C <: Credit]: CommutativeGroup[Balance[D, C]] =
+    implicit def trialBalanceCommutativeGroup[D <: Debit, C <: Credit](
+        implicit CG: CommutativeGroup[(AccountMap[D], AccountMap[C])]
+    ): CommutativeGroup[Balance[D, C]] =
       new CommutativeGroup[Balance[D, C]] {
 
         private val mk = _mk[D, C]
@@ -364,9 +376,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
         def empty: Balance[D, C] = mk((Map.empty, Map.empty))
 
         def combine(a: Balance[D, C], b: Balance[D, C]): Balance[D, C] =
-          mk(CommutativeGroup[(D, C)].combine(ex(a), ex(b)))
+          mk(CG.combine(ex(a), ex(b)))
 
-        def inverse(a: Balance[D, C]): Balance[D, C] = mk(CommutativeGroup[(D, C)] inverse ex(a))
+        def inverse(a: Balance[D, C]): Balance[D, C] = mk(CG inverse ex(a))
       }
   }
 
