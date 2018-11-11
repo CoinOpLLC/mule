@@ -14,7 +14,7 @@ package object model extends model.Api[BigDecimal, Double] {
   lazy val Asset = enums.Asset
   lazy val Cash  = Asset.Cash // Everyone needs Cash.
 
-  type LOQ = enums.LOQ
+  override type LOQ = enums.LOQ
   lazy val LOQ = enums.LOQ
 
   override type Liability = enums.Liability

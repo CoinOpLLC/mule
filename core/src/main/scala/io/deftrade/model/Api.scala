@@ -27,7 +27,7 @@ import time.implicits._
 import money._
 import Monetary.{ Monetary, Money }
 
-import cats.{ Foldable, Monad, Monoid }
+import cats.{ Foldable, Invariant, Monad, Monoid }
 import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
@@ -305,6 +305,10 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   /** Recall the fundamental equation of accounting:
   `Debit` === `Credit`
   `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
+
+  Balance(Assets, LOQs)
+  Balance(XOP, Revenues)  // !!!
+
     */
   // sealed trait AccountType
   type AccountType <: EnumEntry
@@ -315,7 +319,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   type LOQ <: Credit // Liability Or eQuity
   val LOQ: Enum[LOQ]
 
-  type XOP <: Debit
+  type XOP <: Debit // eXpense Or Profit
 
   type Asset <: Debit
   val Asset: Enum[Asset]
@@ -335,10 +339,16 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   type Profit <: XOP
   val Profit: Enum[Profit]
 
-  type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
+  final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
+  object AccountMap {
+    def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
+  }
 
   final type Debits  = AccountMap[Debit]
   final type Credits = AccountMap[Credit]
+
+  final type XOPs = AccountMap[XOP]
+  final type LOQs = AccountMap[LOQ]
 
   final type Assets      = AccountMap[Asset]
   final type Expenses    = AccountMap[Expense]
@@ -346,70 +356,88 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   final type Equities    = AccountMap[Equity]
   final type Revenues    = AccountMap[Revenue]
 
-  case class Balance[D <: Debit, C <: Credit] private (val ds: AccountMap[D], val cs: AccountMap[C]) {
+  sealed abstract class Balance[+D <: Debit, +C <: Credit](ds: AccountMap[D], cs: AccountMap[C]) extends Product with Serializable {
 
     // def updatedGrow(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
     //   BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
     //
     // def updated(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet =
     //   copy(assets = assets + (from -> amt.inverse) + (to -> amt))
-    def updated(d: D, c: C, amt: MonetaryAmount) =
-      Balance(ds + (d -> amt), cs + (c -> amt.inverse))
-
+    // def updated(dc: (D, C), amt: MonetaryAmount): Self = dc match {
+    //   case (d, c) =>
+    //     _mk((ds + (d -> amt), cs + (c -> amt.inverse)))
+    // }
   }
   object Balance {
 
-    private def _mk[D <: Debit, C <: Credit]: ((AccountMap[D], AccountMap[C])) => Balance[D, C] =
-      (Balance apply [D, C] (_, _)).tupled
-    private def _ex[D <: Debit, C <: Credit](tb: Balance[D, C]): (AccountMap[D], AccountMap[C]) =
-      (Balance unapply tb).fold(???)(identity)
+    type Tuple[D <: Debit, C <: Credit] = (AccountMap[D], AccountMap[C])
 
-    def empty[D <: Debit, C <: Credit] = Balance[D, C](Map.empty, Map.empty)
-    implicit def trialBalanceCommutativeGroup[D <: Debit, C <: Credit](
-        implicit CG: CommutativeGroup[(AccountMap[D], AccountMap[C])]
-    ): CommutativeGroup[Balance[D, C]] =
-      new CommutativeGroup[Balance[D, C]] {
+  }
 
-        private val mk = _mk[D, C]
-        private val ex = _ex[D, C] _
+  // def empty[D <: Debit, C <: Credit] = Balance(AccountMap.empty[D], AccountMap.empty[C])
 
-        def empty: Balance[D, C] = mk((Map.empty, Map.empty))
+  // new CommutativeGroup[B] {
+  //
+  //   def empty: B = Balance.empty // mk((Map.empty, Map.empty))
+  //
+  //   def combine(a: B, b: B): B =
+  //     _mk(CG.combine(_ex(a), _ex(b)))
+  //
+  //   def inverse(a: Balance[D, C]): Balance[D, C] = _mk(CG inverse _ex(a))
+  //
+  //   @inline private def _mk: ((AccountMap[D], AccountMap[C])) => Balance[D, C] =
+  //     (Balance apply [D, C] (_, _)).tupled
+  //
+  //   @inline private def _ex(tb: Balance[D, C]): (AccountMap[D], AccountMap[C]) =
+  //     (Balance unapply tb).fold(???)(identity)
+  //
+  // }
+  // }
 
-        def combine(a: Balance[D, C], b: Balance[D, C]): Balance[D, C] =
-          mk(CG.combine(ex(a), ex(b)))
-
-        def inverse(a: Balance[D, C]): Balance[D, C] = mk(CG inverse ex(a))
+  final case class TrialBalance private (
+      val ds: Debits,
+      val cs: Credits
+  ) extends Balance(ds, cs) {
+    lazy val partition: (IncomeStatement, BalanceSheet) = ???
+  }
+  object TrialBalance {
+    implicit lazy val trialBalanceCommutativeGroup: CommutativeGroup[TrialBalance] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[Balance.Tuple[Debit, Credit]]) {
+        case (ds, cs) => apply(ds, cs)
+      } {
+        unapply(_).fold(???)(identity)
       }
   }
 
-  case class IncomeStatement private (val expenses: Expenses, val revenues: Revenues)
+  final case class IncomeStatement private (
+      val xops: XOPs,
+      val revenues: Revenues
+  ) extends Balance(xops, revenues)
+  object IncomeStatement {
+    implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[IncomeStatement] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[Balance.Tuple[XOP, Revenue]]) {
+        case (ds, cs) => apply(ds, cs)
+      } {
+        unapply(_).fold(???)(identity)
+      }
+  }
 
   /**
   `BalanceSheet` forms a commutative group
     all balance sheet ops are double entry
     */
-  case class BalanceSheet private (
+  final case class BalanceSheet private (
       val assets: Assets,
-      val liabilitiesEquities: Liabilities,
-      val equities: Equities
-  )
+      val loqs: LOQs
+  ) extends Balance(assets, loqs)
   object BalanceSheet {
-
-    type TupleType = (Assets, Liabilities, Equities) // DRY.2... would you believe (1) repeat?
-
-    private val mk                   = (BalanceSheet apply (_, _, _)).tupled
-    private def ex(bs: BalanceSheet) = (BalanceSheet unapply bs).fold(???)(identity)
-
-    implicit lazy val balanceSheetCommutativeGroup: CommutativeGroup[BalanceSheet] =
-      new CommutativeGroup[BalanceSheet] {
-
-        override def empty = BalanceSheet(Map.empty, Map.empty, Map.empty)
-
-        override def combine(a: BalanceSheet, b: BalanceSheet) =
-          mk(CommutativeGroup[TupleType].combine(BalanceSheet ex a, BalanceSheet ex b))
-
-        override def inverse(a: BalanceSheet) = mk(CommutativeGroup[TupleType].inverse(BalanceSheet ex a))
+    implicit lazy val balanceCommutativeGroup: CommutativeGroup[BalanceSheet] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets, LOQs)]) {
+        case (ds, cs) => apply(ds, cs)
+      } {
+        unapply(_).fold(???)(identity)
       }
+
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
