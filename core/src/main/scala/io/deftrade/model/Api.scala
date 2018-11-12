@@ -35,7 +35,7 @@ import feralcats.instances._
 import enumeratum.{ Enum, EnumEntry }
 
 import eu.timepit.refined.{ cats => refinedCats, _ }
-import eu.timepit.refined.api.{ Refined }
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric._
 import eu.timepit.refined.auto._
 
@@ -54,6 +54,7 @@ object Fail {
   * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
 abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
+  import io.deftrade.reference._
 
   /** Domain specific tools for dealing with `Quantity`s */
   val Quantity = Financial[Quantity]
@@ -63,13 +64,13 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   val MonetaryAmount = Financial[MonetaryAmount]
   import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
-  type UII = enums.UniversalInstrumentIdentifyer
+  type UII = UniversalInstrumentIdentifyer
 
   /** TODO: use the XBRL definitions for these, a la OpenGamma */
   case class Instrument(json: String)
   object Instrument {
-    type Id = enums.Instrument
-    val Id                               = enums.Instrument
+    type Id = InstrumentIdentifier
+    val Id                               = InstrumentIdentifier
     implicit def eq: cats.Eq[Instrument] = cats.Eq by (_.json)
   }
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]
@@ -356,7 +357,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   final type Equities    = AccountMap[Equity]
   final type Revenues    = AccountMap[Revenue]
 
-  sealed abstract class Balance[+D <: Debit, +C <: Credit](ds: AccountMap[D], cs: AccountMap[C]) extends Product with Serializable {
+  sealed abstract class Balance[D <: Debit, C <: Credit](ds: AccountMap[D], cs: AccountMap[C]) extends Product with Serializable {
 
     // def updatedGrow(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
     //   BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
@@ -368,41 +369,40 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
     //     _mk((ds + (d -> amt), cs + (c -> amt.inverse)))
     // }
   }
-  object Balance {
-
-    type Tuple[D <: Debit, C <: Credit] = (AccountMap[D], AccountMap[C])
-
-  }
-
-  // def empty[D <: Debit, C <: Credit] = Balance(AccountMap.empty[D], AccountMap.empty[C])
-
-  // new CommutativeGroup[B] {
-  //
-  //   def empty: B = Balance.empty // mk((Map.empty, Map.empty))
-  //
-  //   def combine(a: B, b: B): B =
-  //     _mk(CG.combine(_ex(a), _ex(b)))
-  //
-  //   def inverse(a: Balance[D, C]): Balance[D, C] = _mk(CG inverse _ex(a))
-  //
-  //   @inline private def _mk: ((AccountMap[D], AccountMap[C])) => Balance[D, C] =
-  //     (Balance apply [D, C] (_, _)).tupled
-  //
-  //   @inline private def _ex(tb: Balance[D, C]): (AccountMap[D], AccountMap[C]) =
-  //     (Balance unapply tb).fold(???)(identity)
-  //
-  // }
-  // }
+  object Balance {}
 
   final case class TrialBalance private (
       val ds: Debits,
       val cs: Credits
   ) extends Balance(ds, cs) {
-    lazy val partition: (IncomeStatement, BalanceSheet) = ???
+
+    lazy val partition: (IncomeStatement, BalanceSheet) = {
+
+      def collect[T <: AccountType, R <: T](as: AccountMap[T]): AccountMap[R] = as collect {
+        case (k: R, v) => (k, v)
+      }
+      val assets: AccountMap[Asset] = collect(ds)
+      val loqs: AccountMap[LOQ]     = collect(cs)
+
+      val xops: AccountMap[XOP]         = collect(ds)
+      val revenues: AccountMap[Revenue] = collect(cs)
+
+      (IncomeStatement(xops, revenues), BalanceSheet(assets, loqs))
+    }
+
+    def updated(dc: (Debit, Credit), amt: MonetaryAmount): TrialBalance = dc match {
+      case (d, c) => copy(ds + (d -> amt), cs + (c -> amt))
+    }
+    def swappedDebits(dd: (Debit, Debit), amt: MonetaryAmount): TrialBalance = dd match {
+      case (d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> amt.inverse))
+    }
+    def swappedCredits(cc: (Credit, Credit), amt: MonetaryAmount): TrialBalance = cc match {
+      case (c1, c2) => copy(cs = cs + (c1 -> amt) + (c2 -> amt.inverse))
+    }
   }
   object TrialBalance {
     implicit lazy val trialBalanceCommutativeGroup: CommutativeGroup[TrialBalance] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[Balance.Tuple[Debit, Credit]]) {
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits, Credits)]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -415,7 +415,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   ) extends Balance(xops, revenues)
   object IncomeStatement {
     implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[IncomeStatement] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[Balance.Tuple[XOP, Revenue]]) {
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
