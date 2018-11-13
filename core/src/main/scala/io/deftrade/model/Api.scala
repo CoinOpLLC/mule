@@ -17,7 +17,9 @@
 package io.deftrade
 package model
 
-import io.deftrade.repos._
+import enums._
+
+import repos._
 
 import opaqueid._
 
@@ -100,9 +102,9 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   case class LedgerKey(debit: Folio.Id, credit: Folio.Id)
   object LedgerKey
 
-  object FolioTypes extends MemAppendableRepository[cats.Id, Folio.Id, enums.AccountType]
+  object FolioTypes extends MemAppendableRepository[cats.Id, Folio.Id, AccountType]
   type FolioTypes = FolioTypes.Table
-  // Map[enums.AccountType, Set[FolioId]]
+  // Map[AccountType, Set[FolioId]]
 
   /**
     * (Runtime) invariant: `Trade`s must balance across all the `Folio.Id`s in the
@@ -185,9 +187,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
       }
     }
   }
-
-  type Role = enums.Role
-  lazy val Role = enums.Role
 
   /**
     * justification: can't know / can't be responsible for Partition on the entities (i.e. is
@@ -311,35 +310,6 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   Balance(XOP, Revenues)  // !!!
 
     */
-  // sealed trait AccountType
-  type AccountType <: EnumEntry
-
-  type Debit <: AccountType
-  type Credit <: AccountType
-
-  type LOQ <: Credit // Liability Or eQuity
-  val LOQ: Enum[LOQ]
-
-  type XOP <: Debit // eXpense Or Profit
-
-  type Asset <: Debit
-  val Asset: Enum[Asset]
-
-  type Expense <: XOP
-  val Expense: Enum[Expense]
-
-  type Liability <: LOQ
-  val Liability: Enum[Liability]
-
-  type Equity <: LOQ
-  val Equity: Enum[Equity]
-
-  type Revenue <: Credit
-  val Revenue: Enum[Revenue]
-
-  type Profit <: XOP
-  val Profit: Enum[Profit]
-
   final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
   object AccountMap {
     def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
@@ -390,14 +360,12 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
       (IncomeStatement(xops, revenues), BalanceSheet(assets, loqs))
     }
 
-    def updated(dc: (Debit, Credit), amt: MonetaryAmount): TrialBalance = dc match {
-      case (d, c) => copy(ds + (d -> amt), cs + (c -> amt))
-    }
-    def swappedDebits(dd: (Debit, Debit), amt: MonetaryAmount): TrialBalance = dd match {
-      case (d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> amt.inverse))
-    }
-    def swappedCredits(cc: (Credit, Credit), amt: MonetaryAmount): TrialBalance = cc match {
-      case (c1, c2) => copy(cs = cs + (c1 -> amt) + (c2 -> amt.inverse))
+    def updated(uk: UpdateKey, amt: MonetaryAmount): TrialBalance =
+      copy(ds + (uk.debit -> amt), cs + (uk.credit -> amt))
+
+    def swapped[T <: AccountType](sk: SwapKey[T], amt: MonetaryAmount): TrialBalance = sk match {
+      case AssetSwapKey(d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> amt.inverse))
+      case LOQSwapKey(c1, c2)   => copy(cs = cs + (c1 -> amt) + (c2 -> amt.inverse))
     }
   }
   object TrialBalance {

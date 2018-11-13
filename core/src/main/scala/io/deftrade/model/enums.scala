@@ -76,18 +76,22 @@ object Role extends Enum[Role] {
   Assets + eXpenses = eQuity + Liabilities + Income
   A + X = Q + L + I.
   */
-sealed trait AccountType extends EnumEntry
+sealed trait AccountType extends EnumEntry with Product with Serializable
 object AccountType {
   implicit lazy val eq = Eq.fromUniversalEquals[AccountType]
 }
 
-sealed trait DebitAccount extends AccountType
-object DebitAccount
+sealed trait Debit extends AccountType
+object Debit {
+  lazy val values = Asset.values ++ XOP.values
+}
 
-sealed trait CreditAccount extends AccountType
-object CreditAccount
+sealed trait Credit extends AccountType
+object Credit {
+  lazy val values = LOQ.values ++ Revenue.values
+}
 
-sealed trait Asset extends DebitAccount
+sealed trait Asset extends Debit
 object Asset extends Enum[Asset] {
   lazy val values = findValues
   case object Cash                               extends Asset
@@ -110,18 +114,21 @@ object Asset extends Enum[Asset] {
   case object OtherAssets                        extends Asset
 }
 
-sealed trait LOQ extends CreditAccount
+sealed trait LOQ extends Credit
+object LOQ extends Enum[LOQ] {
+  lazy val values = Liability.values ++ Equity.values
+}
 
 sealed trait Liability extends LOQ
 object Liability extends Enum[Liability] {
   lazy val values = findValues
-  case object AccountsPayable        extends Liability
-  case object CurrentMortgateNotes   extends Liability
-  case object OtherCurrentLabilities extends Liability
-  case object NonrecourseLoans       extends Liability
-  case object LoansFromPartners      extends Liability
-  case object MortgageNotes          extends Liability
-  case object OtherLiabilities       extends Liability
+  case object AccountsPayable         extends Liability
+  case object CurrentMortgateNotes    extends Liability
+  case object OtherCurrentLiabilities extends Liability
+  case object NonrecourseLoans        extends Liability
+  case object LoansFromPartners       extends Liability
+  case object MortgageNotes           extends Liability
+  case object OtherLiabilities        extends Liability
 }
 
 sealed trait Equity extends LOQ
@@ -130,29 +137,78 @@ object Equity extends Enum[Equity] {
   lazy val values = findValues
 }
 
-object LOQ extends Enum[LOQ] {
-  lazy val values = Liability.values ++ Equity.values
+sealed trait Revenue extends Credit
+object Revenue extends Enum[Revenue] {
+  case object Receipts       extends Revenue
+  case object OrdinaryIncome extends Revenue
+  lazy val values = findValues
 }
 
-sealed trait Revenue extends CreditAccount
-object Revenue       extends Enum[Revenue] { lazy val values = findValues }
-
-sealed trait XOP extends DebitAccount
-
-sealed trait Expense extends XOP
-object Expense       extends Enum[Expense] { lazy val values = findValues }
-
-sealed trait Profit extends XOP
-object Profit       extends Enum[Profit] { lazy val values = findValues }
-
+sealed trait XOP extends Debit
 object XOP extends Enum[XOP] {
   lazy val values = Expense.values ++ Profit.values
 }
 
-case class AccountTypeKey(debit: AccountType, credit: AccountType)
-object AccountTypeKey {
-  // def mk(debit: AccountType, credit: AccountType): AccountKeyType = (debit, credit) {}
-  lazy val PurchaseInstrument = AccountTypeKey(Asset.OtherInvestments, Asset.Cash)
-  lazy val PayBills           = AccountTypeKey(Liability.AccountsPayable, Asset.Cash)
+sealed trait Expense extends XOP
+object Expense extends Enum[Expense] {
+  case object COGS                  extends Expense
+  case object RepairsAndMaintenance extends Expense
+  case object Salaries              extends Expense
+  case object Rent                  extends Expense
+  lazy val values = findValues
+}
+
+sealed trait Profit extends XOP
+object Profit extends Enum[Profit] {
+  case object Profit extends Profit // SAY IT AGAIN
+  lazy val values = findValues
+}
+
+sealed abstract class DoubleEntryKey protected (
+    k1: AccountType,
+    k2: AccountType
+) extends EnumEntry
+    with Product
+    with Serializable
+object DoubleEntryKey
+
+sealed abstract class UpdateKey private (
+    val debit: Debit,
+    val credit: Credit
+) extends DoubleEntryKey(debit, credit)
+object UpdateKey extends Enum[UpdateKey] {
+  case object PayBills extends UpdateKey(Asset.Cash, Liability.AccountsPayable)
   // etc.
+  lazy val values = findValues
+}
+
+/**
+  * `SwapKey`'s type parameter works to bind
+  */
+sealed abstract class SwapKey[T <: AccountType] private[enums] (
+    val from: T,
+    val to: T
+) extends DoubleEntryKey(from, to)
+object SwapKey
+
+private[enums] sealed abstract class AssetSwapKey(from: Asset, to: Asset) extends SwapKey(from, to)
+object AssetSwapKey extends Enum[AssetSwapKey] { // FIXME: profit?!
+
+  import Asset._
+
+  case object ShipProduct        extends AssetSwapKey(Inventories, AccountsReceivable)
+  case object PurchaseInstrument extends AssetSwapKey(OtherInvestments, Cash)
+
+  def unapply(ask: AssetSwapKey): Option[(Asset, Asset)] = Some(ask.from -> ask.to)
+  lazy val values                                        = findValues
+}
+sealed abstract class LOQSwapKey(from: LOQ, to: LOQ) extends SwapKey(from, to)
+object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
+
+  import Liability._, Equity._
+
+  case object LongTermToCurrentLiability extends LOQSwapKey(OtherLiabilities, OtherCurrentLiabilities)
+
+  def unapply(lsk: LOQSwapKey): Option[(LOQ, LOQ)] = Some(lsk.from -> lsk.to)
+  lazy val values                                  = findValues
 }
