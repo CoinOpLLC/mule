@@ -55,8 +55,10 @@ object Fail {
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
   * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
-abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
+abstract class Api[MA: Financial, Quantity: Financial] { api =>
   import io.deftrade.reference._
+
+  type MonetaryAmount = MA
 
   /** Domain specific tools for dealing with `Quantity`s */
   val Quantity = Financial[Quantity]
@@ -327,7 +329,7 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   final type Equities    = AccountMap[Equity]
   final type Revenues    = AccountMap[Revenue]
 
-  sealed abstract class Balance[D <: Debit, C <: Credit](ds: AccountMap[D], cs: AccountMap[C]) extends Product with Serializable {
+  sealed abstract class Balance[D <: Debit, C <: Credit](val ds: AccountMap[D], val cs: AccountMap[C]) extends Product with Serializable {
 
     // def updatedGrow(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
     //   BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
@@ -342,8 +344,8 @@ abstract class Api[MonetaryAmount: Financial, Quantity: Financial] { api =>
   object Balance {}
 
   final case class TrialBalance private (
-      val ds: Debits,
-      val cs: Credits
+      override val ds: Debits,
+      override val cs: Credits
   ) extends Balance(ds, cs) {
 
     lazy val partition: (IncomeStatement, BalanceSheet) = {

@@ -212,3 +212,32 @@ object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
   def unapply(lsk: LOQSwapKey): Option[(LOQ, LOQ)] = Some(lsk.from -> lsk.to)
   lazy val values                                  = findValues
 }
+
+sealed abstract class Nettable(val gross: Asset, val less: Asset) extends EnumEntry with Product with Serializable {
+  import io.deftrade.model.{ Balance, MonetaryAmount }
+  final def net[D >: Asset <: Debit, C <: Credit](b: Balance[D, C]): MonetaryAmount =
+    b.ds(gross) - b.ds(less) // FIXME: this is typesafe, but not fool-proof.
+}
+object Nettable extends Enum[Nettable] {
+
+  import Asset._
+
+  case object Depreciable
+      extends Nettable(
+        BuildingsAndOtherDepreciableAssets,
+        LessAccumulatedDepreciation
+      )
+
+  case object Depletable
+      extends Nettable(
+        DepletableAssets,
+        LessAccumulatedDepletion
+      )
+  case object Amortizable
+      extends Nettable(
+        IntangibleAssets,
+        LessAccumulatedAmortization
+      )
+
+  val values = findValues
+}

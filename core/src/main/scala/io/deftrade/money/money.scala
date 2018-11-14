@@ -235,10 +235,10 @@ object Monetary extends Enum[MonetaryLike] {
     implicit def moneyCommutativeGroup[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
       new CommutativeGroup[Money[N, C]] {
         type MNY = Money[N, C]
-        val cg                                    = Financial[N].commutativeGroup
-        override def combine(a: MNY, b: MNY): MNY = Money(cg.combine(a.amount, b.amount))
-        override def empty: MNY                   = Money(cg.empty)
-        override def inverse(a: MNY): MNY         = Money(cg inverse a.amount)
+        val CG                                    = Financial[N].commutativeGroup
+        override def combine(a: MNY, b: MNY): MNY = Money(CG.combine(a.amount, b.amount))
+        override def empty: MNY                   = Money(CG.empty)
+        override def inverse(a: MNY): MNY         = Money(CG inverse a.amount)
       }
 
     implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
