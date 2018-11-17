@@ -240,4 +240,5 @@ object Nettable extends Enum[Nettable] {
       )
 
   val values = findValues
+
 }

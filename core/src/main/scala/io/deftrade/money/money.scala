@@ -227,22 +227,19 @@ object Monetary extends Enum[MonetaryLike] {
     def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money(N.fractional negate amount)
   }
   object Money {
+    import cats.Invariant
+    import cats.kernel.CommutativeGroup
+
     def apply[N: Financial, C: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
 
     implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
 
-    implicit def moneyCommutativeGroup[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
-      new CommutativeGroup[Money[N, C]] {
-        type MNY = Money[N, C]
-        val CG                                    = Financial[N].commutativeGroup
-        override def combine(a: MNY, b: MNY): MNY = Money(CG.combine(a.amount, b.amount))
-        override def empty: MNY                   = Money(CG.empty)
-        override def inverse(a: MNY): MNY         = Money(CG inverse a.amount)
-      }
-
     implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
       Show show (Format apply _)
+
+    implicit def commutativeGroupMoney[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
+      Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(Monetary[C] apply _)(_.amount)
   }
 
   object Format {
@@ -329,6 +326,7 @@ object Monetary extends Enum[MonetaryLike] {
       implicit val C2 = cb
       Rate[C, C2]
     }
+
   }
 
   sealed trait Currency

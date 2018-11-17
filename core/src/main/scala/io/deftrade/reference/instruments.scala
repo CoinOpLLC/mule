@@ -94,6 +94,24 @@ object InstrumentIdentifier {
 
   implicit lazy val order: Order[InstrumentIdentifier] = Order by (_.uii)
 }
+
+import io.deftrade.money.Financial
+
+sealed trait Strike[N] extends Any { def value: N }
+object Strike {
+
+  final case class SimpleStrike[N] private (val value: N) extends AnyVal with Strike[N]
+  object SimpleStrike {
+    def apply[N: Financial](value: N): SimpleStrike[N] = new SimpleStrike(value)
+  }
+
+  final case class LogMoneynessStrike[N] private (val value: N) extends AnyVal with Strike[N]
+  object LogMoneynessStrike {
+    def apply[N: Financial](value: N): LogMoneynessStrike[N] = new LogMoneynessStrike(value)
+    def apply[N: Financial](strike: N, forward: N): LogMoneynessStrike[N] =
+      ??? // apply(ln(strike / forward))
+  }
+}
 /*
 object Isin extends App {
   val isins = Seq("US0378331005", "US0373831005", "U50378331005",
