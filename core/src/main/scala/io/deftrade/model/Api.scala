@@ -27,7 +27,7 @@ import time._
 import time.implicits._
 
 import money._
-import Monetary.{ Monetary, Money }
+import Monetary.{ Money, QuotedIn }
 
 import cats.{ Foldable, Invariant, Monad, Monoid }
 import cats.implicits._

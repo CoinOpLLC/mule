@@ -73,37 +73,6 @@ import BigDecimal.RoundingMode._
    todo: treatment of what's expected to be imported implicitly
 
   */
-/**
-  * - `QuotedIn` is a binary typeclass: `A QuotedIn B`. The domain vocabulary usage supports this.
-  * - can come from a variety of sources including live market
-  * - "Orderly market" invariant: `ask` < `bid`.
-  * - must model disorderly markets: not everything that comes at you down the wire makes sense.
-  * - note: the types parameters `A` and `CCY` are effectively *phantom types*
-  *   - used summon a pricing instance (e.g. QuotedIn[SomeShadySpeculativeInstrument, CHF]))
-  *   - CCY is intended (but not required by this base type) to represent a currency, and will
-  * typically have a Monetary[CCY] typeclass instance
-  */
-trait QuotedIn[A, CCY] {
-
-  def ask: BigDecimal
-  def bid: BigDecimal
-
-  def tick: BigDecimal
-
-  def isDerived: Boolean = false
-
-  type CrossType
-  def cross: Option[CrossType] = None
-
-  @inline final def spread = ask - bid
-  @inline final def mid    = bid + spread / 2
-
-}
-
-object QuotedIn {
-  def apply = ???
-}
-
 sealed class Financial[N: Fractional] {
 
   implicit lazy val fractional                       = Fractional[N]
@@ -138,7 +107,7 @@ sealed class Financial[N: Fractional] {
 
     7.4 Representing Exact Monetary Amounts
     */
-  def round[C](n: N)(implicit C: Monetary.Monetary[C]): N = {
+  def round[C](n: N)(implicit C: Monetary[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
   }
@@ -196,7 +165,7 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
   }
 }
 
-object MonetaryLike {
+private[deftrade] object MonetaryLike {
   import cats.instances.string._
   implicit lazy val order: cats.Order[MonetaryLike] = cats.Order by { _.currencyCode }
 }
@@ -206,9 +175,33 @@ object MonetaryLike {
 // problem: toString (only one java class serves as a box - the restriction is entirely a compile time scala typesystem thing.
 // Which is fine, as far as it goes, which isn't far enough to interoperate with other sw that expects toString to give distinct output for different currencies.)
 // But we can implement Show[Money[N, C]] for all the N and C we care about.
+// Q: WTF is Monetary vs Financial, anyway? Sounds like HumptyDumpty naming to me.
+// A: It's this: Monetary is having to do specifically with `Money`, that peculiar, exceptional, ubiquitous, and indispensibile, infinite duration, non-interest bearing, bearer `Security`.
 
+sealed trait Monetary[C] extends MonetaryLike { self =>
+
+  import Monetary._
+
+  type CurrencyType = C
+
+  /** Grant of exclusive license to create `Money[N, C]` instances
+  is hearby made to the implicit instance of `Monetary[C]` (this is all regrettably clever).
+    */
+  def apply[N: Financial](n: N)             = Money[N, C](n)
+  private[this] implicit def C: Monetary[C] = self
+
+  /**
+    * implicit context to provide pricing
+    */
+  def /[C2](cb: Monetary[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+    implicit val C2 = cb
+    Rate[C, C2]
+  }
+
+}
 object Monetary extends Enum[MonetaryLike] {
 
+  /** `Money` is a naked number, with a phantom currency type. (In case you were wondering.)*/
   final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
     type MNY = Money[N, C]
@@ -226,6 +219,10 @@ object Monetary extends Enum[MonetaryLike] {
 
     def unary_-(implicit N: Financial[N], C: Monetary[C]): MNY = Money(N.fractional negate amount)
   }
+
+  /**
+    * `Money[?, C]: Order: Show: CommutativeGroup`
+    */
   object Money {
     import cats.Invariant
     import cats.kernel.CommutativeGroup
@@ -233,23 +230,52 @@ object Monetary extends Enum[MonetaryLike] {
     def apply[N: Financial, C: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
 
-    implicit def orderMoney[N: Order, C <: Currency]: Order[Money[N, C]] = Order by (_.amount)
+    implicit def orderMoney[N: Order, C <: Currency: Monetary]: Order[Money[N, C]] = Order by (_.amount)
 
     implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
       Show show (Format apply _)
 
     implicit def commutativeGroupMoney[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
       Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(Monetary[C] apply _)(_.amount)
+
+    object Format {
+      val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
+      def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
+        val C    = Monetary[C]
+        val fmt  = s"%${flags}.${C.fractionDigits}f" // TODO: this hack won't extend
+        val sfmt = if ((Financial[N].fractional signum m.amount) < 0) fmt else s" $fmt "
+        s"${C.currencyCode} ${m.amount formatted sfmt}"
+      }
+    }
   }
 
-  object Format {
-    val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
-    def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
-      val C    = Monetary[C]
-      val fmt  = s"%${flags}.${C.fractionDigits}f" // FIXME: this hack won't extend
-      val sfmt = if ((Financial[N].fractional signum m.amount) < 0) fmt else s" $fmt "
-      s"${C.currencyCode} ${m.amount formatted sfmt}"
-    }
+  /**
+    * - `QuotedIn` is a binary typeclass: `A QuotedIn B`. The domain vocabulary usage supports this.
+    * - can come from a variety of sources including live market
+    * - "Orderly market" invariant: `ask` < `bid`.
+    * - must model disorderly markets: not everything that comes at you down the wire makes sense.
+    * - note: the types parameters `A` and `CCY` are effectively *phantom types*
+    *   - used summon a pricing instance (e.g. QuotedIn[SomeShadySpeculativeInstrument, CHF]))
+    *   - CCY is intended (but not required by this base type) to represent a currency, and will
+    * typically have a Monetary[CCY] typeclass instance
+    */
+  trait QuotedIn[A, CCY] {
+
+    def ask: BigDecimal
+    def bid: BigDecimal
+
+    def tick: BigDecimal
+
+    def isDerived: Boolean = false
+
+    type CrossType
+    def cross: Option[CrossType] = None
+
+    @inline final def spread = ask - bid
+    @inline final def mid    = bid + spread / 2
+  }
+  object QuotedIn {
+    def apply = ???
   }
 
   /**
@@ -309,28 +335,6 @@ object Monetary extends Enum[MonetaryLike] {
     def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
   }
 
-  sealed trait Monetary[C] extends MonetaryLike { self =>
-
-    type CurrencyType = C
-
-    /** Grant of exclusive license to create `Money[N, C]` instances
-    is hearby made to the implicit instance of `Monetary[C]` (this is all regrettably clever).
-      */
-    def apply[N: Financial](n: N)             = Money[N, C](n)
-    private[this] implicit def C: Monetary[C] = self
-
-    /**
-      * implicit context to provide pricing
-      */
-    def /[C2](cb: Monetary[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
-      implicit val C2 = cb
-      Rate[C, C2]
-    }
-
-  }
-
-  sealed trait Currency
-
   /**
     * Given a currency (phantom) type, get a `Monetary` instance.
     */
@@ -341,15 +345,16 @@ object Monetary extends Enum[MonetaryLike] {
 
   val values = findValues
 
-  final class EUR extends Currency
-  case object EUR extends Monetary[EUR]
+  final class EUR private () extends Currency
+  case object EUR            extends Monetary[EUR]
   implicit val eur: Monetary[EUR] = EUR
 
-  final class USD extends Currency
-  case object USD extends Monetary[USD]
+  final class USD private () extends Currency
+  case object USD            extends Monetary[USD]
   implicit val usd: Monetary[USD] = USD
-}
 
+}
+sealed trait Currency
 object Currency {
   type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
 }
