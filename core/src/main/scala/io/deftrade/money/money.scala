@@ -107,7 +107,7 @@ sealed class Financial[N: Fractional] {
 
     7.4 Representing Exact Monetary Amounts
     */
-  def round[C](n: N)(implicit C: Monetary[C]): N = {
+  def round[C <: Currency](n: N)(implicit C: Monetary[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
   }
@@ -138,7 +138,7 @@ object Financial {
 /**  */
 private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
-  type CurrencyType
+  type CurrencyType <: Currency
   def apply[N: Financial](n: N): Monetary.Money[N, CurrencyType]
   final private lazy val jc = java.util.Currency getInstance monetary.entryName // DRY-fu
 
@@ -168,6 +168,7 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 private[deftrade] object MonetaryLike {
   import cats.instances.string._
   implicit lazy val order: cats.Order[MonetaryLike] = cats.Order by { _.currencyCode }
+
 }
 
 // object PhantomTypePerCurrency {
@@ -178,7 +179,7 @@ private[deftrade] object MonetaryLike {
 // Q: WTF is Monetary vs Financial, anyway? Sounds like HumptyDumpty naming to me.
 // A: It's this: Monetary is having to do specifically with `Money`, that peculiar, exceptional, ubiquitous, and indispensibile, infinite duration, non-interest bearing, bearer `Security`.
 
-sealed trait Monetary[C] extends MonetaryLike { self =>
+sealed trait Monetary[C <: Currency] extends MonetaryLike { self =>
 
   import Monetary._
 
@@ -193,7 +194,7 @@ sealed trait Monetary[C] extends MonetaryLike { self =>
   /**
     * implicit context to provide pricing
     */
-  def /[C2](cb: Monetary[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+  def /[C2 <: Currency](cb: Monetary[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
     implicit val C2 = cb
     Rate[C, C2]
   }
@@ -202,7 +203,7 @@ sealed trait Monetary[C] extends MonetaryLike { self =>
 object Monetary extends Enum[MonetaryLike] {
 
   /** `Money` is a naked number, with a phantom currency type. (In case you were wondering.)*/
-  final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
+  final class Money[N, C <: Currency] private (val amount: N) extends AnyVal { lhs =>
 
     type MNY = Money[N, C]
 
@@ -227,20 +228,20 @@ object Monetary extends Enum[MonetaryLike] {
     import cats.Invariant
     import cats.kernel.CommutativeGroup
 
-    def apply[N: Financial, C: Monetary](amount: N) =
+    def apply[N: Financial, C <: Currency: Monetary](amount: N) =
       new Money[N, C](Financial[N].round[C](amount))
 
     implicit def orderMoney[N: Order, C <: Currency: Monetary]: Order[Money[N, C]] = Order by (_.amount)
 
-    implicit def showMoney[N: Financial, C: Monetary]: Show[Money[N, C]] =
+    implicit def showMoney[N: Financial, C <: Currency: Monetary]: Show[Money[N, C]] =
       Show show (Format apply _)
 
-    implicit def commutativeGroupMoney[N: Financial, C: Monetary]: CommutativeGroup[Money[N, C]] =
+    implicit def commutativeGroupMoney[N: Financial, C <: Currency: Monetary]: CommutativeGroup[Money[N, C]] =
       Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(Monetary[C] apply _)(_.amount)
 
     object Format {
       val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
-      def apply[N: Financial, C: Monetary](m: Money[N, C]): String = {
+      def apply[N: Financial, C <: Currency: Monetary](m: Money[N, C]): String = {
         val C    = Monetary[C]
         val fmt  = s"%${flags}.${C.fractionDigits}f" // TODO: this hack won't extend
         val sfmt = if ((Financial[N].fractional signum m.amount) < 0) fmt else s" $fmt "
@@ -259,7 +260,7 @@ object Monetary extends Enum[MonetaryLike] {
     *   - CCY is intended (but not required by this base type) to represent a currency, and will
     * typically have a Monetary[CCY] typeclass instance
     */
-  trait QuotedIn[A, CCY] {
+  trait QuotedIn[A, CCY <: Currency] {
 
     def ask: BigDecimal
     def bid: BigDecimal
@@ -288,7 +289,7 @@ object Monetary extends Enum[MonetaryLike] {
     * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD.[5]
     */
-  implicit def inverseQuote[C1: Monetary, C2: Monetary](implicit Q: C1 QuotedIn C2): C2 QuotedIn C1 =
+  implicit def inverseQuote[C1 <: Currency: Monetary, C2 <: Currency: Monetary](implicit Q: C1 QuotedIn C2): C2 QuotedIn C1 =
     new QuotedIn[C2, C1] {
       def bid                = 1 / Q.ask
       def ask                = 1 / Q.bid
@@ -296,7 +297,7 @@ object Monetary extends Enum[MonetaryLike] {
       override def isDerived = true
     }
 
-  implicit def crossQuote[C1: Monetary, CX, C2: Monetary](
+  implicit def crossQuote[C1 <: Currency: Monetary, CX <: Currency, C2 <: Currency: Monetary](
       implicit CX: Monetary[CX],
       Q1X: C1 QuotedIn CX,
       QX2: CX QuotedIn C2
@@ -309,10 +310,10 @@ object Monetary extends Enum[MonetaryLike] {
     override def cross: Option[CrossType] = Some(CX)
   }
 
-  final case class Rate[C1, C2]()(implicit
-                                  C1: Monetary[C1],
-                                  C2: Monetary[C2],
-                                  Q: C1 QuotedIn C2) {
+  final case class Rate[C1 <: Currency, C2 <: Currency]()(implicit
+                                                          C1: Monetary[C1],
+                                                          C2: Monetary[C2],
+                                                          Q: C1 QuotedIn C2) {
     import Q._
     @inline def buy[N: Financial](m1: Money[N, C1]): Money[N, C2]   = convert(m1, ask)
     @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2]  = convert(m1, bid)
@@ -331,14 +332,15 @@ object Monetary extends Enum[MonetaryLike] {
     }
   }
 
-  final case class SimpleQuote[C1, C2: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[C1, C2] {
+  final case class SimpleQuote[C1 <: Currency, C2 <: Currency: Monetary](val ask: BigDecimal, val bid: BigDecimal)
+      extends QuotedIn[C1, C2] {
     def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
   }
 
   /**
     * Given a currency (phantom) type, get a `Monetary` instance.
     */
-  def apply[C: Monetary]: Monetary[C] = implicitly
+  def apply[C <: Currency: Monetary]: Monetary[C] = implicitly
 
   // TODO: standard major currency order - can we find a reference other than objectlabkit?
   // "EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "NOK", "SEK", "JPY"

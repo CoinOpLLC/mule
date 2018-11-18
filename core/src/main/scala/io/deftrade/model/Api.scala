@@ -244,10 +244,10 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   // type Order = (AccountId, Entity.Id, Trade)
   type Order = (Account.Id, Entity.Id, LocalDateTime, Trade, money.MonetaryLike, Option[MonetaryAmount])
   object Order extends IdC[Long, Order] {
-    def buy[CCY: Monetary]: Order                                   = ??? // market order
-    def buy[CCY: Monetary](ask: Money[MonetaryAmount, CCY]): Order  = ???
-    def sell[CCY: Monetary]: Order                                  = ???
-    def sell[CCY: Monetary](ask: Money[MonetaryAmount, CCY]): Order = ???
+    def buy[CCY <: Currency: Monetary]: Order                                   = ??? // market order
+    def buy[CCY <: Currency: Monetary](ask: Money[MonetaryAmount, CCY]): Order  = ???
+    def sell[CCY <: Currency: Monetary]: Order                                  = ???
+    def sell[CCY <: Currency: Monetary](ask: Money[MonetaryAmount, CCY]): Order = ???
   }
 
   /**
@@ -275,7 +275,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
 
-  type PricedTrade[CCY] = (Trade, Money[MonetaryAmount, CCY])
+  type PricedTrade[CCY <: Currency] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
 
   case class Exchange(name: String) // a multiparty nexus
@@ -290,10 +290,10 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   object Market extends IdC[Long, Market] {
 
     /** Price all the things. */
-    def quote[C: Monetary](m: Market)(id: Instrument.Id): Money[MonetaryAmount, C] =
+    def quote[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Money[MonetaryAmount, C] =
       Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
-    def quotedIn[C: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
+    def quotedIn[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
 
     // idea: use phantom types to capture sequencing constraint?
     def trade[IO[_]: Monad](m: Market): Order => IO[Seq[Execution]] = _ => ???
@@ -414,12 +414,12 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   //  global functions yay
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  def quoteLeg[CCY: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
+  def quoteLeg[CCY <: Currency: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
     leg match {
       case (security, quantity) => Market.quote[CCY](market)(security) * quantity
     }
 
-  def quote[CCY: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
+  def quote[CCY <: Currency: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
     trade.toList foldMap quoteLeg[CCY](market)
 
   def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
@@ -441,7 +441,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   def trialBalance = ???
 
-  def recorded[IO[_]: Monad, CCY: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = {
+  def recorded[IO[_]: Monad, CCY <: Currency: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = {
     case (oid, _, trade, _, _) =>
       (Orders get oid) match {
         case Some((aid, _, _, _, _, _)) =>
