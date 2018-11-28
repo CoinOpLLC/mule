@@ -1,4 +1,10 @@
 package io.deftrade
+
+object console {
+  def slowrun[T, R](t: T)(run: T => R, zzz: Long = 100L): R =
+    try run(t)
+    finally Thread sleep zzz
+}
 package object test {
 
   // from http://splasho.com/upgoer5/

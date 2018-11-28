@@ -1,6 +1,6 @@
 resolvers += Resolver.sonatypeRepo("releases")
 
-addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.7")
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
 
 import Deps._
 
@@ -15,6 +15,8 @@ lazy val common = Seq(
   scalacOptions in (Compile, console)     --= Args.nonConsoleScalaCflags.to[Seq],
   scalacOptions in (Test, console)        := (scalacOptions in (Compile, console)).value,
   wartremoverErrors in (Compile, compile) ++= Warts.unsafe,
+  // per https://issues.scala-lang.org/browse/SI-9076 - via fs2 faq
+  scalacOptions in Console += "-Ydelambdafy:inline",
   dependencyUpdatesFilter                 -= moduleFilter(organization = "org.scala-lang"),
   crossPaths                              := false,
   cancelable                              := true,

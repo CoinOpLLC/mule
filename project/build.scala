@@ -4,16 +4,18 @@ import Keys._
 
 object Version {
 
-  val Scala          = "2.12.6"
+  val Scala          = "2.12.7"
   val Xml            = "1.1.0"
   val ScalaTest      = "3.0.5"
   val ScalaCheck     = "1.14.0"
   val TypesafeConfig = "1.3.3"
-  val Cats           = "1.2.0"
+
+  val Cats           = "1.4.0"
   val CatsEffect     = "1.0.0"
-  val Fuiid          = "0.1.2"
   val CatsTime       = "0.0.3"
   val CatsScalaCheck = "0.1.0"
+  val Fs2            = "1.0.0"
+  val Fuiid          = "0.1.2"
   val Quicklens      = "1.4.11"
   val PureConfig     = "0.9.2"
   val Enumeratum     = "1.5.13"
@@ -21,14 +23,15 @@ object Version {
   val Refined        = "0.9.2"
   val Circe          = "0.8.0"
   val Cormorant      = "0.0.7"
-  val Fansi          = "0.2.5"
-  val Akka           = "2.5.12"
-  val AkkaHttp       = "10.1.5"
-  val HttpSession    = "0.5.5"
-  val Ammonite       = "0.8.3"
-  val Quill          = "2.3.1"
-  val PgJdbc         = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
-  val OpenGamma      = "2.0.0"
+
+  val Akka        = "2.5.12"
+  val AkkaHttp    = "10.1.5"
+  val HttpSession = "0.5.5"
+  val Quill       = "2.3.1"
+  val PgJdbc      = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+  val Ammonite    = "0.8.3"
+  val Fansi       = "0.2.5"
+  val OpenGamma   = "2.0.0"
   // val Squants        = "1.3.0"
 
   // val PgJdbc = "9.4-1201-jdbc41"
@@ -115,6 +118,13 @@ object Deps {
     "io.chrisdavenport" %% "cormorant-refined"
   ) map (_ % Cormorant)
 
+  val fs2s = List(
+    "co.fs2" %% "fs2-core",
+    "co.fs2" %% "fs2-io",
+    "co.fs2" %% "fs2-reactive-streams",
+    // "co.fs2" %% "fs2-experimental",
+  ) map (_ % Fs2)
+
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi" % Fansi
@@ -150,10 +160,10 @@ object Deps {
     List(
       cats,
       catsEffect,
-      catsTime,
+      // catsTime,
       quicklens,
       spire,
-    ) ++ cormorants ++ fuiids
+    ) ++ fs2s ++ cormorants ++ fuiids
 
   lazy val misclibs =
     List(

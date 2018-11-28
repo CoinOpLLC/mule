@@ -26,9 +26,7 @@ class MoneySpec extends FlatSpec {
     assert(eur20 * 2.0 > e20)
     assert(eur20 + eur20 > e20)
 
-    // import scala.language.higherKinds
-    // type Dollar = USD[Double] // ClassPerCurrency
-    type Dollar = Money[Double, USD] // PhantomTypePerCurrency
+    type Dollar = Money[Double, USD] // phantom type per `Currency`
 
     val d20: Dollar = USD(20.00)
     val d21: Dollar = USD(21.00)
@@ -50,12 +48,12 @@ class MoneySpec extends FlatSpec {
     assert(buck.show === "USD  1.00 ")
     assert((-buck).show === "USD (1.00)")
 
-    implicit def eurusdStaticPrice: QuotedIn[EUR, USD] = SimpleQuote(1.23, 1.22)
+    implicit def eurusdStaticPrice: EUR QuotedIn USD = SimpleQuote(1.23, 1.22)
 
     lazy val eurusd = EUR / USD
 
-    val dollarsRequired = eurusd buy EUR(100.0)
-    val dollarsReceived = eurusd sell EUR(100.0)
+    val dollarsRequired: Dollar = eurusd buy EUR(100.0)
+    val dollarsReceived: Dollar = eurusd sell EUR(100.0)
 
     assert(dollarsReceived < dollarsRequired)
 
