@@ -29,7 +29,7 @@ import time.implicits._
 import money._
 import Monetary.{ Money, QuotedIn }
 
-import cats.{ Foldable, Invariant, Monad, Monoid }
+import cats.{ Foldable, Invariant, Monad, Monoid, MonoidK }
 import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
@@ -83,8 +83,6 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   type Position = (Instrument.Id, Quantity)
   object Position
 
-  abstract class PositionSet[F[_]: Foldable: Monad] // ???
-
   type Folio = Map[Instrument.Id, Quantity] // n.b algebraic relationship Position <=> Folio
   object Folio extends IdC[Long, Folio] {
     def empty: Folio                = Map.empty
@@ -95,11 +93,16 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   }
   type Folios = Folios.Table
 
-  // Need to express `Foldable` relation between `Position` and `Folio`
-  // (also, and indentically, between `Leg` and `Trade`)
-  //
+  /** TODO: consider the wisdom of this alias */
+  type PositionSet = Folio
+  lazy val PositionSet = Folio
 
-  // need some kind of map from folio (account) Roles (AR, Inventory, Revenue, JoeThePlumber, Cash) to concrete FolioIds
+  /** Map from `Folio` (accounting) Roles (AR, Inventory, Revenue, JoeThePlumber, Cash) to concrete `Folio.Id`s */
+  type AccountingRoles = Map[AccountType, Folio.Id]
+  object AccountingRoles //
+
+  type AccountRoles = Map[Account.Id, AccountType]
+  object AccountRoles //I know, right?
 
   case class LedgerKey(debit: Folio.Id, credit: Folio.Id)
   object LedgerKey
@@ -112,17 +115,18 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     * (Runtime) invariant: `Trade`s must balance across all the `Folio.Id`s in the
     * `LedgerEntry`.
     */
-  type JournalEntry = (LocalDateTime, Map[Folio.Id, Trade], Money[MonetaryAmount, Monetary.USD])
+  type JournalEntry[C <: Currency] = (LocalDateTime, Folio.Id, Trade, Money[MA, C])
   object JournalEntry
 
-  type Transaction = JournalEntry
+  type Transaction[C <: Currency] = JournalEntry[C]
   val Transaction = JournalEntry
 
   /**
     */
-  type Journal[F[_]] = F[JournalEntry]
+  type Journal[F[_], C <: Currency] = F[JournalEntry[C]]
   object Journal { // non empty by def?
-    def apply[F[_]: Monad: Foldable](je: JournalEntry): F[JournalEntry] = Monad[F] pure je
+    def empty[F[_]: Monad: Foldable: MonoidK, C <: Currency]: Journal[F, C] =
+      MonoidK[F].empty[JournalEntry[C]]
   }
 
   type Person      = Json
@@ -225,7 +229,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     implicit def eq                                    = cats.Eq.fromUniversalEquals[Account]
   }
 
-  import Account.Id._ // Huh. OK...
+  import Account.Id._ // for implicits
 
   object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
 

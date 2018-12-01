@@ -225,7 +225,7 @@ object Monetary extends Enum[MonetaryLike] {
       new Money[N, C](N.fractional minus (amount, rhs.amount))
 
     def *[S](scale: S)(implicit N: Financial[N], S: Financial[S], C: Monetary[C]) =
-      Money[N, C](N.fractional times (S.to[N](scale), amount))
+      Money[N, C](N.fractional times (S to [N] scale, amount))
 
     def /(rhs: MNY)(implicit N: Financial[N]): N = N.fractional div (lhs.amount, rhs.amount)
 
