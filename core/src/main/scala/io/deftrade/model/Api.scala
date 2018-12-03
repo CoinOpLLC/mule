@@ -27,14 +27,11 @@ import time._
 import time.implicits._
 
 import money._
-import Monetary.{ Money, QuotedIn }
 
 import cats.{ Foldable, Invariant, Monad, Monoid, MonoidK }
 import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
-
-import enumeratum.{ Enum, EnumEntry }
 
 import eu.timepit.refined.{ cats => refinedCats, _ }
 import eu.timepit.refined.api.Refined
