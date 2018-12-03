@@ -149,3 +149,7 @@ object GhoshReader {
       Reader(r => run andThen f apply r run r)
   }
 }
+
+import time._
+import money._
+case class Foo(i: Int, d: Double, b: Boolean, s: String, j: Json, usd: USD, ldt: LocalDateTime, uuid: UUID, )

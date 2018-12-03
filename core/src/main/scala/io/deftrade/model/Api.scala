@@ -53,6 +53,16 @@ object Fail {
 /**
   * This shall be the law of the Api: A `type Foo` may not depend on a `type FooId`.
   * This shall be another: only member names whose appearence cannot be helped may appear here.
+  *
+  * What does "double entry bookkeeping" mean in the context of a shared distributed ledger with
+  * OMS gateways to external markets?
+  *
+  * It means this:
+  * - we keep contra accounts per OMS gateway
+  * - we debit that account when we "buy shares" (creates negative balance)
+  * - we credit that account when settlement happens (zeros out the balance)
+  * - we "reverse polarity" when we enter a short position.
+  * - we can accumulate settled positions for reconcilliation
   */
 abstract class Api[MA: Financial, Quantity: Financial] { api =>
   import io.deftrade.reference._
@@ -67,6 +77,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   val MonetaryAmount = Financial[MonetaryAmount]
   import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
+  /********************************************************************************************
+    * Folio space
+  *******************************************************************************************/
   type UII = UniversalInstrumentIdentifyer
 
   /** TODO: use the XBRL definitions for these, a la OpenGamma */
@@ -79,7 +92,10 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]
   type Instruments = Instruments.Table
 
-  /** How much of a given `Instrument` is held. */
+  /**
+  How much of a given `Instrument` is held.
+  Can also be thought of as a `Leg` at rest.
+    */
   type Position = (Instrument.Id, Quantity)
   object Position
 
@@ -87,7 +103,10 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   type Leg = Position
   lazy val Leg = Position
 
-  /** A `Folio` is a set of `Position`s */
+  /**
+  A `Folio` is a set of `Position`s
+  Can also be thought of as a `Trade` at rest.
+    */
   type Folio = Map[Instrument.Id, Quantity]
   object Folio extends IdC[Long, Folio] {
     def empty: Folio                = Map.empty
@@ -107,64 +126,31 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   type Ledger = Folios
   lazy val Ledger = Folios
 
-  /**
-    * FIXME: depends on mapping between `Folio`s and `Balance`s
-    */
-  final case class DoubleEntryKey(debit: Folio.Id, credit: Folio.Id)
-  object DoubleEntryKey
-
   type Signature = String      // placeholder
   type Sha256    = Array[Byte] // ditto
   /**
-    * (Runtime) invariant: `Trade`s must balance across all the `Folio.Id`s in the
-    * `LedgerEntry`.
-    *
-    * This is a non-standard treatment which makes explicit constructs which are usually implicit
-    * (e.g the fungeable asset blocks held by the broker/dealer)
-    *
-    * Since there is only one cash payment amount,
-    * there can be only two parties to the `Transaction`.
-    *
-    * Finally: Store the _cryptographic hash_ of whatever metadata there is.
+    * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
     */
-  type Transaction[C <: Currency] = (LocalDateTime, Map[Folio.Id, Trade], Money[MA, C], Sha256)
-  object Transaction
-
-  // TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
-  // the `Account.Id`'s would be ideal.
-  // another approoach would be to merkelize the `Roster` to expose only the relevant bits.
-  type Authorization = (Account.Id, Signature)
-  type Auths         = Map[Folio.Id, Authorization]
-
-  type AuthorizedTransaction[C <: Currency] = (Transaction[C], Auths)
-
-  /** Support for multiple contingent deal legs */
-  final case class AllOrNone[C <: Currency](xs: List[AuthorizedTransaction[C]])
-
-  final case class JournalEntry[C <: Currency](
-      /**
-        * FolioId space
-        */
-      date: LocalDate,
-      time: Option[LocalTime],
-      transaction: Map[Folio.Id, Trade],
-      consideration: Money[MA, C],
-      /**
-        * AccountId space - this is designed to be easy to verify
-        */
-      auths: Map[Folio.Id, Authorization],
-      meta: Json
+  final case class Transaction(
+      /** n.b. a `LocalTime` is required of all `Transaction`s */
+      settled: Option[LocalDateTime],
+      /** *Exactly* two parties to a `Transaction`. Use `AllOrNone` to compose. */
+      parties: (Folio.Id, Folio.Id),
+      /** payment is reified in currency-as-instrument  */
+      trade: Trade,
+      /**In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is. */
+      metaSha: Sha256
   )
-
-  /**
-    * Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
-    */
-  type Journal[F[_], C <: Currency] = F[JournalEntry[C]]
-  object Journal { // non empty by def?
-    def empty[F[_]: Monad: Foldable: MonoidK, C <: Currency]: Journal[F, C] =
-      MonoidK[F].empty[JournalEntry[C]]
+  object Transaction {
+    implicit def order: Eq[Transaction] = Eq.fromUniversalEquals[Transaction]
   }
 
+  /** Support for multiple contingent deal legs */
+  final case class AllOrNone(xs: List[Transaction])
+
+  /********************************************************************************************
+    * `Account` space
+    *******************************************************************************************/
   sealed trait Entity extends Product with Serializable { def meta: Json }
   object Entity extends IdC2[Long, Entity] {
 
@@ -198,31 +184,33 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     */
   type Partition[K] = Map[K, Quantity]
   object Partition {
+
     import QF._
+    // import Quantity._
+
+    def apply[K: Hash](shares: (K, Quantity)*): Result[Partition[K]] = {
+      val s = shares.toList
+      if ((s.map(_._2).fold(zero)(plus(_, _)) == one) && (s forall { case (_, q) => validate(q) })) s.toMap.asRight
+      else ???
+    }
+
+    def apply[K: Hash](totalShares: Long)(ps: (K, Long)*): Partition[K] = ps.toList.toMap map {
+      case (k, l) => (k, div(one, fromLong(totalShares)))
+    }
 
     /**
       * The portion of the total accorded to the identified `Entity`.
       */
-    type Share[K] = (K, Quantity)
-    object Share {
-      def validate[K: Hash](p: Share[K]): Boolean = {
-        val (_, q) = p
-        zero <= q && q <= one
-      }
-      def apply[K: Hash](k: K, q: Quantity): Share[K] = (k, q) ensuring { p =>
-        validate(p)
-      }
-      def single[K: Hash](k: K) = Share(k, QF.one)
-    }
-
-    def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
-      val p = accumulate(shares.toList)
-      p.values.toList foldMap identity match {
-        case sum if sum === QF.one => p.asRight
-        case badsum                => s"Partition doesn't add up: $badsum != 1.0".asLeft
-      }
-    }
-    def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
+    def validate(q: Quantity): Boolean          = zero <= q && q <= one
+    def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
+    // def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
+    //   val p = accumulate(shares.toList)
+    //   p.values.toList foldMap identity match {
+    //     case sum if sum === QF.one => p.asRight
+    //     case badsum                => s"Partition doesn't add up: $badsum != 1.0".asLeft
+    //   }
+    // }
+    // def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
 
     def proRata[K: Hash](capTable: Map[K, Quantity]): Partition[K] = {
       import spire.implicits._
@@ -289,14 +277,47 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
 
-  final case class OMS(eid: Entity.Id, aid: Account.Id) {
-    def process[F[_]: Foldable: MonoidK, C <: Currency](order: Order[C]): F[Execution[C]]
+  final case class OMS(eid: Entity.Id, contraAid: Account.Id) {
+    def process[F[_]: Foldable: MonoidK, C <: Currency](order: Order[C]): F[Execution] = ???
+  }
+
+  // TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
+  // the `Account.Id`'s would be ideal.
+  // another approoach would be to merkelize the `Roster` to expose only the relevant bits.
+  type Authorization = (Account.Id, Signature)
+  type Auths         = Map[Folio.Id, Authorization]
+
+  type AuthorizedTransaction = (Transaction, Auths)
+
+  final case class JournalEntry(
+      /**
+        * FolioId space
+        */
+      date: LocalDate,
+      time: Option[LocalTime],
+      transaction: Map[Folio.Id, Trade],
+      consideration: MonetaryAmount,
+      currency: MonetaryLike,
+      /**
+        * AccountId space - this is designed to be easy to verify
+        */
+      auths: Map[Folio.Id, Authorization],
+      meta: Json
+  )
+
+  /**
+    * Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
+    */
+  type Journal[F[_]] = F[JournalEntry]
+  object Journal { // non empty by def?
+    def empty[F[_]: Monad: Foldable: MonoidK]: Journal[F] =
+      MonoidK[F].empty[JournalEntry]
   }
 
   /**
     *
     */
-  type Order[C] = (Account.Id, Entity.Id, LocalDateTime, Trade, Option[Money[MA, C]])
+  type Order[C <: Currency] = (Account.Id, Entity.Id, LocalDateTime, Trade, Option[Money[MA, C]])
   object Order extends IdC[Long, Order[USD]] {
     def buy[C <: Currency: Monetary]: Order[C]                                 = ??? // `market`
     def buy[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C]  = ??? // `limit`
@@ -319,19 +340,20 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   type Allocation = Partition[Account.Id]
   object Allocation {
-    // FIXME: List should be c.e.Stream or more general
-    def allocate[C <: Currency](allocation: Allocation)(ex: Execution[C]): List[Execution[C]] = ???
+    // FIXME: `List` should be c.e.Stream or more general
+    def allocate(allocation: Allocation)(ex: Execution): List[Execution] = ???
   }
 
-  type Execution[C <: Currency] = (LocalDateTime, Order.Id, Market, Transaction[C])
-  object Execution extends IdC[Long, Execution[_]]
+  type Execution = (Market, LocalDateTime, Order.Id, Transaction)
+  object Execution extends IdC[Long, Execution]
 
-  object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution[USD]]
+  object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
 
   type PricedTrade[CCY <: Currency] = (Trade, Money[MonetaryAmount, CCY])
   object PricedTrade
 
-  trait Market { def eid: Entity.Id }
+  implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+  sealed abstract class Market { def eid: Entity.Id }
   object Market extends IdC[Long, Market] {
 
     /** Price all the things. */
@@ -341,7 +363,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     def quotedIn[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
 
     // idea: use phantom types to capture sequencing constraint?
-    def trade[IO[_]: Monad](m: Market): Order => IO[Seq[Execution]] = _ => ???
+    def trade[IO[_]: Monad, C <: Currency](m: Market): Order[C] => IO[Seq[Execution]] = _ => ???
 
     /**
       * Single effective counterparty: the `Exchange` itself.
@@ -494,28 +516,29 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
-  def trialBalance[F[_]: Foldable: Monad: MonoidK, C <: Currency](jes: Journal[F, C]): TrialBalance =
+  def trialBalance[F[_]: Foldable: Monad: MonoidK](jes: Journal[F]): TrialBalance =
     ???
 
-  def recorded[IO[_]: Monad, CCY <: Currency: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = {
-    case (oid, _, trade, _, _) =>
-      (Orders get oid) match {
-        case Some((aid, _, _, _, _, _)) =>
-          accounts(aid) match {
-            case Account(roster, vault) =>
-              // TODO: check roster permissions
-              roster |> discardValue
-              vault match {
-                case Vault.Folio(folioId) =>
-                  Monad[IO] pure { fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade)) }
-                case Vault.SubAccounts(subs) =>
-                  subs |> discardValue
-                  ??? // wut
-              }
-          }
-        case _ => error
-      }
-  }
+  def recorded[IO[_]: Monad, CCY <: Currency: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = ???
+  //   {
+  //   case (oid, _, trade, _, _) =>
+  //     (Orders get oid) match {
+  //       case Some((aid, _, _, _, _, _)) =>
+  //         accounts(aid) match {
+  //           case Account(roster, vault) =>
+  //             // TODO: check roster permissions
+  //             roster |> discardValue
+  //             vault match {
+  //               case Vault.Folio(folioId) =>
+  //                 Monad[IO] pure { fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade)) }
+  //               case Vault.SubAccounts(subs) =>
+  //                 subs |> discardValue
+  //                 ??? // wut
+  //             }
+  //         }
+  //       case _ => error
+  //     }
+  // }
 
   def ordered = ???
   sealed trait Ordered
@@ -527,5 +550,11 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   def settled = ???
 
   def error = ???
+
+  /**
+    * FIXME: depends on mapping between `Folio`s and `Balance`s
+    */
+  final case class DoubleEntryKey(debit: Folio.Id, credit: Folio.Id)
+  object DoubleEntryKey
 
 }

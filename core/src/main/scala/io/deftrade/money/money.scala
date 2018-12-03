@@ -25,9 +25,11 @@ import enumeratum._
 //
 import eu.timepit.refined
 import refined.api.Refined
+import refined.string.MatchesRegex
 import refined.W
+
 import cats.kernel.{ CommutativeGroup, Order }
-import cats.Show
+import cats.{ Invariant, Show }
 // import cats.implicits._
 
 // import spire.implicits._
@@ -135,6 +137,14 @@ object Financial {
 
 }
 
+/**  True `phantom type` - never instantiated */
+sealed trait Currency
+object Currency {
+  type CodePattern = W.`"[A-Z]{3}"`.T
+  type CodeRx      = MatchesRegex[CodePattern]
+  type Code        = String Refined CodeRx
+}
+
 /**  */
 private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
@@ -231,10 +241,6 @@ object Monetary extends Enum[MonetaryLike] {
   implicit val usd: Monetary[USD] = USD
 
 }
-sealed trait Currency
-object Currency {
-  type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
-}
 
 /** `Money` is a naked number, with a phantom currency type. (In case you were wondering.)*/
 final class Money[N, C <: Currency] private (val amount: N) extends AnyVal { lhs =>
@@ -259,8 +265,6 @@ final class Money[N, C <: Currency] private (val amount: N) extends AnyVal { lhs
   * `Money[?, C]: Order: Show: CommutativeGroup`
   */
 object Money {
-  import cats.Invariant
-  import cats.kernel.CommutativeGroup
 
   def apply[N: Financial, C <: Currency: Monetary](amount: N) =
     new Money[N, C](Financial[N].round[C](amount))
@@ -274,7 +278,7 @@ object Money {
     Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(Monetary[C] apply _)(_.amount)
 
   object Format {
-    val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
+    private val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
     def apply[N: Financial, C <: Currency: Monetary](m: Money[N, C]): String = {
       val C    = Monetary[C]
       val fmt  = s"%${flags}.${C.fractionDigits}f" // TODO: this hack won't extend

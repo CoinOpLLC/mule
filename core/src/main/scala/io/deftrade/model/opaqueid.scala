@@ -59,6 +59,12 @@ abstract class IdC[N: cats.Order, P: cats.Eq] {
   object Id extends OpaqueIdC[Id]
 }
 
+abstract class IdC2[N: cats.Order, P] {
+  type Id = OpaqueId[N, P]
+  object Id extends OpaqueIdC[Id]
+  implicit def eq: cats.Eq[P]
+}
+
 object LongId {
   def reserved[P] = OpaqueId[Long, P](Long.MinValue)
 }
