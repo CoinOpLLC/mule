@@ -22,15 +22,19 @@ import spire.math.{ Fractional, Integral }
 import enumeratum._
 // import enumeratum.values._
 
+//
 import eu.timepit.refined
-import refined.{ refineV, W }
 import refined.api.Refined
-import refined.auto._
-import refined.string._
-import refined.cats._
-
+import refined.W
 import cats.kernel.{ CommutativeGroup, Order }
 import cats.Show
+// import cats.implicits._
+
+// import spire.implicits._
+
+// import refined.collection._
+// import refined.numeric._
+// import refined.auto._
 
 import BigDecimal.RoundingMode._
 
@@ -131,16 +135,6 @@ object Financial {
 
 }
 
-/** */
-sealed abstract class Currency
-
-/** */
-object Currency {
-  type CodePattern = W.`"[A-Z]{3}"`.T
-  type CodeRx      = MatchesRegex[CodePattern]
-  type Code        = String Refined CodeRx
-}
-
 /**  */
 private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
@@ -148,15 +142,12 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
   def apply[N: Financial](n: N): Monetary.Money[N, CurrencyType]
   final private lazy val jc = java.util.Currency getInstance monetary.entryName // DRY-fu
 
-  final def currencyCode: Currency.Code =
-    refineV[Currency.CodeRx](jc.getCurrencyCode).toOption.fold(???)(identity)
-  final def numericCode: Int    = jc.getNumericCode
-  final def displayName: String = jc.getDisplayName
-  final def symbol: String      = jc.getSymbol
+  final def currencyCode: String = jc.getCurrencyCode
+  final def numericCode: Int     = jc.getNumericCode
+  final def displayName: String  = jc.getDisplayName
+  final def symbol: String       = jc.getSymbol
   final def defaultFractionDigits: Int = jc.getDefaultFractionDigits match {
-
-    /** typical use case is unit-of-account: no real std, just need a decent default */
-    case -1 => 4
+    case -1 => 4 // typical use case is unit-of-account: no real std, just need a decent default
     case fd => fd
   }
 
@@ -169,8 +160,6 @@ private[deftrade] sealed trait MonetaryLike extends EnumEntry { monetary =>
 
   def fractionDigits: Int = defaultFractionDigits
   def rounding: RoundingMode = monetary.entryName match {
-
-    /** Standard financial convention. */
     case "JPY" => DOWN
     case _     => HALF_UP
   }
@@ -366,6 +355,10 @@ object Monetary extends Enum[MonetaryLike] {
   case object USD            extends Monetary[USD]
   implicit val usd: Monetary[USD] = USD
 
+}
+sealed trait Currency
+object Currency {
+  type Code = String Refined refined.string.MatchesRegex[W.`"[A-Z]{3}"`.T]
 }
 
 // }
