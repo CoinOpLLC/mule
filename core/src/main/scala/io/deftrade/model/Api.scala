@@ -34,11 +34,12 @@ import cats.implicits._
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
-import eu.timepit.refined.{ cats => refinedCats, _ }
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric._
-import eu.timepit.refined.string._
-import eu.timepit.refined.auto._
+import eu.timepit.refined
+import refined.{ cats => refinedCats, _ }
+import refined.api.Refined
+import refined.numeric._
+import refined.string._
+import refined.auto._
 
 import io.circe.Json
 
@@ -132,13 +133,25 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
     */
   final case class Transaction(
-      /** n.b. a `LocalTime` is required of all `Transaction`s */
-      settled: Option[LocalDateTime],
-      /** *Exactly* two parties to a `Transaction`. Use `AllOrNone` to compose. */
+      /**
+        * A `LocalDateTime` is required of all `Recorded Transaction`s, assigned by the `Recorder`
+        * - the transaction is provisional until dated, returned as a receipt
+        * The exact semantics can vary depending on the higher level context
+        * - (e.g. booking a trade vs receiving notice of settlement).
+        */
+      recorded: Option[LocalDateTime],
+      /**
+        * *Exactly* two parties to a `Transaction`.
+        * - Use `AllOrNone` to compose multiparty `Transaction`s
+        */
       parties: (Folio.Id, Folio.Id),
-      /** payment is reified in currency-as-instrument  */
+      /**
+        * Note: cash payment is reified in currency-as-instrument.
+        */
       trade: Trade,
-      /**In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is. */
+      /**
+        * In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is.
+        */
       metaSha: Sha256
   )
   object Transaction {
@@ -262,95 +275,116 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     */
   case class Account(roster: Roster, vault: Vault)
   object Account {
-    type IdRefinement = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
-    type Id           = Long Refined IdRefinement
+    type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+    type Id         = Long Refined ValidRange
     object Id {
       implicit def order: cats.Order[Id] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Id] =
-        StrictFresh[Id](100000100100L, id => refineV[IdRefinement](id + 1L).fold(_ => ???, identity))
+        StrictFresh[Id](100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
-    def simple(fid: Folio.Id, eid: Entity.Id): Account = Account(Roster(eid), Vault.empty)
-    implicit def eq                                    = cats.Eq.fromUniversalEquals[Account]
+
+    def empty(eid: Entity.Id) = Account(Roster(eid), Vault.empty)
+
+    def simple(eid: Entity.Id, fid: Folio.Id) = Account(Roster(eid), Vault.Folio(fid))
+
+    implicit def eq = Eq.fromUniversalEquals[Account]
   }
 
   import Account.Id._ // for implicits
 
   object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
+  type Accounts = Accounts.Table
 
-  final case class OMS(eid: Entity.Id, contraAid: Account.Id) {
-    def process[F[_]: Foldable: MonoidK, C <: Currency](order: Order[C]): F[Execution] = ???
-  }
-
-  // TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
-  // the `Account.Id`'s would be ideal.
-  // another approoach would be to merkelize the `Roster` to expose only the relevant bits.
-  type Authorization = (Account.Id, Signature)
-  type Auths         = Map[Folio.Id, Authorization]
-
-  type AuthorizedTransaction = (Transaction, Auths)
-
-  final case class JournalEntry(
-      /**
-        * FolioId space
-        */
-      date: LocalDate,
-      time: Option[LocalTime],
-      transaction: Map[Folio.Id, Trade],
-      consideration: MonetaryAmount,
-      currency: MonetaryLike,
-      /**
-        * AccountId space - this is designed to be easy to verify
-        */
-      auths: Map[Folio.Id, Authorization],
-      meta: Json
-  )
+  /********************************************************************************************
+    * make stuff happen space
+    *******************************************************************************************/
+  /**
+    * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
+    * the `Account.Id`'s would be ideal.
+    * another approoach would be to merkelize the `Roster` to expose only the relevant bits.
+    */
+  type AccountAuth           = (Account.Id, Signature)
+  type FolioAuth             = (Folio.Id, AccountAuth)
+  type FolioAuths            = (FolioAuth, FolioAuth)
+  type AuthorizedTransaction = (Transaction, FolioAuths)
 
   /**
     * Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
     */
-  type Journal[F[_]] = F[JournalEntry]
+  type Journal[F[_], A] = F[A]
   object Journal { // non empty by def?
-    def empty[F[_]: Monad: Foldable: MonoidK]: Journal[F] =
-      MonoidK[F].empty[JournalEntry]
+
+    def empty[F[_]: Monad: Foldable: MonoidK, A]: Journal[F, A] =
+      MonoidK[F].empty[A]
+
+    /** fold over me */
+    final case class Entry(
+        ax: AuthorizedTransaction,
+        meta: Json
+    )
   }
 
   /**
-    *
+    *`OMS` := Order Management System. Ubiquitous acronym in the domain.
     */
-  type Order[C <: Currency] = (Account.Id, Entity.Id, LocalDateTime, Trade, Option[Money[MA, C]])
-  object Order extends IdC[Long, Order[USD]] {
-    def buy[C <: Currency: Monetary]: Order[C]                                 = ??? // `market`
-    def buy[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C]  = ??? // `limit`
-    def sell[C <: Currency: Monetary]: Order[C]                                = ???
-    def sell[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C] = ???
+  final case class OMS(eid: Entity.Id, contraAid: Account.Id) {
+
+    import OMS.{ Allocation, Execution, Order }
+
+    def trade[F[_]: Foldable: Monad: MonoidK, C <: Currency]: Order[C] => F[Execution] =
+      ???
+
+    def allocate[F[_]: Foldable: Monad: MonoidK, C <: Currency](
+        parent: Account.Id,
+        a: Allocation
+    ): Execution => F[Execution] =
+      ???
+  }
+  object OMS {
+
+    type Allocation = Partition[Account.Id]
+
+    /**
+      *
+      */
+    type Order[C <: Currency] = (AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
+    object Order extends IdC[Long, Order[USD]] {
+
+      /** Market orders */
+      def buy[C <: Currency: Monetary]: Order[C]  = ???
+      def sell[C <: Currency: Monetary]: Order[C] = ???
+
+      /** limit orders */
+      def buy[C <: Currency: Monetary](bid: Money[MonetaryAmount, C]): Order[C]  = ???
+      def sell[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C] = ???
+    }
+
+    /**
+      *
+      *  this is something of an abuse of the original PiT concept,
+      * which models slowly evolving entities *with identity (key) which survives updates.
+      *
+      *  `Orders` is exactly the opposite.
+      *
+      *  But the open date range for "current `Table`" models the "open orders" concept perfectly.
+      *
+      *  TODO: is this really worthwhile?
+      *
+      */
+    object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Id, OMS.Order[USD]]
+
+    type Execution = (Market, LocalDateTime, Order.Id, Transaction)
+    object Execution extends IdC[Long, Execution]
+
+    object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
   }
 
-  /**
+  type PricedTrade[C <: Currency] = (Trade, Money[MonetaryAmount, C])
+  object PricedTrade {
 
-  this is something of an abuse of the original PiT concept, which models slowly evolving entities with identity (key) which survives updates.
-
-  `Orders` is exactly the opposite.
-
-  But the open date range for "current `Table`" models the "open orders" concept perfectly.
-
-  TODO: is this really worthwhile?
-
-    */
-  object Orders extends SimplePointInTimeRepository[cats.Id, Order.Id, Order[USD]]
-
-  type Allocation = Partition[Account.Id]
-  object Allocation {
-    // FIXME: `List` should be c.e.Stream or more general
-    def allocate(allocation: Allocation)(ex: Execution): List[Execution] = ???
+    /** Used to convert to the currency as `Instrument` convention */
+    def apply[C <: Currency](pt: PricedTrade[C]): Trade = ???
   }
-
-  type Execution = (Market, LocalDateTime, Order.Id, Transaction)
-  object Execution extends IdC[Long, Execution]
-
-  object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
-
-  type PricedTrade[CCY <: Currency] = (Trade, Money[MonetaryAmount, CCY])
-  object PricedTrade
 
   implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
   sealed abstract class Market { def eid: Entity.Id }
@@ -362,32 +396,39 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
     def quotedIn[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
 
-    // idea: use phantom types to capture sequencing constraint?
-    def trade[IO[_]: Monad, C <: Currency](m: Market): Order[C] => IO[Seq[Execution]] = _ => ???
-
     /**
       * Single effective counterparty: the `Exchange` itself.
       * - seller for all buyers and vice versa.)
       */
     final case class Exchange(eid: Entity.Id, contraAccount: Account.Id) extends Market
-    object Exchange {
-      implicit def eq = Eq.fromUniversalEquals[Exchange]
-    }
-    type CounterParty
-    object CounterParty
+    object Exchange
+
+    /**
+      * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
+      * assumed to be "real" (not a contra account) although it can assume those characteristics
+      * when the `Counterparty` is sourcing `Instruments` from private flows.
+      * - (e.g. exempt Securities for accredited individuals or qualified institutions)
+      */
+    final case class Counterparty(val eid: Entity.Id) extends Market
+    object Counterparty
   }
 
   lazy val Markets: Repository[cats.Id, Market.Id, Market] =
     SimplePointInTimeRepository[cats.Id, Market.Id, Market]()
   type Markets = Markets.Table
 
-  /** Recall the fundamental equation of accounting:
-  `Debit` === `Credit`
-  `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
-
-  Balance(Assets, LOQs)
-  Balance(XOP, Revenues)  // !!!
-
+  /********************************************************************************************
+    * `Accounting` space
+    *******************************************************************************************/
+  /**
+    * Recall the fundamental equation of accounting:
+    *
+    *  `Debit` === `Credit`
+    *  `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
+    *
+    *  Balance(Assets, LOQs)
+    *  Balance(XOP, Revenues)  // !!!
+    *
     */
   final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
   object AccountMap {
@@ -516,10 +557,13 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
-  def trialBalance[F[_]: Foldable: Monad: MonoidK](jes: Journal[F]): TrialBalance =
+  def trialBalance[F[_]: Foldable: Monad: MonoidK](jes: Journal[F, Journal.Entry]): TrialBalance =
     ???
 
-  def recorded[IO[_]: Monad, CCY <: Currency: Monetary](fs: Folios, accounts: Accounts.Table): Execution => IO[Folios] = ???
+  def recorded[F[_]: Foldable: Monad: MonoidK](
+      fs: Folios,
+      accounts: Accounts
+  ): OMS.Execution => F[Folios] = ???
   //   {
   //   case (oid, _, trade, _, _) =>
   //     (Orders get oid) match {
