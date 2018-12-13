@@ -139,8 +139,11 @@ object Equity extends Enum[Equity] {
 
 sealed trait Revenue extends Credit
 object Revenue extends Enum[Revenue] {
+  case object Finance        extends Revenue
+  case object Investment     extends Revenue
   case object Receipts       extends Revenue
   case object OrdinaryIncome extends Revenue
+
   lazy val values = findValues
 }
 
@@ -150,11 +153,14 @@ object XOP extends Enum[XOP] {
 }
 
 sealed trait Expense extends XOP
+sealed trait OpEx    extends Expense
 object Expense extends Enum[Expense] {
-  case object COGS                  extends Expense
-  case object RepairsAndMaintenance extends Expense
-  case object Salaries              extends Expense
-  case object Rent                  extends Expense
+  case object Investment            extends Expense
+  case object Finance               extends Expense
+  case object COGS                  extends OpEx
+  case object RepairsAndMaintenance extends OpEx
+  case object Salaries              extends OpEx
+  case object Rent                  extends OpEx
   lazy val values = findValues
 }
 
@@ -216,7 +222,7 @@ object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
 sealed abstract class Nettable(val gross: Asset, val less: Asset) extends EnumEntry with Product with Serializable {
   import io.deftrade.model.{ Balance, MonetaryAmount }
   final def net[D >: Asset <: Debit, C <: Credit](b: Balance[D, C]): MonetaryAmount =
-    b.ds(gross) - b.ds(less) // FIXME: this is typesafe, but not fool-proof.
+    b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
 }
 object Nettable extends Enum[Nettable] {
 

@@ -17,21 +17,24 @@
 package io.deftrade
 package model
 
-import enums._
-
-import repos._
-
-import opaqueid._
-
 import time._
 import time.implicits._
 
 import money._
 import Monetary.USD
 
+import opaqueid._
+
+import enums._
+
+import repos._
+
+import reference.InstrumentIdentifier
+
 import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK }
-import cats.implicits._
 import cats.kernel.CommutativeGroup
+import cats.data.Kleisli
+import cats.implicits._
 import feralcats.instances._
 
 import eu.timepit.refined
@@ -66,7 +69,6 @@ object Fail {
   * - we can accumulate settled positions for reconcilliation
   */
 abstract class Api[MA: Financial, Quantity: Financial] { api =>
-  import io.deftrade.reference._
 
   type MonetaryAmount = MA
 
@@ -81,9 +83,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   /********************************************************************************************
     * Folio space
   *******************************************************************************************/
-  type UII = UniversalInstrumentIdentifyer
-
-  /** TODO: use the XBRL definitions for these, a la OpenGamma */
+  /**
+    * TODO: use the XBRL definitions for these, a la OpenGamma
+    */
   final case class Instrument(meta: Json)
   object Instrument {
     type Id = InstrumentIdentifier
@@ -92,6 +94,13 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   }
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]
   type Instruments = Instruments.Table
+
+  /**
+    * Foundational instrument types to be provided via injection of some kind tbd
+    * TODO: capture the fact that the sets of instruments are disjoint.
+    */
+  type CashInstruments = Map[Monetary[Currency], Set[Instrument.Id]]
+  implicit def currencyInstruments: CashInstruments = ??? // this will go over big
 
   /**
   How much of a given `Instrument` is held.
@@ -105,18 +114,31 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   lazy val Leg = Position
 
   /**
-  A `Folio` is a set of `Position`s
-  Can also be thought of as a `Trade` at rest.
+    * A `Folio` is a set of `Position`s.
+    * Can also be thought of as a `Trade` at rest.
     */
   type Folio = Map[Instrument.Id, Quantity]
   object Folio extends IdC[Long, Folio] {
-    def empty: Folio                = Map.empty
-    def apply(ps: Position*): Folio = accumulate(ps.toList)
+    def empty: Folio                                    = Map.empty
+    def apply(ps: Position*): Folio                     = accumulate(ps.toList)
+    def apply[C <: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
   }
 
   /** `Trade` := `Folio` in motion */
   type Trade = Folio
   lazy val Trade = Folio
+
+  type PricedTrade[C <: Currency] = (Trade, Money[MonetaryAmount, C])
+  object PricedTrade {
+
+    /**
+      * Used to convert to the currency as `Instrument` convention.
+      * Consider the set of `Instrument`s which represent bank account balances in dollars.
+      * What is the set of "payable on demand" dollar instruments?
+      * This dictates the normalization.
+      */
+    def normalize[C <: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments): Trade = ???
+  }
 
   object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Id, Folio] {
     def apply(id: Folio.Id): Folio = get(id).fold(Folio.empty)(identity)
@@ -146,7 +168,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
         */
       parties: (Folio.Id, Folio.Id),
       /**
-        * Note: cash payment is reified in currency-as-instrument.
+        * Note: cash payments are reified in currency-as-instrument.
         */
       trade: Trade,
       /**
@@ -199,7 +221,6 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   object Partition {
 
     import QF._
-    // import Quantity._
 
     def apply[K: Hash](shares: (K, Quantity)*): Result[Partition[K]] = {
       val s = shares.toList
@@ -226,15 +247,13 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     // def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
 
     def proRata[K: Hash](capTable: Map[K, Quantity]): Partition[K] = {
-      import spire.implicits._
       val totalShares = (capTable map { case (_, shares) => shares }).toList |> QF.sum
-      capTable map { case (k, mySlice) => (k, mySlice / totalShares) }
+      capTable map { case (k, mySlice) => (k, div(mySlice, totalShares)) }
     }
 
     def pariPassu[K: Hash](ks: Set[K]): Partition[K] = {
-      import spire.implicits._
       val n = ks.size
-      (ks.toList zip List.fill(n)(one / fromInt(n))).toMap
+      (ks.toList zip List.fill(n)(div(one, fromInt(n)))).toMap
     }
 
     object Single {
@@ -269,6 +288,11 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   }
 
   /**
+    * `Account`s consist of:
+    * - a `Roster`: who gets to do what, and who are the beneficial owners.
+    * = a `Folio` (list of instruments and their quantities), OR a list of sub `Account`s.
+    * = (Tree structures only. No loops, no reconvergence at all permitted.)
+    *
     * How composition of `Roster`s and `Vault::SubAccount`s works:
     * - conjuction.
     * - that's it (you're welcome.)
@@ -278,7 +302,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
     type Id         = Long Refined ValidRange
     object Id {
-      implicit def order: cats.Order[Id] = cats.Order by { _.value }
+      implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Id] =
         StrictFresh[Id](100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
@@ -326,35 +350,61 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   /**
     *`OMS` := Order Management System. Ubiquitous acronym in the domain.
+    *
+    * Note: The methods on `OMS` return `Kliesli` arrows, which are intended to be chained with
+    * `andThen`.
+    *
+    * If it is possible for the arrows to be sequenced in a semantically incorrect way per the
+    * domain model, use phantom types to ensure proper sequencing.
+    *
+    * Reference:
+    * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
     */
-  final case class OMS(eid: Entity.Id, contraAid: Account.Id) {
+  final case class OMS private (eid: Entity.Id, contra: Account.Id, markets: Set[Market]) {
 
     import OMS.{ Allocation, Execution, Order }
 
-    def trade[F[_]: Foldable: Monad: MonoidK, C <: Currency]: Order[C] => F[Execution] =
+    def riskCheck[F[_]: Monad: MonoidK, C <: Currency, X](x: X): Kleisli[F, X, Order[C]] =
       ???
 
-    def allocate[F[_]: Foldable: Monad: MonoidK, C <: Currency](
-        parent: Account.Id,
-        a: Allocation
-    ): Execution => F[Execution] =
+    def trade[F[_]: Monad: MonoidK, C <: Currency]: Kleisli[F, Order[C], Execution] =
       ???
+
+    def allocate[F[_]: Monad: MonoidK, C <: Currency](
+        p: Account.Id,
+        a: Allocation
+    ): Kleisli[F, Execution, Execution] =
+      ???
+
+    def process[F[_]: Monad: MonoidK, C <: Currency](
+        p: Account.Id,
+        a: Allocation
+    ): Kleisli[F, Order[C], Execution] = ???
+    // riskCheck(()) and then trade andThen allocate(p, a) FIXME: divirging implicits wtf???
   }
   object OMS {
+
+    implicit def omsEq = Eq.fromUniversalEquals[OMS]
 
     type Allocation = Partition[Account.Id]
 
     /**
-      *
+      * TODO: augment/evolve creation pattern.
       */
-    type Order[C <: Currency] = (AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
+    def apply(eid: Entity.Id, ms: Market*): OMS = OMS(eid, newContraAccount, ms.toSet)
+    private def newContraAccount: Account.Id    = ???
+
+    /**
+      * Minimum viable `Order` type. What the client would _like_ to have happen.
+      */
+    type Order[C <: Currency] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
     object Order extends IdC[Long, Order[USD]] {
 
-      /** Market orders */
+      /** `Market` orders */
       def buy[C <: Currency: Monetary]: Order[C]  = ???
       def sell[C <: Currency: Monetary]: Order[C] = ???
 
-      /** limit orders */
+      /** `Limit` orders */
       def buy[C <: Currency: Monetary](bid: Money[MonetaryAmount, C]): Order[C]  = ???
       def sell[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C] = ???
     }
@@ -371,37 +421,47 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       *  TODO: is this really worthwhile?
       *
       */
+    type Orders = Orders.Table
     object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Id, OMS.Order[USD]]
 
-    type Execution = (Market, LocalDateTime, Order.Id, Transaction)
+    /**
+      * What actually happened.
+      */
+    type Execution = (LocalDateTime, OMS, Order.Id, Transaction)
     object Execution extends IdC[Long, Execution]
 
+    type Executions = Executions.Table
     object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
+
   }
 
-  type PricedTrade[C <: Currency] = (Trade, Money[MonetaryAmount, C])
-  object PricedTrade {
-
-    /** Used to convert to the currency as `Instrument` convention */
-    def apply[C <: Currency](pt: PricedTrade[C]): Trade = ???
-  }
-
-  implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+  /**
+    * Price all the things.
+    * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
+    * - this isn't how data typically comes, especially cheap data.
+    * - smart routers (and internalizers!) introduce another layer of conceptual complexity
+    * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
+    * isn't good enough, don't offer it.
+    */
   sealed abstract class Market { def eid: Entity.Id }
   object Market extends IdC[Long, Market] {
 
-    /** Price all the things. */
-    def quote[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Money[MonetaryAmount, C] =
-      Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+    def quote[F[_]: Monad, C <: Currency: Monetary](
+        m: Market
+    )(
+        id: Instrument.Id
+    ): F[Money[MonetaryAmount, C]] = ???
+    // Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
     def quotedIn[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
 
     /**
       * Single effective counterparty: the `Exchange` itself.
       * - seller for all buyers and vice versa.)
+      * - activity recorded in a `contra account`
       */
-    final case class Exchange(eid: Entity.Id, contraAccount: Account.Id) extends Market
-    object Exchange
+    final case class Exchange(eid: Entity.Id, contraAid: Account.Id) extends Market
+    object Exchange {}
 
     /**
       * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
@@ -410,8 +470,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       * - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
     final case class Counterparty(val eid: Entity.Id) extends Market
-    object Counterparty
+    object Counterparty {}
   }
+  implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
 
   lazy val Markets: Repository[cats.Id, Market.Id, Market] =
     SimplePointInTimeRepository[cats.Id, Market.Id, Market]()
@@ -497,10 +558,19 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       }
   }
 
+  /**
+    * Note: These are a mixture of cash and accrual items when "raw".
+    * A cash account can be determined from its `Instrument.Id`.
+    * This can be used to create a filter for `CashFlowStatement`s.
+    */
   final case class IncomeStatement private (
       val xops: XOPs,
       val revenues: Revenues
-  ) extends Balance(xops, revenues)
+  ) extends Balance(xops, revenues) {
+    def partition(implicit ci: CashInstruments): (IncomeStatement, IncomeStatement) = ???
+  }
+
+  /** */
   object IncomeStatement {
     implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[IncomeStatement] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
@@ -509,6 +579,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
         unapply(_).fold(???)(identity)
       }
   }
+
+  final case class CashFlowStatement private (wut: Nothing)
+  final case class EquityStatement private (wut: Nothing)
 
   /**
   `BalanceSheet` forms a commutative group
@@ -534,7 +607,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
   def quoteLeg[CCY <: Currency: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
     leg match {
-      case (security, quantity) => Market.quote[CCY](market)(security) * quantity
+      case (security, quantity) => Market.quote[cats.Id, CCY](market)(security) * quantity
     }
 
   def quote[CCY <: Currency: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
@@ -558,6 +631,13 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     }
 
   def trialBalance[F[_]: Foldable: Monad: MonoidK](jes: Journal[F, Journal.Entry]): TrialBalance =
+    ???
+
+  def breakdown(
+      prior: BalanceSheet,
+      delta: BalanceSheet, // delta and raw come from TrialBalance
+      raw: IncomeStatement // mixed cash and accrual
+  )(implicit ci: CashInstruments): (CashFlowStatement, EquityStatement) =
     ???
 
   def recorded[F[_]: Foldable: Monad: MonoidK](
