@@ -22,46 +22,66 @@ object Fail {
   def apply(msg: String): Fail = Impl(msg)
 }
 
-/** */
+/**
+  * TODO: There is a single `F[_]` type - `IO` - below.
+  * split into an effect type and a container type (IO/Pure vs Stream/Chain)
+  *
+  * n.b. doobie can return `Streams`
+  *
+  */
 trait Api {
 
-  abstract class Repository[IO[_]: Monad, K: cats.Order, V: Eq] {
+  abstract class RepoImplicits[IO[_]: Monad, K: cats.Order, V: Eq] {
 
     lazy val IO = Monad[IO]
     lazy val K  = cats.Order[K]
     lazy val V  = cats.Eq[V]
+  }
 
-    type Row   = (K, V)
-    type Rows  = List[Row]
-    type Table = Map[K, V]
+  abstract class AppendableRepoImplicits[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends RepoImplicits[IO, K, V] {
+    lazy val FK = Fresh[K]
+  }
+
+  trait Repository[IO[_], K, V] { self: RepoImplicits[IO, K, V] =>
+
+    type R[x]
+    type T[k, v]
+
+    final type Row   = (K, V)
+    final type Rows  = R[Row]
+    final type Table = T[K, V]
 
     /** Simple Queries */
-    final def empty: IO[Table] = IO pure { Map.empty }
     def rows: IO[Rows]
-    def table: IO[Table]
     def get(k: K): IO[Option[V]]
   }
 
-  trait Mutants[IO[_], K, V] { self: Repository[IO, K, V] =>
+  trait Filterable[IO[_], K, V] { self: RepoImplicits[IO, K, V] with Repository[IO, K, V] =>
+    def filter(f: Row => Boolean): IO[Rows] = ???
+  }
+
+  trait Mutable[IO[_], K, V] { self: RepoImplicits[IO, K, V] with Repository[IO, K, V] =>
     def update(row: Row): IO[Result[Unit]]
     def delete(k: K): IO[Result[Boolean]]
   }
 
-  abstract class AppendableRepository[IO[_]: Monad, K: cats.Order, V: Eq]()(implicit val FK: Fresh[K])
-      extends Repository[IO, K, V]
-      with Mutants[IO, K, V] {
-    def append(v: V): IO[Result[K]]
-  }
-
-  abstract class InsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends Repository[IO, K, V] with Mutants[IO, K, V] {
+  trait Insertable[IO[_], K, V] { self: RepoImplicits[IO, K, V] with Repository[IO, K, V] =>
     def insert(row: Row): IO[Result[Unit]]
     def upsert(row: Row): IO[Result[Int]] = ??? // try insert, then update
   }
 
-  trait MemImpl[IO[_], K, V] { self: Repository[IO, K, V] =>
+  trait Appendable[IO[_], K, V] { self: AppendableRepoImplicits[IO, K, V] =>
+    def append(v: V): IO[Result[K]]
+  }
+
+  trait MemImpl[IO[_], K, V] {
+    self: RepoImplicits[IO, K, V] with Repository[IO, K, V] with Mutable[IO, K, V] =>
+
+    type R[x]    = List[x]
+    type T[k, v] = Map[k, v]
+
     protected var kvs: Table     = Map.empty
     def rows: IO[Rows]           = IO pure kvs.toList
-    def table: IO[Table]         = IO pure kvs
     def get(k: K): IO[Option[V]] = IO pure { kvs get k }
     def update(row: Row): IO[Result[Unit]] = IO pure {
       Result { kvs += row }
@@ -76,10 +96,11 @@ trait Api {
     }
   }
 
-  trait MemImplAppendable[IO[_], K, V] extends MemImpl[IO, K, V] { self: AppendableRepository[IO, K, V] =>
+  trait MemImplAppendable[IO[_], K, V] extends MemImpl[IO, K, V] {
+    self: AppendableRepoImplicits[IO, K, V] with Repository[IO, K, V] with Mutable[IO, K, V] with Appendable[IO, K, V] =>
+
     private var k: K = FK.init
 
-    /** mutators record timestamp FIXME: do they now? */
     def append(v: V): IO[Result[K]] = IO pure {
       Result {
         k = FK next k
@@ -89,18 +110,31 @@ trait Api {
     }
   }
 
-  trait MemImplInsertable[IO[_], K, V] extends MemImpl[IO, K, V] { self: InsertableRepository[IO, K, V] =>
+  trait MemImplInsertable[IO[_], K, V] extends MemImpl[IO, K, V] {
+    self: RepoImplicits[IO, K, V] with Repository[IO, K, V] with Mutable[IO, K, V] with Insertable[IO, K, V] =>
 
     def insert(row: Row): IO[Result[Unit]] = IO pure Result { kvs += row }
   }
 
   class MemAppendableRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]
-      extends AppendableRepository[IO, K, V]
+      extends AppendableRepoImplicits[IO, K, V]
+      with Repository[IO, K, V]
+      with Mutable[IO, K, V]
+      with Appendable[IO, K, V]
       with MemImplAppendable[IO, K, V]
 
-  class MemInsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq] extends InsertableRepository[IO, K, V] with MemImplInsertable[IO, K, V]
+  class MemInsertableRepository[IO[_]: Monad, K: cats.Order, V: Eq]
+      extends RepoImplicits[IO, K, V]
+      with Repository[IO, K, V]
+      with Mutable[IO, K, V]
+      with Insertable[IO, K, V]
+      with MemImplInsertable[IO, K, V]
 
-  abstract class PointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq] extends AppendableRepository[IO, K, V] {
+  /**
+    * `PointInTime` feature
+    */
+  trait PointInTimeRepository[IO[_], K, V] {
+    self: AppendableRepoImplicits[IO, K, V] with Repository[IO, K, V] with Mutable[IO, K, V] with Appendable[IO, K, V] =>
 
     type LocalDateTimeRange = Interval[LocalDateTime]
     object LocalDateTimeRange {
@@ -113,7 +147,6 @@ trait Api {
 
     /** Simple Queries always take from the current data stored in the `Table` */
     final override def rows: IO[Rows]           = rowsBetween(LocalDateTimeRange.all)
-    final override def table: IO[Table]         = tableAt(localDateTime)
     final override def get(k: K): IO[Option[V]] = getAt(localDateTime)(k)
 
     /** Point In Time Queries */
@@ -122,6 +155,7 @@ trait Api {
     def getAt(pit: LocalDateTime)(k: K): IO[Option[V]]
     def getBetween(range: LocalDateTimeRange)(k: K): IO[Rows]
 
+    /** mutators record timestamp */
     final override def append(v: V): IO[Result[K]] = append(localDateTime)(v)
     def append(pit: LocalDateTime)(v: V): IO[Result[K]]
 
@@ -133,11 +167,15 @@ trait Api {
 
   }
 
-  trait MemImplPiT[IO[_], K, V] { self: PointInTimeRepository[IO, K, V] =>
+  trait MemImplPiT[IO[_], K, V] {
+    self: AppendableRepoImplicits[IO, K, V] with PointInTimeRepository[IO, K, V] with Repository[IO, K, V] =>
 
     implicit def IO_ = self.IO
     implicit def K_  = self.K
     implicit def V_  = self.V
+
+    type R[x]    = List[x]
+    type T[k, v] = Map[k, v]
 
     var cache: Table     = Map.empty
     var pitRows: PitRows = List.empty
@@ -217,7 +255,11 @@ trait Api {
 
   }
   case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]()
-      extends PointInTimeRepository[IO, K, V]
+      extends AppendableRepoImplicits[IO, K, V]
+      with PointInTimeRepository[IO, K, V]
+      with Repository[IO, K, V]
+      with Mutable[IO, K, V]
+      with Appendable[IO, K, V]
       with MemImplPiT[IO, K, V]
 }
 
