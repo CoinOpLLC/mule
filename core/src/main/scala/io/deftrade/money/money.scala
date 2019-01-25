@@ -40,17 +40,8 @@ import cats.{ Invariant, Show }
 
 import BigDecimal.RoundingMode._
 
-// from https://www.markettraders.com/blog/easily-calculate-cross-currency-rates/
 // https://en.wikipedia.org/wiki/ISO_4217
 // https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies
-// Euro-EUR
-// British Pound GBP
-// Australian Dollar-AUD
-// New Zealand Dollar-NZD
-// US Dollar-USD
-// Canadian Dollar-CAD
-// Canadian Dollar-CHF
-// Japanese Yen-JPY
 
 /**
 
@@ -298,7 +289,7 @@ object Money {
   *   - CCY is intended (but not required by this base type) to represent a currency, and will
   * typically have a Monetary[CCY] typeclass instance
   */
-trait QuotedIn[A, CCY <: Currency] {
+trait QuotedIn[A, CCY <: Currency] extends Any {
 
   def ask: BigDecimal
   def bid: BigDecimal
@@ -315,6 +306,16 @@ trait QuotedIn[A, CCY <: Currency] {
 }
 object QuotedIn {
   def apply = ???
+
+  // FIXME: get rid of implicit case class param
+  final case class Spread[A, C2 <: Currency: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[A, C2] {
+    def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
+  }
+  final case class TradeQuote[A, C2 <: Currency: Monetary](val trade: BigDecimal) extends /* AnyVal with */ QuotedIn[A, C2] {
+    def bid: BigDecimal  = trade
+    def ask: BigDecimal  = trade
+    def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
+  }
 }
 
 final case class Rate[C1 <: Currency, C2 <: Currency]()(implicit
@@ -326,8 +327,11 @@ final case class Rate[C1 <: Currency, C2 <: Currency]()(implicit
   @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2]  = convert(m1, bid)
   @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
 
-  def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) =
-    (buy(C1(N.fractional.one)), sell(C1(N.fractional.one)))
+  def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) = {
+    import N.fractional.one
+    val single = C1(one)
+    (buy(single), sell(single))
+  }
 
   def description: String = s"""
         |Quoter buys  ${C1} and sells ${C2} at ${bid}
@@ -337,8 +341,4 @@ final case class Rate[C1 <: Currency, C2 <: Currency]()(implicit
     val N = Financial[N]
     C2(m1.amount |> N.toBigDecimal |> (_ * rate) |> N.fromBigDecimal)
   }
-}
-
-final case class SimpleQuote[C1 <: Currency, C2 <: Currency: Monetary](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[C1, C2] {
-  def tick: BigDecimal = Monetary[C2].pip //  / 10 // this is a thing now
 }
