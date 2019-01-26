@@ -31,6 +31,8 @@ object Fail {
   */
 trait Api {
 
+  import OpaqueId.Fresh
+
   abstract class RepoImplicits[IO[_]: Monad, K: cats.Order, V: Eq] {
 
     lazy val IO = Monad[IO]
@@ -141,9 +143,9 @@ trait Api {
       def all: LocalDateTimeRange = Interval.all[LocalDateTime]
     }
 
-    type PitTable = Map[K, List[(LocalDateTimeRange, V)]]
+    type PitTable = Map[K, R[(LocalDateTimeRange, V)]]
     type PitRow   = (K, (LocalDateTimeRange, V))
-    type PitRows  = List[PitRow]
+    type PitRows  = R[PitRow]
 
     /** Simple Queries always take from the current data stored in the `Table` */
     final override def rows: IO[Rows]           = rowsBetween(LocalDateTimeRange.all)
@@ -156,9 +158,6 @@ trait Api {
     def getBetween(range: LocalDateTimeRange)(k: K): IO[Rows]
 
     /** mutators record timestamp */
-    final override def append(v: V): IO[Result[K]] = append(localDateTime)(v)
-    def append(pit: LocalDateTime)(v: V): IO[Result[K]]
-
     final override def update(row: Row): IO[Result[Unit]] = update(localDateTime)(row)
     def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]]
 
@@ -167,19 +166,22 @@ trait Api {
 
   }
 
-  trait MemImplPiT[IO[_], K, V] {
-    self: AppendableRepoImplicits[IO, K, V] with PointInTimeRepository[IO, K, V] with Repository[IO, K, V] =>
-
-    implicit def IO_ = self.IO
-    implicit def K_  = self.K
-    implicit def V_  = self.V
+  case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]()
+      extends AppendableRepoImplicits[IO, K, V]
+      with PointInTimeRepository[IO, K, V]
+      with Repository[IO, K, V]
+      with Mutable[IO, K, V]
+      with Appendable[IO, K, V] {
 
     type R[x]    = List[x]
     type T[k, v] = Map[k, v]
 
-    var cache: Table     = Map.empty
-    var pitRows: PitRows = List.empty
-    var k: K             = FK.init
+    // @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    // private var cache: Table = Map.empty
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var pitRows: PitRows = List.empty
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var k: K = FK.init
 
     def tableAt(pit: LocalDateTime): IO[Table] =
       IO pure {
@@ -204,63 +206,40 @@ trait Api {
     /** mutators record timestamp
     pitRow discipline: for any given key, the list of (range, v) has each range perfectly ascending, with the earlierst matching key being the latest [ts, inf)
       */
-    override def append(pit: LocalDateTime)(v: V): IO[Result[K]] =
-      IO.map(tableAt(pit)) { table =>
-        val now     = localDateTime
-        val updated = Interval.fromBounds(Closed(now), Unbound())
+    override def append(v: V): IO[Result[K]] =
+      IO pure {
+        val updated = Interval.fromBounds(Closed(localDateTime), Unbound())
         k = FK next k
-        (table get k) match {
-          case Some(u) =>
-            Result.fail[K](s"id=$k already present with value $u")
-          case None =>
-            Result {
-              pitRows = (k, (updated, v)) :: pitRows
-              k
-            }
-        }
+        pitRows = (k, (updated, v)) :: pitRows
+        Result { k }
       }
-    override def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]] =
+
+    override def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]] = {
+      import Interval.fromBounds
+      val now    = localDateTime
+      val (k, v) = row
       IO.map(tableAt(pit)) { table =>
-        val now     = localDateTime
-        val updated = Interval.fromBounds(Closed(now), Unbound())
-        val (k, v)  = row
-        (table get k) match {
-          case Some(u) =>
-            Result {
-              val (_, sfx)          = pitRows span (_._1 =!= k) // (k, _) is `head` of sfx
-              val (kk, (range, uu)) = sfx.headOption getOrElse ??? // tell it like it is
-              assert(k === kk)
-              assert(u === uu)
-              val ValueBound(lb) = range.lowerBound
-              assert(lb < now)
-              val retired = Interval fromBounds (range.lowerBound, Open(now))
-              pitRows = (k, (updated, v)) :: (k, (retired, u)) :: (pitRows drop 1)
-              // FIXME: and herin lies the problem: we'd like a stable-over-time id  as well
-              // the better to reference `V`s without needing dates.
-              // solution:
-              // type PitMap[J] = Map[J, PitRow]
-              // ^ implement this as insert-only
-              // insert has to return _two_ ids? that ain't right... !
-              // // alt semantics where library client is in charge of key generation
-              // def insert(row: Row): Result[Unit]
-              // def upsert(row: Row): Result[Boolean]
-              // def insert(row: Row): Result[J]
-              // def upsert(row: Row): Result[J]  // row._1 == J.init != return if new
-            }
-          case None =>
-            Result.fail[Unit](s"id=$k not found")
+        (table get k).fold(Result.fail[Unit](s"id=$k not found")) { u =>
+          Result {
+            val (_, sfx)          = pitRows span (_._1 =!= k) // (k, _) is `head` of suffix
+            val (kk, (range, uu)) = sfx.headOption getOrElse ??? // tell it like it is
+            assert(k === kk)
+            assert(u === uu)
+            val ValueBound(lb) = range.lowerBound
+            assert(lb < now)
+            // FIXME bugz drop 1 lmao
+            // todo: use cache to remember start of interval:
+            // var cache: Map[K, (LocalDateTimeRange, V)]
+            // don't worry about stale open intervals: flatMap them to empty when reading the file.
+            // only apppend to a fs2.Stream[IO, (K, LocalDateTimeRange, V)]
+            pitRows = (k, (fromBounds(Closed(now), Unbound()), v)) :: (k, (fromBounds(range.lowerBound, Open(now)), u)) :: (pitRows drop 1)
+          }
         }
       }
+    }
     override def delete(pit: LocalDateTime)(k: K): IO[Result[Boolean]] = ???
 
   }
-  case class SimplePointInTimeRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]()
-      extends AppendableRepoImplicits[IO, K, V]
-      with PointInTimeRepository[IO, K, V]
-      with Repository[IO, K, V]
-      with Mutable[IO, K, V]
-      with Appendable[IO, K, V]
-      with MemImplPiT[IO, K, V]
 }
 
 object Api extends Api

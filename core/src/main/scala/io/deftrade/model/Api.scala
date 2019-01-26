@@ -24,6 +24,7 @@ import money._
 import Monetary.USD
 
 import opaqueid._
+import OpaqueId.Fresh
 
 import enums._
 
@@ -31,7 +32,7 @@ import repos._
 
 import reference.InstrumentIdentifier
 
-import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK }
+import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
 import cats.kernel.CommutativeGroup
 import cats.data.Kleisli
 import cats.implicits._
@@ -123,6 +124,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     def apply(ps: Position*): Folio                     = accumulate(ps.toList)
     def apply[C <: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
   }
+  import Folio.Id._
 
   /** `Trade` := `Folio` in motion */
   type Trade = Folio
@@ -187,8 +189,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     * `Account` space
     *******************************************************************************************/
   sealed trait Entity extends Product with Serializable { def meta: Json }
-  object Entity extends IdC2[Long, Entity] {
+  object Entity extends IdPC[Long, Entity] {
 
+    // FIXME: check out the existing `Refine`ments in the library.
     object SSN {
       type Pattern = W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
       type Regex   = MatchesRegex[Pattern]
