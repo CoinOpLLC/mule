@@ -8,7 +8,7 @@ class MoneySpec extends FlatSpec {
   import cats.syntax.show._
   import cats.syntax.order.{ catsSyntaxOrder, catsSyntaxPartialOrder }
 
-  import Monetary._
+  import Currency._
 
   "Money" should "be created elastically" in {
 
@@ -35,7 +35,7 @@ class MoneySpec extends FlatSpec {
     assert(d20 < d21)
     assert((d20 max d21) === d21)
 
-    def funge[C <: Currency](den: Monetary[C]): Money[Double, C] = den(19.47)
+    def funge[C](den: Currency[C]): Money[Double, C] = den(19.47)
     // def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
 
     assert(USD(19.47) === funge(USD))

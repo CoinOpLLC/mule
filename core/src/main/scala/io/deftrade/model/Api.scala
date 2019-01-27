@@ -21,7 +21,7 @@ import time._
 import time.implicits._
 
 import money._
-import Monetary.USD
+import Currency.USD
 
 import opaqueid._
 import OpaqueId.Fresh
@@ -100,7 +100,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     * Foundational instrument types to be provided via injection of some kind tbd
     * TODO: capture the fact that the sets of instruments are disjoint.
     */
-  type CashInstruments = Map[Monetary[Currency], Set[Instrument.Id]]
+  type CashInstruments = Map[Currency[_], Set[Instrument.Id]]
   implicit def currencyInstruments: CashInstruments = ??? // this will go over big
 
   /**
@@ -120,9 +120,9 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     */
   type Folio = Map[Instrument.Id, Quantity]
   object Folio extends IdC[Long, Folio] {
-    def empty: Folio                                    = Map.empty
-    def apply(ps: Position*): Folio                     = accumulate(ps.toList)
-    def apply[C <: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+    def empty: Folio                        = Map.empty
+    def apply(ps: Position*): Folio         = accumulate(ps.toList)
+    def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
   }
   import Folio.Id._
 
@@ -130,7 +130,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   type Trade = Folio
   lazy val Trade = Folio
 
-  type PricedTrade[C <: Currency] = (Trade, Money[MonetaryAmount, C])
+  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
   object PricedTrade {
 
     /**
@@ -139,7 +139,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       * What is the set of "payable on demand" dollar instruments?
       * This dictates the normalization.
       */
-    def normalize[C <: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments): Trade = ???
+    def normalize[C](pt: PricedTrade[C])(implicit ci: CashInstruments): Trade = ???
   }
 
   object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Id, Folio] {
@@ -307,7 +307,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     object Id {
       implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Id] =
-        StrictFresh[Id](100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
+        Fresh(100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
     def empty(eid: Entity.Id) = Account(Roster(eid), Vault.empty)
@@ -367,19 +367,19 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
 
     import OMS.{ Allocation, Execution, Order }
 
-    def riskCheck[F[_]: Monad: MonoidK, C <: Currency, X](x: X): Kleisli[F, X, Order[C]] =
+    def riskCheck[F[_]: Monad: MonoidK, C, X](x: X): Kleisli[F, X, Order[C]] =
       ???
 
-    def trade[F[_]: Monad: MonoidK, C <: Currency]: Kleisli[F, Order[C], Execution] =
+    def trade[F[_]: Monad: MonoidK, C]: Kleisli[F, Order[C], Execution] =
       ???
 
-    def allocate[F[_]: Monad: MonoidK, C <: Currency](
+    def allocate[F[_]: Monad: MonoidK, C](
         p: Account.Id,
         a: Allocation
     ): Kleisli[F, Execution, Execution] =
       ???
 
-    def process[F[_]: Monad: MonoidK, C <: Currency](
+    def process[F[_]: Monad: MonoidK, C](
         p: Account.Id,
         a: Allocation
     ): Kleisli[F, Order[C], Execution] = ???
@@ -400,16 +400,16 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
     /**
       * Minimum viable `Order` type. What the client would _like_ to have happen.
       */
-    type Order[C <: Currency] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
+    type Order[C] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
     object Order extends IdC[Long, Order[USD]] {
 
       /** `Market` orders */
-      def buy[C <: Currency: Monetary]: Order[C]  = ???
-      def sell[C <: Currency: Monetary]: Order[C] = ???
+      def buy[C: Currency]: Order[C]  = ???
+      def sell[C: Currency]: Order[C] = ???
 
       /** `Limit` orders */
-      def buy[C <: Currency: Monetary](bid: Money[MonetaryAmount, C]): Order[C]  = ???
-      def sell[C <: Currency: Monetary](ask: Money[MonetaryAmount, C]): Order[C] = ???
+      def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
+      def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
     }
 
     /**
@@ -449,14 +449,14 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   sealed abstract class Market { def eid: Entity.Id }
   object Market extends IdC[Long, Market] {
 
-    def quote[F[_]: Monad, C <: Currency: Monetary](
+    def quote[F[_]: Monad, C: Currency](
         m: Market
     )(
         id: Instrument.Id
     ): F[Money[MonetaryAmount, C]] = ???
-    // Monetary[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+    // Currency[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
-    def quotedIn[C <: Currency: Monetary](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
+    def quotedIn[C: Currency](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
 
     /**
       * Single effective counterparty: the `Exchange` itself.
@@ -570,7 +570,7 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
       val xops: XOPs,
       val revenues: Revenues
   ) extends Balance(xops, revenues) {
-    def partition(implicit ci: CashInstruments): (IncomeStatement, IncomeStatement) = ???
+    def partition[C](implicit ci: CashInstruments): (IncomeStatement, IncomeStatement) = ???
   }
 
   /** */
@@ -608,12 +608,12 @@ abstract class Api[MA: Financial, Quantity: Financial] { api =>
   //  global functions yay
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  def quoteLeg[CCY <: Currency: Monetary](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
+  def quoteLeg[CCY: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, CCY] =
     leg match {
       case (security, quantity) => Market.quote[cats.Id, CCY](market)(security) * quantity
     }
 
-  def quote[CCY <: Currency: Monetary](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
+  def quote[CCY: Currency](market: Market)(trade: Trade): Money[MonetaryAmount, CCY] =
     trade.toList foldMap quoteLeg[CCY](market)
 
   def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
