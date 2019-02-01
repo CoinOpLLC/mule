@@ -7,7 +7,7 @@ scalafmtOnCompile in ThisBuild := true // all projects
   * [Flyway database migrations tool](https://flywaydb.org/):
   * schema roll-back, roll-forward, etc.
   */
-addSbtPlugin("io.github.davidmweber" % "flyway-sbt" % "5.0.0")
+// addSbtPlugin("io.github.davidmweber" % "flyway-sbt" % "5.0.0")
 
 /**
   * Implementing suggestions from [this post](https://pbassiner.github.io/blog/essential_sbt_plugins.html).

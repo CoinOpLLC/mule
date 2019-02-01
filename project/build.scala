@@ -12,7 +12,6 @@ object Version {
 
   val Cats           = "1.4.0"
   val CatsEffect     = "1.0.0"
-  val CatsTime       = "0.0.3"
   val CatsScalaCheck = "0.1.0"
   val Fs2            = "1.0.0"
   val Fuiid          = "0.1.2"
@@ -27,11 +26,11 @@ object Version {
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
   val HttpSession = "0.5.5"
-  val Quill       = "2.3.1"
-  val PgJdbc      = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
-  val Ammonite    = "0.8.3"
-  val Fansi       = "0.2.5"
-  val OpenGamma   = "2.0.0"
+  // val Quill       = "2.3.1"
+  val PgJdbc    = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+  val Ammonite  = "0.8.3"
+  val Fansi     = "0.2.5"
+  val OpenGamma = "2.0.0"
   // val Squants        = "1.3.0"
 
   // val PgJdbc = "9.4-1201-jdbc41"
@@ -51,8 +50,6 @@ object Deps {
   val cats = "org.typelevel" %% "cats-core" % Cats
 
   val catsEffect = "org.typelevel" %% "cats-effect" % CatsEffect
-
-  val catsTime = "io.chrisdavenport" %% "cats-time" % CatsTime
 
   val quicklens = "com.softwaremill.quicklens" %% "quicklens" % Quicklens
 
@@ -131,11 +128,11 @@ object Deps {
 
   val postgres = "org.postgresql" % "postgresql" % PgJdbc
 
-  val quills = Seq(
-    "io.getquill" %% "quill-jdbc",
-    "io.getquill" %% "quill-async-postgres",
-  ) map (_ % Quill)
-
+  // val quills = Seq(
+  //   "io.getquill" %% "quill-jdbc",
+  //   "io.getquill" %% "quill-async-postgres",
+  // ) map (_ % Quill)
+  //
   /** toolkits */
   val akkaHttp   = "com.typesafe.akka" %% "akka-http"   % AkkaHttp
   val akkaActor  = "com.typesafe.akka" %% "akka-actor"  % Akka
@@ -160,8 +157,7 @@ object Deps {
     List(
       cats,
       catsEffect,
-      // catsTime,
-      quicklens,
+      // quicklens,
       spire,
     ) ++ fs2s ++ cormorants ++ fuiids
 

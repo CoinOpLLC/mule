@@ -33,9 +33,9 @@ trait Logos {
 
   type Point = Complex[Real]
 
-  def enc(p: Point): String  = s"${real(p)},${imag(p)}"
-  def real(p: Point): String = s"${p.real}"
-  def imag(p: Point): String = s"${p.imag}"
+  def point(p: Point): String  = s"${real(p)},${imag(p)}"
+  def real(p: Point): String   = s"${p.real}"
+  def imag(p: Point): String              = s"${p.imag}"
 
   sealed trait Graphic { self =>
     final val TissueThin = 0.05
@@ -50,7 +50,7 @@ trait Logos {
               stroke-opacity: ${d * TissueThin};"""} />
 
       case Line(p, q)        => <line x1={real(p)} y1={imag(p)} x2={real(q)} y2={imag(q)} />
-      case Triangle(a, b, c) => <polygon points={s"${enc(a)} ${enc(b)} ${enc(c)}"} />
+      case Triangle(a, b, c) => <polygon points={s"${point(a)} ${point(b)} ${point(c)}"} />
 
     }
   }
