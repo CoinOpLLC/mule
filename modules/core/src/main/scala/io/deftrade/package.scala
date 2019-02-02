@@ -22,7 +22,6 @@ package object deftrade extends deftrade.Api {
 
   implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
-    def p2f1[B](f: A => B): B = f(a)
   }
 
   /**
@@ -37,7 +36,7 @@ package object deftrade extends deftrade.Api {
   type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
   val IndexedSeq = scala.collection.immutable.IndexedSeq
 
-  /** failure types */
+  /** `Result` types */
   type Result[T]     = Either[Fail, T]
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]

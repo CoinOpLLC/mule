@@ -4,73 +4,6 @@ package model.enums
 import cats.Eq
 
 import enumeratum._
-// import enumeratum.values._
-
-sealed trait Role extends EnumEntry
-object Role extends Enum[Role] {
-
-  /**
-    * The `Entity` which is the economic actor responsible for establishing the `Account`.
-    *
-    * Semantics for `Principle` are conditioned on the status of account, for examples:
-    * - beneficial owner for an asset
-    * - responsible party for a liability
-    * - shareholder for equity
-    * - business unit chief for revenue and expenses
-    */
-  case object Principle extends Role
-
-  /**
-    * The primary delegate selected by a `Principle`.
-    * Also, simply, the `Entity`(s) whose names are listed on the `Account`,
-    * and the primary point of contact for the `Account`.
-    *
-    * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
-    * from the `Ledger`.
-    *
-    * By convention a `Princple` is their own `Agent` unless otherwise specified.
-    */
-  case object Agent extends Role
-
-  /**
-    * The primary delegate selected by the `Agent`.
-    * `Entity`(s) with responsibility for, and authority over,
-    * the disposition of assets in the `Account`.
-    *
-    * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
-    * so long as the `Position`s are already entered in the `Ledger` - i.e. the `Instrument` is
-    * known to be tradeable on the ledger.
-    *
-    * (All publicly listed and traded assets are treated as tradeable on the `Ledger`
-    * by convention.)
-    *
-    * An `Agent` is their own `Manager` unless otherwise specified.
-    */
-  case object Manager extends Role
-
-  /**
-    * `Regulator`s are first class entities, each with a package of rights and responsibilities
-    * which is situation and juristiction specific.
-    *
-    * Practically, what this means is that `Regulator`s will have a (possibly limited) view
-    * into the state of the `Ledger`,
-    * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
-    * or even intitiate `Transaction`s.
-    *
-    * Actions of the `Regulator` may include the publishing of specific summaries of its views
-    * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
-    *
-    * N.B.: the `Regulator` need not be a governmental entity; in particular this role might
-    * be suited to a risk manager function.
-    */
-  case object Regulator extends Role
-
-  /** The `findValues` macro collects all `value`s in the order written. */
-  lazy val values: IndexedSeq[Role] = findValues
-
-  implicit lazy val eq = Eq.fromUniversalEquals[Role]
-}
-
 /** IRS Form 1065 Schedule L ontology */
 /**
   Assets + eXpenses = eQuity + Liabilities + Income
@@ -170,7 +103,7 @@ object Profit extends Enum[Profit] {
   lazy val values = findValues
 }
 
-sealed abstract class DoubleEntryKey protected (
+sealed abstract class DoubleEntryKeys protected (
     k1: AccountType,
     k2: AccountType
 ) extends EnumEntry

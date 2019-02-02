@@ -1,12 +1,19 @@
 package io.deftrade
-package reference
+package model
 
 import cats.{ Order }
 import cats.instances.string._
 
 import scala.util.matching.Regex
 
-sealed trait UniversalInstrumentIdentifyer { def s: String; def rx: Regex = ??? }
+
+sealed trait UniversalInstrumentIdentifyer extends Serial with Product {
+  def s: String
+
+  // FIXME: TODO: what this really needs is the `Refined` treatment (with `Validation`)
+  def rx: Regex = ???
+}
+
 object UniversalInstrumentIdentifyer       {
   // TODO: each of these needs a regex refinement for the string param
   case class Cusip(s: String) extends UniversalInstrumentIdentifyer

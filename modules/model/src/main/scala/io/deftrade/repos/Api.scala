@@ -180,6 +180,7 @@ trait Api {
     // private var cache: Table = Map.empty
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     private var pitRows: PitRows = List.empty
+
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     private var k: K = FK.init
 
