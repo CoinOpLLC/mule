@@ -6,15 +6,14 @@ import cats.instances.string._
 
 import scala.util.matching.Regex
 
-
-sealed trait UniversalInstrumentIdentifyer extends Serial with Product {
+sealed trait UniversalInstrumentIdentifyer extends Serializable with Product {
   def s: String
 
   // FIXME: TODO: what this really needs is the `Refined` treatment (with `Validation`)
   def rx: Regex = ???
 }
 
-object UniversalInstrumentIdentifyer       {
+object UniversalInstrumentIdentifyer {
   // TODO: each of these needs a regex refinement for the string param
   case class Cusip(s: String) extends UniversalInstrumentIdentifyer
   case class Isin(s: String)  extends UniversalInstrumentIdentifyer

@@ -12,8 +12,6 @@ import OpaqueId.Fresh
 
 import repos._
 
-import reference.InstrumentIdentifier
-
 import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
 import cats.kernel.CommutativeGroup
 import cats.data.Kleisli
@@ -31,7 +29,6 @@ import io.circe.Json
 
 import scala.language.higherKinds
 
-
 /**
   * `Balance` calculation from a sequence of `Transaction`s.
   *
@@ -43,54 +40,57 @@ import scala.language.higherKinds
   *  Balance(Assets, LOQs)
   *  Balance(XOP, Revenues)  // !!!
   *
-  * TODO: fix this comment – design is provisional 
+  * TODO: fix this comment – design is provisional
   * Both type params are needed to deal with case where MA =!= Q in the cake
   * this allows this package to deal with MA <=> Q functions via Monetary Instruments table.
   * Also binding explicitly to `Ledger` with `Folio.Id` dependence.
+  * FIXME: really only depends on `Ledger`
   */
-abstract class Balances[MA: Financial, Q: Financial] extends Ledger[MA, Q] {
+abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
 
-  final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
-  object AccountMap {
-    def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
-  }
+  // type AccountType
+  //
+  // type Debit  <: AccountType
+  // type Credit <: AccountType
+  //
+  // type XOP <: Debit
+  // type Revenue <: Credit
+  //
+  // type Asset <: Debit
+  // type LOQ <: Credit
+  //
+  // type Expense <: XOP
+  // // type Profit <: XOP
+  //
+  // type Liability <: LOQ
+  // type Equity <: LOQ
 
-  type AccountType
-
-  type Debit  <: AccountType
-  type Credit <: AccountType
-
-  type XOP <: Debit
-  type Revenue <: Credit
-
-  type Asset <: Debit
-  type LOQ <: Credit
-
-  type Expense <: XOP
-  // type Profit <: XOP
-
-  type Liability <: LOQ
-  type Equity <: LOQ
+  type AccountType = enums.AccountType
+  type Debit       = enums.Debit
+  type Credit      = enums.Credit
+  type XOP         = enums.XOP
+  type LOQ         = enums.LOQ
+  type Asset       = enums.Asset
+  type Expense     = enums.Expense
+  type Liability   = enums.Liability
+  type Equity      = enums.Equity
+  type Revenue     = enums.Revenue
+  // type Profit = enums.Profit
 
   /**
     * FIXME: depends on mapping between `Folio`s and `Balance`s
     */
   type EntryKey = (AccountType, Folio.Id)
-  final case class DoubleEntryKey(debit: EntryKey, credit: EntryKey)
-  object DoubleEntryKey {}
 
+  /** Domain specific tools for dealing with `MonetaryAmount`s */
+  type MonetaryAmount = MA
+  val MonetaryAmount = Financial[MonetaryAmount]
+  import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
-  // type AccountType = enums.AccountType
-  // type Debit = enums.Debit
-  // type Credit = enums.Credit
-  // type XOP = enums.XOP
-  // type LOQ = enums.LOQ
-  // type Asset = enums.Asset
-  // type Expense = enums.Expense
-  // type Liability = enums.Liability
-  // type Equity = enums.Equity
-  // type Revenue = enums.Revenue
-  //  // type Profit = enums.Profit
+  private final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
+  private object AccountMap {
+    def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
+  }
 
   final type Debits  = AccountMap[Debit]
   final type Credits = AccountMap[Credit]
@@ -104,19 +104,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[MA, Q] {
   final type Equities    = AccountMap[Equity]
   final type Revenues    = AccountMap[Revenue]
 
-  sealed abstract class Balance[D <: Debit, C <: Credit](val ds: AccountMap[D], val cs: AccountMap[C]) extends Product with Serializable {
-
-    // def updatedGrow(asset: Asset, liability: Liability)(amt: MonetaryAmount): BalanceSheet =
-    //   BalanceSheet(assets + (asset -> amt), liabilities + (liability -> amt))
-    //
-    // def updated(from: Asset, to: Asset)(amt: MonetaryAmount): BalanceSheet =
-    //   copy(assets = assets + (from -> amt.inverse) + (to -> amt))
-    // def updated(dc: (D, C), amt: MonetaryAmount): Self = dc match {
-    //   case (d, c) =>
-    //     _mk((ds + (d -> amt), cs + (c -> amt.inverse)))
-    // }
-  }
-  object Balance {}
+  sealed abstract class Balance[D <: Debit, C <: Credit](val ds: AccountMap[D], val cs: AccountMap[C]) extends Product with Serializable
+  object Balance
 
   final case class TrialBalance private (
       override val ds: Debits,

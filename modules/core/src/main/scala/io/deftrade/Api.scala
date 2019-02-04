@@ -1,15 +1,10 @@
 package io.deftrade
 
 sealed abstract class Fail extends Product with Serializable
-
 object Fail {
-
-  final case class Model(mf: model.Fail) extends Fail
-  def apply(mf: model.Fail): Fail = Model(mf)
-
-  final case class Repos(rf: repos.Fail) extends Fail
-  def apply(rf: repos.Fail): Fail = Repos(rf)
-
+  private final case class Impl(msg: String, cause: Option[Throwable]) extends Fail
+  def apply(msg: String): Fail                   = Impl(msg, None)
+  def apply(msg: String, cause: Throwable): Fail = Impl(msg, Some(cause))
 }
 
 object Result {
@@ -17,10 +12,9 @@ object Result {
   import scala.util.Try
   import cats.data.Validated
 
-  private def _fail(msg: String)                 = Fail(model.Fail(msg))
-  private lazy val throw2fail: Throwable => Fail = x => _fail(s"${x.getClass}: ${x.getMessage}")
+  private lazy val throw2fail: Throwable => Fail = x => Fail(s"${x.getClass}: ${x.getMessage}")
 
-  def fail[T](msg: String): Result[T] = _fail(msg).asLeft
+  def fail[T](msg: String): Result[T] = Fail(msg).asLeft
 
   def apply[T](unsafe: => T): Result[T] =
     (Try apply unsafe).toEither.left map throw2fail
@@ -61,11 +55,9 @@ trait Api {
     val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
 
     def apply(sep: String)(name: String): String = {
-      val osc = maybeSepFrom(sep)
-      // (name |> splitCaps(osc) |> bustHumps(osc)).mkString
+      val osc                        = maybeSepFrom(sep)
       val bh: Seq[Char] => Seq[Char] = bustHumps(osc)(_)
       val sc: String => Seq[Char]    = splitCaps(osc)(_)
-      // val fc2: String => Seq[Char]    = fsc andThen fbh
       (sc andThen bh)(name).mkString
     }
     protected def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
@@ -99,5 +91,4 @@ trait Api {
     }
 
   }
-
 }

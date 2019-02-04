@@ -77,9 +77,6 @@ package object time extends time.Api {
     def +(amount: Period): LocalDate = ld plus amount
     def -(amount: Period): LocalDate = ld minus amount
 
-    def +(wpp: market.ProxiedPeriod): LocalDate = ld plus wpp.period
-    def -(wpp: market.ProxiedPeriod): LocalDate = ld minus wpp.period
-
     def -(end: LocalDate): Period = ld until end
   }
 

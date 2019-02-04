@@ -209,7 +209,7 @@ trait Api {
       */
     override def append(v: V): IO[Result[K]] =
       IO pure {
-        val updated = Interval.fromBounds(Closed(localDateTime), Unbound())
+        val updated = Interval fromBounds (Closed(localDateTime), Unbound())
         k = FK next k
         pitRows = (k, (updated, v)) :: pitRows
         Result { k }

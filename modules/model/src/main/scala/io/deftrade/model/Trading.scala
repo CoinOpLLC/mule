@@ -47,12 +47,7 @@ import io.circe.Json
 
 import scala.language.higherKinds
 
-/** FIXME wtf is this even, besides eponymous */
-sealed abstract class Fail extends Product with Serializable { def msg: String }
-object Fail {
-  final case class Impl(val msg: String) extends Fail
-  def apply(msg: String): Fail = Impl(msg)
-}
+// final case class Fail(val msg: String)
 
 /**
   * What does "double entry bookkeeping" mean in the context of a shared distributed ledger with
@@ -64,12 +59,15 @@ object Fail {
   * - we credit that account when settlement happens (zeros out the balance)
   * - we "reverse polarity" when we enter a short position.
   * - we can accumulate settled positions for reconcilliation
+  *
+  * TODO - provisional:
+  * we depend on `Balances` because it makes no sense
+  * to trade blind with respect to account sums - these calcs are intrinsic to margin (I think)
   */
-abstract class Trading[MA: Financial, Q: Financial] extends Ledger[MA, Q] { api =>
+abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
 
   import Quantity.{ fractional => QF, commutativeGroup => QCG }
   import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
-
 
   /** `Leg` := `Position` in motion */
   type Leg = Position
@@ -91,93 +89,102 @@ abstract class Trading[MA: Financial, Q: Financial] extends Ledger[MA, Q] { api 
     def normalize[C](pt: PricedTrade[C])(implicit ci: CashInstruments): Trade = ???
   }
 
+  /**
+    *`OMS` := Order Management System. Ubiquitous acronym in the domain.
+    *
+    * Note: The methods on `OMS` return `Kliesli` arrows, which are intended to be chained with
+    * `andThen`.
+    *
+    * If it is possible for the arrows to be sequenced in a semantically incorrect way per the
+    * domain model, use phantom types to ensure proper sequencing.
+    *
+    * Reference:
+    * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
+    *
+    * FIXME: Maybe make this a full MTL thing because MonoidK for Kleisli is restrictive.
+    * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
+    */
+  final case class OMS[F[_]: Monad: MonoidK] private (
+      eid: Entity.Id,
+      contra: Account.Id,
+      markets: Set[Market]
+  ) {
+
+    import OMS.{ Allocation, Execution, Order }
+
+    /** He stacc. He refacc. */
+    type FK[T, R] = EitherT[Kleisli[F, T, R], Fail, R]
+
+    final def process[C, A](p: Account.Id, a: Allocation)(
+        block: => A
+    ): FK[A, Execution] = riskCheck[C, A](block) andThen trade[C] andThen allocate[C](p, a)
+
+    def riskCheck[C, A](a: A): FK[A, Order[C]] =
+      ???
+
+    def trade[C]: FK[Order[C], Execution] =
+      ???
+
+    private final def allocate[C](
+        p: Account.Id,
+        a: Allocation
+    ): FK[Execution, Execution] = // UM... this is recursive, given account structure. Fine!
+      ???
+  }
+
+  /**
+    * Where do Order Management Systems come from? (Here.)
+    */
+  object OMS {
+
+    implicit def omsEq[F[_]: Monad] = Eq.fromUniversalEquals[OMS[F]]
+
+    type Allocation = Partition[Account.Id]
 
     /**
-      *`OMS` := Order Management System. Ubiquitous acronym in the domain.
-      *
-      * Note: The methods on `OMS` return `Kliesli` arrows, which are intended to be chained with
-      * `andThen`.
-      *
-      * If it is possible for the arrows to be sequenced in a semantically incorrect way per the
-      * domain model, use phantom types to ensure proper sequencing.
-      *
-      * Reference:
-      * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
+      * TODO: augment/evolve creation pattern.
       */
-    final case class OMS private (eid: Entity.Id, contra: Account.Id, markets: Set[Market]) {
+    def apply(eid: Entity.Id, ms: Market*): OMS = OMS(eid, newContraAccount, ms.toSet)
+    private def newContraAccount: Account.Id    = ???
 
-      import OMS.{ Allocation, Execution, Order }
+    /**
+      * Minimum viable `Order` type. What the client would _like_ to have happen.
+      */
+    type Order[C] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
+    object Order extends IdC[Long, Order[USD]] {
 
-      def riskCheck[F[_]: Monad: MonoidK, C, X](x: X): Kleisli[F, X, Order[C]] =
-        ???
+      /** `Market` orders */
+      def buy[C: Currency]: Order[C]  = ???
+      def sell[C: Currency]: Order[C] = ???
 
-      def trade[F[_]: Monad: MonoidK, C]: Kleisli[F, Order[C], Execution] =
-        ???
-
-      def allocate[F[_]: Monad: MonoidK, C](
-          p: Account.Id,
-          a: Allocation
-      ): Kleisli[F, Execution, Execution] =
-        ???
-
-      def process[F[_]: Monad: MonoidK, C](
-          p: Account.Id,
-          a: Allocation
-      ): Kleisli[F, Order[C], Execution] = ???
-      // riskCheck(()) and then trade andThen allocate(p, a) FIXME: divirging implicits wtf???
+      /** `Limit` orders */
+      def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
+      def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
     }
-    object OMS {
 
-      implicit def omsEq = Eq.fromUniversalEquals[OMS]
+    /**
+      *
+      *  this is something of an abuse of the original PiT concept,
+      * which models slowly evolving entities *with identity (key) which survives updates.
+      *
+      *  `Orders` is exactly the opposite.
+      *
+      *  But the open date range for "current `Table`" models the "open orders" concept perfectly.
+      *
+      *  TODO: is this really worthwhile?
+      *
+      */
+    type Orders = Orders.Table
+    object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Id, OMS.Order[USD]]
 
-      type Allocation = Partition[Account.Id]
+    /**
+      * What actually happened.
+      */
+    type Execution = (LocalDateTime, OMS, Order.Id, Transaction)
+    object Execution extends IdC[Long, Execution]
 
-      /**
-        * TODO: augment/evolve creation pattern.
-        */
-      def apply(eid: Entity.Id, ms: Market*): OMS = OMS(eid, newContraAccount, ms.toSet)
-      private def newContraAccount: Account.Id    = ???
-
-      /**
-        * Minimum viable `Order` type. What the client would _like_ to have happen.
-        */
-      type Order[C] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
-      object Order extends IdC[Long, Order[USD]] {
-
-        /** `Market` orders */
-        def buy[C: Currency]: Order[C]  = ???
-        def sell[C: Currency]: Order[C] = ???
-
-        /** `Limit` orders */
-        def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
-        def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
-      }
-
-      /**
-        *
-        *  this is something of an abuse of the original PiT concept,
-        * which models slowly evolving entities *with identity (key) which survives updates.
-        *
-        *  `Orders` is exactly the opposite.
-        *
-        *  But the open date range for "current `Table`" models the "open orders" concept perfectly.
-        *
-        *  TODO: is this really worthwhile?
-        *
-        */
-      type Orders = Orders.Table
-      object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Id, OMS.Order[USD]]
-
-      /**
-        * What actually happened.
-        */
-      type Execution = (LocalDateTime, OMS, Order.Id, Transaction)
-      object Execution extends IdC[Long, Execution]
-
-      type Executions = Executions.Table
-      object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
-
-    }
+    type Executions = Executions.Table
+    object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
   }
 
   /**
@@ -216,14 +223,15 @@ abstract class Trading[MA: Financial, Q: Financial] extends Ledger[MA, Q] { api 
       */
     final case class Counterparty(val eid: Entity.Id) extends Market
     object Counterparty {}
-  implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+
+    implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+  }
 
   lazy val Markets: Repository[cats.Id, Market.Id, Market] =
     SimplePointInTimeRepository[cats.Id, Market.Id, Market]()
   type Markets = Markets.Table
 
   /** top level methods */
-
   def quoteLeg[C: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, C] =
     leg match {
       case (security, quantity) => Market.quote[cats.Id, C](market)(security) * quantity
@@ -270,6 +278,5 @@ abstract class Trading[MA: Financial, Q: Financial] extends Ledger[MA, Q] { api 
   //       case _ => error
   //     }
   // }
-
 
 }

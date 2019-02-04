@@ -4,6 +4,7 @@ package model.enums
 import cats.Eq
 
 import enumeratum._
+
 /** IRS Form 1065 Schedule L ontology */
 /**
   Assets + eXpenses = eQuity + Liabilities + Income
@@ -103,7 +104,7 @@ object Profit extends Enum[Profit] {
   lazy val values = findValues
 }
 
-sealed abstract class DoubleEntryKeys protected (
+sealed abstract class DoubleEntryKey protected (
     k1: AccountType,
     k2: AccountType
 ) extends EnumEntry

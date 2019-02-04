@@ -1,29 +1,21 @@
 package io.deftrade
 package model
 
-import time._
-import time.implicits._
-
 import money._
-import Currency.USD
+import time._
 
 import opaqueid._
 import OpaqueId.Fresh
 
 import repos._
 
-import reference.InstrumentIdentifier
-
 import enumeratum._
 
-import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
-import cats.kernel.CommutativeGroup
-import cats.data.Kleisli
+import cats._
 import cats.implicits._
-import feralcats.instances._
 
 import eu.timepit.refined
-import refined.{ cats => refinedCats, _ }
+// import refined.{ cats => refinedCats, _ }
 import refined.api.Refined
 import refined.numeric._
 import refined.string._
@@ -31,11 +23,26 @@ import refined.auto._
 
 import io.circe.Json
 
-import scala.language.higherKinds
-
-
+/**
+  * Every `Entity` needs a `Role`.
+  * There are a finite enumeration of `Role`s.
+  */
 sealed trait Role extends EnumEntry
+
+/**
+  * There is _always_ a distinguished `Role`, the `Principle`.
+  * `Principle` `Entity` status may enforced by the type system using this.
+  */
+sealed trait Principle extends Role
+
+/**
+  * A type representing all `Role`s _other_ than `Princple`.
+  */
 sealed trait NonPrinciple extends Role
+
+/**
+  * Enumerated `Role`s.
+  */
 object Role extends Enum[Role] {
 
   /**
@@ -47,7 +54,7 @@ object Role extends Enum[Role] {
     * - shareholder for equity
     * - business unit chief for revenue and expenses
     */
-  case object Principle extends Role
+  case object Principle extends Principle
 
   /**
     * The primary delegate selected by a `Principle`.
@@ -98,162 +105,157 @@ object Role extends Enum[Role] {
   lazy val values: IndexedSeq[Role] = findValues
 
   lazy val nonPrinciples: Set[NonPrinciple] =
-    (Set.empty[Role] ++ values - Principle).asInstanceOf[Set[NonPriniple]]
+    (Set.empty[Role] ++ values - Principle).asInstanceOf[Set[NonPrinciple]]
 
   implicit lazy val eq = Eq.fromUniversalEquals[Role]
-}
-
-/** `Entities`: People, Corporations */
-sealed trait Entity extends Product with Serializable { def meta: Json }
-object Entity extends IdPC[Long, Entity] {
-
-  // FIXME: check out the existing `Refine`ments in the library.
-  object SSN {
-    type Pattern = W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
-    type Regex   = MatchesRegex[Pattern]
-  }
-  type SSN = String Refined SSN.Regex
-
-  object EIN {
-    type Pattern = W.`"[0-9]{2}-[0-9]{7}"`.T
-    type Regex   = MatchesRegex[Pattern]
-  }
-  type EIN = String Refined EIN.Regex
-
-  final case class Person(val ssn: SSN, val meta: Json)      extends Entity
-  final case class Corporation(val ein: EIN, val meta: Json) extends Entity
-
-  implicit def eq = Eq.fromUniversalEquals[Entity]
 }
 
 object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Id, Entity]
 
 /** package level API */
-abstract class EntityAccountMapping[MA: Financial, Q: Financial] extends Ledger[MA, Q] { self =>
+abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
+  /**  */
+  type Entities = Entities.Table
 
-    /**  */
-    type Entities = Entities.Table
+  /**
+    * Note that Roster encodes the notion of a `CapitalKey` _per `Role`_!
+    * The meaning of this `Partition` will depend upon the `Role`.
+    * For the beneficial owner(s) of the assets in question the meaning is obvious.
+    * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
+    * their ownership rights.
+    */
+  final case class Partition[K] private (val kvs: Map[K, Quantity])
+  object Partition {
 
-    /**
-      * Note that Roster encodes the notion of a `CapitalKey` _per `Role`_!
-      * The meaning of this `Partition` will depend upon the `Role`.
-      * For the beneficial owner(s) of the assets in question the meaning is obvious.
-      * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
-      * their ownership rights.
-      */
-    final case class Partition[K] private (val kvs: Map[K, Quantity]) extends AnyVal
-    object Partition {
+    import QF._
 
-      import QF._
+    def apply[K: Order](shares: (K, Quantity)*): Result[Partition[K]] = {
+      val s = shares.toList
+      val x = s.map(_._2).fold(zero)(plus(_, _))
+      if (x == one && (s forall { case (_, q) => validate(q) })) Partition(s.toMap).asRight
+      else io.deftrade.Fail(s"Partition: invalid creation parms: $x != 1: $shares").asLeft
+    }
 
-      def apply[K: Order](shares: (K, Quantity)*): Result[Partition[K]] = {
-        val s = shares.toList
-        val x = s.map(_._2).fold(zero)(plus(_, _)
-        if ( x == one) && (s forall { case (_, q) => validate(q) })) s.toMap.asRight
-        else Fail(s"Partition: invalid creation parms: $x != 1: $shares")
-      }
-
-      def apply[K: Order](totalShares: Long)(ps: (K, Long)*): Partition[K] = ps.toList.toMap map {
-        case (k, l) => (k, div(one, fromLong(totalShares)))
-      }
-
-      /**
-        * The portion of the total accorded to the identified `Entity`.
-        */
-      def validate(q: Quantity): Boolean          = zero <= q && q <= one
-      def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
-      // def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
-      //   val p = accumulate(shares.toList)
-      //   p.values.toList foldMap identity match {
-      //     case sum if sum === QF.one => p.asRight
-      //     case badsum                => s"Partition doesn't add up: $badsum != 1.0".asLeft
-      //   }
-      // }
-      // def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
-
-      def proRata[K: Order](capTable: Map[K, Quantity]): Partition[K] = {
-        val totalShares = (capTable map { case (_, shares) => shares }).toList |> QF.sum
-        capTable map { case (k, mySlice) => (k, div(mySlice, totalShares)) }
-      }
-
-      def pariPassu[K: Hash](ks: Set[K]): Partition[K] = {
-        val n = ks.size
-        (ks.toList zip List.fill(n)(div(one, fromInt(n)))).toMap
-      }
-
-      object Single {
-
-        def unapply[K](p: Partition[K]): Option[K] = p.toList match {
-          case (k, Quantity.One) :: Nil => k.some
-          case _                        => none
+    def apply[K: Order](totalShares: Long)(ps: (K, Long)*): Result[Partition[K]] = {
+      val computedShares = ps.map(_._2).foldLeft(zero)((b, a) => plus(fromLong(a), b))
+      if (computedShares != totalShares) io.deftrade.Fail(s"$computedShares != $totalShares").asLeft
+      else {
+        val shares = ps.toList.toMap map {
+          case (k, l) => (k, div(fromLong(l), fromLong(totalShares)))
         }
+        Partition(shares).asRight
       }
     }
 
     /**
-      * Who does what. Or should. And shouldn't.
+      * The portion of the total accorded to the identified `Entity`.
       */
-    final case class Roster(principles: Partition[Entity.Id], roles: NonPrinciple => Set[Entity.Id])
+    def validate(q: Quantity): Boolean          = zero <= q && q <= one
+    def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
+    // def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
+    //   val p = accumulate(shares.toList)
+    //   p.values.toList foldMap identity match {
+    //     case sum if sum === QF.one => p.asRight
+    //     case badsum                => s"Partition doesn't add up: $badsum != 1.0".asLeft
+    //   }
+    // }
+    // def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
 
-    object Roster {
-      def apply(eid: Entity.Id): Roster =
-        Map.empty + (Role.Principle -> Set(eid))
+    def proRata[K: Order](capTable: Map[K, Quantity]): Partition[K] = {
+      val totalShares = (capTable map { case (_, shares) => shares }).toList |> QF.sum
+      Partition apply (capTable map { case (k, mySlice) => (k, div(mySlice, totalShares)) })
     }
 
-    /**
-      * `Account`s consist of:
-      * - a `Roster`: who gets to do what, and who are the beneficial owners.
-      * = a `Folio` (list of instruments and their quantities), OR a list of sub `Account`s.
-      * = (Tree structures only. No loops, no reconvergence at all permitted.)
-      *
-      * How composition of `Roster`s and `Vault::SubAccount`s works:
-      * - conjuction.
-      * - that's it (you're welcome.)
-      */
-    case class Account(roster: Roster, vault: Vault)
-    object Account {
-      type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
-      type Id         = Long Refined ValidRange
-      object Id {
-        implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
-        implicit lazy val fresh: Fresh[Id] =
-          Fresh(100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
+    def pariPassu[K: Hash](ks: Set[K]): Partition[K] = {
+      val n = ks.size
+      Partition apply (ks.toList zip List.fill(n)(div(one, fromInt(n)))).toMap
+    }
+
+    object Single {
+
+      def unapply[K](p: Partition[K]): Option[K] = p.kvs.toList match {
+        case (k, Quantity.One) :: Nil => k.some
+        case _                        => none
       }
+    }
+  }
 
-      def empty(eid: Entity.Id) = Account(Roster(eid), Vault.empty)
+  type NonEmptySet[A] = Set[A] Refined refined.collection.NonEmpty
 
-      def simple(eid: Entity.Id, fid: Folio.Id) = Account(Roster(eid), Vault.Folio(fid))
+  /**
+    * Who does what. Or should. And shouldn't.
+    */
+  final case class Roster private (
+      principles: Partition[Entity.Id],
+      nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
+  ) {
+    val roles: Map[Role, NonEmptySet[Entity.Id]] =
+      Map.empty + (Role.Principle -> NonEmptySet(principles.keySet)) ++
+        Role.nonPrinciples map { _ -> nps }
+  }
 
-      implicit def eq = Eq.fromUniversalEquals[Account]
+  object Roster {
+    def single(eid: Entity.Id): Roster =
+      Roster(
+        principles = Partition(eid, Quantity.one),
+        nonPrinciples = _ => NonEmptySet(eid)
+      )
+  }
+
+  /**
+    * `Vault` is a sum type used in its capacity as an obfuscator ;)
+    * TODO: implement recursive traversal of a `Vault` as a `Foldable`
+    * so you can treat as a container of `Folio.Id`s, basically.
+    */
+  sealed trait Vault
+  object Vault {
+
+    case class SubAccounts(subs: Set[Account.Id]) extends Vault
+    case class Folio(fid: self.Folio.Id)          extends Vault
+
+    def empty: Vault = SubAccounts(Set.empty) // idiom
+  }
+
+  /**
+    * `Account`s consist of:
+    * - a `Roster`: who gets to do what, and who are the beneficial owners.
+    * = a `Folio` (list of instruments and their quantities), OR a list of sub `Account`s.
+    * = (Tree structures only. No loops, no reconvergence at all permitted.)
+    *
+    * How composition of `Roster`s and `Vault::SubAccount`s works:
+    * - conjuction.
+    * - that's it (you're welcome.)
+    */
+  case class Account(roster: Roster, vault: Vault)
+  object Account {
+    type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+    type Id         = Long Refined ValidRange
+    object Id {
+      implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
+      implicit lazy val fresh: Fresh[Id] =
+        Fresh(100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
-    import Account.Id._ // for implicits
+    def empty(eid: Entity.Id) = Account(Roster single eid, Vault.empty)
 
-    object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
-    type Accounts = Accounts.Table
+    def simple(eid: Entity.Id, fid: Folio.Id) = Account(Roster single eid, Vault.Folio(fid))
 
-    /**
-      * `Vault` is a sum type used in its capacity as an obfuscator ;)
-      * TODO: implement recursive traversal of a `Vault` as a `Foldable`
-      * so you can treat as a container of `Folio.Id`s, basically.
-      */
-    sealed trait Vault
-    object Vault {
+    implicit def eq = Eq.fromUniversalEquals[Account]
+  }
 
-      case class SubAccounts(subs: Set[Account.Id]) extends Vault
-      case class Folio(fid: self.Folio.Id)          extends Vault
+  import Account.Id._ // for implicits
 
-      def empty: Vault = SubAccounts(Set.empty) // idiom
-    }
+  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
+  type Accounts = Accounts.Table
 
-    /**
-      * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
-      * the `Account.Id`'s would be ideal.
-      * another approoach would be to merkelize the `Roster` to expose only the relevant bits.
-      */
-    type AccountAuth           = (Account.Id, Signature)
-    type FolioAuth             = (Folio.Id, AccountAuth)
-    type FolioAuths            = (FolioAuth, FolioAuth)
-    type AuthorizedTransaction = (Transaction, FolioAuths)
+  /**
+    * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
+    * the `Account.Id`'s would be ideal.
+    * another approoach would be to merkelize the `Roster` to expose only the relevant bits.
+    */
+  type AccountAuth           = (Account.Id, Signature)
+  type FolioAuth             = (Folio.Id, AccountAuth)
+  type FolioAuths            = (FolioAuth, FolioAuth)
+  type AuthorizedTransaction = (Transaction, FolioAuths)
 }
