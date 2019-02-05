@@ -83,8 +83,6 @@ abstract class Ledger[Q: Financial] { self =>
     * A `Folio` is a set of `Position`s.
     * Can also be thought of as a `Trade` at rest.
     */
-  (Eq[Quantity], Eq[Instrument.Id]) |> discardValue
-
   type Folio = Map[Instrument.Id, Quantity]
   object Folio extends IdC[Long, Folio] {
     def empty: Folio                        = Map.empty

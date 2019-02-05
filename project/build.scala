@@ -69,7 +69,8 @@ object Deps {
   ) map (_ % Refined)) :+ ("eu.timepit" %% "refined-scalacheck" % Refined % Test)
 
   val enumerata = Seq(
-    "com.beachape" %% "enumeratum"       % Enumeratum,
+    "com.beachape" %% "enumeratum" % Enumeratum,
+    // "com.beachape" %% "enumeratum-cats"  % Enumeratum,
     "com.beachape" %% "enumeratum-circe" % Enumeratum,
   )
 

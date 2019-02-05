@@ -28,11 +28,9 @@ import OpaqueId.Fresh
 
 import repos._
 
-import reference.InstrumentIdentifier
-
 import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
 import cats.kernel.CommutativeGroup
-import cats.data.Kleisli
+import cats.data.{ EitherT, Kleisli }
 import cats.implicits._
 import feralcats.instances._
 
@@ -104,7 +102,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * FIXME: Maybe make this a full MTL thing because MonoidK for Kleisli is restrictive.
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     */
-  final case class OMS[F[_]: Monad: MonoidK] private (
+  final case class OMS[F[_]: Monad: MonoidK: Foldable] private (
       eid: Entity.Id,
       contra: Account.Id,
       markets: Set[Market]
@@ -113,7 +111,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     import OMS.{ Allocation, Execution, Order }
 
     /** He stacc. He refacc. */
-    type FK[T, R] = EitherT[Kleisli[F, T, R], Fail, R]
+    type FK[T, R] = Kleisli[F, T, Either[Fail, R]]
 
     final def process[C, A](p: Account.Id, a: Allocation)(
         block: => A

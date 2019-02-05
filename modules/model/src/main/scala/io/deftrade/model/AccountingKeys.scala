@@ -116,14 +116,22 @@ sealed abstract class UpdateKey private (
     val debit: Debit,
     val credit: Credit
 ) extends DoubleEntryKey(debit, credit)
+
+/** Keys that grow or shrink the balance. */
 object UpdateKey extends Enum[UpdateKey] {
+
+  /** bill payment */
   case object PayBills extends UpdateKey(Asset.Cash, Liability.AccountsPayable)
+
   // etc.
   lazy val values = findValues
 }
 
 /**
-  * `SwapKey`'s type parameter works to bind
+  * Keys that preserve the balance.
+  *
+  * `SwapKey`'s type parameter restricts the swap to occur
+  * within the same "column" of the `Balance`.
   */
 sealed abstract class SwapKey[T <: AccountType] private[enums] (
     val from: T,
@@ -142,12 +150,17 @@ object AssetSwapKey extends Enum[AssetSwapKey] { // FIXME: profit?!
   def unapply(ask: AssetSwapKey): Option[(Asset, Asset)] = Some(ask.from -> ask.to)
   lazy val values                                        = findValues
 }
+
 sealed abstract class LOQSwapKey(from: LOQ, to: LOQ) extends SwapKey(from, to)
 object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
 
-  import Liability._, Equity._
+  import Liability._
 
-  case object LongTermToCurrentLiability extends LOQSwapKey(OtherLiabilities, OtherCurrentLiabilities)
+  case object LongTermToCurrentLiability
+      extends LOQSwapKey(
+        OtherLiabilities,
+        OtherCurrentLiabilities
+      )
 
   def unapply(lsk: LOQSwapKey): Option[(LOQ, LOQ)] = Some(lsk.from -> lsk.to)
   lazy val values                                  = findValues

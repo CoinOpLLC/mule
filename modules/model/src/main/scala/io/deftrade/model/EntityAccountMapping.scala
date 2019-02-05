@@ -13,15 +13,81 @@ import enumeratum._
 
 import cats._
 import cats.implicits._
+import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
 // import refined.{ cats => refinedCats, _ }
 import refined.api.Refined
 import refined.numeric._
-import refined.string._
-import refined.auto._
 
 import io.circe.Json
+
+import scala.collection.immutable.{ SortedMap, SortedSet }
+
+/**
+  * `Entities` model real world actors.
+  * See Also: `model.Role`s.
+  */
+sealed trait Entity extends Product with Serializable {
+  def name: Entity.VarChar
+  def dtid: Entity.DTID
+  def meta: Json
+}
+
+/** `Entity`s recognized by the system. */
+object Entity extends IdPC[Long, Entity] {
+
+  import refined.W
+  import refined.boolean.{ And, Or }
+  import refined.collection.{ MaxSize, NonEmpty }
+  import refined.string.{ MatchesRegex, Trimmed }
+  import refined.auto._
+
+  /**
+    * RDB friendly `String`s that are born usable as is.
+    * Defaults to Postgres, which is the shorter limit (126)
+    */
+  type VarChar = VarChar126
+
+  /** Postgres optimizes strings less than this. */
+  type VarChar126 = String Refined NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
+
+  /** Typical SQL */
+  type VarChar255 = String Refined NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
+
+  /**
+    * Post Randomization SSN validation. I.e., cursory only.
+    * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
+    * https://www.ssa.gov/employer/randomization.html
+    * https://www.ssa.gov/history/ssn/geocard.html
+    */
+  type SSN = String Refined refinements.SSN
+
+  type EIN = String Refined refinements.EIN
+
+  /** TODO fill in the placeholder... also: what else? */
+  // type AIN = String // Refined refinements.AIN
+
+  // type DTID = String Refined Or[refinements.SSN, Or[refinements.EIN, refinements.AIN]]
+  type DTID = String Refined Or[refinements.SSN, refinements.EIN]
+
+  /** `People` are people. Also, `People` are `Entity`s.  */
+  final case class Person(name: VarChar, ssn: SSN, dob: LocalDate, meta: Json) extends Entity {
+    def dtid = ??? // ssn FIXME this keeps breaking, and then working again
+  }
+
+  /** `Corporation`s are `Entity`s too! */
+  final case class Corporation(name: VarChar, ein: EIN, meta: Json) extends Entity {
+    def dtid = ein
+  }
+
+  /** TODO flesh this concept out... minimum viable PM */
+  final case class Algorithm(name: VarChar, /* ain: AIN, */ meta: Json) extends Entity {
+    def dtid = ??? // ain FIXME
+  }
+
+  implicit def eq = Eq.fromUniversalEquals[Entity]
+}
 
 /**
   * Every `Entity` needs a `Role`.
@@ -104,8 +170,8 @@ object Role extends Enum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 
-  lazy val nonPrinciples: Set[NonPrinciple] =
-    (Set.empty[Role] ++ values - Principle).asInstanceOf[Set[NonPrinciple]]
+  lazy val nonPrinciples: NonEmptySet[NonPrinciple] =
+    (NonEmptySet fromSet (SortedSet.empty[Role] ++ values - Principle)).asInstanceOf[NonEmptySet[NonPrinciple]]
 
   implicit lazy val eq = Eq.fromUniversalEquals[Role]
 }
@@ -125,63 +191,59 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
     * their ownership rights.
     */
-  final case class Partition[K] private (val kvs: Map[K, Quantity])
+  final case class Partition[K] private (val kvs: NonEmptyMap[K, Quantity]) {
+    def keys: NonEmptySet[K] = kvs.keys
+  }
   object Partition {
 
     import QF._
+    private def unsafe[K: Order](kvs: SortedMap[K, Quantity]): Partition[K] =
+      new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
 
     def apply[K: Order](shares: (K, Quantity)*): Result[Partition[K]] = {
-      val s = shares.toList
-      val x = s.map(_._2).fold(zero)(plus(_, _))
-      if (x == one && (s forall { case (_, q) => validate(q) })) Partition(s.toMap).asRight
-      else io.deftrade.Fail(s"Partition: invalid creation parms: $x != 1: $shares").asLeft
+      def isUnitary    = one == shares.map(_._2).fold(zero)(plus(_, _))
+      def isReasonable = shares forall { case (_, q) => zero <= q && q <= one }
+      if (isUnitary && isReasonable) (Partition unsafe SortedMap(shares: _*)).asRight
+      else io.deftrade.Fail(s"Partition: invalid creation parms: $shares").asLeft
     }
 
-    def apply[K: Order](totalShares: Long)(ps: (K, Long)*): Result[Partition[K]] = {
-      val computedShares = ps.map(_._2).foldLeft(zero)((b, a) => plus(fromLong(a), b))
-      if (computedShares != totalShares) io.deftrade.Fail(s"$computedShares != $totalShares").asLeft
-      else {
-        val shares = ps.toList.toMap map {
+    def fromShares[K: Order](totalShares: Long)(ps: (K, Long)*): Result[Partition[K]] = {
+      val computedShares = ps.map(_._2).sum
+      if (computedShares =!= totalShares) {
+        io.deftrade.Fail(s"$computedShares != $totalShares").asLeft
+      } else {
+        val shares = ps map {
           case (k, l) => (k, div(fromLong(l), fromLong(totalShares)))
         }
-        Partition(shares).asRight
+        Partition(shares: _*)
+      }
+    }
+
+    def proRata[K: Order](shares: (K, Long)*): Partition[K] =
+      fromShares(shares.map(_._2).sum)(shares: _*).right.get
+
+    def pariPassu[K: Order](ks: NonEmptySet[K]): Partition[K] = {
+      val oneSlice = div(one, fromLong(ks.size))
+      val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
+      Partition unsafe slices
+    }
+
+    def single[K: Order](k: K): Partition[K] = ???
+
+    object Single {
+
+      def unapply[K: Order](p: Partition[K]): Option[K] = p.kvs.toList match {
+        case (k: K, Quantity.One) :: Nil => Some(k)
+        case _                           => None
       }
     }
 
     /**
-      * The portion of the total accorded to the identified `Entity`.
+      * Ensure the portion of the total accorded to the identified `Entity` is reasonable.
       */
-    def validate(q: Quantity): Boolean          = zero <= q && q <= one
-    def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
-    // def apply[K](shares: Share[K]*): Either[String, Partition[K]] = {
-    //   val p = accumulate(shares.toList)
-    //   p.values.toList foldMap identity match {
-    //     case sum if sum === QF.one => p.asRight
-    //     case badsum                => s"Partition doesn't add up: $badsum != 1.0".asLeft
-    //   }
-    // }
-    // def single[K: Hash](k: K): Partition[K] = Map.empty + Share.single[K](k)
+    private def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
 
-    def proRata[K: Order](capTable: Map[K, Quantity]): Partition[K] = {
-      val totalShares = (capTable map { case (_, shares) => shares }).toList |> QF.sum
-      Partition apply (capTable map { case (k, mySlice) => (k, div(mySlice, totalShares)) })
-    }
-
-    def pariPassu[K: Hash](ks: Set[K]): Partition[K] = {
-      val n = ks.size
-      Partition apply (ks.toList zip List.fill(n)(div(one, fromInt(n)))).toMap
-    }
-
-    object Single {
-
-      def unapply[K](p: Partition[K]): Option[K] = p.kvs.toList match {
-        case (k, Quantity.One) :: Nil => k.some
-        case _                        => none
-      }
-    }
   }
-
-  type NonEmptySet[A] = Set[A] Refined refined.collection.NonEmpty
 
   /**
     * Who does what. Or should. And shouldn't.
@@ -191,7 +253,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
   ) {
     val roles: Map[Role, NonEmptySet[Entity.Id]] =
-      Map.empty + (Role.Principle -> NonEmptySet(principles.keySet)) ++
+      Map.empty + (Role.Principle -> principles.keys) ++
         Role.nonPrinciples map { _ -> nps }
   }
 
@@ -258,4 +320,41 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type FolioAuth             = (Folio.Id, AccountAuth)
   type FolioAuths            = (FolioAuth, FolioAuth)
   type AuthorizedTransaction = (Transaction, FolioAuths)
+}
+
+object refinements {
+
+  import refined.api.Validate
+
+  final case class SSN private ()
+  object SSN {
+
+    implicit def ssnValidate: Validate.Plain[String, SSN] =
+      Validate.fromPredicate(predicate, t => s"$t is mos def NOT a valid SSN", SSN())
+
+    private val regex = "^(\\d{3})-(\\d{2})-(\\d{4})$".r.pattern
+    private val predicate: String => Boolean = s => {
+      val matcher = regex matcher s
+      matcher.find() && matcher.matches() && {
+        import matcher.group
+        val an      = group(1).toInt
+        val gn      = group(2).toInt
+        val sn      = group(3).toInt
+        def checkAn = 0 < an && an != 666 /* sic */ && an < 900
+        checkAn && 0 < gn && 0 < sn
+      }
+    }
+  }
+
+  type EIN = EIN.MRx
+  object EIN {
+    type Pattern = W.`"[0-9]{2}-[0-9]{7}"`.T
+    type MRx     = MatchesRegex[Pattern]
+  }
+
+  type AIN = AIN.MRx
+  object AIN {
+    type Pattern = W.`"666-[A-F]{2}-[0-9]{6}"`.T
+    type MRx     = MatchesRegex[Pattern]
+  }
 }
