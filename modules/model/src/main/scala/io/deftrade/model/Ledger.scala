@@ -56,9 +56,7 @@ abstract class Ledger[Q: Financial] { self =>
 
   /** Domain specific tools for dealing with `Quantity`s */
   type Quantity = Q
-  val Quantity          = Financial[Quantity]
-  implicit lazy val QF  = Quantity.fractional
-  implicit lazy val QCG = Quantity.commutativeGroup
+  val Quantity = Financial[Quantity]
 
   /** Working repository of `Instrument`s, for the working Trader. */
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]

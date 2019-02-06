@@ -8,7 +8,7 @@ class MoneySpec extends FlatSpec {
   import cats.syntax.show._
   import cats.syntax.order.{ catsSyntaxOrder, catsSyntaxPartialOrder }
 
-  import Currency._
+  import Currency.{ EUR, USD }
 
   "Money" should "be created elastically" in {
 
@@ -17,8 +17,6 @@ class MoneySpec extends FlatSpec {
     val eur20 = 20.0 |> eurF
     val e20   = EUR(20.00)
 
-    val F = Financial[Double]
-    import F._
     cats.kernel.Order[Money[Double, USD]]
 
     assert(eur20 === e20)
@@ -47,6 +45,8 @@ class MoneySpec extends FlatSpec {
 
     assert(buck.show === "USD  1.00 ")
     assert((-buck).show === "USD (1.00)")
+
+    import pricing._
 
     implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn.Spread(1.23, 1.22)
 

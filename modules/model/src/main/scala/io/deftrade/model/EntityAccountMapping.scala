@@ -22,6 +22,8 @@ import refined.numeric._
 
 import io.circe.Json
 
+import spire.math.Fractional
+
 import scala.collection.immutable.{ SortedMap, SortedSet }
 
 /**
@@ -109,7 +111,7 @@ sealed trait NonPrinciple extends Role
 /**
   * Enumerated `Role`s.
   */
-object Role extends Enum[Role] {
+object Role extends Enum[Role] with CatsEnum[Role] {
 
   /**
     * The `Entity` which is the economic actor responsible for establishing the `Account`.
@@ -170,10 +172,12 @@ object Role extends Enum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 
+  /** this is just a hack to use `SortedSet`s etc */
+  implicit def orderRoles: Order[Role] = Order by (_.entryName)
+
   lazy val nonPrinciples: NonEmptySet[NonPrinciple] =
     (NonEmptySet fromSet (SortedSet.empty[Role] ++ values - Principle)).asInstanceOf[NonEmptySet[NonPrinciple]]
 
-  implicit lazy val eq = Eq.fromUniversalEquals[Role]
 }
 
 object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Id, Entity]
@@ -185,82 +189,23 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type Entities = Entities.Table
 
   /**
-    * Note that Roster encodes the notion of a `CapitalKey` _per `Role`_!
-    * The meaning of this `Partition` will depend upon the `Role`.
-    * For the beneficial owner(s) of the assets in question the meaning is obvious.
-    * For a `Manager`, the `Partition` could encode their voting rights – which may differ from
-    * their ownership rights.
-    */
-  final case class Partition[K] private (val kvs: NonEmptyMap[K, Quantity]) {
-    def keys: NonEmptySet[K] = kvs.keys
-  }
-  object Partition {
-
-    import QF._
-    private def unsafe[K: Order](kvs: SortedMap[K, Quantity]): Partition[K] =
-      new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
-
-    def apply[K: Order](shares: (K, Quantity)*): Result[Partition[K]] = {
-      def isUnitary    = one == shares.map(_._2).fold(zero)(plus(_, _))
-      def isReasonable = shares forall { case (_, q) => zero <= q && q <= one }
-      if (isUnitary && isReasonable) (Partition unsafe SortedMap(shares: _*)).asRight
-      else io.deftrade.Fail(s"Partition: invalid creation parms: $shares").asLeft
-    }
-
-    def fromShares[K: Order](totalShares: Long)(ps: (K, Long)*): Result[Partition[K]] = {
-      val computedShares = ps.map(_._2).sum
-      if (computedShares =!= totalShares) {
-        io.deftrade.Fail(s"$computedShares != $totalShares").asLeft
-      } else {
-        val shares = ps map {
-          case (k, l) => (k, div(fromLong(l), fromLong(totalShares)))
-        }
-        Partition(shares: _*)
-      }
-    }
-
-    def proRata[K: Order](shares: (K, Long)*): Partition[K] =
-      fromShares(shares.map(_._2).sum)(shares: _*).right.get
-
-    def pariPassu[K: Order](ks: NonEmptySet[K]): Partition[K] = {
-      val oneSlice = div(one, fromLong(ks.size))
-      val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
-      Partition unsafe slices
-    }
-
-    def single[K: Order](k: K): Partition[K] = ???
-
-    object Single {
-
-      def unapply[K: Order](p: Partition[K]): Option[K] = p.kvs.toList match {
-        case (k: K, Quantity.One) :: Nil => Some(k)
-        case _                           => None
-      }
-    }
-
-    /**
-      * Ensure the portion of the total accorded to the identified `Entity` is reasonable.
-      */
-    private def validate(total: Long)(n: Long): Boolean = 0L <= n && n <= total
-
-  }
-
-  /**
     * Who does what. Or should. And shouldn't.
     */
   final case class Roster private (
-      principles: Partition[Entity.Id],
+      principles: Partition[Entity.Id, Quantity],
       nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
   ) {
-    val roles: Map[Role, NonEmptySet[Entity.Id]] =
-      Map.empty + (Role.Principle -> principles.keys) ++
-        Role.nonPrinciples map { _ -> nps }
+    val roles: NonEmptyMap[Role, NonEmptySet[Entity.Id]] =
+      NonEmptyMap(
+        Role.Principle -> principles.keys,
+        Role.nonPrinciples.map((role: Role) => (role -> nonPrinciples(role))): _*
+      )
   }
 
   object Roster {
     def single(eid: Entity.Id): Roster =
       Roster(
-        principles = Partition(eid, Quantity.one),
+        principles = Partition(eid, V.one),
         nonPrinciples = _ => NonEmptySet(eid)
       )
   }

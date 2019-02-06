@@ -5,7 +5,7 @@ import spire.math.Integral
 import eu.timepit.refined.api.Refined
 
 /**
- And by `opaque` we mean opaque.
+  * And by `opaque` we mean opaque.
   */
 object opaqueid {
 

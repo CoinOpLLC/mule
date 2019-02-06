@@ -18,7 +18,7 @@ package io
 
 import cats.data.{ NonEmptyChain, Validated }
 
-package object deftrade extends deftrade.Api {
+package object deftrade {
 
   implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
