@@ -17,32 +17,20 @@
 package io.deftrade
 package model
 
+import kves._
 import time._
-import time.implicits._
-
-import money._
+import money._, pricing._
+import repos._
 import Currency.USD
 
-import kves._
-import OpaqueId.Fresh
-
-import repos._
-
-import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
-import cats.kernel.CommutativeGroup
-import cats.data.{ EitherT, Kleisli }
+import cats.{ Eq, Foldable, Monad, MonoidK }
+import cats.data.{ Kleisli, NonEmptySet }
 import cats.implicits._
-import feralcats.instances._
 
 import eu.timepit.refined
-import refined.{ cats => refinedCats, _ }
-import refined.api.Refined
-import refined.numeric._
-import refined.string._
 import refined.auto._
 
-import io.circe.Json
-
+import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
 
 // final case class Fail(val msg: String)
@@ -63,9 +51,6 @@ import scala.language.higherKinds
   * to trade blind with respect to account sums - these calcs are intrinsic to margin (I think)
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
-
-  import Quantity.{ fractional => QF, commutativeGroup => QCG }
-  import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
   /** `Leg` := `Position` in motion */
   type Leg = Position
@@ -105,7 +90,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   final case class OMS[F[_]: Monad: MonoidK: Foldable] private (
       eid: Entity.Id,
       contra: Account.Id,
-      markets: Set[Market]
+      markets: NonEmptySet[Market]
   ) {
 
     import OMS.{ Allocation, Execution, Order }
@@ -113,42 +98,63 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /** He stacc. He refacc. */
     type FK[T, R] = Kleisli[F, T, Either[Fail, R]]
 
-    final def process[C, A](p: Account.Id, a: Allocation)(
+    final def process[C: Currency, A](p: Account.Id, a: Allocation)(
         block: => A
-    ): FK[A, Execution] = riskCheck[C, A](block) andThen trade[C] andThen allocate[C](p, a)
+    ): FK[A, Execution] = {
+      val risk: FK[A, Order[C]]           = riskCheck(block)
+      val tr: FK[Order[C], Execution]     = trade
+      val alloc: FK[Execution, Execution] = allocate(p, a)
+      // FIXME this used to work
+      // and by work I mean compile ;)
+      // risk andThen tr andThen alloc
+      ???
+    }
 
-    def riskCheck[C, A](a: A): FK[A, Order[C]] =
+    def riskCheck[C: Currency, A](a: A): FK[A, Order[C]] =
       ???
 
-    def trade[C]: FK[Order[C], Execution] =
-      ???
+    def trade[C]: FK[Order[C], Execution] = ???
 
-    private final def allocate[C](
+    private final def allocate[C: Currency](
         p: Account.Id,
         a: Allocation
     ): FK[Execution, Execution] = // UM... this is recursive, given account structure. Fine!
       ???
   }
 
+  // TODO: revisit, systematize
+  implicit def omsEq[F[_]: Monad] = Eq.fromUniversalEquals[OMS[F]]
+
   /**
     * Where do Order Management Systems come from? (Here.)
     */
-  object OMS {
+  object OMS extends IdC[Long, OMS[cats.Id]] {
 
-    implicit def omsEq[F[_]: Monad] = Eq.fromUniversalEquals[OMS[F]]
-
-    type Allocation = Partition[Account.Id]
+    type Allocation = Partition[Account.Id, Quantity]
 
     /**
       * TODO: augment/evolve creation pattern.
       */
-    def apply(eid: Entity.Id, ms: Market*): OMS = OMS(eid, newContraAccount, ms.toSet)
-    private def newContraAccount: Account.Id    = ???
+    def apply[F[_]: Monad: MonoidK: Foldable](eid: Entity.Id, market: Market, ms: Market*): OMS[F] =
+      OMS[F](eid, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
+
+    private def newContraAccount: Account.Id = ???
 
     /**
       * Minimum viable `Order` type. What the client would _like_ to have happen.
       */
-    type Order[C] = (Market, AccountAuth, LocalDateTime, Trade, Option[Money[MA, C]])
+    final case class Order[C: Currency](
+        market: Market,
+        auth: AccountAuth,
+        ts: Instant,
+        trade: Trade,
+        limit: Option[Money[MA, C]]
+    ) {
+      def currency = Currency[C]
+    }
+    implicit def orderEq[C: Currency] = Eq.fromUniversalEquals[Order[C]]
+
+    /** */
     object Order extends IdC[Long, Order[USD]] {
 
       /** `Market` orders */
@@ -178,7 +184,11 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /**
       * What actually happened.
       */
-    type Execution = (LocalDateTime, OMS, Order.Id, Transaction)
+    final case class Execution(ts: Instant, oms: OMS.Id, oid: Order.Id, tx: Transaction)
+
+    /** Executions are sorted first by Order.Id, and then by timestamp – that should do it! ;) */
+    implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.oid) // FIXME add ts
+    // FIXME here's your problem right here cats.Order[Instant] |> discardValue
     object Execution extends IdC[Long, Execution]
 
     type Executions = Executions.Table
@@ -193,7 +203,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed abstract class Market { def eid: Entity.Id }
+  sealed trait Market { def eid: Entity.Id }
+  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.eid)
   object Market extends IdC[Long, Market] {
 
     def quote[F[_]: Monad, C: Currency](
@@ -257,24 +268,4 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       fs: Folios,
       accounts: Accounts
   ): OMS.Execution => F[Folios] = ???
-  //   {
-  //   case (oid, _, trade, _, _) =>
-  //     (Orders get oid) match {
-  //       case Some((aid, _, _, _, _, _)) =>
-  //         accounts(aid) match {
-  //           case Account(roster, vault) =>
-  //             // TODO: check roster permissions
-  //             roster |> discardValue
-  //             vault match {
-  //               case Vault.Folio(folioId) =>
-  //                 Monad[IO] pure { fs.updated(folioId, (fs get folioId).fold(Folio.empty)(_ |+| trade)) }
-  //               case Vault.SubAccounts(subs) =>
-  //                 subs |> discardValue
-  //                 ??? // wut
-  //             }
-  //         }
-  //       case _ => error
-  //     }
-  // }
-
 }

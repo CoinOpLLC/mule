@@ -5,7 +5,7 @@ import spire.math.Integral
 import eu.timepit.refined.api.Refined
 
 /**
-  * Key Value Entity Schema:
+  * kvse: Key Value Entity Schema:
   * - keys: opaque identifiers with `Order`, `Eq`, `Hash` and `Show` (uses `refined`).
   * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
   * - entities: ("aggregate roots") `Map`s of Key -> Value entries: repos, logs...

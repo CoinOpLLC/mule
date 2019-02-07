@@ -148,21 +148,21 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   case object Manager extends NonPrinciple
 
   /**
-    * `Regulator`s are first class entities, each with a package of rights and responsibilities
+    * `Auditor`s are first class entities, each with a package of rights and responsibilities
     * which is situation and juristiction specific.
     *
-    * Practically, what this means is that `Regulator`s will have a (possibly limited) view
+    * Practically, what this means is that `Auditor`s will have a (possibly limited) view
     * into the state of the `Ledger`,
     * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
     * or even intitiate `Transaction`s.
     *
-    * Actions of the `Regulator` may include the publishing of specific summaries of its views
+    * Actions of the `Auditor` may include the publishing of specific summaries of its views
     * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
     *
-    * N.B.: the `Regulator` need not be a governmental entity; in particular this role might
+    * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
     * be suited to a risk manager function.
     */
-  case object Regulator extends NonPrinciple
+  case object Auditor extends NonPrinciple
 
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
@@ -170,9 +170,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   /** this is just a hack to use `SortedSet`s etc */
   implicit def orderRoles: Order[Role] = Order by (_.entryName)
 
-  lazy val nonPrinciples: NonEmptySet[NonPrinciple] =
-    (NonEmptySet fromSet (SortedSet.empty[Role] ++ values - Principle)).asInstanceOf[NonEmptySet[NonPrinciple]]
-
+  lazy val nonPrinciples: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
 object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Id, Entity]
@@ -192,17 +190,17 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   ) {
     import Cats._ // FIXME: DOESN'T HAVE ORDER! AND SHOULDN'T!
     val roles: NonEmptyMap[Role, NonEmptySet[Entity.Id]] =
-      NonEmptyMap(
+      NonEmptyMap of (
         Role.Principle -> principles.keys,
-        Role.nonPrinciples.map((role: Role) => (role -> nonPrinciples(role))): _*
-      )
+        Role.nonPrinciples.map(np => (np, nonPrinciples(np))): _*
+    )
   }
 
   object Roster {
     def single(eid: Entity.Id): Roster =
       Roster(
         principles = Partition single eid,
-        nonPrinciples = _ => NonEmptySet(eid)
+        nonPrinciples = _ => NonEmptySet one eid
       )
   }
 
@@ -236,8 +234,9 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     type Id = Long Refined ValidRange
     object Id {
       implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
-      implicit lazy val fresh: Fresh[Id] =
-        Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
+      implicit lazy val fresh: Fresh[Id]          = ???
+      // FIXME need to revisit fresh anyway
+      // Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
     def empty(eid: Entity.Id) = Account(Roster single eid, Vault.empty)
