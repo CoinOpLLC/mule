@@ -5,16 +5,19 @@ import spire.math.Integral
 import eu.timepit.refined.api.Refined
 
 /**
-  * And by `opaque` we mean opaque.
+  * Key Value Entity Schema:
+  * - keys: opaque identifiers with `Order`, `Eq`, `Hash` and `Show` (uses `refined`).
+  * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
+  * - entities: ("aggregate roots") `Map`s of Key -> Value entries: repos, logs...
   */
-package object opaqueid {
+package object kves {
 
   type OpaqueId[K, P] = Refined[K, P]
 
   implicit def orderId[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.value)
 }
 
-package opaqueid {
+package kves {
 
   object OpaqueId {
 
@@ -22,6 +25,7 @@ package opaqueid {
 
     def apply[K: Order, P: Eq](id: K): OpaqueId[K, P] = Refined unsafeApply id
 
+    // TODO: consider threading F[_] thru Fresh
     final case class Fresh[I](val init: I, val next: I => I)
     object Fresh {
       def apply[ID: Fresh] = implicitly[Fresh[ID]]

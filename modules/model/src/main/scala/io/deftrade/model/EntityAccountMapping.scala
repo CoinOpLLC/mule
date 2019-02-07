@@ -4,7 +4,7 @@ package model
 import money._
 import time.{ LocalDate }
 
-import opaqueid._
+import kves._
 import OpaqueId.Fresh
 
 import repos._

@@ -4,7 +4,7 @@ package repos
 import io.deftrade.time._
 import io.deftrade.time.implicits._
 
-import io.deftrade.opaqueid._
+import io.deftrade.kves._
 
 import cats._
 import cats.implicits._

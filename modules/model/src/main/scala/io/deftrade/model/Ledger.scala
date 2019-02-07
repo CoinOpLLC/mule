@@ -4,7 +4,7 @@ package model
 import time._
 import money._
 
-import opaqueid._
+import kves._
 
 import repos._
 

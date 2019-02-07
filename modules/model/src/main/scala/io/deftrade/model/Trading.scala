@@ -23,7 +23,7 @@ import time.implicits._
 import money._
 import Currency.USD
 
-import opaqueid._
+import kves._
 import OpaqueId.Fresh
 
 import repos._
