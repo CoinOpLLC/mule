@@ -1,31 +1,17 @@
 package io.deftrade
 package model
 
-import time._
-import time.implicits._
-
 import money._
-import Currency.USD
 
-import opaqueid._
-import OpaqueId.Fresh
+import enums.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 
-import repos._
-
-import cats.{ Eq, Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
+import cats.{ Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
 import cats.kernel.CommutativeGroup
-import cats.data.Kleisli
 import cats.implicits._
 import feralcats.instances._
 
 import eu.timepit.refined
-import refined.{ cats => refinedCats, _ }
-import refined.api.Refined
-import refined.numeric._
-import refined.string._
 import refined.auto._
-
-import io.circe.Json
 
 import scala.language.higherKinds
 
@@ -187,7 +173,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  def trialBalance[F[_]: Foldable: Monad: MonoidK](jes: Journal[F, Journal.Entry]): TrialBalance =
+  def trialBalance[F[_]: Foldable: Monad: MonoidK](ts: Transactions[F]): TrialBalance =
     ???
 
   def breakdown(

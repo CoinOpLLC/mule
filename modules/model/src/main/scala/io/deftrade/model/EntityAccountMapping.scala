@@ -2,7 +2,7 @@ package io.deftrade
 package model
 
 import money._
-import time._
+import time.{ LocalDate }
 
 import opaqueid._
 import OpaqueId.Fresh
@@ -22,8 +22,6 @@ import refined.numeric._
 
 import io.circe.Json
 
-import spire.math.Fractional
-
 import scala.collection.immutable.{ SortedMap, SortedSet }
 
 /**
@@ -39,12 +37,6 @@ sealed trait Entity extends Product with Serializable {
 /** `Entity`s recognized by the system. */
 object Entity extends IdPC[Long, Entity] {
 
-  import refined.W
-  import refined.boolean.{ And, Or }
-  import refined.collection.{ MaxSize, NonEmpty }
-  import refined.string.{ MatchesRegex, Trimmed }
-  import refined.auto._
-
   /**
     * RDB friendly `String`s that are born usable as is.
     * Defaults to Postgres, which is the shorter limit (126)
@@ -52,10 +44,10 @@ object Entity extends IdPC[Long, Entity] {
   type VarChar = VarChar126
 
   /** Postgres optimizes strings less than this. */
-  type VarChar126 = String Refined NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
+  type VarChar126 = String Refined refinements.VarChar126
 
   /** Typical SQL */
-  type VarChar255 = String Refined NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
+  type VarChar255 = String Refined refinements.VarChar255
 
   /**
     * Post Randomization SSN validation. I.e., cursory only.
@@ -68,10 +60,13 @@ object Entity extends IdPC[Long, Entity] {
   type EIN = String Refined refinements.EIN
 
   /** TODO fill in the placeholder... also: what else? */
-  // type AIN = String // Refined refinements.AIN
+  type AIN = String Refined refinements.AIN
 
-  // type DTID = String Refined Or[refinements.SSN, Or[refinements.EIN, refinements.AIN]]
-  type DTID = String Refined Or[refinements.SSN, refinements.EIN]
+  import refined.boolean.Or
+  lazy val rf = refinements
+  type DTID = String Refined Or[rf.SSN, rf.EIN] // adding another Or kills auto derivation
+
+  import refined.auto._
 
   /** `People` are people. Also, `People` are `Entity`s.  */
   final case class Person(name: VarChar, ssn: SSN, dob: LocalDate, meta: Json) extends Entity {
@@ -195,6 +190,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       principles: Partition[Entity.Id, Quantity],
       nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
   ) {
+    import Cats._ // FIXME: DOESN'T HAVE ORDER! AND SHOULDN'T!
     val roles: NonEmptyMap[Role, NonEmptySet[Entity.Id]] =
       NonEmptyMap(
         Role.Principle -> principles.keys,
@@ -205,7 +201,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   object Roster {
     def single(eid: Entity.Id): Roster =
       Roster(
-        principles = Partition(eid, V.one),
+        principles = Partition single eid,
         nonPrinciples = _ => NonEmptySet(eid)
       )
   }
@@ -236,12 +232,12 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     */
   case class Account(roster: Roster, vault: Vault)
   object Account {
-    type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
-    type Id         = Long Refined ValidRange
+    import refinements.ValidRange
+    type Id = Long Refined ValidRange
     object Id {
       implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Id] =
-        Fresh(100000100100L, id => refineV[ValidRange](id + 1L).fold(_ => ???, identity))
+        Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
     def empty(eid: Entity.Id) = Account(Roster single eid, Vault.empty)
@@ -269,7 +265,14 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
 object refinements {
 
+  import refined.W
+  import refined.boolean.{ And }
+  import refined.collection.{ MaxSize, NonEmpty }
+  import refined.string.{ MatchesRegex, Trimmed }
+
   import refined.api.Validate
+
+  type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
 
   final case class SSN private ()
   object SSN {
@@ -302,4 +305,7 @@ object refinements {
     type Pattern = W.`"666-[A-F]{2}-[0-9]{6}"`.T
     type MRx     = MatchesRegex[Pattern]
   }
+
+  type VarChar126 = NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
+  type VarChar255 = NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
 }

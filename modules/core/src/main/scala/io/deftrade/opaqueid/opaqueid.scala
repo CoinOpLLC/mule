@@ -7,9 +7,14 @@ import eu.timepit.refined.api.Refined
 /**
   * And by `opaque` we mean opaque.
   */
-object opaqueid {
+package object opaqueid {
 
-  final type OpaqueId[K, P] = Refined[K, P]
+  type OpaqueId[K, P] = Refined[K, P]
+
+  implicit def orderId[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.value)
+}
+
+package opaqueid {
 
   object OpaqueId {
 
@@ -40,8 +45,6 @@ object opaqueid {
     object Id extends OpaqueIdC[K, P]
     implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
   }
-
-  implicit def orderId[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.value)
 
   object LongId {
     import cats.instances.long._

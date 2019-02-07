@@ -18,8 +18,31 @@ package io
 
 import cats.data.{ NonEmptyChain, Validated }
 
+/** House rules. */
 package object deftrade {
 
+  /**
+    * `Result` types
+    */
+  type Result[T]     = Either[Fail, T]
+  type ResultV[T]    = Validated[Fail, T]
+  type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
+
+  /**
+    * Informs wart remover that the value is intentionally discarded.
+    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
+    */
+  val discardValue: Any => Unit = (_: Any) => ()
+
+  /**
+    * Bind a message to an assertion function.
+    * Handy for development. If you write trading algos, this is basically "forever".
+    */
+  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+
+  /**
+    * I hear nice things about OCaml. So I stole something from it.
+    */
   implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)
   }
@@ -33,12 +56,7 @@ package object deftrade {
   type Seq[+A] = scala.collection.immutable.Seq[A]
   val Seq = scala.collection.immutable.Seq
 
+  /** IndexedSeq is also made immutable */
   type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
   val IndexedSeq = scala.collection.immutable.IndexedSeq
-
-  /** `Result` types */
-  type Result[T]     = Either[Fail, T]
-  type ResultV[T]    = Validated[Fail, T]
-  type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
-
 }

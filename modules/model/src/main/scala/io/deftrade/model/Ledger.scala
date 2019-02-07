@@ -119,26 +119,30 @@ abstract class Ledger[Q: Financial] { self =>
       metaSha: Sha256
   )
   object Transaction {
+
+    /** fold over me */
+    final case class Entry(ax: Transaction, meta: Json)
+
+    object Entry {
+      def empty[F[_]: Monad: MonoidK: Foldable]: F[Entry] = MonoidK[F].empty[Entry]
+    }
+
     implicit def order: Eq[Transaction] = Eq.fromUniversalEquals[Transaction]
   }
 
   /** Support for multiple contingent deal legs */
   final case class AllOrNone(xs: List[Transaction])
 
+  // FIXME this is a hack placeholder
+  type Transactions[F[_]] = Foldable[F]
+
   /**
     */
-  object Transactions {
-
-    /** fold over me */
-    final case class Entry(
-        ax: AuthorizedTransaction,
-        meta: Json
-    )
+  object Transactions { // FIME this becomes a stream like repo (???)
 
     /**
-      * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
-      */
-    def empty[F[_]: Monad: MonoidK: Foldable]: F[Entry] = MonoidK[F].empty[Entry]
+    * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
+    */
   }
 
   def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =

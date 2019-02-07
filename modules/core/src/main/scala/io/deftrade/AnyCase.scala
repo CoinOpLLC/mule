@@ -2,13 +2,6 @@ package io.deftrade
 
 trait AnyCase {
 
-  /**
-    * Informs wart remover that the value is intentionally discarded.
-    */
-  val discardValue: Any => Unit = (_: Any) => ()
-
-  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
-
   def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)
 
   def camelToSnake(name: String): String  = CamelTo(name)("_")
