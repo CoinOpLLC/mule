@@ -142,9 +142,10 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
     /**
       * Minimum viable `Order` type. What the client would _like_ to have happen.
+      * TODO: revisit parent/child orders
       */
     final case class Order[C: Currency](
-        market: Market,
+        market: Market.Id,
         auth: AccountAuth,
         ts: Instant,
         trade: Trade,

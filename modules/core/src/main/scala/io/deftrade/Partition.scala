@@ -4,21 +4,34 @@ import cats._
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
-// import refined.{ cats => refinedCats, _ }
 import spire.math.Fractional
 
 import scala.collection.immutable.{ SortedMap }
 
+// TODO use refined to restrict V to be between 0 and 1
 /** Guaranteed untitary and reasonable proportioning among several unique keys. */
 final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal {
   def keys: NonEmptySet[K] = kvs.keys
+
+  def proRata[N](n: N)(implicit V: Fractional[V], N: Fractional[N]): NonEmptyMap[K, N] = ???
+
 }
 
+/**
+  * we will explain with the pizza metaphore
+  * TODO: see if
+  * type Pos[N] = N Refined Positive
+  * is a help... maybe to return, not to accept (Postel's rule again)
+  */
 object Partition {
 
-  private def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): Partition[K, V] =
-    new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
+  import eu.timepit.refined
+  import refined.api.Refined
+  import refined.numeric.Positive
+  import refined.auto._
+  type PositiveLong = Long // Refined Positive // FIXME do this
 
+  /** `exact` slices is what you say; we'll be the judge of that ;) */
   def exact[K: Order, V: Fractional](shares: (K, V)*): Result[Partition[K, V]] = {
     val V = Fractional[V]
     import V._
@@ -28,7 +41,8 @@ object Partition {
     if (isUnitary && isReasonable) unsafe(SortedMap(shares: _*)).asRight else Fail(failmsg).asLeft
   }
 
-  def fromShares[K: Order, V: Fractional](n: Long)(ps: (K, Long)*): Result[Partition[K, V]] = {
+  /** `n` shares issued; sum of slices must equal whole pie */
+  def fromTotalShares[K: Order, V: Fractional](n: Long)(ps: (K, Long)*): Result[Partition[K, V]] = {
     val V = Fractional[V]
     import V._
     val computedShares = ps.map(_._2).sum
@@ -42,10 +56,12 @@ object Partition {
     }
   }
 
-  def proRata[K: Order, V: Fractional](shares: (K, Long)*): Result[Partition[K, V]] =
-    fromShares(shares.map(_._2).sum)(shares: _*)
+  /** total shares outstanding computed from the sum of `shares` */
+  def fromShares[K: Order, V: Fractional](shares: (K, Long)*): Result[Partition[K, V]] =
+    fromTotalShares(shares.map(_._2).sum)(shares: _*)
 
-  def pariPassu[K: Order, V: Fractional](ks: NonEmptySet[K]): Partition[K, V] = {
+  /** what every pizza slicer aims for */
+  def fair[K: Order, V: Fractional](ks: NonEmptySet[K]): Partition[K, V] = {
     val V = Fractional[V]
     import V._
     val oneSlice = div(one, fromLong(ks.size))
@@ -53,6 +69,7 @@ object Partition {
     unsafe(slices)
   }
 
+  /** whole pie for me */
   def single[K: Order, V: Fractional](k: K): Partition[K, V] =
     unsafe(SortedMap(k -> Fractional[V].one))
 
@@ -67,4 +84,7 @@ object Partition {
       }
     }
   }
+  private def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): Partition[K, V] =
+    new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
+
 }

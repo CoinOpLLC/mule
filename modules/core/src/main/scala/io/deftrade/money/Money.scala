@@ -2,36 +2,29 @@ package io.deftrade
 package money
 
 import eu.timepit.refined
-import refined.api.Refined
-
-import spire.math.{ Fractional, Integral }
-
-import enumeratum._
 
 import cats.kernel.{ CommutativeGroup, Order }
 import cats.{ Invariant, Show }
-
-import BigDecimal.RoundingMode._
+import cats.syntax.option._
 
 /**
   * `Money` is a scala value class, with a phantom currency type.
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
+  import spire.implicits._
 
-  type MNY = Money[N, C]
+  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] =
+    new Money(amount + rhs.amount)
 
-  def +(rhs: MNY)(implicit N: Financial[N]) =
-    new Money[N, C](N.fractional plus (amount, rhs.amount))
+  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] =
+    new Money(amount - rhs.amount)
 
-  def -(rhs: MNY)(implicit N: Financial[N]) =
-    new Money[N, C](N.fractional minus (amount, rhs.amount))
+  def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Money[N, C] =
+    new Money(S.to[N](scale) * amount)
 
-  def *[S](scale: S)(implicit N: Financial[N], S: Financial[S], C: Currency[C]) =
-    Money[N, C](N.fractional times (S to [N] scale, amount))
+  def /(rhs: Money[N, C])(implicit N: Financial[N]): N = lhs.amount / rhs.amount
 
-  def /(rhs: MNY)(implicit N: Financial[N]): N = N.fractional div (lhs.amount, rhs.amount)
-
-  def unary_-(implicit N: Financial[N], C: Currency[C]): MNY = Money(N.fractional negate amount)
+  def unary_-(implicit N: Financial[N]): Money[N, C] = new Money(-amount)
 
   override def toString: String = amount.toString
 }
@@ -41,13 +34,18 @@ final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
   */
 object Money {
 
-  def apply[N: Financial, C: Currency](amount: N) = new Money[N, C](Financial[N].round[C](amount))
+  def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
+    new Money(Financial[N].round[C](amount))
 
-  implicit def orderMoney[N: Financial, C: Currency]: Order[Money[N, C]] =
+  def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
+
+  implicit def catsOrderMoney[N: Financial, C: Currency]: Order[Money[N, C]] =
     Order by (_.amount)
 
-  // toString is limited due to value class implementation
-  // But we can implement Show[Money[N, C]] for all the N and C we care about.
+  /**
+    * `toString` is limited due to value class implementation
+    * But we can implement Show[Money[N, C]] for all the N and C we care about.
+    */
   implicit def showMoney[N: Financial, C: Currency]: Show[Money[N, C]] =
     Show show (Format apply _)
 

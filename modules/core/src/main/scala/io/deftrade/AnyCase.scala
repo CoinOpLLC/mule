@@ -1,5 +1,7 @@
 package io.deftrade
 
+object AnyCase extends AnyCase
+
 trait AnyCase {
 
   def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)
@@ -52,5 +54,3 @@ trait AnyCase {
     }
   }
 }
-
-object AnyCase extends AnyCase
