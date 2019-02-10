@@ -5,7 +5,7 @@ import money._
 import time.{ LocalDate }
 
 import kves._
-import OpaqueId.Fresh
+import OpaqueKey.Fresh
 
 import repos._
 

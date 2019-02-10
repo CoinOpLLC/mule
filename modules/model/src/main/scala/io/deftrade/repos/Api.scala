@@ -31,7 +31,7 @@ object Fail {
   */
 trait Api {
 
-  import OpaqueId.Fresh
+  import OpaqueKey.Fresh
 
   abstract class RepoImplicits[IO[_]: Monad, K: cats.Order, V: Eq] {
 

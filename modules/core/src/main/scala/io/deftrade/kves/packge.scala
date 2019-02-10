@@ -1,8 +1,12 @@
 package io.deftrade
 
-import cats.{ Eq, Order }
-import spire.math.Integral
+import cats.{ Eq, Order, Show }
+import cats.implicits._
+
 import eu.timepit.refined.api.Refined
+
+import spire.math.Integral
+import spire.implicits._
 
 /**
   * kvse: Key Value Entity Schema:
@@ -12,52 +16,59 @@ import eu.timepit.refined.api.Refined
   */
 package object kves {
 
-  type OpaqueId[K, P] = Refined[K, P]
+  type OpaqueKey[K, P] = Refined[K, P]
 
-  implicit def orderId[K: Order, P]: Order[OpaqueId[K, P]] = Order by (_.value)
+  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
+  implicit def orderOpaqueKey[K: Order, P]: Order[OpaqueKey[K, P]] =
+    Order by (_.value)
+
+  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
+  implicit def showOpaqueKey[K: Show: Order, P]: Show[OpaqueKey[K, P]] =
+    Show show (key => s"key:${key.value.show}")
 }
 
 package kves {
 
-  object OpaqueId {
+  object OpaqueKey {
 
-    import spire.implicits._
+    def apply[K: Order, P: Eq](id: K): OpaqueKey[K, P] = Refined unsafeApply id
 
-    def apply[K: Order, P: Eq](id: K): OpaqueId[K, P] = Refined unsafeApply id
+    /**
+      * Make a fresh *globally unique* key, suitable to be persisted.
+      * TODO: consider threading F[_] thru Fresh. (See above.)
+      */
+    final case class Fresh[I](init: I, next: I => I)
 
-    // TODO: consider threading F[_] thru Fresh
-    final case class Fresh[I](val init: I, val next: I => I)
+    /** fresh `Fresh` */
     object Fresh {
-      def apply[ID: Fresh] = implicitly[Fresh[ID]]
-    }
 
-    implicit def freshOpaqueId[K, P](implicit K: Integral[K], P: Eq[P]): Fresh[OpaqueId[K, P]] =
-      Fresh(OpaqueId(K.zero), id => { import K._; OpaqueId(id.value + one) })
+      def apply[KY: Fresh] = implicitly[Fresh[KY]]
+
+      def zeroBasedIncr[K: Integral, P: Eq]: Fresh[OpaqueKey[K, P]] = {
+
+        val K = Integral[K]
+        import K._
+
+        Fresh(
+          OpaqueKey(zero),
+          id => OpaqueKey(id.value + one)
+        )
+      }
+    }
   }
 
   abstract class OpaqueIdC[K: Order, P: Eq] {
-    def apply(id: K) = OpaqueId[K, P](id)
+    def apply(id: K) = OpaqueKey[K, P](id)
   }
 
   abstract class IdC[K: Order, P: Eq] {
-    type Id = OpaqueId[K, P]
+    type Id = OpaqueKey[K, P]
     object Id extends OpaqueIdC[K, P]
   }
 
   abstract class IdPC[K: Order, P] {
-    type Id = OpaqueId[K, P]
+    type Id = OpaqueKey[K, P]
     object Id extends OpaqueIdC[K, P]
     implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
   }
-
-  object LongId {
-    import cats.instances.long._
-    def reserved[P: Eq] = OpaqueId[Long, P](Long.MinValue)
-  }
-
-  object IntId {
-    import cats.instances.int._
-    def reserved[P: Eq] = OpaqueId[Int, P](Int.MinValue)
-  }
-
 }

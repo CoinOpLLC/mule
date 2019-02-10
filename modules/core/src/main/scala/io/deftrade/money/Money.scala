@@ -3,6 +3,8 @@ package money
 
 import eu.timepit.refined
 
+import spire.implicits._
+
 import cats.kernel.{ CommutativeGroup, Order }
 import cats.{ Invariant, Show }
 import cats.syntax.option._
@@ -11,13 +13,10 @@ import cats.syntax.option._
   * `Money` is a scala value class, with a phantom currency type.
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
-  import spire.implicits._
 
-  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] =
-    new Money(amount + rhs.amount)
+  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = new Money(amount + rhs.amount)
 
-  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] =
-    new Money(amount - rhs.amount)
+  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = new Money(amount - rhs.amount)
 
   def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Money[N, C] =
     new Money(S.to[N](scale) * amount)
@@ -76,6 +75,17 @@ object Money {
       def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
     }
 
+  /**
+    // why not?
+    // `implicit object refinedRefType extends RefType[Money] {`
+    // because:
+    // bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+    // in object refinedRefType
+    // which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
+    // clashes with definition of the member itself;
+    // both have erased type (t: Object)Object
+    //     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+    */
   implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
     Validate alwaysPassed Currency[P]
 }
