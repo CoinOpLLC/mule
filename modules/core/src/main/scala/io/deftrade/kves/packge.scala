@@ -10,10 +10,12 @@ import spire.math.Integral
 import spire.implicits._
 
 /**
-  * kvse: Key Value Entity Schema:
+  * kvse: Key Value Entity Scheme*:
   * - keys: opaque identifiers with `Order`, `Eq`, `Hash` and `Show` (uses `refined`).
   * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
   * - entities: ("aggregate roots") `Map`s of Key -> Value entries: repos, logs...
+  *
+  * *It's a scheme because calling it a "schema" is too grand.
   */
 package object kves {
 
@@ -32,7 +34,7 @@ package kves {
 
   object OpaqueKey {
 
-    def apply[K: Order, P: Eq](id: K): OpaqueKey[K, P] = Refined unsafeApply id
+    def apply[K: Order, P: Eq](k: K): OpaqueKey[K, P] = Refined unsafeApply k
 
     /**
     * Make a fresh *globally unique* key, suitable to be persisted.
@@ -53,26 +55,26 @@ package kves {
 
       Fresh(
         OpaqueKey(zero),
-        id => OpaqueKey(id.value + one)
+        key => OpaqueKey(key.value + one)
       )
     }
   }
 
   abstract class OpaqueKeyC[K: Order, P: Eq] {
-    def apply(id: K) = OpaqueKey[K, P](id)
+    def apply(k: K) = OpaqueKey[K, P](k)
 
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
   }
 
   abstract class WithKey[K: Order, P: Eq] {
-    type Id = OpaqueKey[K, P]
-    object Id extends OpaqueKeyC[K, P]
+    type Key = OpaqueKey[K, P]
+    object Key extends OpaqueKeyC[K, P]
   }
 
   abstract class WithKeyAndEq[K: Order, P] {
-    type Id = OpaqueKey[K, P]
-    object Id extends OpaqueKeyC[K, P]
+    type Key = OpaqueKey[K, P]
+    object Key extends OpaqueKeyC[K, P]
     implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
   }
 }

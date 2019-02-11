@@ -1,18 +1,22 @@
 package io.deftrade
 
-object AnyCase extends AnyCase
-
-trait AnyCase {
+object util { outer =>
 
   def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)
 
-  def camelToSnake(name: String): String  = CamelTo(name)("_")
-  def camelToHyphen(name: String): String = CamelTo(name)("-")
-  def camelToDot(name: String): String    = CamelTo(name)(".")
-  def camelToWord(name: String): String   = CamelTo(name)(" ")
+  def camelToSnake(camelName: String): String  = CamelTo("_")(camelName)
+  def camelToHyphen(camelName: String): String = CamelTo("-")(camelName)
+  def camelToDot(camelName: String): String    = CamelTo(".")(camelName)
+  def camelToWord(camelName: String): String   = CamelTo(" ")(camelName)
 
-  object CamelTo extends CamelTo
-  trait CamelTo {
+  implicit class CamelOps(val camelName: String) extends AnyVal {
+    def camelToSnake: String  = outer.camelToSnake(camelName)
+    def camelToHyphen: String = outer.camelToHyphen(camelName)
+    def camelToDot: String    = outer.camelToDot(camelName)
+    def camelToWord: String   = outer.camelToWord(camelName)
+  }
+
+  private object CamelTo {
 
     val uppers    = 'A' to 'Z'
     val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'

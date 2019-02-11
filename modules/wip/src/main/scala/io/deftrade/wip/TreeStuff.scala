@@ -55,14 +55,14 @@ object MuhDomain {
 
 object TreeStuff {
 
-  import cats.{ Eval, Id, Monoid }
+  import cats.{ Eval, Key, Monoid }
 
   1.pure[Option] === 1.some |> assert
 
   for {
-    l <- 1: Id[Int]
-    s <- 20: Id[Int]
-    d <- 12: Id[Int]
+    l <- 1: Key[Int]
+    s <- 20: Key[Int]
+    d <- 12: Key[Int]
   } yield l * s * d === 240 |> assert
 
   val foo = Eval.now((0xfeedface * 0x2badbabe + 7) % 13)
@@ -81,7 +81,7 @@ object TreeStuff {
   }.value === n |> assert
 
   import cats.data.Writer
-  // type Writer[W, A] = WriterT[Id, W, A]
+  // type Writer[W, A] = WriterT[Key, W, A]
   type Logged[A] = Writer[Vector[String], A]
 
   Monoid[String] |> discardValue

@@ -90,7 +90,7 @@ object Entity extends WithKeyAndEq[Long, Entity] {
     * The default `Fresh` instance placed in scope by `Entity` is zeroBasedIncr.
     * This is one possible policy decision; there are others. TODO: revisit.
     */
-  implicit def freshEntityKey: Fresh[Id] = Fresh.zeroBasedIncr
+  implicit def freshEntityKey: Fresh[Key] = Fresh.zeroBasedIncr
 }
 
 /**
@@ -180,7 +180,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   lazy val nonPrinciples: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
-object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Id, Entity]
+object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Key, Entity]
 
 /** package level API */
 abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
@@ -192,10 +192,10 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * Who does what. Or should. And shouldn't.
     */
   final case class Roster private (
-      principles: Partition[Entity.Id, Quantity],
-      nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
+      principles: Partition[Entity.Key, Quantity],
+      nonPrinciples: NonPrinciple => NonEmptySet[Entity.Key]
   ) {
-    val roles: NonEmptyMap[Role, NonEmptySet[Entity.Id]] =
+    val roles: NonEmptyMap[Role, NonEmptySet[Entity.Key]] =
       NonEmptyMap of (
         Role.Principle -> principles.keys,
         Role.nonPrinciples.map(np => (np, nonPrinciples(np))): _*
@@ -203,7 +203,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   }
 
   object Roster {
-    def single(eid: Entity.Id): Roster =
+    def single(eid: Entity.Key): Roster =
       Roster(
         principles = Partition single eid,
         nonPrinciples = _ => NonEmptySet one eid
@@ -213,13 +213,13 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   /**
     * `Vault` is a sum type used in its capacity as an obfuscator ;)
     * TODO: implement recursive traversal of a `Vault` as a `Foldable`
-    * so you can treat as a container of `Folio.Id`s, basically.
+    * so you can treat as a container of `Folio.Key`s, basically.
     */
   sealed trait Vault
   object Vault {
 
-    case class SubAccounts(subs: Set[Account.Id]) extends Vault
-    case class Folio(fid: self.Folio.Id)          extends Vault
+    case class SubAccounts(subs: Set[Account.Key]) extends Vault
+    case class Folio(fid: self.Folio.Key)          extends Vault
 
     def empty: Vault = SubAccounts(Set.empty) // idiom
   }
@@ -238,33 +238,33 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   object Account {
     import refinements.ValidRange
     implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
-    type Id = Long Refined ValidRange
-    object Id {
-      implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
-      implicit lazy val fresh: Fresh[Id]          = Fresh.zeroBasedIncr[Long, ValidRange]
+    type Key = Long Refined ValidRange
+    object Key {
+      implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
+      implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
       // FIXME need to revisit fresh anyway
       // Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
-    def empty(eid: Entity.Id) = Account(Roster single eid, Vault.empty)
+    def empty(eid: Entity.Key) = Account(Roster single eid, Vault.empty)
 
-    def simple(eid: Entity.Id, fid: Folio.Id) = Account(Roster single eid, Vault.Folio(fid))
+    def simple(eid: Entity.Key, fid: Folio.Key) = Account(Roster single eid, Vault.Folio(fid))
 
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
 
-  import Account.Id._ // for implicits
+  import Account.Key._ // for implicits
 
-  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Id, Account]
+  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
   type Accounts = Accounts.Table
 
   /**
     * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
-    * the `Account.Id`'s would be ideal.
+    * the `Account.Key`'s would be ideal.
     * another approoach would be to merkelize the `Roster` to expose only the relevant bits.
     */
-  type AccountAuth           = (Account.Id, Signature)
-  type FolioAuth             = (Folio.Id, AccountAuth)
+  type AccountAuth           = (Account.Key, Signature)
+  type FolioAuth             = (Folio.Key, AccountAuth)
   type FolioAuths            = (FolioAuth, FolioAuth)
   type AuthorizedTransaction = (Transaction, FolioAuths)
 }

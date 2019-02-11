@@ -20,7 +20,7 @@ package wip
 import scala.language.higherKinds
 // import scala.language.implicitConversions
 
-import cats.{ Eq, Id, Monad, Semigroupal }
+import cats.{ Eq, Key, Monad, Semigroupal }
 
 import cats.data.{ Validated, NonEmptyList => NEL }
 
@@ -61,7 +61,7 @@ object SemigroupalStuff {
     import cats.syntax.functor._
     import cats.syntax.flatMap._
     def pr[M[_]: Monad, A, B](fa: M[A], fb: M[B]): M[(A, B)] = for { a <- fa; b <- fb } yield (a, b)
-    pr[Id, Unit, Unit] _
+    pr[Key, Unit, Unit] _
   } |> discardValue
 
   def vx(s: String) = Validated catchNonFatal { s.toInt }

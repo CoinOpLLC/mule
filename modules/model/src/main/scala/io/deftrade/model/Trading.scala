@@ -88,8 +88,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     */
   final case class OMS[F[_]: Monad: MonoidK: Foldable] private (
-      eid: Entity.Id,
-      contra: Account.Id,
+      eid: Entity.Key,
+      contra: Account.Key,
       markets: NonEmptySet[Market]
   ) {
 
@@ -98,7 +98,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /** He stacc. He refacc. */
     type FK[T, R] = Kleisli[F, T, Either[Fail, R]]
 
-    final def process[C: Currency, A](p: Account.Id, a: Allocation)(
+    final def process[C: Currency, A](p: Account.Key, a: Allocation)(
         block: => A
     ): FK[A, Execution] = {
       val risk: FK[A, Order[C]]           = riskCheck(block)
@@ -116,7 +116,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     def trade[C]: FK[Order[C], Execution] = ???
 
     private final def allocate[C: Currency](
-        p: Account.Id,
+        p: Account.Key,
         a: Allocation
     ): FK[Execution, Execution] = // UM... this is recursive, given account structure. Fine!
       ???
@@ -130,22 +130,22 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     */
   object OMS extends WithKey[Long, OMS[cats.Id]] {
 
-    type Allocation = Partition[Account.Id, Quantity]
+    type Allocation = Partition[Account.Key, Quantity]
 
     /**
       * TODO: augment/evolve creation pattern.
       */
-    def apply[F[_]: Monad: MonoidK: Foldable](eid: Entity.Id, market: Market, ms: Market*): OMS[F] =
+    def apply[F[_]: Monad: MonoidK: Foldable](eid: Entity.Key, market: Market, ms: Market*): OMS[F] =
       OMS[F](eid, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
 
-    private def newContraAccount: Account.Id = ???
+    private def newContraAccount: Account.Key = ???
 
     /**
       * Minimum viable `Order` type. What the client would _like_ to have happen.
       * TODO: revisit parent/child orders
       */
     final case class Order[C: Currency](
-        market: Market.Id,
+        market: Market.Key,
         auth: AccountAuth,
         ts: Instant,
         trade: Trade,
@@ -166,7 +166,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
       def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
 
-      implicit def freshOrderKey: Fresh[Id] = Fresh.zeroBasedIncr
+      implicit def freshOrderKey: Fresh[Key] = Fresh.zeroBasedIncr
 
     }
 
@@ -183,22 +183,22 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       *
       */
     type Orders = Orders.Table
-    object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Id, OMS.Order[USD]]
+    object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Key, OMS.Order[USD]]
 
     /**
       * What actually happened.
       */
-    final case class Execution(ts: Instant, oms: OMS.Id, oid: Order.Id, tx: Transaction)
+    final case class Execution(ts: Instant, oms: OMS.Key, oid: Order.Key, tx: Transaction)
 
-    /** Executions are sorted first by Order.Id, and then by timestamp – that should do it! ;) */
+    /** Executions are sorted first by Order.Key, and then by timestamp – that should do it! ;) */
     implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.oid) // FIXME add ts
     // FIXME here's your problem right here cats.Order[Instant] |> discardValue
     object Execution extends WithKey[Long, Execution] {
-      implicit def freshExecutionKey: Fresh[Id] = Fresh.zeroBasedIncr
+      implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
     }
 
     type Executions = Executions.Table
-    object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
+    object Executions extends MemAppendableRepository[cats.Id, Execution.Key, Execution]
   }
 
   /**
@@ -209,25 +209,25 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed trait Market { def eid: Entity.Id }
+  sealed trait Market { def eid: Entity.Key }
   implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.eid)
   object Market extends WithKey[Long, Market] {
 
     def quote[F[_]: Monad, C: Currency](
         m: Market
     )(
-        id: Instrument.Id
+        id: Instrument.Key
     ): F[Money[MonetaryAmount, C]] = ???
     // Currency[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
 
-    def quotedIn[C: Currency](m: Market)(id: Instrument.Id): Instrument.Id QuotedIn C = ???
+    def quotedIn[C: Currency](m: Market)(id: Instrument.Key): Instrument.Key QuotedIn C = ???
 
     /**
       * Single effective counterparty: the `Exchange` itself.
       * - seller for all buyers and vice versa.)
       * - activity recorded in a `contra account`
       */
-    final case class Exchange(eid: Entity.Id, contraAid: Account.Id) extends Market
+    final case class Exchange(eid: Entity.Key, contraAid: Account.Key) extends Market
     object Exchange {}
 
     /**
@@ -236,17 +236,17 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * when the `Counterparty` is sourcing `Instruments` from private flows.
       * - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
-    final case class Counterparty(val eid: Entity.Id) extends Market
+    final case class Counterparty(val eid: Entity.Key) extends Market
     object Counterparty {}
 
     implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
 
-    implicit def freshMarketKey: Fresh[Id] = Fresh.zeroBasedIncr
+    implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
 
   }
 
-  lazy val Markets: Repository[cats.Id, Market.Id, Market] =
-    SimplePointInTimeRepository[cats.Id, Market.Id, Market]()
+  lazy val Markets: Repository[cats.Id, Market.Key, Market] =
+    SimplePointInTimeRepository[cats.Id, Market.Key, Market]()
   type Markets = Markets.Table
 
   /** top level methods */

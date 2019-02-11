@@ -35,8 +35,8 @@ object Fail {
   */
 final case class Instrument(meta: Json)
 object Instrument {
-  type Id = InstrumentIdentifier
-  val Id                          = InstrumentIdentifier
+  type Key = InstrumentIdentifier
+  val Key                         = InstrumentIdentifier
   implicit def eq: Eq[Instrument] = Eq by (_.meta)
 }
 
@@ -51,7 +51,7 @@ abstract class Ledger[Q: Financial] { self =>
   import io.deftrade.kves.Fresh
 
   /** n.b. this is where fresh key policy is decided for the ledger */
-  implicit def defaultFresh: Fresh[Folio.Id] = Fresh.zeroBasedIncr
+  implicit def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
 
   /** independent of type params - FIXME placeholder */
   type Signature = String
@@ -64,7 +64,7 @@ abstract class Ledger[Q: Financial] { self =>
   val Quantity = Financial[Quantity]
 
   /** Working repository of `Instrument`s, for the working Trader. */
-  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Id, Instrument]
+  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
   type Instruments = Instruments.Table
 
   /**
@@ -72,29 +72,29 @@ abstract class Ledger[Q: Financial] { self =>
     * TODO: capture the fact that the sets of instruments are disjoint.
     * Cash instruments as a repository, or store, shall nevery have F[_] threaded through it.
     */
-  type CashInstruments = Map[Currency[_], Set[Instrument.Id]]
+  type CashInstruments = Map[Currency[_], Set[Instrument.Key]]
   implicit def currencyInstruments: CashInstruments = ??? // this will go over big
 
   /**
     * How much of a given `Instrument` is held.
     * Can also be thought of as a `Leg` at rest.
     */
-  type Position = (Instrument.Id, Quantity)
+  type Position = (Instrument.Key, Quantity)
   object Position
 
   /**
     * A `Folio` is a set of `Position`s.
     * Can also be thought of as a `Trade` at rest.
     */
-  type Folio = Map[Instrument.Id, Quantity]
+  type Folio = Map[Instrument.Key, Quantity]
   object Folio extends WithKey[Long, Folio] {
     def empty: Folio                        = Map.empty
     def apply(ps: Position*): Folio         = accumulate(ps.toList)
     def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
   }
 
-  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Id, Folio] {
-    def apply(id: Folio.Id): Folio = get(id).fold(Folio.empty)(identity)
+  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
+    def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
   }
   type Folios = Folios.Table
 
@@ -113,7 +113,7 @@ abstract class Ledger[Q: Financial] { self =>
         * *Exactly* two parties to a `Transaction`.
         * - Use `AllOrNone` to compose multiparty `Transaction`s
         */
-      parties: (Folio.Id, Folio.Id),
+      parties: (Folio.Key, Folio.Key),
       /**
         * Note: cash payments are reified in currency-as-instrument.
         */

@@ -29,7 +29,7 @@ import scala.language.higherKinds
   * TODO: fix this comment – design is provisional
   * Both type params are needed to deal with case where MA =!= Q in the cake
   * this allows this package to deal with MA <=> Q functions via Monetary Instruments table.
-  * Also binding explicitly to `Ledger` with `Folio.Id` dependence.
+  * Also binding explicitly to `Ledger` with `Folio.Key` dependence.
   * FIXME: really only depends on `Ledger`
   */
 abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
@@ -66,7 +66,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /**
     * FIXME: depends on mapping between `Folio`s and `Balance`s
     */
-  type EntryKey = (AccountType, Folio.Id)
+  type EntryKey = (AccountType, Folio.Key)
 
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   type MonetaryAmount = MA
@@ -134,7 +134,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   /**
     * Note: These are a mixture of cash and accrual items when "raw".
-    * A cash account can be determined from its `Instrument.Id`.
+    * A cash account can be determined from its `Instrument.Key`.
     * This can be used to create a filter for `CashFlowStatement`s.
     */
   final case class IncomeStatement private (
