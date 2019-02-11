@@ -3,7 +3,8 @@ package io.deftrade
 import cats.{ Eq, Order, Show }
 import cats.implicits._
 
-import eu.timepit.refined.api.Refined
+import eu.timepit.refined
+import refined.api.{ Min, Refined }
 
 import spire.math.Integral
 import spire.implicits._
@@ -34,41 +35,44 @@ package kves {
     def apply[K: Order, P: Eq](id: K): OpaqueKey[K, P] = Refined unsafeApply id
 
     /**
-      * Make a fresh *globally unique* key, suitable to be persisted.
-      * TODO: consider threading F[_] thru Fresh. (See above.)
-      */
-    final case class Fresh[I](init: I, next: I => I)
+    * Make a fresh *globally unique* key, suitable to be persisted.
+    * TODO: consider threading F[_] thru Fresh. (See above.)
+    */
+  }
+  final case class Fresh[I](init: I, next: I => I)
 
-    /** fresh `Fresh` */
-    object Fresh {
+  /** fresh `Fresh` */
+  object Fresh {
 
-      def apply[KY: Fresh] = implicitly[Fresh[KY]]
+    def apply[KY: Fresh] = implicitly[Fresh[KY]]
 
-      def zeroBasedIncr[K: Integral, P: Eq]: Fresh[OpaqueKey[K, P]] = {
+    def zeroBasedIncr[K: Integral, P: Eq]: Fresh[OpaqueKey[K, P]] = {
 
-        val K = Integral[K]
-        import K._
+      val K = Integral[K]
+      import K._
 
-        Fresh(
-          OpaqueKey(zero),
-          id => OpaqueKey(id.value + one)
-        )
-      }
+      Fresh(
+        OpaqueKey(zero),
+        id => OpaqueKey(id.value + one)
+      )
     }
   }
 
-  abstract class OpaqueIdC[K: Order, P: Eq] {
+  abstract class OpaqueKeyC[K: Order, P: Eq] {
     def apply(id: K) = OpaqueKey[K, P](id)
+
+    /** Where the key type is integral, we will reserve the min value. */
+    def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
   }
 
-  abstract class IdC[K: Order, P: Eq] {
+  abstract class WithKey[K: Order, P: Eq] {
     type Id = OpaqueKey[K, P]
-    object Id extends OpaqueIdC[K, P]
+    object Id extends OpaqueKeyC[K, P]
   }
 
-  abstract class IdPC[K: Order, P] {
+  abstract class WithKeyAndEq[K: Order, P] {
     type Id = OpaqueKey[K, P]
-    object Id extends OpaqueIdC[K, P]
+    object Id extends OpaqueKeyC[K, P]
     implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
   }
 }

@@ -1,18 +1,6 @@
 package io.deftrade
 package money
 
-import eu.timepit.refined
-import refined.api.Refined
-
-import spire.math.{ Fractional, Integral }
-
-import enumeratum._
-
-import cats.kernel.{ CommutativeGroup, Order }
-import cats.{ Invariant, Show }
-
-import BigDecimal.RoundingMode._
-
 object pricing {
 
   /**

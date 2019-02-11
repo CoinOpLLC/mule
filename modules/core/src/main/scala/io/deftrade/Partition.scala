@@ -1,12 +1,12 @@
 package io.deftrade
 
+import spire.math.Fractional
+
 import cats._
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
-import spire.math.Fractional
-
-import scala.collection.immutable.{ SortedMap }
+import scala.collection.immutable.SortedMap
 
 // TODO use refined to restrict V to be between 0 and 1
 /** Guaranteed untitary and reasonable proportioning among several unique keys. */
@@ -29,6 +29,7 @@ object Partition {
   import refined.api.Refined
   import refined.numeric.Positive
   import refined.auto._
+
   type PositiveLong = Long // Refined Positive // FIXME do this
 
   /** `exact` slices is what you say; we'll be the judge of that ;) */
@@ -68,6 +69,10 @@ object Partition {
     val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
     unsafe(slices)
   }
+
+  def buyIn[K: Order, V: Fractional](in: K, slice: V): Result[Partition[K, V]] = ???
+
+  def buyOut[K: Order, V: Fractional](in: K): Result[Partition[K, V]] = ???
 
   /** whole pie for me */
   def single[K: Order, V: Fractional](k: K): Partition[K, V] =

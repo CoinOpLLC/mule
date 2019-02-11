@@ -2,7 +2,6 @@ package io.deftrade
 package repos
 
 import io.deftrade.time._
-import io.deftrade.time.implicits._
 
 import io.deftrade.kves._
 
@@ -30,8 +29,6 @@ object Fail {
   *
   */
 trait Api {
-
-  import OpaqueKey.Fresh
 
   abstract class RepoImplicits[IO[_]: Monad, K: cats.Order, V: Eq] {
 

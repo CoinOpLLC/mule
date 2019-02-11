@@ -1,6 +1,8 @@
 package io.deftrade
 package time
 
+import cats.{ Eq, Hash, Order, Show }
+
 import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt._, ChronoUnit._
@@ -128,13 +130,13 @@ trait Api {
 
   def localDateTime               = LocalDateTime.now
   def localDateTime(zone: ZoneId) = LocalDateTime now zone
-  def localDateTime(clock: Clock) = LocalDateTime now clock
+  def localDateTime(clock: Clock) = LocalDate now clock
 
-  def localDateTime(ta: TemporalAccessor) = LocalDateTime from ta
+  def localDateTime(ta: TemporalAccessor) = LocalDate from ta
 
-  def localDateTime(iso8601: String) = LocalDateTime parse iso8601
+  def localDateTime(iso8601: String) = LocalDate parse iso8601
 
-  def localDateTime(s: String, fmt: DateTimeFormatter) = LocalDateTime parse (s, fmt)
+  def localDateTime(s: String, fmt: DateTimeFormatter) = LocalDate parse (s, fmt)
 
   def localDateTime(ld: LocalDate, lt: LocalTime) = LocalDateTime of (ld, lt)
 
@@ -266,25 +268,38 @@ trait Api {
   type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
   type ZoneRulesException               = java.time.zone.ZoneRulesException
 
-  object implicits {
+  abstract class FormatShow[TA <: TemporalAccessor](val formatter: DateTimeFormatter, tq: TemporalAccessor => TA) extends Show[TA] {
+    override def show(x: TA): String = formatter format x
 
-    trait DefHash[T] extends cats.Hash[T] { override def hash(x: T): Int    = x.hashCode }
-    trait DefShow[T] extends cats.Show[T] { override def show(x: T): String = x.toString }
+    // TODO: refactor this where it belongs (i.e. will pick up operator)
+    def parse(s: String): Either[Throwable, TA] =
+      scala.util.Try {
+        tq(formatter parse s)
+      }.toEither
+  }
 
-    abstract class FormatShow[TA <: TemporalAccessor](val formatter: DateTimeFormatter, tq: TemporalAccessor => TA) extends DefShow[TA] {
-      override def show(x: TA): String = formatter format x
-
-      // TODO: refactor this where it belongs (i.e. will pick up operator)
-      def parse(s: String): Either[Throwable, TA] =
-        scala.util.Try {
-          tq(formatter parse s)
-        }.toEither
+  implicit lazy val shoLocalDate =
+    new FormatShow[LocalDate](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDate.from(_)) with Hash[LocalDate] with cats.Order[LocalDate] {
+      override def hash(x: LocalDate): Int                  = x.hashCode
+      override def compare(x: LocalDate, y: LocalDate): Int = x compareTo y
     }
 
-    implicit lazy val shoLocalDateTime =
-      new FormatShow[LocalDateTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime.from(_)) with DefHash[LocalDateTime]
-      with cats.Order[LocalDateTime] {
-        override def compare(x: LocalDateTime, y: LocalDateTime): Int = x compareTo y
-      }
-  }
+  implicit lazy val shoLocalTime =
+    new FormatShow[LocalTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalTime.from(_)) with Hash[LocalTime] with cats.Order[LocalTime] {
+      override def hash(x: LocalTime): Int                  = x.hashCode
+      override def compare(x: LocalTime, y: LocalTime): Int = x compareTo y
+    }
+
+  implicit lazy val shoLocalDateTime =
+    new FormatShow[LocalDateTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime.from(_)) with Hash[LocalDateTime]
+    with cats.Order[LocalDateTime] {
+      override def hash(x: LocalDateTime): Int                      = x.hashCode
+      override def compare(x: LocalDateTime, y: LocalDateTime): Int = x compareTo y
+    }
+
+  implicit lazy val shoInstant =
+    new FormatShow[Instant](DateTimeFormatter.ISO_LOCAL_DATE_TIME, Instant.from(_)) with Hash[Instant] with cats.Order[Instant] {
+      override def hash(x: Instant): Int                = x.hashCode
+      override def compare(x: Instant, y: Instant): Int = x compareTo y
+    }
 }

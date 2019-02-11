@@ -1,15 +1,14 @@
 package io.deftrade
 package test
 
+import io.deftrade.time._
+
 import cats.implicits._
-import cats.syntax.eq._
+import cats.syntax.eq._ // FIXME: don't understand why this works, or is necessary
 
 import org.scalatest._, prop._
 
 class TimeFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
-
-  import io.deftrade.time._
-  import implicits._
 
   "time" should "move forward" in {
     val today = localDateTime

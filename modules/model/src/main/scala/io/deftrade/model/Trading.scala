@@ -128,7 +128,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   /**
     * Where do Order Management Systems come from? (Here.)
     */
-  object OMS extends IdC[Long, OMS[cats.Id]] {
+  object OMS extends WithKey[Long, OMS[cats.Id]] {
 
     type Allocation = Partition[Account.Id, Quantity]
 
@@ -156,7 +156,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     implicit def orderEq[C: Currency] = Eq.fromUniversalEquals[Order[C]]
 
     /** */
-    object Order extends IdC[Long, Order[USD]] {
+    object Order extends WithKey[Long, Order[USD]] {
 
       /** `Market` orders */
       def buy[C: Currency]: Order[C]  = ???
@@ -165,6 +165,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       /** `Limit` orders */
       def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
       def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
+
+      implicit def freshOrderKey: Fresh[Id] = Fresh.zeroBasedIncr
+
     }
 
     /**
@@ -190,7 +193,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /** Executions are sorted first by Order.Id, and then by timestamp – that should do it! ;) */
     implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.oid) // FIXME add ts
     // FIXME here's your problem right here cats.Order[Instant] |> discardValue
-    object Execution extends IdC[Long, Execution]
+    object Execution extends WithKey[Long, Execution] {
+      implicit def freshExecutionKey: Fresh[Id] = Fresh.zeroBasedIncr
+    }
 
     type Executions = Executions.Table
     object Executions extends MemAppendableRepository[cats.Id, Execution.Id, Execution]
@@ -206,7 +211,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     */
   sealed trait Market { def eid: Entity.Id }
   implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.eid)
-  object Market extends IdC[Long, Market] {
+  object Market extends WithKey[Long, Market] {
 
     def quote[F[_]: Monad, C: Currency](
         m: Market
@@ -235,6 +240,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     object Counterparty {}
 
     implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+
+    implicit def freshMarketKey: Fresh[Id] = Fresh.zeroBasedIncr
+
   }
 
   lazy val Markets: Repository[cats.Id, Market.Id, Market] =

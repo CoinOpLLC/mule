@@ -1,34 +1,12 @@
 package io.deftrade
 package money
 
-import eu.timepit.refined
-import refined.api.Refined
+import spire.math.{ Fractional, Integral, Rational }
 
-import spire.math.{ Fractional, Integral }
-
-import enumeratum._
-
-import cats.kernel.{ CommutativeGroup, Order }
-import cats.{ Invariant, Show }
-
-import BigDecimal.RoundingMode._
+import cats.kernel.CommutativeGroup
 
 /** */
 class Financial[N] private (implicit val fractional: Fractional[N]) {
-
-  def commutativeGroup: CommutativeGroup[N] = fractional.additive
-
-  def fromBigDecimal(bd: BigDecimal): N = fractional.fromBigDecimal(bd)
-  def toBigDecimal(n: N): BigDecimal    = fractional.toBigDecimal(n)
-
-  def fromLong(l: Long): N = fractional.fromLong(l)
-
-  /**
-    * Someday, maybe, "as if by" will be the operative words.
-    * But today, we go with "literally".
-    */
-  def from[T: Financial](t: T): N = t |> Financial[T].toBigDecimal |> fromBigDecimal
-  def to[R: Financial](n: N): R   = n |> toBigDecimal              |> Financial[R].fromBigDecimal
 
   /**
     * How do we deal with scale and significant digits?
@@ -39,6 +17,17 @@ class Financial[N] private (implicit val fractional: Fractional[N]) {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
   }
+
+  /** section: `spire.math.Fractional` proxies */
+  def commutativeGroup: CommutativeGroup[N] = fractional.additive
+
+  def fromBigDecimal(bd: BigDecimal): N = fractional.fromBigDecimal(bd)
+  def toBigDecimal(n: N): BigDecimal    = fractional.toBigDecimal(n)
+
+  def fromLong(l: Long): N = fractional.fromLong(l)
+
+  def from[T: Financial](t: T): N = t |> fractional.fromType[T]
+  def to[R: Financial](n: N): R   = n |> fractional.toType[R]
 
   /** Extractors and (any) other tools for dealing with integral quantities. */
   object IntegralIs {
@@ -52,16 +41,20 @@ class Financial[N] private (implicit val fractional: Fractional[N]) {
   */
 object Financial {
 
-  import Fractional._
-
   def apply[N: Financial]: Financial[N] = implicitly
 
-  def derive[N: Fractional]: Financial[N] = new Financial
+  // type ZeroToOne[N: Fractional] = {
+  //   val N = Fractional[N]
+  //   import N._
+  //   Not[Less[zero]] And Not[Greater[one]]
+  // }
+  // implicit def refinedValidate[N: Financial, P]: Validate[N, P] = ???
 
-  implicit lazy val DoubleIsFinancial: Financial[Double] = derive
+  implicit lazy val DoubleIsFinancial: Financial[Double] = new Financial
 
-  implicit lazy val BigDecimalIsFinancial: Financial[BigDecimal] = derive
+  implicit lazy val BigDecimalIsFinancial: Financial[BigDecimal] = new Financial
 
+  implicit lazy val RationalIsFinancial: Financial[Rational] = new Financial
 }
 
 /*

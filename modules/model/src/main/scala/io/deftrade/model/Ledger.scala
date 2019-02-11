@@ -48,6 +48,11 @@ object Instrument {
   */
 abstract class Ledger[Q: Financial] { self =>
 
+  import io.deftrade.kves.Fresh
+
+  /** n.b. this is where fresh key policy is decided for the ledger */
+  implicit def defaultFresh: Fresh[Folio.Id] = Fresh.zeroBasedIncr
+
   /** independent of type params - FIXME placeholder */
   type Signature = String
 
@@ -82,7 +87,7 @@ abstract class Ledger[Q: Financial] { self =>
     * Can also be thought of as a `Trade` at rest.
     */
   type Folio = Map[Instrument.Id, Quantity]
-  object Folio extends IdC[Long, Folio] {
+  object Folio extends WithKey[Long, Folio] {
     def empty: Folio                        = Map.empty
     def apply(ps: Position*): Folio         = accumulate(ps.toList)
     def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)

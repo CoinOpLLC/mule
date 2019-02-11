@@ -5,7 +5,7 @@ import money._
 
 import enums.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 
-import cats.{ Foldable, Hash, Invariant, Monad, Monoid, MonoidK, Order }
+import cats.{ Foldable, Invariant, Monad, MonoidK }
 import cats.kernel.CommutativeGroup
 import cats.implicits._
 import feralcats.instances._
@@ -71,12 +71,14 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   type MonetaryAmount = MA
   val MonetaryAmount = Financial[MonetaryAmount]
-  import MonetaryAmount.{ fractional => MAF, commutativeGroup => MACG }
 
   private final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
   private object AccountMap {
     def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
   }
+
+  /** convenience and domain semantics only */
+  def openAccount[A <: AccountType]: AccountMap[A] = AccountMap.empty
 
   final type Debits  = AccountMap[Debit]
   final type Credits = AccountMap[Credit]
@@ -100,9 +102,10 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
     lazy val partition: (IncomeStatement, BalanceSheet) = {
 
-      def collect[T <: AccountType, R <: T](as: AccountMap[T]): AccountMap[R] = as collect {
-        case (k: R, v) => (k, v)
-      }
+      def collect[T <: AccountType, R <: T](as: AccountMap[T]): AccountMap[R] =
+        as collect {
+          case (k: R, v) => (k, v) // FIXME: this is almost certainly broken
+        }
       val assets: AccountMap[Asset] = collect(ds)
       val loqs: AccountMap[LOQ]     = collect(cs)
 
@@ -151,8 +154,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  final case class CashFlowStatement private (wut: Nothing)
-  final case class EquityStatement private (wut: Nothing)
+  final case class CashFlowStatement private (wut: Null) // FIXME: this is where I left off
+  final case class EquityStatement private (wut: Null)
 
   /**
     * `BalanceSheet` forms a commutative group

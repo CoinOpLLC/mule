@@ -5,7 +5,6 @@ import money._
 import time.{ LocalDate }
 
 import kves._
-import OpaqueKey.Fresh
 
 import repos._
 
@@ -22,8 +21,6 @@ import refined.numeric._
 
 import io.circe.Json
 
-import scala.collection.immutable.{ SortedMap, SortedSet }
-
 /**
   * `Entities` model real world actors.
   * See Also: `model.Role`s.
@@ -35,7 +32,7 @@ sealed trait Entity extends Product with Serializable {
 }
 
 /** `Entity`s recognized by the system. */
-object Entity extends IdPC[Long, Entity] {
+object Entity extends WithKeyAndEq[Long, Entity] {
 
   /**
     * RDB friendly `String`s that are born usable as is.
@@ -79,11 +76,21 @@ object Entity extends IdPC[Long, Entity] {
   }
 
   /** TODO flesh this concept out... minimum viable PM */
-  final case class Algorithm(name: VarChar, /* ain: AIN, */ meta: Json) extends Entity {
+  final case class Algorithm(name: VarChar, ain: AIN, meta: Json) extends Entity {
     def dtid = ??? // ain FIXME
   }
 
-  implicit def eq = Eq.fromUniversalEquals[Entity]
+  implicit def eqEntity = Eq.fromUniversalEquals[Entity]
+
+  implicit def showEntity = Show.show[Entity] {
+    _.toString // this can evolve!
+  }
+
+  /**
+    * The default `Fresh` instance placed in scope by `Entity` is zeroBasedIncr.
+    * This is one possible policy decision; there are others. TODO: revisit.
+    */
+  implicit def freshEntityKey: Fresh[Id] = Fresh.zeroBasedIncr
 }
 
 /**
@@ -160,7 +167,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
     *
     * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
-    * be suited to a risk manager function.
+    * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
     */
   case object Auditor extends NonPrinciple
 
@@ -188,7 +195,6 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       principles: Partition[Entity.Id, Quantity],
       nonPrinciples: NonPrinciple => NonEmptySet[Entity.Id]
   ) {
-    import Cats._ // FIXME: DOESN'T HAVE ORDER! AND SHOULDN'T!
     val roles: NonEmptyMap[Role, NonEmptySet[Entity.Id]] =
       NonEmptyMap of (
         Role.Principle -> principles.keys,
@@ -231,10 +237,11 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   case class Account(roster: Roster, vault: Vault)
   object Account {
     import refinements.ValidRange
+    implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
     type Id = Long Refined ValidRange
     object Id {
       implicit def orderAccountId: cats.Order[Id] = cats.Order by { _.value }
-      implicit lazy val fresh: Fresh[Id]          = ???
+      implicit lazy val fresh: Fresh[Id]          = Fresh.zeroBasedIncr[Long, ValidRange]
       // FIXME need to revisit fresh anyway
       // Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
