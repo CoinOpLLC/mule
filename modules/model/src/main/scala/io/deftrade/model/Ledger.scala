@@ -88,9 +88,8 @@ abstract class Ledger[Q: Financial] { self =>
     */
   type Folio = Map[Instrument.Key, Quantity]
   object Folio extends WithKey[Long, Folio] {
-    def empty: Folio                        = Map.empty
-    def apply(ps: Position*): Folio         = accumulate(ps.toList)
-    def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+    def empty: Folio                = Map.empty
+    def apply(ps: Position*): Folio = accumulate(ps.toList)
   }
 
   object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
@@ -103,12 +102,12 @@ abstract class Ledger[Q: Financial] { self =>
     */
   final case class Transaction(
       /**
-        * A `LocalDateTime` is required of all `Recorded Transaction`s, assigned by the `Recorder`
+        * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`
         * - the transaction is provisional until dated, returned as a receipt
         * The exact semantics can vary depending on the higher level context
         * - (e.g. booking a trade vs receiving notice of settlement).
         */
-      recorded: Option[LocalDateTime],
+      recordedAt: Option[Instant],
       /**
         * *Exactly* two parties to a `Transaction`.
         * - Use `AllOrNone` to compose multiparty `Transaction`s
@@ -117,7 +116,7 @@ abstract class Ledger[Q: Financial] { self =>
       /**
         * Note: cash payments are reified in currency-as-instrument.
         */
-      trade: Trade,
+      trade: Folio,
       /**
         * In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is.
         */

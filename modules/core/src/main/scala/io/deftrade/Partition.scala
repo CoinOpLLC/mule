@@ -75,13 +75,16 @@ object Partition {
     unsafe(slices)
   }
 
+  /** whole pie for me */
+  def single[K: Order, V: Fractional](k: K): Partition[K, V] =
+    unsafe(SortedMap(k -> Fractional[V].one))
+
   def buyIn[K: Order, V: Fractional](in: K, slice: V): Result[Partition[K, V]] = ???
 
   def buyOut[K: Order, V: Fractional](in: K): Result[Partition[K, V]] = ???
 
-  /** whole pie for me */
-  def single[K: Order, V: Fractional](k: K): Partition[K, V] =
-    unsafe(SortedMap(k -> Fractional[V].one))
+  private def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): Partition[K, V] =
+    new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
 
   object Single {
 
@@ -93,7 +96,4 @@ object Partition {
       }
     }
   }
-  private def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): Partition[K, V] =
-    new Partition((NonEmptyMap fromMap kvs).fold(???)(identity))
-
 }

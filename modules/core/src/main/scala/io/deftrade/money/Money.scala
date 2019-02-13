@@ -27,18 +27,21 @@ import cats.syntax.option._
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
-  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = new Money(amount + rhs.amount)
+  import Money.fiat
 
-  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = new Money(amount - rhs.amount)
+  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> fiat
+
+  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount - rhs.amount |> fiat
 
   def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Money[N, C] =
-    new Money(S.to[N](scale) * amount)
+    S.to[N](scale) * amount |> fiat
 
   def /(rhs: Money[N, C])(implicit N: Financial[N]): N = lhs.amount / rhs.amount
 
-  def unary_-(implicit N: Financial[N]): Money[N, C] = new Money(-amount)
+  def unary_-(implicit N: Financial[N]): Money[N, C] = -amount |> fiat
 
   override def toString: String = amount.toString
+
 }
 
 /**
@@ -46,8 +49,11 @@ final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
   */
 object Money {
 
+  /** `fiat` is the new `unsafe` ;) */
+  private def fiat[N, C](n: N): Money[N, C] = new Money(n)
+
   def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
-    new Money(Financial[N].round[C](amount))
+    Financial[N].round[C](amount) |> fiat
 
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
 

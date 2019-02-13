@@ -62,6 +62,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
   object PricedTrade {
+    def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
 
     /**
       * Used to convert to the currency as `Instrument` convention.

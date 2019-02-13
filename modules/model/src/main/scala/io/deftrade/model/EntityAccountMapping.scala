@@ -246,12 +246,10 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   object Account {
     import refinements.ValidRange
     implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
-    type Key = Long Refined ValidRange
+    type Key = Long Refined ValidRange // remember you only get one free (value class) wrapper
     object Key {
       implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
-      // FIXME need to revisit fresh anyway
-      // Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
     def empty(key: Entity.Key) = Account(Roster single key, Vault.empty)

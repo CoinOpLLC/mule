@@ -5,13 +5,22 @@ import spire.math.{ Fractional, Integral, Rational }
 
 import cats.kernel.CommutativeGroup
 
-/** */
+/**
+  * A typeclass for number types suitable for financial calculations.
+  *
+  * The essential affordance is a `Currency` dependend `round`ing method.
+  *
+  * Beyond that, essentially a wrapper around `spire.math.Fractional`.
+  *
+  * While all `Financial`s are `Fractional`, the reverse is not true.
+  * (At least, not true enough for this domain model architect.)
+  */
 class Financial[N] private (val fractional: Fractional[N]) {
 
   /**
     * How do we deal with scale and significant digits?
-    * Simple rule: the left operand scale is "sticky" for those operations {+, -, *} that
-    * ultimately result in Money.
+    * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
+    * that return `Money`.
     */
   def round[C](n: N)(implicit C: Currency[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)

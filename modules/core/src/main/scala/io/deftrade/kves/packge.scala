@@ -27,7 +27,7 @@ package object kves {
 
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
   implicit def showOpaqueKey[K: Show: Order, P]: Show[OpaqueKey[K, P]] =
-    Show show (key => s"key:${key.value.show}")
+    Show show (key => s"k: ${key.value.show}")
 }
 
 package kves {
@@ -60,6 +60,7 @@ package kves {
     }
   }
 
+  /** Key type companion base class. */
   abstract class OpaqueKeyC[K: Order, P: Eq] {
     def apply(k: K) = OpaqueKey[K, P](k)
 
@@ -67,6 +68,7 @@ package kves {
     def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
   }
 
+  /** Module-level companion base class with default Key type */
   abstract class WithKey[K: Order, P: Eq] {
     type Key = OpaqueKey[K, P]
     object Key extends OpaqueKeyC[K, P]
