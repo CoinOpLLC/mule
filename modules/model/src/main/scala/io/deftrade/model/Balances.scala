@@ -95,16 +95,16 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   sealed abstract class Balance[D <: Debit, C <: Credit](val ds: AccountMap[D], val cs: AccountMap[C]) extends Product with Serializable
   object Balance
 
-  final case class TrialBalance private (
+  case class TrialBalance private (
       override val ds: Debits,
       override val cs: Credits
   ) extends Balance(ds, cs) {
 
     lazy val partition: (IncomeStatement, BalanceSheet) = {
-
-      def collect[T <: AccountType, R <: T](as: AccountMap[T]): AccountMap[R] =
+      import scala.reflect.ClassTag
+      def collect[T <: AccountType, R <: T: ClassTag](as: AccountMap[T]): AccountMap[R] =
         as collect {
-          case (k: R, v) => (k, v) // FIXME: this is almost certainly broken
+          case (k: R, v) => (k, v)
         }
       val assets: AccountMap[Asset] = collect(ds)
       val loqs: AccountMap[LOQ]     = collect(cs)
