@@ -6,7 +6,7 @@ import spire.math.{ Fractional, Integral, Rational }
 import cats.kernel.CommutativeGroup
 
 /** */
-class Financial[N] private (implicit val fractional: Fractional[N]) {
+class Financial[N] private (val fractional: Fractional[N]) {
 
   /**
     * How do we deal with scale and significant digits?
@@ -43,6 +43,8 @@ object Financial {
 
   def apply[N: Financial]: Financial[N] = implicitly
 
+  def fromFractional[N](N: Fractional[N]): Financial[N] = new Financial(N)
+
   // type ZeroToOne[N: Fractional] = {
   //   val N = Fractional[N]
   //   import N._
@@ -50,26 +52,26 @@ object Financial {
   // }
   // implicit def refinedValidate[N: Financial, P]: Validate[N, P] = ???
 
-  implicit lazy val DoubleIsFinancial: Financial[Double] = new Financial
+  implicit lazy val DoubleIsFinancial = Financial fromFractional Fractional[Double]
 
-  implicit lazy val BigDecimalIsFinancial: Financial[BigDecimal] = new Financial
+  implicit lazy val BigDecimalIsFinancial = Financial fromFractional Fractional[BigDecimal]
 
-  implicit lazy val RationalIsFinancial: Financial[Rational] = new Financial
+  /**
+    * TODO: read up
+    *
+    * # [XBR: Precision, Decimals and Units 1.0]
+    * http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN- 017-01-11.html)
+    *
+    * > 6.3
+    * ..Another related issue is the desire to express the exact value of certain ratios that
+    * cannot be exactly represented in a decimal representation. This requirement arises from
+    * the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal
+    * relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of
+    * 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and
+    * denominator are always exact).
+
+    * Also:
+    * > 7.4 Representing Exact Currency Amounts
+    */
+  implicit lazy val RationalIsFinancial = Financial fromFractional Fractional[Rational]
 }
-
-/*
-TODO: read up
-
-  # [XBR: Precision, Decimals and Units 1.0](http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html)
-
-  > 6.3
-  ...Another related issue is the desire to express the exact value of certain ratios that cannot be
-exactly represented in a decimal representation. This requirement arises from the Tax domain space.
-Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between
-9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the
-fractionItemType in XBRL (where the numerator and denominator are always exact).
-
-  This suggests a Rational type e.g. from spire
-
-  > 7.4 Representing Exact Currency Amounts
- */

@@ -95,7 +95,7 @@ class TimePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
 }
 
 class CamelCasePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
-  import AnyCase._
+  import io.deftrade.util._
 
   // Our Gold standard (for testing): yet another take on an old fav:
   // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22

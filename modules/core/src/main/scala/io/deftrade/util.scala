@@ -16,7 +16,7 @@ object util { outer =>
     def camelToWord: String   = outer.camelToWord(camelName)
   }
 
-  private object CamelTo {
+  object CamelTo {
 
     val uppers    = 'A' to 'Z'
     val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'

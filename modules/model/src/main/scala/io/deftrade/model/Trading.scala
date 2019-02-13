@@ -23,7 +23,7 @@ import money._, pricing._
 import repos._
 import Currency.USD
 
-import cats.{ Eq, Foldable, Monad, MonoidK }
+import cats._
 import cats.data.{ Kleisli, NonEmptySet }
 import cats.implicits._
 
@@ -84,11 +84,11 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * Reference:
     * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
     *
-    * FIXME: Maybe make this a full MTL thing because MonoidK for Kleisli is restrictive.
+    * FIXME: Maybe make this a full MTL thing because SemigroupK for Kleisli is restrictive.
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     */
-  final case class OMS[F[_]: Monad: MonoidK: Foldable] private (
-      eid: Entity.Key,
+  final case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
+      key: Entity.Key,
       contra: Account.Key,
       markets: NonEmptySet[Market]
   ) {
@@ -135,8 +135,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /**
       * TODO: augment/evolve creation pattern.
       */
-    def apply[F[_]: Monad: MonoidK: Foldable](eid: Entity.Key, market: Market, ms: Market*): OMS[F] =
-      OMS[F](eid, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
+    def apply[F[_]: Monad: SemigroupK: Foldable](key: Entity.Key, market: Market, ms: Market*): OMS[F] =
+      OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
 
     private def newContraAccount: Account.Key = ???
 
@@ -188,10 +188,10 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /**
       * What actually happened.
       */
-    final case class Execution(ts: Instant, oms: OMS.Key, oid: Order.Key, tx: Transaction)
+    final case class Execution(ts: Instant, oms: OMS.Key, orderKey: Order.Key, tx: Transaction)
 
     /** Executions are sorted first by Order.Key, and then by timestamp – that should do it! ;) */
-    implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.oid) // FIXME add ts
+    implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.orderKey) // FIXME add ts
     // FIXME here's your problem right here cats.Order[Instant] |> discardValue
     object Execution extends WithKey[Long, Execution] {
       implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
@@ -209,8 +209,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed trait Market { def eid: Entity.Key }
-  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.eid)
+  sealed trait Market { def key: Entity.Key }
+  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
   object Market extends WithKey[Long, Market] {
 
     def quote[F[_]: Monad, C: Currency](
@@ -227,7 +227,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * - seller for all buyers and vice versa.)
       * - activity recorded in a `contra account`
       */
-    final case class Exchange(eid: Entity.Key, contraAid: Account.Key) extends Market
+    final case class Exchange(key: Entity.Key, contraAk: Account.Key) extends Market
     object Exchange {}
 
     /**
@@ -236,10 +236,10 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * when the `Counterparty` is sourcing `Instruments` from private flows.
       * - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
-    final case class Counterparty(val eid: Entity.Key) extends Market
+    final case class Counterparty(val key: Entity.Key) extends Market
     object Counterparty {}
 
-    implicit def eqMarket: Eq[Market] = Eq by (_.eid) // FIXME: fuck this shit
+    implicit def eqMarket: Eq[Market] = Eq by (_.key) // FIXME: fuck this shit
 
     implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
 
@@ -273,7 +273,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * FIXME Accounts are needed to verify sigs and allocate partitions
     * BUT can we break this down into two methods (anonymous, and not)
     */
-  def recorded[F[_]: Foldable: Monad: MonoidK](
+  def recorded[F[_]: Foldable: Monad: SemigroupK](
       fs: Folios,
       accounts: Accounts
   ): OMS.Execution => F[Folios] = ???

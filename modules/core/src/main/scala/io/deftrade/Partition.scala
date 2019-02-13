@@ -1,10 +1,19 @@
 package io.deftrade
 
-import spire.math.Fractional
-
 import cats._
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
+
+import eu.timepit.refined
+// import refined.api.Refined
+// import refined.numeric.Positive
+import refined.auto._
+
+import spire.math.Fractional
+// n.b. the intentionally narrow import!
+// point being: this is how `spire.math.Fractional` and `cats.Order` can co-exist
+// (before grand unification)
+import spire.syntax.field._
 
 import scala.collection.immutable.SortedMap
 
@@ -25,33 +34,30 @@ final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends An
   */
 object Partition {
 
-  import eu.timepit.refined
-  import refined.api.Refined
-  import refined.numeric.Positive
-  import refined.auto._
-
   type PositiveLong = Long // Refined Positive // FIXME do this
 
-  /** `exact` slices is what you say; we'll be the judge of that ;) */
+  /** `exact` slices is what you claim; we'll be the judge of that ;) */
   def exact[K: Order, V: Fractional](shares: (K, V)*): Result[Partition[K, V]] = {
-    val V = Fractional[V]
-    import V._
-    def isUnitary    = one == shares.map(_._2).fold(zero)(plus(_, _))
-    def isReasonable = shares forall { case (_, q) => zero <= q && q <= one }
-    def failmsg      = s"Partition: invalid creation parms: $shares"
-    if (isUnitary && isReasonable) unsafe(SortedMap(shares: _*)).asRight else Fail(failmsg).asLeft
+    val V                     = Fractional[V]
+    def isUnitary             = V.one === shares.map(_._2).fold(V.zero)(_ + _)
+    def zeroToOneForallShares = shares forall { case (_, q) => V.zero <= q && q <= V.one }
+    def failmsg               = s"Partition: invalid creation parms: $shares"
+    if (isUnitary && zeroToOneForallShares)
+      unsafe(SortedMap(shares: _*)).asRight
+    else
+      Fail(failmsg).asLeft
   }
 
   /** `n` shares issued; sum of slices must equal whole pie */
   def fromTotalShares[K: Order, V: Fractional](n: Long)(ps: (K, Long)*): Result[Partition[K, V]] = {
-    val V = Fractional[V]
-    import V._
+    val V              = Fractional[V]
     val computedShares = ps.map(_._2).sum
     if (computedShares =!= n) {
-      io.deftrade.Fail(s"$computedShares != $n").asLeft
+      Fail(s"$computedShares != $n").asLeft
     } else {
+      val vn = V fromLong n
       val shares = ps map {
-        case (k, l) => (k, div(fromLong(l), fromLong(n)))
+        case (k, l) => (k -> (V fromLong l) / vn)
       }
       exact(shares: _*)
     }
@@ -63,9 +69,8 @@ object Partition {
 
   /** what every pizza slicer aims for */
   def fair[K: Order, V: Fractional](ks: NonEmptySet[K]): Partition[K, V] = {
-    val V = Fractional[V]
-    import V._
-    val oneSlice = div(one, fromLong(ks.size))
+    val V        = Fractional[V]
+    val oneSlice = V.one / (V fromLong ks.size)
     val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
     unsafe(slices)
   }
@@ -82,10 +87,9 @@ object Partition {
 
     def unapply[K: Order, V: Fractional](p: Partition[K, V]): Option[K] = {
       val V = Fractional[V]
-      import V._
       p.kvs.toNel.toList match {
-        case (k, v) :: Nil if v === one => k.some
-        case _                          => none
+        case (k, v) :: Nil if v === V.one => k.some
+        case _                            => none
       }
     }
   }

@@ -304,7 +304,7 @@
 //
 //         val enumSql =
 //           """|SELECT t.typname, e.enumlabel
-//              |FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid;
+//              |FROM pg_type t JOIN pg_enum e ON t.orderKey = e.enumtypid;
 //              |""".stripMargin
 //
 //         val enumRs = db.createStatement executeQuery enumSql

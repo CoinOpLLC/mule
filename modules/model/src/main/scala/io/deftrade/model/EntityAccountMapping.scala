@@ -47,16 +47,24 @@ object Entity extends WithKeyAndEq[Long, Entity] {
   type VarChar255 = String Refined refinements.VarChar255
 
   /**
-    * Post Randomization SSN validation. I.e., cursory only.
+    * Post Randomization SSN validation: i.e., cursory only.
+    * See also:
     * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
     * https://www.ssa.gov/employer/randomization.html
     * https://www.ssa.gov/history/ssn/geocard.html
     */
   type SSN = String Refined refinements.SSN
 
+  /**
+    * An `Entity` represents a legal (e.g. corporate, or non-profit) body.
+    * TODO: refine (no pun intended) the requirements on US EINs.
+    * TODO: Internationalize with an ADT.
+    */
   type EIN = String Refined refinements.EIN
 
-  /** TODO fill in the placeholder... also: what else? */
+  /**
+    * An algo in my head told me to do this.
+    */
   type AIN = String Refined refinements.AIN
 
   import refined.boolean.Or
@@ -203,10 +211,10 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   }
 
   object Roster {
-    def single(eid: Entity.Key): Roster =
+    def single(key: Entity.Key): Roster =
       Roster(
-        principles = Partition single eid,
-        nonPrinciples = _ => NonEmptySet one eid
+        principles = Partition single key,
+        nonPrinciples = _ => NonEmptySet one key
       )
   }
 
@@ -246,9 +254,9 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       // Fresh(100000100100L, id => refined.refineV[ValidRange](id + 1L).fold(_ => ???, identity))
     }
 
-    def empty(eid: Entity.Key) = Account(Roster single eid, Vault.empty)
+    def empty(key: Entity.Key) = Account(Roster single key, Vault.empty)
 
-    def simple(eid: Entity.Key, fid: Folio.Key) = Account(Roster single eid, Vault.Folio(fid))
+    def simple(key: Entity.Key, fid: Folio.Key) = Account(Roster single key, Vault.Folio(fid))
 
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
