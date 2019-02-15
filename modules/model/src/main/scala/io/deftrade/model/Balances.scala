@@ -14,6 +14,7 @@ import eu.timepit.refined
 import refined.auto._
 
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
+import spire.math.Fractional
 import spire.syntax.field._
 
 import scala.language.higherKinds
@@ -77,20 +78,34 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   final type Debits  = AccountMap[Debit]
   final type Credits = AccountMap[Credit]
 
-  final type XOPs = AccountMap[XOP]
-  final type LOQs = AccountMap[LOQ]
+  final type XOPs     = AccountMap[XOP]
+  final type Revenues = AccountMap[Revenue]
 
-  final type Assets      = AccountMap[Asset]
+  final type Assets = AccountMap[Asset]
+  final type LOQs   = AccountMap[LOQ]
+
   final type Expenses    = AccountMap[Expense]
   final type Liabilities = AccountMap[Liability]
   final type Equities    = AccountMap[Equity]
-  final type Revenues    = AccountMap[Revenue]
 
+  /** pure trait for the enum base */
+  private[model] sealed trait BalanceLike extends Product with Serializable {
+    type DebitType <: Debit
+    type CreditType <: Credit
+    def ds: AccountMap[DebitType]
+    def cs: AccountMap[CreditType]
+  }
+
+  /** specify key types */
   sealed abstract class Balance[D <: Debit, C <: Credit] private[Balances] (
-      val ds: AccountMap[D],
-      val cs: AccountMap[C]
-  ) extends Product
-      with Serializable
+      debits: AccountMap[D],
+      credits: AccountMap[C]
+  ) extends BalanceLike {
+    final type DebitType  = D
+    final type CreditType = C
+    final def ds = debits
+    final def cs = credits
+  }
 
   /** */
   object Balance {
@@ -101,9 +116,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   case class TrialBalance private (
-      override val ds: Debits,
-      override val cs: Credits
-  ) extends Balance(ds, cs) {
+      debits: Debits,
+      credits: Credits
+  ) extends Balance(debits, credits) {
 
     lazy val partition: (IncomeStatement, BalanceSheet) = {
       import scala.reflect.ClassTag
@@ -124,8 +139,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       copy(ds + (uk.debit -> amt), cs + (uk.credit -> amt))
 
     def swapped[T <: AccountType](sk: SwapKey[T], amt: MonetaryAmount): TrialBalance = sk match {
-      case AssetSwapKey(d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> -amt))
-      case LOQSwapKey(c1, c2)   => copy(cs = cs + (c1 -> amt) + (c2 -> -amt))
+      case AssetSwapKey(d1, d2) => copy(debits = ds + (d1  -> amt) + (d2 -> -amt))
+      case LOQSwapKey(c1, c2)   => copy(credits = cs + (c1 -> amt) + (c2 -> -amt))
     }
   }
   object TrialBalance {
@@ -146,10 +161,12 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       val xops: XOPs,
       val revenues: Revenues
   ) extends Balance(xops, revenues) {
-    def partition[C](implicit ci: CashInstruments): (IncomeStatement, IncomeStatement) = ???
+    def partition[C](implicit ci: CashInstruments): (IncomeStatement, CashFlowStatement) = ???
   }
 
-  /** */
+  /**
+    *
+    */
   object IncomeStatement {
     implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[IncomeStatement] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
@@ -159,7 +176,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  final case class CashFlowStatement private (wut: Null) // FIXME: this is where I left off
+  /**
+    * - `CashFlowStatement` is a Balance(debit, credit) like the IncomeStatement.
+    * - TODO: cash keys should get their own flavors
+    */
+  final case class CashFlowStatement private (
+      val outflows: XOPs,
+      val inflows: Revenues
+  ) extends Balance(outflows, inflows) {
+
+    def net: MA = sumOf(inflows) - sumOf(outflows)
+  }
+
+  /** Follow the `Money`. */
   object CashFlowStatement {
 
     /** operations, investment, financing */
@@ -170,8 +199,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   final case class EquityStatement private (wut: Null)
 
   /**
-    * `BalanceSheet` forms a commutative group
-    *   all balance sheet ops are double entry
+    * `BalanceSheet`s form a `CommutativeGroup`.
+    *  All operations are double entry by construction.
     */
   final case class BalanceSheet private (
       val assets: Assets,

@@ -16,7 +16,14 @@
 
 package io
 
+import cats._
 import cats.data.{ NonEmptyChain, Validated }
+import cats.implicits._
+
+import spire.math.Fractional
+import spire.syntax.field._
+
+import scala.language.higherKinds
 
 /** House rules. */
 package object deftrade {
@@ -27,6 +34,27 @@ package object deftrade {
   type Result[T]     = Either[Fail, T]
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
+
+  def sumOf[K, V: Fractional](m: Map[K, V]): V =
+    m.map(_._2).fold(Fractional[V].zero)(_ + _)
+
+  /** FIXME revisit List. Continue to generalize. */
+  def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
+    as.foldLeft(Map.empty[K, List[A]]) { (acc, a) =>
+      (acc get f(a)).fold(acc + (f(a) -> List(a))) { as =>
+        acc + (f(a) -> (a +: as))
+      }
+    }
+
+  def index[F[_]: Foldable, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
+    groupBy(kvs)(_._1) map {
+      case (k, kvs) => (k, kvs map (_._2))
+    }
+
+  def accumulate[F[_]: Foldable, K, V: Monoid](kvs: F[(K, V)]): Map[K, V] =
+    groupBy(kvs)(_._1) map {
+      case (k, kvs) => (k, kvs foldMap (_._2))
+    }
 
   /**
     * Informs wart remover that the value is intentionally discarded.

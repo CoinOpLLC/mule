@@ -121,6 +121,9 @@ abstract class Ledger[Q: Financial] { self =>
   )
   object Transaction {
 
+    /**
+      * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
+      */
     def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
 
     implicit def order: Eq[Transaction]  = Eq.fromUniversalEquals[Transaction]
@@ -140,26 +143,6 @@ abstract class Ledger[Q: Financial] { self =>
     */
   object Transactions { // FIME this becomes a stream like repo (???)
 
-    /**
-    * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
-    */
   }
-
-  def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
-    as.foldLeft(Map.empty[K, List[A]]) { (acc, a) =>
-      (acc get f(a)).fold(acc + (f(a) -> List(a))) { as =>
-        acc + (f(a) -> (a +: as))
-      }
-    }
-
-  def index[F[_]: Foldable, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs map (_._2))
-    }
-
-  def accumulate[F[_]: Foldable, K, V: Monoid](kvs: F[(K, V)]): Map[K, V] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs foldMap (_._2))
-    }
 
 }
