@@ -42,9 +42,6 @@ object Instrument {
 
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
-  *
-  * This shall be the law: A `type Foo` may not depend on any kind of Foo key. (e.g. `type FooId`.)
-  * This shall be another: only member names whose appearence cannot be helped may appear here.
   */
 abstract class Ledger[Q: Financial] { self =>
 
@@ -124,15 +121,14 @@ abstract class Ledger[Q: Financial] { self =>
   )
   object Transaction {
 
-    /** fold over me */
-    final case class Entry(ax: Transaction, meta: Json)
+    def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
 
-    object Entry {
-      def empty[F[_]: Monad: MonoidK: Foldable]: F[Entry] = MonoidK[F].empty[Entry]
-    }
-
-    implicit def order: Eq[Transaction] = Eq.fromUniversalEquals[Transaction]
+    implicit def order: Eq[Transaction]  = Eq.fromUniversalEquals[Transaction]
+    implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }
+
+  /** fold over me */
+  final case class Entry(ax: Transaction, meta: Json)
 
   /** Support for multiple contingent deal legs */
   final case class AllOrNone(xs: List[Transaction])

@@ -166,12 +166,26 @@ object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
   lazy val values                                  = findValues
 }
 
-sealed abstract class Nettable(val gross: Asset, val less: Asset) extends EnumEntry with Product with Serializable {
-  import io.deftrade.model.{ Balance, MonetaryAmount }
-  final def net[D >: Asset <: Debit, C <: Credit](b: Balance[D, C]): MonetaryAmount =
-    b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
+sealed trait NettableLike extends EnumEntry with Product with Serializable {
+  type AssetType <: Debit
+  def gross: AssetType
+  def less: AssetType
 }
-object Nettable extends Enum[Nettable] {
+
+abstract class Nettable[D <: Asset](
+    val gross: D,
+    val less: D
+) extends NettableLike {
+
+  import io.deftrade.model.{ Balance, MonetaryAmount }
+
+  final type AssetType = D
+  final def net[C <: Credit](b: Balance[D, C]): MonetaryAmount = b match {
+    case Balance(ds, _) => ds(gross) - ds(less)
+  }
+  // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
+}
+object Nettable extends Enum[NettableLike] {
 
   import Asset._
 

@@ -13,55 +13,49 @@ import feralcats.instances._
 import eu.timepit.refined
 import refined.auto._
 
+// narrow import to get `Field` operators (only!) for `Fractional` spire types.
+import spire.syntax.field._
+
 import scala.language.higherKinds
 
 /**
-  * `Balance` calculation from a sequence of `Transaction`s.
+  * Double entry `Balance` calculation from a sequence of `Transaction`s.
   *
   * Recall the fundamental equation of accounting:
   *
-  *  `Debit` === `Credit`
+  *  `Debits` === `Credits`
   *  `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
   *
   *  Balance(Assets, LOQs)
   *  Balance(XOP, Revenues)  // !!!
   *
-  * TODO: fix this comment – design is provisional
   * Both type params are needed to deal with case where MA =!= Q in the cake
-  * this allows this package to deal with MA <=> Q functions via Monetary Instruments table.
-  * Also binding explicitly to `Ledger` with `Folio.Key` dependence.
-  * FIXME: really only depends on `Ledger`
+  * enabling the package to create
+  *   Money[MA, C] <=> (MI, Q)
+  * codecs via MonetaryInstruments table.
+  *
+  * TODO: this design is provisional
+  *
+  * Note the explicit binding to `Ledger` with `Folio.Key` dependence.
+  * FIXME: really only depends on `Ledger` - could merge but would need 2 type params
   */
 abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
 
-  // type AccountType
-  //
-  // type Debit  <: AccountType
-  // type Credit <: AccountType
-  //
-  // type XOP <: Debit
-  // type Revenue <: Credit
-  //
-  // type Asset <: Debit
-  // type LOQ <: Credit
-  //
-  // type Expense <: XOP
-  // // type Profit <: XOP
-  //
-  // type Liability <: LOQ
-  // type Equity <: LOQ
-
   type AccountType = enums.AccountType
-  type Debit       = enums.Debit
-  type Credit      = enums.Credit
-  type XOP         = enums.XOP
-  type LOQ         = enums.LOQ
-  type Asset       = enums.Asset
-  type Expense     = enums.Expense
-  type Liability   = enums.Liability
-  type Equity      = enums.Equity
-  type Revenue     = enums.Revenue
+
+  type Debit  = enums.Debit
+  type Credit = enums.Credit
+
+  type XOP     = enums.XOP
+  type Revenue = enums.Revenue
+
+  type Asset = enums.Asset
+  type LOQ   = enums.LOQ
+
+  type Expense = enums.Expense
   // type Profit = enums.Profit
+  type Liability = enums.Liability
+  type Equity    = enums.Equity
 
   /**
     * FIXME: depends on mapping between `Folio`s and `Balance`s
@@ -92,8 +86,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   final type Equities    = AccountMap[Equity]
   final type Revenues    = AccountMap[Revenue]
 
-  sealed abstract class Balance[D <: Debit, C <: Credit](val ds: AccountMap[D], val cs: AccountMap[C]) extends Product with Serializable
-  object Balance
+  sealed abstract class Balance[D <: Debit, C <: Credit] private[Balances] (
+      val ds: AccountMap[D],
+      val cs: AccountMap[C]
+  ) extends Product
+      with Serializable
+
+  /** */
+  object Balance {
+    def unapply[D <: Debit, C <: Credit](
+        b: Balance[D, C]
+    ): Option[(AccountMap[D], AccountMap[C])] =
+      (b.ds, b.cs).some
+  }
 
   case class TrialBalance private (
       override val ds: Debits,
@@ -119,8 +124,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       copy(ds + (uk.debit -> amt), cs + (uk.credit -> amt))
 
     def swapped[T <: AccountType](sk: SwapKey[T], amt: MonetaryAmount): TrialBalance = sk match {
-      case AssetSwapKey(d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> amt.inverse))
-      case LOQSwapKey(c1, c2)   => copy(cs = cs + (c1 -> amt) + (c2 -> amt.inverse))
+      case AssetSwapKey(d1, d2) => copy(ds = ds + (d1 -> amt) + (d2 -> -amt))
+      case LOQSwapKey(c1, c2)   => copy(cs = cs + (c1 -> amt) + (c2 -> -amt))
     }
   }
   object TrialBalance {
@@ -155,6 +160,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   final case class CashFlowStatement private (wut: Null) // FIXME: this is where I left off
+  object CashFlowStatement {
+
+    /** operations, investment, financing */
+
+    /** outputs: YearBegin, YearEnd, NetIncrease = YearEnd - YearBegin */
+  }
+
   final case class EquityStatement private (wut: Null)
 
   /**
