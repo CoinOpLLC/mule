@@ -57,6 +57,13 @@ package object deftrade {
     }
 
   /**
+    * FIXME: revisit because this doesn't survive a map or flatmap
+    * might just bite bullet and use .get.toResult
+    */
+  def zeroSafeMap[K, V: Monoid](kvs: (K, V)*): Map[K, V] =
+    Map(kvs: _*) withDefaultValue Monoid[V].empty
+
+  /**
     * Informs wart remover that the value is intentionally discarded.
     * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
     */
