@@ -57,7 +57,7 @@ lazy val core = module("core", "identity, time, and money, Scalazzi style")
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ misclibs ++ testers
   )
 
-lazy val model = module("model", "foundational finance VOs/enums/fns/MTLs")
+lazy val model = module("model", "foundational finance VOs/keys/fns/MTLs")
   .dependsOn(core)
   .settings(common)
   .settings(

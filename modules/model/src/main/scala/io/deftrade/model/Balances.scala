@@ -3,7 +3,7 @@ package model
 
 import money._
 
-import enums.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
+import keys.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 
 import cats.{ Foldable, Invariant, Monad, MonoidK }
 import cats.kernel.CommutativeGroup
@@ -14,7 +14,7 @@ import eu.timepit.refined
 import refined.auto._
 
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
-import spire.math.Fractional
+import spire.math.{ Fractional }
 import spire.syntax.field._
 
 import scala.language.higherKinds
@@ -42,21 +42,21 @@ import scala.language.higherKinds
   */
 abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
 
-  type AccountType = enums.AccountType
+  type AccountType = keys.AccountType
 
-  type Debit  = enums.Debit
-  type Credit = enums.Credit
+  type Debit  = keys.Debit
+  type Credit = keys.Credit
 
-  type XOP     = enums.XOP
-  type Revenue = enums.Revenue
+  type XOP     = keys.XOP
+  type Revenue = keys.Revenue
 
-  type Asset = enums.Asset
-  type LOQ   = enums.LOQ
+  type Asset = keys.Asset
+  type LOQ   = keys.LOQ
 
-  type Expense = enums.Expense
-  // type Profit = enums.Profit
-  type Liability = enums.Liability
-  type Equity    = enums.Equity
+  type Expense = keys.Expense
+  // type Profit = keys.Profit
+  type Liability = keys.Liability
+  type Equity    = keys.Equity
 
   /**
     * FIXME: depends on mapping between `Folio`s and `Balance`s
@@ -98,13 +98,18 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   /** specify key types */
   sealed abstract class Balance[D <: Debit, C <: Credit] private[Balances] (
-      debits: AccountMap[D],
-      credits: AccountMap[C]
+      _ds: AccountMap[D],
+      _cs: AccountMap[C]
   ) extends BalanceLike {
+
     final type DebitType  = D
     final type CreditType = C
-    final def ds = debits
-    final def cs = credits
+
+    final def ds: AccountMap[DebitType]  = _ds
+    final def cs: AccountMap[CreditType] = _cs
+
+    final def net: MA = cs.sumValues - ds.sumValues
+
   }
 
   /** */
@@ -113,6 +118,14 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
         b: Balance[D, C]
     ): Option[(AccountMap[D], AccountMap[C])] =
       (b.ds, b.cs).some
+
+    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag](
+        as: AccountMap[T]
+    ): AccountMap[R] =
+      as collect {
+        case (k: R, v) => (k, v)
+      }
+
   }
 
   case class TrialBalance private (
@@ -120,27 +133,20 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       credits: Credits
   ) extends Balance(debits, credits) {
 
-    lazy val partition: (IncomeStatement, BalanceSheet) = {
-      import scala.reflect.ClassTag
-      def collect[T <: AccountType, R <: T: ClassTag](as: AccountMap[T]): AccountMap[R] =
-        as collect {
-          case (k: R, v) => (k, v)
-        }
-      val assets: AccountMap[Asset] = collect(ds)
-      val loqs: AccountMap[LOQ]     = collect(cs)
+    import Balance.collect
 
-      val xops: AccountMap[XOP]         = collect(ds)
-      val revenues: AccountMap[Revenue] = collect(cs)
-
-      (IncomeStatement(xops, revenues), BalanceSheet(assets, loqs))
-    }
+    def partition: (IncomeStatement, BalanceSheet) =
+      (
+        IncomeStatement(debits |> collect, credits |> collect),
+        BalanceSheet(debits    |> collect, credits |> collect)
+      )
 
     def updated(uk: UpdateKey, amt: MonetaryAmount): TrialBalance =
-      copy(ds + (uk.debit -> amt), cs + (uk.credit -> amt))
+      copy(debits + (uk.debit -> amt), credits + (uk.credit -> amt))
 
     def swapped[T <: AccountType](sk: SwapKey[T], amt: MonetaryAmount): TrialBalance = sk match {
-      case AssetSwapKey(d1, d2) => copy(debits = ds + (d1  -> amt) + (d2 -> -amt))
-      case LOQSwapKey(c1, c2)   => copy(credits = cs + (c1 -> amt) + (c2 -> -amt))
+      case AssetSwapKey(d1, d2) => copy(debits = debits + (d1   -> amt) + (d2 -> -amt))
+      case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
     }
   }
   object TrialBalance {
@@ -178,20 +184,22 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   /**
     * - `CashFlowStatement` is a Balance(debit, credit) like the IncomeStatement.
-    * - TODO: cash keys should get their own flavors
+    * - Follow the `Money`. Operations, Investment, Financing
+    * - TODO: cash keys should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
   final case class CashFlowStatement private (
       val outflows: XOPs,
       val inflows: Revenues
-  ) extends Balance(outflows, inflows) {
+  ) extends Balance(outflows, inflows)
 
-    def net: MA = sumOf(inflows) - sumOf(outflows)
-  }
-
-  /** Follow the `Money`. */
+  /**  */
   object CashFlowStatement {
-
-    /** operations, investment, financing */
+    implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[CashFlowStatement] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
+        case (ds, cs) => apply(ds, cs)
+      } {
+        unapply(_).fold(???)(identity)
+      }
 
     /** outputs: YearBegin, YearEnd, NetIncrease = YearEnd - YearBegin */
   }

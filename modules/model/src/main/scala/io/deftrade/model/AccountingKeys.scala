@@ -1,5 +1,5 @@
 package io.deftrade
-package model.enums
+package model.keys
 
 import cats.Eq
 
@@ -133,13 +133,13 @@ object UpdateKey extends Enum[UpdateKey] {
   * `SwapKey`'s type parameter restricts the swap to occur
   * within the same "column" of the `Balance`.
   */
-sealed abstract class SwapKey[T <: AccountType] private[enums] (
+sealed abstract class SwapKey[T <: AccountType] private[keys] (
     val from: T,
     val to: T
 ) extends DoubleEntryKey(from, to)
 object SwapKey
 
-private[enums] sealed abstract class AssetSwapKey(from: Asset, to: Asset) extends SwapKey(from, to)
+private[keys] sealed abstract class AssetSwapKey(from: Asset, to: Asset) extends SwapKey(from, to)
 object AssetSwapKey extends Enum[AssetSwapKey] { // FIXME: profit?!
 
   import Asset._
@@ -180,6 +180,7 @@ abstract class Nettable[D <: Asset](
   import io.deftrade.model.{ Balance, MonetaryAmount }
 
   final type AssetType = D
+
   final def net[C <: Credit](b: Balance[D, C]): MonetaryAmount = b match {
     case Balance(ds, _) => ds(gross) - ds(less)
   }

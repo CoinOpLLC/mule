@@ -17,6 +17,7 @@
 package io
 
 import cats._
+import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyChain, Validated }
 import cats.implicits._
 
@@ -35,33 +36,34 @@ package object deftrade {
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
 
-  def sumOf[K, V: Fractional](m: Map[K, V]): V =
-    m.map(_._2).fold(Fractional[V].zero)(_ + _)
-
   /** FIXME revisit List. Continue to generalize. */
-  def groupBy[F[_]: Foldable, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
+  def groupBy[F[_]: Foldable: MonoidK, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
     as.foldLeft(Map.empty[K, List[A]]) { (acc, a) =>
       (acc get f(a)).fold(acc + (f(a) -> List(a))) { as =>
         acc + (f(a) -> (a +: as))
       }
     }
 
-  def index[F[_]: Foldable, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
+  def index[F[_]: Foldable: MonoidK, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs map (_._2))
     }
 
-  def accumulate[F[_]: Foldable, K, V: Monoid](kvs: F[(K, V)]): Map[K, V] =
+  def accumulate[F[_]: Foldable: MonoidK, K, V: CommutativeGroup](kvs: F[(K, V)]): Map[K, V] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
   /**
-    * FIXME: revisit because this doesn't survive a map or flatmap
-    * might just bite bullet and use .get.toResult
+    *
     */
-  def zeroSafeMap[K, V: Monoid](kvs: (K, V)*): Map[K, V] =
-    Map(kvs: _*) withDefaultValue Monoid[V].empty
+  implicit class SweetMap[K, V](val m: Map[K, V]) extends AnyVal {
+
+    def getWithZero(k: K)(implicit V: Fractional[V]): V = (m get k).fold(V.zero)(identity)
+
+    def sumValues(implicit V: Fractional[V]): V = m.map(_._2).fold(V.zero)(V.plus)
+
+  }
 
   /**
     * Informs wart remover that the value is intentionally discarded.
