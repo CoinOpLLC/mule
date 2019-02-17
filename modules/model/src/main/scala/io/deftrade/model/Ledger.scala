@@ -9,6 +9,7 @@ import kves._
 import repos._
 
 import cats._
+import cats.data.NonEmptySet // which is also Sorted
 import cats.implicits._
 
 import eu.timepit.refined
@@ -16,6 +17,7 @@ import refined.auto._
 
 import io.circe.Json
 
+// import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
 
 /**
@@ -35,8 +37,8 @@ object Fail {
   */
 final case class Instrument(meta: Json)
 object Instrument {
-  type Key = InstrumentIdentifier
-  val Key                         = InstrumentIdentifier
+  type Key = keys.InstrumentIdentifier
+  val Key                         = keys.InstrumentIdentifier
   implicit def eq: Eq[Instrument] = Eq by (_.meta)
 }
 
@@ -64,14 +66,23 @@ abstract class Ledger[Q: Financial] { self =>
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
   type Instruments = Instruments.Table
 
-  /**
-    * Foundational instrument types to be provided via injection of some kind tbd
-    * TODO: capture the fact that the sets of instruments are disjoint.
-    * Cash instruments as a repository, or store, shall nevery have F[_] threaded through it.
-    */
-  type CashInstruments = Map[Currency[_], Set[Instrument.Key]]
-  implicit def currencyInstruments: CashInstruments = ??? // this will go over big
+  /** */
+  type CashInstruments[C] = NonEmptySet[(Instrument.Key, Folio.Key)] // phantom type `C`
+  object CashInstruments
 
+  /**
+    * `CashInstruments`:
+    * - is a configuration parameter only.
+    * - is not as a repository, or store.
+    * - shall nevery have F[_] threaded through it.
+    *
+    * All `Currency` instances in scope are required to have a `CashInstruments` instance.
+    *
+    * TODO: capture the fact that the sets of instruments are disjoint.
+    */
+  implicit def cashInstruments[C: Currency]: CashInstruments[C] = cashInstrumentsMap(Currency[C])
+
+  private lazy val cashInstrumentsMap: Map[Currency[_], CashInstruments[_]] = Map.empty // cfg!
   /**
     * How much of a given `Instrument` is held.
     * Can also be thought of as a `Leg` at rest.
@@ -107,6 +118,7 @@ abstract class Ledger[Q: Financial] { self =>
       recordedAt: Option[Instant],
       /**
         * *Exactly* two parties to a `Transaction`.
+        * Convention: (from, to)
         * - Use `AllOrNone` to compose multiparty `Transaction`s
         */
       parties: (Folio.Key, Folio.Key),

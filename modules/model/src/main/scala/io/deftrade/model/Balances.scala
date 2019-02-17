@@ -67,91 +67,94 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type MonetaryAmount = MA
   val MonetaryAmount = Financial[MonetaryAmount]
 
-  private final type AccountMap[A <: AccountType] = Map[A, MonetaryAmount]
+  private final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
   private object AccountMap {
-    def empty[A <: AccountType]: AccountMap[A] = Map.empty[A, MonetaryAmount]
+    def empty[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = Map.empty[A, Money[MA, CCY]]
   }
 
   /** convenience and domain semantics only */
-  def openAccount[A <: AccountType]: AccountMap[A] = AccountMap.empty
+  def openAccount[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = AccountMap.empty
 
-  final type Debits  = AccountMap[Debit]
-  final type Credits = AccountMap[Credit]
-
-  final type XOPs     = AccountMap[XOP]
-  final type Revenues = AccountMap[Revenue]
-
-  final type Assets = AccountMap[Asset]
-  final type LOQs   = AccountMap[LOQ]
-
-  final type Expenses    = AccountMap[Expense]
-  final type Liabilities = AccountMap[Liability]
-  final type Equities    = AccountMap[Equity]
+  final type Debits[CCY]      = AccountMap[Debit, CCY]
+  final type Credits[CCY]     = AccountMap[Credit, CCY]
+  final type XOPs[CCY]        = AccountMap[XOP, CCY]
+  final type Revenues[CCY]    = AccountMap[Revenue, CCY]
+  final type Assets[CCY]      = AccountMap[Asset, CCY]
+  final type LOQs[CCY]        = AccountMap[LOQ, CCY]
+  final type Expenses[CCY]    = AccountMap[Expense, CCY]
+  final type Liabilities[CCY] = AccountMap[Liability, CCY]
+  final type Equities[CCY]    = AccountMap[Equity, CCY]
 
   /** pure trait for the enum base */
   private[model] sealed trait BalanceLike extends Product with Serializable {
     type DebitType <: Debit
     type CreditType <: Credit
-    def ds: AccountMap[DebitType]
-    def cs: AccountMap[CreditType]
+    type CurrencyType
+    def currency(implicit CCY: Currency[CurrencyType]): Currency[CurrencyType] = CCY
+    def ds[CCY]: AccountMap[DebitType, CCY]
+    def cs[CCY]: AccountMap[CreditType, CCY]
   }
 
   /** specify key types */
-  sealed abstract class Balance[D <: Debit, C <: Credit] private[Balances] (
-      _ds: AccountMap[D],
-      _cs: AccountMap[C]
+  sealed abstract class Balance[D <: Debit, C <: Credit, CCY] private[Balances] (
+      _ds: AccountMap[D, CCY],
+      _cs: AccountMap[C, CCY]
   ) extends BalanceLike {
 
     final type DebitType  = D
     final type CreditType = C
 
-    final def ds: AccountMap[DebitType]  = _ds
-    final def cs: AccountMap[CreditType] = _cs
+    final type CurrencyType = CCY
 
-    final def net: MA = cs.sumValues - ds.sumValues
+    /** FIXME implementing this will take creatime downcasting... */
+    final def ds[CCY]: AccountMap[DebitType, CCY]  = ??? // _ds
+    final def cs[CCY]: AccountMap[CreditType, CCY] = ??? // _cs
+
+    final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = ??? // FIXME cs.sumValues - ds.sumValues
 
   }
 
   /** */
   object Balance {
-    def unapply[D <: Debit, C <: Credit](
-        b: Balance[D, C]
-    ): Option[(AccountMap[D], AccountMap[C])] =
-      (b.ds, b.cs).some
+    def unapply[D <: Debit, C <: Credit, CCY: Currency](
+        b: Balance[D, C, CCY]
+    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = ???
+    // (b.ds, b.cs).some
 
-    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag](
-        as: AccountMap[T]
-    ): AccountMap[R] =
+    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, CCY](
+        as: AccountMap[T, CCY]
+    ): AccountMap[R, CCY] =
       as collect {
         case (k: R, v) => (k, v)
       }
 
   }
 
-  case class TrialBalance private (
-      debits: Debits,
-      credits: Credits
-  ) extends Balance(debits, credits) {
+  case class TrialBalance[CCY] private (
+      debits: Debits[CCY],
+      credits: Credits[CCY]
+  ) extends Balance[Debit, Credit, CCY](debits, credits) {
 
     import Balance.collect
 
-    def partition: (IncomeStatement, BalanceSheet) =
+    def partition: (IncomeStatement[CCY], BalanceSheet[CCY]) =
       (
         IncomeStatement(debits |> collect, credits |> collect),
         BalanceSheet(debits    |> collect, credits |> collect)
       )
 
-    def updated(uk: UpdateKey, amt: MonetaryAmount): TrialBalance =
+    def updated(uk: UpdateKey, amt: Money[MA, CCY]): TrialBalance[CCY] =
       copy(debits + (uk.debit -> amt), credits + (uk.credit -> amt))
 
-    def swapped[T <: AccountType](sk: SwapKey[T], amt: MonetaryAmount): TrialBalance = sk match {
-      case AssetSwapKey(d1, d2) => copy(debits = debits + (d1   -> amt) + (d2 -> -amt))
-      case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
-    }
+    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, CCY]): TrialBalance[CCY] =
+      sk match {
+        case AssetSwapKey(d1, d2) => copy(debits = debits + (d1   -> amt) + (d2 -> -amt))
+        case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
+      }
   }
   object TrialBalance {
-    implicit lazy val trialBalanceCommutativeGroup: CommutativeGroup[TrialBalance] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits, Credits)]) {
+    implicit def trialBalanceCommutativeGroup[CCY: Currency]: CommutativeGroup[TrialBalance[CCY]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[CCY], Credits[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -163,19 +166,21 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * A cash account can be determined from its `Instrument.Key`.
     * This can be used to create a filter for `CashFlowStatement`s.
     */
-  final case class IncomeStatement private (
-      val xops: XOPs,
-      val revenues: Revenues
+  final case class IncomeStatement[CCY] private (
+      val xops: XOPs[CCY],
+      val revenues: Revenues[CCY]
   ) extends Balance(xops, revenues) {
-    def partition[C](implicit ci: CashInstruments): (IncomeStatement, CashFlowStatement) = ???
+
+    def partition(implicit ci: CashInstruments[CCY]): (IncomeStatement[CCY], CashFlowStatement[CCY]) =
+      ???
   }
 
   /**
     *
     */
   object IncomeStatement {
-    implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[IncomeStatement] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
+    implicit def incomeStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[IncomeStatement[CCY]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs[CCY], Revenues[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -187,15 +192,15 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * - Follow the `Money`. Operations, Investment, Financing
     * - TODO: cash keys should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
-  final case class CashFlowStatement private (
-      val outflows: XOPs,
-      val inflows: Revenues
+  final case class CashFlowStatement[CCY] private (
+      val outflows: XOPs[CCY],
+      val inflows: Revenues[CCY]
   ) extends Balance(outflows, inflows)
 
   /**  */
   object CashFlowStatement {
-    implicit lazy val incomeStatementCommutativeGroup: CommutativeGroup[CashFlowStatement] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs, Revenues)]) {
+    implicit def cashflowStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[CashFlowStatement[CCY]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs[CCY], Revenues[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -204,34 +209,34 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     /** outputs: YearBegin, YearEnd, NetIncrease = YearEnd - YearBegin */
   }
 
-  final case class EquityStatement private (wut: Null)
+  final case class EquityStatement[CCY] private (wut: Null)
 
   /**
     * `BalanceSheet`s form a `CommutativeGroup`.
     *  All operations are double entry by construction.
     */
-  final case class BalanceSheet private (
-      val assets: Assets,
-      val loqs: LOQs
+  final case class BalanceSheet[CCY] private (
+      val assets: Assets[CCY],
+      val loqs: LOQs[CCY]
   ) extends Balance(assets, loqs)
 
   /** tax free implicits */
   object BalanceSheet {
-    implicit lazy val balanceCommutativeGroup: CommutativeGroup[BalanceSheet] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets, LOQs)]) {
+    implicit def balanceCommutativeGroup[CCY: Currency]: CommutativeGroup[BalanceSheet[CCY]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets[CCY], LOQs[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
       }
   }
 
-  def trialBalance[F[_]: Foldable: Monad: MonoidK](ts: Transactions[F]): TrialBalance =
+  def trialBalance[F[_]: Foldable: Monad: MonoidK, CCY: Currency](ts: Transactions[F]): TrialBalance[CCY] =
     ???
 
-  def breakdown(
-      prior: BalanceSheet,
-      delta: BalanceSheet, // delta and raw come from TrialBalance
-      raw: IncomeStatement // mixed cash and accrual
-  )(implicit ci: CashInstruments): (CashFlowStatement, EquityStatement) =
+  def breakdown[CCY: Currency: CashInstruments](
+      prior: BalanceSheet[CCY],
+      delta: BalanceSheet[CCY], // delta and raw come from TrialBalance
+      raw: IncomeStatement[CCY] // mixed cash and accrual
+  ): (CashFlowStatement[CCY], EquityStatement[CCY]) =
     ???
 }

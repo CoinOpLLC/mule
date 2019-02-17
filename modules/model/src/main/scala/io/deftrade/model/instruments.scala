@@ -1,12 +1,12 @@
 package io.deftrade
-package model
+package model.keys
 
 import cats.{ Order }
 import cats.instances.string._
 
 import scala.util.matching.Regex
 
-sealed trait UniversalInstrumentIdentifyer extends Serializable with Product {
+sealed trait UniversalInstrumentIdentifyer extends Any with Serializable with Product {
   def s: String
 
   // FIXME: TODO: what this really needs is the `Refined` treatment (with `Validation`)
@@ -15,12 +15,12 @@ sealed trait UniversalInstrumentIdentifyer extends Serializable with Product {
 
 object UniversalInstrumentIdentifyer {
   // TODO: each of these needs a regex refinement for the string param
-  case class Cusip(s: String) extends UniversalInstrumentIdentifyer
-  case class Isin(s: String)  extends UniversalInstrumentIdentifyer
-  // case class Ric(s: String)          extends UniversalInstrumentIdentifyer
-  // case class Buid(s: String)         extends UniversalInstrumentIdentifyer
-  case class IbContractId(s: String) extends UniversalInstrumentIdentifyer
-  case class HouseId(s: String)      extends UniversalInstrumentIdentifyer
+  case class Cusip(s: String)        extends AnyVal with UniversalInstrumentIdentifyer
+  case class Isin(s: String)         extends AnyVal with UniversalInstrumentIdentifyer
+  case class Ric(s: String)          extends AnyVal with UniversalInstrumentIdentifyer
+  case class Buid(s: String)         extends AnyVal with UniversalInstrumentIdentifyer
+  case class IbContractId(s: String) extends AnyVal with UniversalInstrumentIdentifyer
+  case class HouseId(s: String)      extends AnyVal with UniversalInstrumentIdentifyer
 
   // implicit lazy val eq = Eq.fromUniversalEquals[UniversalInstrumentIdentifyer]
   implicit lazy val order: Order[UniversalInstrumentIdentifyer] = Order by (_.s)
@@ -119,6 +119,8 @@ object Strike {
   }
 }
 /*
+// TODO: com.google.common.base.CharMatcher
+
 object Isin extends App {
   val isins = Seq("US0378331005", "US0373831005", "U50378331005",
     "US03378331005", "AU0000XVGZA3","AU0000VXGZA3", "FR0000988040")

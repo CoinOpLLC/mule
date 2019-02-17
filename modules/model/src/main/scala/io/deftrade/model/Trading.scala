@@ -24,7 +24,7 @@ import repos._
 import Currency.USD
 
 import cats._
-import cats.data.{ Kleisli, NonEmptySet }
+import cats.data.{ EitherT, Kleisli, NonEmptySet }
 import cats.implicits._
 
 import eu.timepit.refined
@@ -62,7 +62,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
   object PricedTrade {
-    def apply[C](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+    def apply[C: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
 
     /**
       * Used to convert to the currency as `Instrument` convention.
@@ -70,7 +70,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * What is the set of "payable on demand" dollar instruments?
       * This dictates the normalization.
       */
-    def normalize[C](pt: PricedTrade[C])(implicit ci: CashInstruments): Trade = ???
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments[C]): Trade = ???
   }
 
   /**
@@ -97,7 +97,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     import OMS.{ Allocation, Execution, Order }
 
     /** He stacc. He refacc. */
-    type FK[T, R] = Kleisli[F, T, Either[Fail, R]]
+    type FF[R]    = EitherT[F, Fail, R]
+    type FK[T, R] = Kleisli[FF, T, R]
 
     final def process[C: Currency, A](p: Account.Key, a: Allocation)(
         block: => A
@@ -107,8 +108,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       val alloc: FK[Execution, Execution] = allocate(p, a)
       // FIXME this used to work
       // and by work I mean compile ;)
-      // risk andThen tr andThen alloc
-      ???
+      risk andThen tr andThen alloc
+      // ???
     }
 
     def riskCheck[C: Currency, A](a: A): FK[A, Order[C]] =
@@ -136,7 +137,11 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /**
       * TODO: augment/evolve creation pattern.
       */
-    def apply[F[_]: Monad: SemigroupK: Foldable](key: Entity.Key, market: Market, ms: Market*): OMS[F] =
+    def apply[F[_]: Monad: SemigroupK: Foldable](
+        key: Entity.Key,
+        market: Market,
+        ms: Market*
+    ): OMS[F] =
       OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
 
     private def newContraAccount: Account.Key = ???

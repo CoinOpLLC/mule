@@ -178,10 +178,11 @@ abstract class Nettable[D <: Asset](
 ) extends NettableLike {
 
   import io.deftrade.model.{ Balance, MonetaryAmount }
+  import io.deftrade.money._
 
   final type AssetType = D
 
-  final def net[C <: Credit](b: Balance[D, C]): MonetaryAmount = b match {
+  final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MonetaryAmount, CCY] = b match {
     case Balance(ds, _) => ds(gross) - ds(less)
   }
   // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
