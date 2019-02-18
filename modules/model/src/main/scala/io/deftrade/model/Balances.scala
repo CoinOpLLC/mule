@@ -5,7 +5,8 @@ import money._
 
 import keys.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 
-import cats.{ Foldable, Invariant, Monad, MonoidK }
+import cats.{ Foldable, Invariant, Monad, MonoidK, Reducible }
+import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
 import cats.implicits._
 import feralcats.instances._
@@ -42,6 +43,10 @@ import scala.language.higherKinds
   */
 abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
 
+  /** Domain specific tools for dealing with `MonetaryAmount`s */
+  type MonetaryAmount = MA
+  val MonetaryAmount = Financial[MonetaryAmount]
+
   type AccountType = keys.AccountType
 
   type Debit  = keys.Debit
@@ -59,17 +64,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Equity    = keys.Equity
 
   /**
-    * FIXME: depends on mapping between `Folio`s and `Balance`s
+    * FIXME: depends on mapping between `Folio`s and `Balance`s,
+    * which in turn depends on Pricing. :|
     */
   type EntryKey = (AccountType, Folio.Key)
-
-  /** Domain specific tools for dealing with `MonetaryAmount`s */
-  type MonetaryAmount = MA
-  val MonetaryAmount = Financial[MonetaryAmount]
 
   private final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
   private object AccountMap {
     def empty[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = Map.empty[A, Money[MA, CCY]]
+  }
+
+  implicit class SweetAccountMap[A <: AccountType, CCY](am: AccountMap[A, CCY]) {
+    def total(implicit CCY: Currency[CCY]): Money[MA, CCY] =
+      CCY(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
   }
 
   /** convenience and domain semantics only */
@@ -87,12 +94,16 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   /** pure trait for the enum base */
   private[model] sealed trait BalanceLike extends Product with Serializable {
-    type DebitType <: Debit
-    type CreditType <: Credit
+
     type CurrencyType
     def currency(implicit CCY: Currency[CurrencyType]): Currency[CurrencyType] = CCY
-    def ds[CCY]: AccountMap[DebitType, CCY]
-    def cs[CCY]: AccountMap[CreditType, CCY]
+
+    type DebitType <: Debit
+    def ds: AccountMap[DebitType, CurrencyType]
+
+    type CreditType <: Credit
+    def cs: AccountMap[CreditType, CurrencyType]
+
   }
 
   /** specify key types */
@@ -106,20 +117,20 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
     final type CurrencyType = CCY
 
-    /** FIXME implementing this will take creatime downcasting... */
-    final def ds[CCY]: AccountMap[DebitType, CCY]  = ??? // _ds
-    final def cs[CCY]: AccountMap[CreditType, CCY] = ??? // _cs
+    final def ds: AccountMap[DebitType, CurrencyType]  = _ds
+    final def cs: AccountMap[CreditType, CurrencyType] = _cs
 
-    final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = ??? // FIXME cs.sumValues - ds.sumValues
+    /** FIXME implementing this will take creatime downcasting... */
+    final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = cs.total - ds.total
 
   }
 
   /** */
   object Balance {
+
     def unapply[D <: Debit, C <: Credit, CCY: Currency](
         b: Balance[D, C, CCY]
-    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = ???
-    // (b.ds, b.cs).some
+    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.ds, b.cs).some
 
     def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, CCY](
         as: AccountMap[T, CCY]
@@ -147,7 +158,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       copy(debits + (uk.debit -> amt), credits + (uk.credit -> amt))
 
     def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, CCY]): TrialBalance[CCY] =
-      sk match {
+      sk match { // FIXME: BUG: this doesn't do what I think. Need to lift the pairs to Maps.
         case AssetSwapKey(d1, d2) => copy(debits = debits + (d1   -> amt) + (d2 -> -amt))
         case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
       }

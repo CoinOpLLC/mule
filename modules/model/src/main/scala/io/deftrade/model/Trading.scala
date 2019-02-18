@@ -106,10 +106,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       val risk: FK[A, Order[C]]           = riskCheck(block)
       val tr: FK[Order[C], Execution]     = trade
       val alloc: FK[Execution, Execution] = allocate(p, a)
-      // FIXME this used to work
-      // and by work I mean compile ;)
       risk andThen tr andThen alloc
-      // ???
     }
 
     def riskCheck[C: Currency, A](a: A): FK[A, Order[C]] =
