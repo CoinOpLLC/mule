@@ -89,7 +89,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     */
   final case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
-      key: Entity.Key,
+      key: LegalEntity.Key,
       contra: Account.Key,
       markets: NonEmptySet[Market]
   ) {
@@ -135,7 +135,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * TODO: augment/evolve creation pattern.
       */
     def apply[F[_]: Monad: SemigroupK: Foldable](
-        key: Entity.Key,
+        key: LegalEntity.Key,
         market: Market,
         ms: Market*
     ): OMS[F] =
@@ -212,7 +212,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed trait Market { def key: Entity.Key }
+  sealed trait Market { def key: LegalEntity.Key }
   implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
   object Market extends WithKey[Long, Market] {
 
@@ -230,7 +230,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * - seller for all buyers and vice versa.)
       * - activity recorded in a `contra account`
       */
-    final case class Exchange(key: Entity.Key, contraAk: Account.Key) extends Market
+    final case class Exchange(key: LegalEntity.Key, contraAk: Account.Key) extends Market
     object Exchange {}
 
     /**
@@ -239,7 +239,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * when the `Counterparty` is sourcing `Instruments` from private flows.
       * - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
-    final case class Counterparty(val key: Entity.Key) extends Market
+    final case class Counterparty(val key: LegalEntity.Key) extends Market
     object Counterparty {}
 
     implicit def eqMarket: Eq[Market] = Eq by (_.key) // FIXME: fuck this shit

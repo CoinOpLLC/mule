@@ -22,17 +22,17 @@ import refined.numeric._
 import io.circe.Json
 
 /**
-  * `Entities` model real world actors.
+  * `LegalEntities` model real world actors.
   * See Also: `model.Role`s.
   */
-sealed trait Entity extends Product with Serializable {
-  def name: Entity.VarChar
-  def dtid: Entity.DTID
+sealed trait LegalEntity extends Product with Serializable {
+  def name: LegalEntity.VarChar
+  def dtid: LegalEntity.DTID
   def meta: Json
 }
 
-/** `Entity`s recognized by the system. */
-object Entity extends WithKeyAndEq[Long, Entity] {
+/** `LegalEntity`s recognized by the system. */
+object LegalEntity extends WithKeyAndEq[Long, LegalEntity] {
 
   /**
     * RDB friendly `String`s that are born usable as is.
@@ -56,7 +56,7 @@ object Entity extends WithKeyAndEq[Long, Entity] {
   type SSN = String Refined refinements.SSN
 
   /**
-    * An `Entity` represents a legal (e.g. corporate, or non-profit) body.
+    * An `LegalEntity` represents a legal (e.g. corporate, or non-profit) body.
     * TODO: refine (no pun intended) the requirements on US EINs.
     * TODO: Internationalize with an ADT.
     */
@@ -73,43 +73,52 @@ object Entity extends WithKeyAndEq[Long, Entity] {
 
   import refined.auto._
 
-  /** `People` are people. Also, `People` are `Entity`s.  */
-  final case class Person(name: VarChar, ssn: SSN, dob: LocalDate, meta: Json) extends Entity {
-    def dtid = ??? // ssn FIXME this keeps breaking, and then working again
+  /**
+    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
+    */
+  final case class NaturalPerson(
+      name: VarChar,
+      ssn: SSN,
+      dob: LocalDate,
+      meta: Json
+  ) extends LegalEntity {
+    def dtid = ssn
   }
 
-  /** `Corporation`s are `Entity`s too! */
-  final case class Corporation(name: VarChar, ein: EIN, meta: Json) extends Entity {
+  /**
+    * `Corporation`s are `LegalEntity`s too!
+    */
+  final case class Corporation(name: VarChar, ein: EIN, meta: Json) extends LegalEntity {
     def dtid = ein
   }
 
   /** TODO flesh this concept out... minimum viable PM */
-  final case class Algorithm(name: VarChar, ain: AIN, meta: Json) extends Entity {
+  final case class Algorithm(name: VarChar, ain: AIN, meta: Json) extends LegalEntity {
     def dtid = ??? // ain FIXME
   }
 
-  implicit def eqEntity = Eq.fromUniversalEquals[Entity]
+  implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
 
-  implicit def showEntity = Show.show[Entity] {
+  implicit def showEntity = Show.show[LegalEntity] {
     _.toString // this can evolve!
   }
 
   /**
-    * The default `Fresh` instance placed in scope by `Entity` is zeroBasedIncr.
+    * The default `Fresh` instance placed in scope by `LegalEntity` is zeroBasedIncr.
     * This is one possible policy decision; there are others. TODO: revisit.
     */
   implicit def freshEntityKey: Fresh[Key] = Fresh.zeroBasedIncr
 }
 
 /**
-  * Every `Entity` needs a `Role`.
+  * Every `LegalEntity` needs a `Role`.
   * There are a finite enumeration of `Role`s.
   */
 sealed trait Role extends EnumEntry
 
 /**
   * There is _always_ a distinguished `Role`, the `Principle`.
-  * `Principle` `Entity` status may enforced by the type system using this.
+  * `Principle` `LegalEntity` status may enforced by the type system using this.
   */
 sealed trait Principle extends Role
 
@@ -124,7 +133,7 @@ sealed trait NonPrinciple extends Role
 object Role extends Enum[Role] with CatsEnum[Role] {
 
   /**
-    * The `Entity` which is the economic actor responsible for establishing the `Account`.
+    * The `LegalEntity` which is the economic actor responsible for establishing the `Account`.
     *
     * Semantics for `Principle` are conditioned on the status of account, for examples:
     * - beneficial owner for an asset
@@ -136,7 +145,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
 
   /**
     * The primary delegate selected by a `Principle`.
-    * Also, simply, the `Entity`(s) whose names are listed on the `Account`,
+    * Also, simply, the `LegalEntity`(s) whose names are listed on the `Account`,
     * and the primary point of contact for the `Account`.
     *
     * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
@@ -148,7 +157,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
 
   /**
     * The primary delegate selected by the `Agent`.
-    * `Entity`(s) with responsibility for, and authority over,
+    * `LegalEntity`(s) with responsibility for, and authority over,
     * the disposition of assets in the `Account`.
     *
     * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
@@ -188,48 +197,45 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   lazy val nonPrinciples: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
-object Entities extends SimplePointInTimeRepository[cats.Id, Entity.Key, Entity]
+object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
 
 /** package level API */
 abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
   /**  */
-  type Entities = Entities.Table
+  type LegalEntities = LegalEntities.Table
 
   /**
     * Who does what. Or should. And shouldn't.
     */
   final case class Roster private (
-      principles: Partition[Entity.Key, Quantity],
-      nonPrinciples: NonPrinciple => NonEmptySet[Entity.Key]
+      principles: Partition[LegalEntity.Key, Quantity],
+      nonPrinciples: NonPrinciple => NonEmptySet[LegalEntity.Key]
   ) {
-    val roles: NonEmptyMap[Role, NonEmptySet[Entity.Key]] =
+    lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
       NonEmptyMap of (
         Role.Principle -> principles.keys,
         Role.nonPrinciples.map(np => (np, nonPrinciples(np))): _*
     )
+
+    def withAgent(agent: LegalEntity.Key): Roster =
+      copy(nonPrinciples = {
+        case Role.Agent => NonEmptySet one agent
+        case np         => nonPrinciples(np)
+      })
+
+    def withAuditor(auditor: LegalEntity.Key): Roster = ??? // refactor with above
   }
 
   object Roster {
-    def single(key: Entity.Key): Roster =
+
+    def fromRoles(rs: Map[Role, LegalEntity.Key]): Result[Roster] = ???
+
+    def single(key: LegalEntity.Key): Roster =
       Roster(
         principles = Partition single key,
         nonPrinciples = _ => NonEmptySet one key
       )
-  }
-
-  /**
-    * `Vault` is a sum type used in its capacity as an obfuscator ;)
-    * TODO: implement recursive traversal of a `Vault` as a `Foldable`
-    * so you can treat as a container of `Folio.Key`s, basically.
-    */
-  sealed trait Vault
-  object Vault {
-
-    case class SubAccounts(subs: Set[Account.Key]) extends Vault
-    case class Folio(fid: self.Folio.Key)          extends Vault
-
-    def empty: Vault = SubAccounts(Set.empty) // idiom
   }
 
   /**
@@ -242,7 +248,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * - conjuction.
     * - that's it (you're welcome.)
     */
-  case class Account(roster: Roster, vault: Vault)
+  case class Account(roster: Roster, folioKey: Folio.Key)
   object Account {
     import refinements.ValidRange
     implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
@@ -252,9 +258,11 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
     }
 
-    def empty(key: Entity.Key) = Account(Roster single key, Vault.empty)
+    def freshFolioKey: Folio.Key = ??? // FIXME: this is now repo-dependent
 
-    def simple(key: Entity.Key, fid: Folio.Key) = Account(Roster single key, Vault.Folio(fid))
+    def empty(key: LegalEntity.Key) = simple(key, freshFolioKey)
+
+    def simple(le: LegalEntity.Key, f: Folio.Key) = Account(Roster single le, f)
 
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
@@ -290,7 +298,7 @@ object refinements {
   object SSN {
 
     implicit def ssnValidate: Validate.Plain[String, SSN] =
-      Validate.fromPredicate(predicate, t => s"$t is mos def NOT a valid SSN", SSN())
+      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid SSN", SSN())
 
     private val regex = "^(\\d{3})-(\\d{2})-(\\d{4})$".r.pattern
     private val predicate: String => Boolean = s => {
@@ -298,8 +306,8 @@ object refinements {
       matcher.find() && matcher.matches() && {
         import matcher.group
         val an      = group(1).toInt
-        val gn      = group(2).toInt
-        val sn      = group(3).toInt
+        def gn      = group(2).toInt
+        def sn      = group(3).toInt
         def checkAn = 0 < an && an != 666 /* sic */ && an < 900
         checkAn && 0 < gn && 0 < sn
       }
