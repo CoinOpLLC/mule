@@ -22,7 +22,6 @@ import cats.data.{ NonEmptyChain, Validated }
 import cats.implicits._
 
 import spire.math.Fractional
-import spire.syntax.field._
 
 import scala.language.higherKinds
 
@@ -36,20 +35,32 @@ package object deftrade {
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
 
-  /** FIXME revisit List. Continue to generalize. */
-  def groupBy[F[_]: Foldable: MonoidK, A, K](as: F[A])(f: A => K): Map[K, List[A]] =
-    as.foldLeft(Map.empty[K, List[A]]) { (acc, a) =>
-      (acc get f(a)).fold(acc + (f(a) -> List(a))) { as =>
-        acc + (f(a) -> (a +: as))
-      }
-    }
+  def groupBy[F[_]: Applicative: Foldable: MonoidK, K, A](
+      as: F[A]
+  )(
+      f: A => K
+  ): Map[K, F[A]] = {
 
-  def index[F[_]: Foldable: MonoidK, K, V](kvs: F[(K, V)]): Map[K, List[V]] =
+    val MA = MonoidK[F].algebra[A]
+    import MA.{ combine, empty }
+
+    as.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
+      val key    = f(a)
+      def asForK = (acc get key).fold(empty)(identity)
+      acc + (key -> combine(asForK, a.pure[F]))
+    }
+  }
+
+  def index[F[_]: Applicative: Foldable: MonoidK, K, V](
+      kvs: F[(K, V)]
+  ): Map[K, F[V]] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs map (_._2))
     }
 
-  def accumulate[F[_]: Foldable: MonoidK, K, V: CommutativeGroup](kvs: F[(K, V)]): Map[K, V] =
+  def accumulate[F[_]: Applicative: Foldable: MonoidK, K, V: CommutativeGroup](
+      kvs: F[(K, V)]
+  ): Map[K, V] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
@@ -66,19 +77,20 @@ package object deftrade {
   }
 
   /**
-    * Informs wart remover that the value is intentionally discarded.
-    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
-    */
-  val discardValue: Any => Unit = (_: Any) => ()
-
-  /**
     * Bind a message to an assertion function.
     * Handy for development. If you write trading algos, this is basically "forever".
     */
   def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
 
   /**
+    * Informs wart remover that the value is intentionally discarded.
+    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
+    */
+  val discardValue: Any => Unit = (_: Any) => ()
+
+  /**
     * I hear nice things about OCaml. So I stole something from it.
+    * The |> operator pairs nicely with `discardValues`.
     */
   implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
     def |>[B](f: A => B): B = f(a)

@@ -109,5 +109,4 @@ package object test {
   )
   // @formatter:on
 
-
 }
