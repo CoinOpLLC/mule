@@ -12,6 +12,8 @@ object Version {
 
   val Cats           = "1.6.0"
   val CatsEffect     = "1.2.0"
+  val Kittens        = "1.2.1"
+  val Mouse          = "0.7.0"
   val CatsScalaCheck = "0.1.0"
   val Fs2            = "1.0.0"
   val Fuiid          = "0.1.2"
@@ -21,7 +23,7 @@ object Version {
   val Spire          = "0.16.0"
   val Refined        = "0.9.2"
   val Circe          = "0.8.0"
-  val Cormorant      = "0.0.7"
+  val Cormorant      = "0.2.0-M3"
 
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
@@ -48,6 +50,10 @@ object Deps {
   val conf = "com.typesafe" % "config" % TypesafeConfig
 
   val cats = "org.typelevel" %% "cats-core" % Cats
+
+  val kittens = "org.typelevel" %% "kittens" % Kittens
+
+  val mouse = "org.typelevel" %% "mouse" % Mouse
 
   val catsEffect = "org.typelevel" %% "cats-effect" % CatsEffect
 
@@ -158,6 +164,8 @@ object Deps {
     List(
       cats,
       catsEffect,
+      kittens,
+      // mouse,
       // quicklens,
       spire,
     ) ++ fs2s ++ cormorants ++ fuiids
