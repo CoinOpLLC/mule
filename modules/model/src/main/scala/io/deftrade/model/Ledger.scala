@@ -97,7 +97,7 @@ abstract class Ledger[Q: Financial] { self =>
   type Folio = Map[Instrument.Key, Quantity]
   object Folio extends WithKey[Long, Folio] {
     def empty: Folio                = Map.empty
-    def apply(ps: Position*): Folio = accumulate(ps.toList)
+    def apply(ps: Position*): Folio = indexAndSum(ps.toList)
   }
 
   object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {

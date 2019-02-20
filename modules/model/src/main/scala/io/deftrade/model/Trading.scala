@@ -44,7 +44,7 @@ import scala.language.higherKinds
   * - we debit that account when we "buy shares" (creates negative balance)
   * - we credit that account when settlement happens (zeros out the balance)
   * - we "reverse polarity" when we enter a short position.
-  * - we can accumulate settled positions for reconcilliation
+  * - we can indexAndSum settled positions for reconcilliation
   *
   * TODO - provisional:
   * we depend on `Balances` because it makes no sense

@@ -35,35 +35,53 @@ package object deftrade {
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
 
-  def groupBy[F[_]: Applicative: Foldable: MonoidK, K, A](
+  def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](
       as: F[A]
   )(
       f: A => K
   ): Map[K, F[A]] = {
 
-    val MA = MonoidK[F].algebra[A]
-    import MA.{ combine, empty }
+    val SA = SemigroupK[F].algebra[A]
+    import SA.combine
 
     as.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
-      val key    = f(a)
-      def asForK = (acc get key).fold(empty)(identity)
-      acc + (key -> combine(asForK, a.pure[F]))
+      val key = f(a)
+      val v   = a.pure[F]
+      acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
     }
   }
 
-  def index[F[_]: Applicative: Foldable: MonoidK, K, V](
+  def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
       kvs: F[(K, V)]
   ): Map[K, F[V]] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs map (_._2))
     }
 
-  def accumulate[F[_]: Applicative: Foldable: MonoidK, K, V: CommutativeGroup](
+  def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
       kvs: F[(K, V)]
   ): Map[K, V] =
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
+
+  implicit class SweetColumn[C[_], V](val column: C[V]) {
+
+    import io.deftrade.money._
+
+    def total(
+        implicit C: Foldable[C],
+        V: Financial[V]
+    ): V =
+      column.foldLeft(Fractional[V].zero)(Fractional[V].plus)
+
+    def tally[CCY](
+        implicit C: Foldable[C],
+        V: Financial[V],
+        CCY: Currency[CCY]
+    ): Money[V, CCY] =
+      total |> CCY.apply[V]
+  }
 
   /**
     *

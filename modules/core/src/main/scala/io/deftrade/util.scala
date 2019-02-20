@@ -74,11 +74,15 @@ object csvio {
   import java.util.UUID
   // import java.time.{ Instant, LocalDate, LocalTime }
 
-  sealed trait Nut extends Product with Serializable
-  object Nut {
+  import enumeratum._
+
+  sealed trait Nut extends EnumEntry with Product with Serializable
+  object Nut extends Enum[Nut] {
     case object Hazelnut extends Nut
     case object Peanut   extends Nut
     case object Almond   extends Nut
+
+    lazy val values: IndexedSeq[Nut] = findValues
   }
 
   /** Serialize this. */
@@ -94,7 +98,7 @@ object csvio {
       time: LocalTime,
       nut: Nut,
       // c: Currency[_],
-      // tally: Money[Double, Currency.USD],
+      // indexAndSum: Money[Double, Currency.USD],
       ts: Instant,
   )
 
@@ -112,11 +116,27 @@ object csvio {
       val time = localTime(clockDefaultZone) // FIXME make moar orthogonal pleaz
       val nut  = Nut.Almond
       // val c    = Currency.USD
-      //  val tally = Money[Double, Currency.USD]
+      //  val indexAndSum = Money[Double, Currency.USD]
       val ts = instant
       Foo(uuid, s, i, l, d, bd, date, time, nut, ts)
     }
   }
+
+  // implicit def refinedGet[T: Get, P]: Get[T Refined P] = Get.tryOrMessage[T Refined P](
+  //   field =>
+  //     ??? // FIXME um... get the T
+  //       refineV [P] (field) // passes the error along
+  // )
+  // implicit def refinedPut[T: Put, P]: Put[T Refined P] = stringPut.contramap(_.toString)
+
+  final def enumeratumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get.tryOrMessage(
+    field => scala.util.Try(e.withName(field.x)),
+    field => s"Failed to decode Enum: $e: Received Field $field"
+  )
+  final def enumeratumPut[EE <: EnumEntry]: Put[EE] = stringPut.contramap(_.toString)
+
+  implicit lazy val nutGet = enumeratumGet(Nut)
+  implicit lazy val nutPut = enumeratumPut[Nut]
 
   implicit val lr: LabelledRead[Foo] = deriveLabelledRead
 
@@ -133,50 +153,6 @@ object csvio {
       .leftWiden[Error]
       .flatMap(_.readLabelled[Foo].sequence)
   }
-}
-
-object csvioReference {
-
-  import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.generic.semiauto._
-  import io.chrisdavenport.cormorant.parser._
-  import io.chrisdavenport.cormorant.implicits._
-  import cats.implicits._
-  import java.util.UUID
-  import java.time.Instant
-
-  case class Bar(a: String, b: Int, c: Long, d: Option[UUID], e: Instant)
-// defined class Bar
-
-  implicit val lr: LabelledRead[Bar] = deriveLabelledRead
-// lr: io.chrisdavenport.cormorant.LabelledRead[Bar] = io.chrisdavenport.cormorant.generic.semiauto$$anon$12@2a3e8b1f
-
-  implicit val lw: LabelledWrite[Bar] = deriveLabelledWrite
-// lw: io.chrisdavenport.cormorant.LabelledWrite[Bar] = io.chrisdavenport.cormorant.generic.semiauto$$anon$6@52e56b36
-
-// A List of A given derived type
-// Don't use Instant.Now or UUID.randomUUID in pure code in the real world please.
-  val l: List[Bar] = List(
-    Bar("Yellow", 3, 5L, UUID.randomUUID.some, Instant.now),
-    Bar("Boo", 7, 6L, None, Instant.MAX)
-  )
-// l: List[Bar] = List(Bar(Yellow,3,5,Some(7885e314-4a0a-4596-9f21-3ffc2bfbb2d0),2019-02-11T15:11:30.755Z), Bar(Boo,7,6,None,+1000000000-12-31T23:59:59.999999999Z))
-
-// From Type to String
-  val csv = l.writeComplete.print(Printer.default)
-// csv: String =
-// a,b,c,d,e
-// Yellow,3,5,7885e314-4a0a-4596-9f21-3ffc2bfbb2d0,2019-02-11T15:11:30.755Z
-// Boo,7,6,,+1000000000-12-31T23:59:59.999999999Z
-
-// From String to Type
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  val decoded: Either[Error, List[Bar]] = {
-    parseComplete(csv)
-      .leftWiden[Error]
-      .flatMap(_.readLabelled[Bar].sequence)
-  }
-// decoded: Either[io.chrisdavenport.cormorant.Error,List[Bar]] = Right(List(Bar(Yellow,3,5,Some(7885e314-4a0a-4596-9f21-3ffc2bfbb2d0),2019-02-11T15:11:30.755Z), Bar(Boo,7,6,None,+1000000000-12-31T23:59:59.999999999Z)))
 }
 
 object fio {}
