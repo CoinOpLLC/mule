@@ -8,8 +8,8 @@ import keys.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 import cats.{ Foldable, Invariant, Monad, MonoidK, Reducible }
 import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
-import cats.implicits._
 import feralcats.instances._
+import cats.implicits._
 
 import eu.timepit.refined
 import refined.auto._
@@ -63,14 +63,25 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Liability = keys.Liability
   type Equity    = keys.Equity
 
-  private final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
-  private object AccountMap {
-    def empty[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = Map.empty[A, Money[MA, CCY]]
+  /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
+  final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
+
+  /* */
+  object AccountMap {
+
+    def empty[AT <: AccountType, CCY]: AccountMap[AT, CCY] = Map.empty[AT, Money[MA, CCY]]
+
+    def from[AT <: AccountType, CCY](
+        ks: keys.SwapKey[AT],
+        value: Money[MA, CCY]
+    ): AccountMap[AT, CCY] = empty[AT, CCY] + (ks.from -> -value) + (ks.to -> value)
   }
 
   implicit class SweetAccountMap[A <: AccountType, CCY](am: AccountMap[A, CCY]) {
+
     def total(implicit CCY: Currency[CCY]): Money[MA, CCY] =
       CCY(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
+
   }
 
   /** convenience and domain semantics only */
@@ -114,7 +125,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     final def ds: AccountMap[DebitType, CurrencyType]  = _ds
     final def cs: AccountMap[CreditType, CurrencyType] = _cs
 
-    /** FIXME implementing this will take creatime downcasting... */
+    /**
+      * n.b. as it stands, this is useful as a check only, because the algebra is balanced by design
+      */
     final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = cs.total - ds.total
 
   }
@@ -134,6 +147,14 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
 
   }
+  final case class Marker[CCY](
+      cratchit: io.circe.Json => keys.DoubleEntryKey,
+      mark: Trade => Money[MA, CCY]
+  )
+  val JokeDollarMarker = Marker[Currency.USD](
+    cratchit = _ => ???,
+    mark = _ => Currency.USD(Fractional[MA].one)
+  )
 
   /** */
   case class TrialBalance[CCY] private (
@@ -143,24 +164,28 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
     import Balance.collect
 
+    def updated(uk: UpdateKey, amt: Money[MA, CCY]): TrialBalance[CCY] =
+      copy(debits + (uk.debit -> amt), credits + (uk.credit -> amt))
+
+    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, CCY]): TrialBalance[CCY] = {
+
+      def CG[AT <: AccountType] = CommutativeGroup[AccountMap[AT, CCY]]
+
+      sk match {
+        // FIXME: make syntax great again (it's back on its bs).
+        case ks @ AssetSwapKey(_, _) =>
+          copy(debits = CG[Debit].combine(debits, AccountMap.from(ks, amt)))
+        case ks @ LOQSwapKey(_, _) =>
+          copy(credits = CG[Credit].combine(credits, AccountMap.from(ks, amt)))
+      }
+    }
+
     def partition: (IncomeStatement[CCY], BalanceSheet[CCY]) =
       (
         IncomeStatement(debits |> collect, credits |> collect),
         BalanceSheet(debits    |> collect, credits |> collect)
       )
-
-    def updated(uk: UpdateKey, amt: Money[MA, CCY]): TrialBalance[CCY] =
-      copy(debits + (uk.debit -> amt), credits + (uk.credit -> amt))
-
-    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, CCY]): TrialBalance[CCY] =
-      sk match { // FIXME: BUG: this doesn't do what I think. Need to lift the pairs to Maps.
-        case AssetSwapKey(d1, d2) => copy(debits = debits + (d1   -> amt) + (d2 -> -amt))
-        case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
-      }
   }
-
-  final case class Marker[CCY](val mark: Trade => Money[MA, CCY])
-  val JokeDollarMarker = Marker[Currency.USD](_ => Currency.USD(Fractional[MA].one))
 
   /** */
   object TrialBalance {

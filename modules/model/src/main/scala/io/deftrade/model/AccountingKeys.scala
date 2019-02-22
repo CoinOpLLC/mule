@@ -133,7 +133,7 @@ object UpdateKey extends Enum[UpdateKey] {
   * `SwapKey`'s type parameter restricts the swap to occur
   * within the same "column" of the `Balance`.
   */
-sealed abstract class SwapKey[T <: AccountType] private[keys] (
+sealed abstract class SwapKey[+T <: AccountType] private[keys] (
     val from: T,
     val to: T
 ) extends DoubleEntryKey(from, to)
@@ -151,7 +151,7 @@ object AssetSwapKey extends Enum[AssetSwapKey] { // FIXME: profit?!
   lazy val values                                        = findValues
 }
 
-sealed abstract class LOQSwapKey(from: LOQ, to: LOQ) extends SwapKey(from, to)
+sealed abstract class LOQSwapKey(from: LOQ, to: LOQ) extends SwapKey[LOQ](from, to)
 object LOQSwapKey extends Enum[LOQSwapKey] { // FIXME: profit?!
 
   import Liability._

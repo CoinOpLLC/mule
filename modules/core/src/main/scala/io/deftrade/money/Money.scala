@@ -57,18 +57,21 @@ object Money {
 
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
 
-  implicit def catsOrderMoney[N: Financial, C: Currency]: Order[Money[N, C]] =
+  /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
+  implicit def catsOrderMoney[N: Financial, C]: Order[Money[N, C]] =
     Order by (_.amount)
 
   /**
     * `toString` is limited due to value class implementation
     * But we can implement Show[Money[N, C]] for all the N and C we care about.
+    * The Currency[_] instance is legit necessary for proper formatting.
     */
   implicit def showMoney[N: Financial, C: Currency]: Show[Money[N, C]] =
     Show show (m => format(m))
 
-  implicit def commutativeGroupMoney[N: Financial, C: Currency]: CommutativeGroup[Money[N, C]] =
-    Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(Currency[C] apply _)(_.amount)
+  /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
+  implicit def commutativeGroupMoney[N: Financial, C]: CommutativeGroup[Money[N, C]] =
+    Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(_ |> fiat[N, C])(_.amount)
 
   def format[N: Financial, C: Currency](m: Money[N, C]): String = {
     val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
@@ -93,7 +96,7 @@ object Money {
     }
 
   /**
-    * Design rational:
+    * Design rational(ization?):
     *
     * why not the following, which seems more obvious?
     * `implicit object refinedRefType extends RefType[Money] {`
