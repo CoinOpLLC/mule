@@ -93,15 +93,19 @@ object Money {
     }
 
   /**
-    // why not?
-    // `implicit object refinedRefType extends RefType[Money] {`
-    // because:
-    // bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
-    // in object refinedRefType
-    // which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
-    // clashes with definition of the member itself;
-    // both have erased type (t: Object)Object
-    //     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+    * Design rational:
+    *
+    * why not the following, which seems more obvious?
+    * `implicit object refinedRefType extends RefType[Money] {`
+    *
+    * because:
+    *
+    * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+    * in object refinedRefType
+    * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
+    * clashes with definition of the member itself;
+    * both have erased type (t: Object)Object
+    *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
     */
   implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
     Validate alwaysPassed Currency[P]

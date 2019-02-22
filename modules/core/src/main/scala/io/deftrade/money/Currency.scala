@@ -9,7 +9,7 @@ import enumeratum._
 import BigDecimal.RoundingMode._
 
 /**  */
-private[money] sealed trait CurrencyLike extends EnumEntry { monetary =>
+sealed trait CurrencyLike extends EnumEntry { monetary =>
 
   type Type
   def apply[N: Financial](n: N): Money[N, Type]
@@ -47,7 +47,7 @@ private[money] object CurrencyLike {
 /**
   * Per-real-world-instance of ISO 4217 currencies.
   */
-sealed trait Currency[C] extends CurrencyLike { self =>
+sealed trait Currency[C] extends CurrencyLike with Product with Serializable { self =>
 
   type Type = C
 
@@ -95,44 +95,45 @@ object Currency extends Enum[CurrencyLike] {
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)
     * standard major currency order via objectlabkit
     * TODO: can we find a reference other than objectlabkit?
+    * This still smells bonkers. If it flies I want to call it the Wall of Types pattern.
     */
-  final class EUR
+  final class EUR private[money] ()
   case object EUR extends Currency[EUR]
   implicit def eur: Currency[EUR] = EUR
 
-  final class GBP
+  final class GBP private[money] ()
   case object GBP extends Currency[GBP]
   implicit def gbp: Currency[GBP] = GBP
 
-  final class AUD
+  final class AUD private[money] ()
   case object AUD extends Currency[AUD]
   implicit def aud: Currency[AUD] = AUD
 
-  final class NZD
+  final class NZD private[money] ()
   case object NZD extends Currency[NZD]
   implicit def nzd: Currency[NZD] = NZD
 
-  final class USD
+  final class USD private[money] ()
   case object USD extends Currency[USD]
   implicit def usd: Currency[USD] = USD
 
-  final class CAD
+  final class CAD private[money] ()
   case object CAD extends Currency[CAD]
   implicit def cad: Currency[CAD] = CAD
 
-  final class CHF
+  final class CHF private[money] ()
   case object CHF extends Currency[CHF]
   implicit def chf: Currency[CHF] = CHF
 
-  final class NOK
+  final class NOK private[money] ()
   case object NOK extends Currency[NOK]
   implicit def nok: Currency[NOK] = NOK
 
-  final class SEK
+  final class SEK private[money] ()
   case object SEK extends Currency[SEK]
   implicit def sek: Currency[SEK] = SEK
 
-  final class JPY
+  final class JPY private[money] ()
   case object JPY extends Currency[JPY]
   implicit def jpy: Currency[JPY] = JPY
 

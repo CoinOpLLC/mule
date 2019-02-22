@@ -4,7 +4,7 @@ import cats.{ Eq, Order, Show }
 import cats.implicits._
 
 import eu.timepit.refined
-import refined.api.{ Min, Refined }
+import refined.api.{ Min, Refined, Validate }
 
 import spire.math.Integral
 import spire.implicits._
@@ -27,11 +27,7 @@ import spire.implicits._
   */
 package object kves {
 
-  /**
-    * Our keys will be embedded with phantom types.
-    * By convention, we will use as the phantom type the type of the `Value`
-    * which is indexed by this `Key`.
-    */
+  /** Just an alias.  */
   type OpaqueKey[K, P] = Refined[K, P]
 
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
@@ -41,6 +37,18 @@ package object kves {
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
   implicit def showOpaqueKey[K: Show: Order, P]: Show[OpaqueKey[K, P]] =
     Show show (key => s"k: ${key.value.show}")
+
+  import enumeratum._
+  import io.chrisdavenport.cormorant._
+  import io.chrisdavenport.cormorant.implicits._
+
+  /** Integrates Enumeratum into Cormorant (CSV). Use these methods to create implicits per Enum. */
+  final def enumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get tryOrMessage (
+    field => scala.util.Try { e withName field.x },
+    field => s"Failed to decode Enum: $e: Received Field $field"
+  )
+  final def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
+
 }
 
 package kves {
@@ -74,14 +82,23 @@ package kves {
     }
   }
 
+  private[kves] abstract class WithKeyBase[K: Order, V] {
+    final type Key        = OpaqueKey[K, V]
+    final type Value      = V
+    final type Row        = (Key, Value)
+    final type Table      = Map[Key, Value]
+    final type Rows[C[_]] = C[Row]
+
+    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
+  }
+
   /** Module-level companion base class with default Key type */
-  abstract class WithKey[K: Order, P: Eq] {
-    type Key = OpaqueKey[K, P]
+  abstract class WithKey[K: Order, P: Eq] extends WithKeyBase[K, P] {
     object Key extends OpaqueKeyC[K, P]
   }
 
-  abstract class WithKeyAndEq[K: Order, P] {
-    type Key = OpaqueKey[K, P]
+  /** Same but with implicit Eq[P] typeclass instance */
+  abstract class WithKeyAndEq[K: Order, P] extends WithKeyBase[K, P] {
     object Key extends OpaqueKeyC[K, P]
     implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
   }

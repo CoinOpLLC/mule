@@ -63,12 +63,6 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Liability = keys.Liability
   type Equity    = keys.Equity
 
-  /**
-    * FIXME: depends on mapping between `Folio`s and `Balance`s,
-    * which in turn depends on Pricing. :|
-    */
-  type EntryKey = (AccountType, Folio.Key)
-
   private final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
   private object AccountMap {
     def empty[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = Map.empty[A, Money[MA, CCY]]
@@ -80,7 +74,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   /** convenience and domain semantics only */
-  def openAccount[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = AccountMap.empty
+  def emptyAccount[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = AccountMap.empty
 
   final type Debits[CCY]      = AccountMap[Debit, CCY]
   final type Credits[CCY]     = AccountMap[Credit, CCY]
@@ -141,6 +135,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   }
 
+  /** */
   case class TrialBalance[CCY] private (
       debits: Debits[CCY],
       credits: Credits[CCY]
@@ -163,13 +158,32 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
         case LOQSwapKey(c1, c2)   => copy(credits = credits + (c1 -> amt) + (c2 -> -amt))
       }
   }
+
+  final case class Marker[CCY](val mark: Trade => Money[MA, CCY])
+  val JokeDollarMarker = Marker[Currency.USD](_ => Currency.USD(Fractional[MA].one))
+
+  /** */
   object TrialBalance {
+
+    def empty[CCY: Currency]: TrialBalance[CCY] =
+      TrialBalance(
+        debits = emptyAccount[Debit, CCY],
+        credits = emptyAccount[Credit, CCY]
+      )
+
     implicit def trialBalanceCommutativeGroup[CCY: Currency]: CommutativeGroup[TrialBalance[CCY]] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[CCY], Credits[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
       }
+
+    def from[L[_]: Foldable, CCY: Currency](
+        marker: Marker[CCY]
+    )(
+        xs: L[Transaction]
+    ): TrialBalance[CCY] = ??? // xs.sum // FIXME this is all I should have to say!
+
   }
 
   /**

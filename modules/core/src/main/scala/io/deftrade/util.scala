@@ -61,21 +61,28 @@ object camelsnake { outer =>
 
 object csvio {
 
+  import time._
+  import money._
+  import kves._
+
+  import enumeratum._
+
+  import eu.timepit.refined
+  import refined.refineMV
+  import refined.api.{ Refined }
+  import refined.numeric.Positive
+
+  import cats.implicits._
+
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.generic.semiauto._
   import io.chrisdavenport.cormorant.parser._
   import io.chrisdavenport.cormorant.implicits._
-
-  import cats.implicits._
-
-  import io.deftrade.time._
-  import io.deftrade.money._
+  import io.chrisdavenport.cormorant.refined._
 
   import java.util.UUID
-  // import java.time.{ Instant, LocalDate, LocalTime }
 
-  import enumeratum._
-
+  /** */
   sealed trait Nut extends EnumEntry with Product with Serializable
   object Nut extends Enum[Nut] {
     case object Hazelnut extends Nut
@@ -97,15 +104,20 @@ object csvio {
       date: LocalDate,
       time: LocalTime,
       nut: Nut,
-      // c: Currency[_],
-      // indexAndSum: Money[Double, Currency.USD],
+      x: Double Refined Positive,
+      ccy: CurrencyLike,
+      // total: Money[Double, Currency.USD],
       ts: Instant,
   )
 
-  import kves._
   object Foo extends WithKeyAndEq[Long, Foo] {
 
-    def unsafeRandom = {
+    /**
+      * recall: our policy is to specify policy; specifically, to require that policy be specified
+      */
+    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
+
+    def unsafeRandom: Foo = {
       val uuid = UUID.randomUUID
       val s    = uuid.toString
       val i    = s.map(_.toInt).sum
@@ -115,36 +127,31 @@ object csvio {
       val date = localDate(instant)
       val time = localTime(clockDefaultZone) // FIXME make moar orthogonal pleaz
       val nut  = Nut.Almond
-      // val c    = Currency.USD
-      //  val indexAndSum = Money[Double, Currency.USD]
+      val x    = refineMV[Positive](3.14)
+      val ccy  = Currency.USD // FIXME: why?
+      //  val total = Money[Double, Currency.USD]
       val ts = instant
-      Foo(uuid, s, i, l, d, bd, date, time, nut, ts)
+      Foo(uuid, s, i, l, d, bd, date, time, nut, x, ccy, ts)
     }
   }
 
-  // implicit def refinedGet[T: Get, P]: Get[T Refined P] = Get.tryOrMessage[T Refined P](
-  //   field =>
-  //     ??? // FIXME um... get the T
-  //       refineV [P] (field) // passes the error along
-  // )
-  // implicit def refinedPut[T: Put, P]: Put[T Refined P] = stringPut.contramap(_.toString)
+  implicit lazy val nutGet = enumGet(Nut)
+  implicit lazy val nutPut = enumPut[Nut]
 
-  final def enumeratumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get.tryOrMessage(
-    field => scala.util.Try(e.withName(field.x)),
-    field => s"Failed to decode Enum: $e: Received Field $field"
-  )
-  final def enumeratumPut[EE <: EnumEntry]: Put[EE] = stringPut.contramap(_.toString)
+  implicit lazy val ccyGet = enumGet(Currency)
+  implicit lazy val ccyPut = enumPut[CurrencyLike]
 
-  implicit lazy val nutGet = enumeratumGet(Nut)
-  implicit lazy val nutPut = enumeratumPut[Nut]
+  implicit lazy val lr: LabelledRead[Foo]  = deriveLabelledRead
+  implicit lazy val lw: LabelledWrite[Foo] = deriveLabelledWrite
 
-  implicit val lr: LabelledRead[Foo] = deriveLabelledRead
+  case class Bar(i: Int, d: Double)
 
-  implicit val lw: LabelledWrite[Foo] = deriveLabelledWrite
+  Get[Double Refined Positive] |> discardValue
+  Get[Foo.Key]                 |> discardValue
 
   val l: List[Foo] = List.fill(3)(Foo.unsafeRandom)
 
-  val csv = l.writeComplete.print(Printer.default)
+  val csv = l.writeComplete print Printer.default
 
 // From String to Type
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
