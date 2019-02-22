@@ -102,23 +102,20 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
     final def process[C: Currency, A](p: Account.Key, a: Allocation)(
         block: => A
-    ): FK[A, Execution] = {
-      val risk: FK[A, Order[C]]           = riskCheck(block)
-      val tr: FK[Order[C], Execution]     = trade
-      val alloc: FK[Execution, Execution] = allocate(p, a)
-      risk andThen tr andThen alloc
-    }
+    ): FK[A, Transaction] =
+      riskCheck[C, A](p)(block) andThen trade[C](p) andThen allocate[C](a) andThen settle[C](p)
 
-    def riskCheck[C: Currency, A](a: A): FK[A, Order[C]] =
+    def riskCheck[C: Currency, A](p: Account.Key)(a: A): FK[A, Order[C]] =
       ???
 
-    def trade[C]: FK[Order[C], Execution] = ???
+    def trade[C](p: Account.Key): FK[Order[C], Execution] = ???
 
     private final def allocate[C: Currency](
-        p: Account.Key,
         a: Allocation
-    ): FK[Execution, Execution] = // UM... this is recursive, given account structure. Fine!
+    ): FK[Execution, Execution] =
       ???
+
+    private def settle[C: Currency](p: Account.Key): FK[Execution, Transaction] = ???
   }
 
   // TODO: revisit, systematize
@@ -146,6 +143,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /**
       * Minimum viable `Order` type. What the client would _like_ to have happen.
       * TODO: revisit parent/child orders
+      * FIXME: Eliminate `C`. Normalize the trade. MA and Currency as separate fields.
       */
     final case class Order[C: Currency](
         market: Market.Key,

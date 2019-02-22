@@ -9,6 +9,8 @@ import refined.api.{ Min, Refined, Validate }
 import spire.math.Integral
 import spire.implicits._
 
+import scala.language.higherKinds
+
 /**
   * kvse: Key Value Entity Scheme*:
   *
@@ -86,7 +88,6 @@ package kves {
     final type Key        = OpaqueKey[K, V]
     final type Value      = V
     final type Row        = (Key, Value)
-    final type Table      = Map[Key, Value]
     final type Rows[C[_]] = C[Row]
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())

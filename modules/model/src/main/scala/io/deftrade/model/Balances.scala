@@ -147,17 +147,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
 
   }
-  final case class Marker[CCY](
-      cratchit: io.circe.Json => keys.DoubleEntryKey,
+  final case class TransactionMarker[CCY](
+      cratchit: Transaction.Meta => keys.DoubleEntryKey,
       mark: Trade => Money[MA, CCY]
-  )
-  val JokeDollarMarker = Marker[Currency.USD](
-    cratchit = _ => ???,
-    mark = _ => Currency.USD(Fractional[MA].one)
   )
 
   /** */
-  case class TrialBalance[CCY] private (
+  final case class TrialBalance[CCY] private (
       debits: Debits[CCY],
       credits: Credits[CCY]
   ) extends Balance[Debit, Credit, CCY](debits, credits) {
@@ -204,7 +200,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
 
     def from[L[_]: Foldable, CCY: Currency](
-        marker: Marker[CCY]
+        marker: TransactionMarker[CCY]
     )(
         xs: L[Transaction]
     ): TrialBalance[CCY] = ??? // xs.sum // FIXME this is all I should have to say!

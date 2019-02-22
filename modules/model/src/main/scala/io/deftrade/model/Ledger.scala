@@ -133,6 +133,8 @@ abstract class Ledger[Q: Financial] { self =>
   )
   object Transaction {
 
+    type Meta = io.circe.Json // f'rinstance
+
     /**
       * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
       */
