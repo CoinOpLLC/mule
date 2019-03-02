@@ -5,6 +5,10 @@ import java.nio.file.Paths
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
+// Files.readAllLines(Paths.get(openChooser.getSelectedFile().getPath())))
+
+// TODO: Should we eliminate the dependence on FS2 and just use IO?
+
 object Converter extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {

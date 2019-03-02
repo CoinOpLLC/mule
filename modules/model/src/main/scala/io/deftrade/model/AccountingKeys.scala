@@ -17,7 +17,7 @@ object AccountType {
 
 sealed trait Debit extends AccountType
 object Debit {
-  lazy val values = Asset.values ++ XOP.values
+  lazy val values = Asset.values ++ XOI.values
 }
 
 sealed trait Credit extends AccountType
@@ -81,12 +81,12 @@ object Revenue extends Enum[Revenue] {
   lazy val values = findValues
 }
 
-sealed trait XOP extends Debit
-object XOP extends Enum[XOP] {
-  lazy val values = Expense.values ++ Profit.values
+sealed trait XOI extends Debit
+object XOI extends Enum[XOI] {
+  lazy val values = Expense.values ++ Income.values
 }
 
-sealed trait Expense extends XOP
+sealed trait Expense extends XOI
 sealed trait OpEx    extends Expense
 object Expense extends Enum[Expense] {
   case object Investment            extends Expense
@@ -98,9 +98,9 @@ object Expense extends Enum[Expense] {
   lazy val values = findValues
 }
 
-sealed trait Profit extends XOP
-object Profit extends Enum[Profit] {
-  case object Profit extends Profit // SAY IT AGAIN
+sealed trait Income extends XOI
+object Income extends Enum[Income] {
+  case object Income extends Income // SAY IT AGAIN
   lazy val values = findValues
 }
 

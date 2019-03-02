@@ -2,10 +2,11 @@ package io.deftrade
 package model
 
 import money._
+import time._
 
 import keys.{ AssetSwapKey, LOQSwapKey, SwapKey, UpdateKey }
 
-import cats.{ Foldable, Invariant, Monad, MonoidK, Reducible }
+import cats.{ Foldable, Invariant, Monad, Reducible, SemigroupK }
 import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
@@ -29,7 +30,7 @@ import scala.language.higherKinds
   *  `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
   *
   *  Balance(Assets, LOQs)
-  *  Balance(XOP, Revenues)  // !!!
+  *  Balance(XOI, Revenues)
   *
   * Both type params are needed to deal with case where MA =!= Q in the cake
   * enabling the package to create
@@ -52,14 +53,14 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Debit  = keys.Debit
   type Credit = keys.Credit
 
-  type XOP     = keys.XOP
+  type XOI     = keys.XOI
   type Revenue = keys.Revenue
 
   type Asset = keys.Asset
   type LOQ   = keys.LOQ
 
   type Expense = keys.Expense
-  // type Profit = keys.Profit
+  // type Income = keys.Income
   type Liability = keys.Liability
   type Equity    = keys.Equity
 
@@ -89,7 +90,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   final type Debits[CCY]      = AccountMap[Debit, CCY]
   final type Credits[CCY]     = AccountMap[Credit, CCY]
-  final type XOPs[CCY]        = AccountMap[XOP, CCY]
+  final type XOIs[CCY]        = AccountMap[XOI, CCY]
   final type Revenues[CCY]    = AccountMap[Revenue, CCY]
   final type Assets[CCY]      = AccountMap[Asset, CCY]
   final type LOQs[CCY]        = AccountMap[LOQ, CCY]
@@ -213,7 +214,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * This can be used to create a filter for `CashFlowStatement`s.
     */
   final case class IncomeStatement[CCY] private (
-      val xops: XOPs[CCY],
+      val xops: XOIs[CCY],
       val revenues: Revenues[CCY]
   ) extends Balance(xops, revenues) {
 
@@ -226,7 +227,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     */
   object IncomeStatement {
     implicit def incomeStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[IncomeStatement[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs[CCY], Revenues[CCY])]) {
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOIs[CCY], Revenues[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -239,14 +240,14 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * - TODO: cash keys should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
   final case class CashFlowStatement[CCY] private (
-      val outflows: XOPs[CCY],
+      val outflows: XOIs[CCY],
       val inflows: Revenues[CCY]
   ) extends Balance(outflows, inflows)
 
   /**  */
   object CashFlowStatement {
     implicit def cashflowStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[CashFlowStatement[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOPs[CCY], Revenues[CCY])]) {
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(XOIs[CCY], Revenues[CCY])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -256,6 +257,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   final case class EquityStatement[CCY] private (wut: Null)
+  object EquityStatement
 
   /**
     * `BalanceSheet`s form a `CommutativeGroup`.
@@ -276,7 +278,32 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  def trialBalance[F[_]: Foldable: Monad: MonoidK, CCY: Currency](ts: Transactions[F]): TrialBalance[CCY] =
+  sealed trait CoveredPeriod {
+    def date: LocalDate
+    def period: Period
+    final def startDate = date - period
+  }
+
+  final case class CashBookSet[C: Currency](
+      date: LocalDate,
+      period: Period,
+      cs: CashFlowStatement[C],
+      bs: BalanceSheet[C]
+  ) extends CoveredPeriod {
+    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+  }
+
+  final case class AccrualBookSet[C: Currency](
+      date: LocalDate,
+      period: Period,
+      cs: CashFlowStatement[C],
+      is: IncomeStatement[C],
+      bs: BalanceSheet[C]
+  ) extends CoveredPeriod {
+    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+  }
+
+  def trialBalance[F[_]: Foldable: Monad: SemigroupK, CCY: Currency](ts: Transactions[F]): TrialBalance[CCY] =
     ???
 
   def breakdown[CCY: Currency: CashInstruments](
