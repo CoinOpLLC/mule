@@ -191,9 +191,6 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 
-  /** this is just a hack to use `SortedSet`s etc */
-  implicit def orderRoles: Order[Role] = Order by (_.entryName)
-
   lazy val nonPrinciples: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
