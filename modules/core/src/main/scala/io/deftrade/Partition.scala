@@ -19,53 +19,54 @@ import spire.syntax.field._
 
 import scala.collection.immutable.SortedMap
 
-trait PartitionLike extends Any {
+trait PartitionLike[K, V] extends Any {
 
-  type KeyType
-  type ValueType
+  def kvs: NonEmptyMap[K, V]
 
-  def kvs: NonEmptyMap[KeyType, ValueType]
+  final type KeyType   = K
+  final type ValueType = V
 
-  final def total(implicit V: Fractional[ValueType]): ValueType = kvs reduce V.plus
-  final def keys: NonEmptySet[KeyType]                          = kvs.keys
-  final def toSortedMap: SortedMap[KeyType, ValueType]          = kvs.toSortedMap
-}
+  final def total(implicit V: Fractional[V]): ValueType = kvs reduce V.plus
+  final def keys: NonEmptySet[K]                        = kvs.keys
+  final def toSortedMap: SortedMap[K, V]                = kvs.toSortedMap
 
-final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike {
-  type KeyType   = K
-  type ValueType = V
-  def normalize(implicit K: Order[K], V: Financial[V]): UnitPartition[K, V] = {
+  final def proRate[N](n: N)(implicit K: Order[K], V: Financial[V], N: Financial[N]): Partition[K, N] =
+    Partition unsafe (toSortedMap mapValues (v => n * V.to[N](v)))
+
+  final def normalize(implicit K: Order[K], V: Financial[V]): UnitPartition[K, V] = {
     val _total = total
     UnitPartition unsafe [K, V] (toSortedMap mapValues (_ / _total))
   }
+
 }
+
+final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {}
+
 object Partition {
+
   private[deftrade] def unsafe[K: Order, V: Financial](sm: SortedMap[K, V]): Partition[K, V] =
     Partition(NonEmptyMap fromMapUnsafe sm)
+
+  def currified[K: Order, V: Financial](
+      compute: NonEmptySet[K] => V => NonEmptyMap[K, V]
+  )(
+      keys: NonEmptySet[K]
+  )(
+      amount: V
+  ) = compute(keys)(amount) |> apply[K, V]
 }
 
 // TODO use refined to restrict V to be between 0 and 1
 /** Guaranteed untitary and reasonable proportioning among several unique keys. */
-final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike {
-
-  type KeyType   = K
-  type ValueType = V
-
-  def proRate[N](n: N)(implicit K: Order[K], V: Financial[V], N: Financial[N]): Partition[K, N] =
-    Partition unsafe (toSortedMap mapValues (v => n * V.to[N](v)))
-}
+final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {}
 
 /**
-  * we will explain with the pizza metaphore
-  * TODO: see if
-  * type Pos[N] = N Refined Positive
-  * is a help... maybe to return, not to accept (Postel's rule again)
   */
 object UnitPartition {
 
   type PositiveLong = Long Refined Positive // FIXME consider this
 
-  /** n.b. we are using waterfall as a verb here, consistent with domain practice */
+  /** n.b. we are using waterfall as a verb here, consistent with domain practice ``*/
   def waterfall[K: Order, V: Fractional](
       hurdles: NonEmptyMap[K, V]
   ): Result[V => UnitPartition[K, V]] =

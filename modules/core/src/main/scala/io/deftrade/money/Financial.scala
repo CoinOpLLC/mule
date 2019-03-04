@@ -15,7 +15,7 @@ import cats.kernel.CommutativeGroup
   * While all `Financial`s are `Fractional`, the reverse is not true.
   * (At least, not true enough for this domain model architect.)
   */
-class Financial[N] private (val fractional: Fractional[N]) {
+final class Financial[N] private (val fractional: Fractional[N]) {
 
   /**
     * How do we deal with scale and significant digits?
