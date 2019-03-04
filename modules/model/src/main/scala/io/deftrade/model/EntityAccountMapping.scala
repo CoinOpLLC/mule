@@ -206,7 +206,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * Who does what. Or should. And shouldn't.
     */
   final case class Roster private (
-      principles: Partition[LegalEntity.Key, Quantity],
+      principles: UnitPartition[LegalEntity.Key, Quantity],
       nonPrinciples: NonPrinciple => NonEmptySet[LegalEntity.Key]
   ) {
     lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
@@ -230,7 +230,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
     def single(key: LegalEntity.Key): Roster =
       Roster(
-        principles = Partition single key,
+        principles = UnitPartition single key,
         nonPrinciples = _ => NonEmptySet one key
       )
   }

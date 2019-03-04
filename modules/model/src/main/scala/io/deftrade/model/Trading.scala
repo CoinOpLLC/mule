@@ -126,7 +126,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     */
   object OMS extends WithKey[Long, OMS[cats.Id]] {
 
-    type Allocation = Partition[Account.Key, Quantity]
+    type Allocation = UnitPartition[Account.Key, Quantity]
 
     /**
       * TODO: augment/evolve creation pattern.

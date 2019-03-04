@@ -155,7 +155,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /** I call this "cratchiting" */
   def deltaCashBooksFrom[CCY: Currency](
       pt: PricedTrade[CCY],
-      p: Partition[AccountType, MA],
+      p: UnitPartition[AccountType, MA],
       meta: Transaction.Meta
   ): DeltaCashBooks[CCY] = ???
 
