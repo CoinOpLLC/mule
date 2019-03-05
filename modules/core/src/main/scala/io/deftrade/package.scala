@@ -35,6 +35,8 @@ package object deftrade {
   type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
 
+  def fail[T](msg: String): Result[T] = Fail(msg).asLeft
+
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](
       as: F[A]
   )(

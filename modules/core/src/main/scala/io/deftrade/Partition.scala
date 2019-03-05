@@ -40,12 +40,9 @@ trait PartitionLike[K, V] extends Any {
 
 }
 
-final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {}
+final case class Partition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V]
 
 object Partition {
-
-  private[deftrade] def unsafe[K: Order, V: Financial](sm: SortedMap[K, V]): Partition[K, V] =
-    Partition(NonEmptyMap fromMapUnsafe sm)
 
   def currified[K: Order, V: Financial](
       compute: NonEmptySet[K] => V => NonEmptyMap[K, V]
@@ -54,23 +51,35 @@ object Partition {
   )(
       amount: V
   ) = compute(keys)(amount) |> apply[K, V]
+
+  def waterfall[K: Order, V: Fractional](
+      tranches: Map[K, V],
+      equity: K
+  ): V => Partition[K, V] = ???
+
+  private[deftrade] def unsafe[K: Order, V: Financial](sm: SortedMap[K, V]): Partition[K, V] =
+    Partition(NonEmptyMap fromMapUnsafe sm)
+
 }
 
 // TODO use refined to restrict V to be between 0 and 1
 /** Guaranteed untitary and reasonable proportioning among several unique keys. */
-final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {}
+final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {
+
+  /** share acquired from each according to their proportion */
+  def buyIn(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
+    if ((toSortedMap contains key) && share > V.fractional.zero)
+      Partition.unsafe(toSortedMap + (key -> share)).normalize.asRight
+    else
+      fail(s"bad params: key=$key, share=$share")
+
+  /** share returned to each according to their proportion */
+  def buyOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] = ???
+}
 
 /**
   */
 object UnitPartition {
-
-  type PositiveLong = Long Refined Positive // FIXME consider this
-
-  /** n.b. we are using waterfall as a verb here, consistent with domain practice ``*/
-  def waterfall[K: Order, V: Fractional](
-      hurdles: NonEmptyMap[K, V]
-  ): Result[V => UnitPartition[K, V]] =
-    ???
 
   /** `exact` slices is what you claim; we'll be the judge of that ;) */
   def exact[K: Order, V: Fractional](shares: (K, V)*): Result[UnitPartition[K, V]] = {
@@ -115,13 +124,6 @@ object UnitPartition {
   def single[K: Order, V: Fractional](k: K): UnitPartition[K, V] =
     unsafe(SortedMap(k -> Fractional[V].one))
 
-  def buyIn[K: Order, V: Fractional](in: K, slice: V): Result[UnitPartition[K, V]] = ???
-
-  def buyOut[K: Order, V: Fractional](in: K): Result[UnitPartition[K, V]] = ???
-
-  private[deftrade] def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): UnitPartition[K, V] =
-    new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity))
-
   object Single {
 
     def unapply[K: Order, V: Fractional](p: UnitPartition[K, V]): Option[K] = {
@@ -132,4 +134,7 @@ object UnitPartition {
       }
     }
   }
+
+  private[deftrade] def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): UnitPartition[K, V] =
+    new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity))
 }
