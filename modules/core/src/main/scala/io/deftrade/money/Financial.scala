@@ -21,7 +21,15 @@ final class Financial[N] private (val fractional: Fractional[N]) {
     * How do we deal with scale and significant digits?
     * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
     * that return `Money`.
+    *
+    * TODO: export some `Refined` types...
+    * will require final subclassing; this class becoms abstract
     */
+  // type Positive
+  // type NonNegative
+  // type ZeroToOneInclusive
+  // type ZeroToOneExclusive
+  //
   def round[C](n: N)(implicit C: Currency[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
