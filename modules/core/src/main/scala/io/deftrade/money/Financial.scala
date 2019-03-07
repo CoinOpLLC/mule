@@ -5,6 +5,11 @@ import spire.math.{ Fractional, Integral, Rational }
 
 import cats.kernel.CommutativeGroup
 
+import eu.timepit.refined
+import refined.api.Refined
+import refined.numeric.{ Greater, Less }
+import refined.boolean.{ And, Not }
+
 /**
   * A typeclass for number types suitable for financial calculations.
   *
@@ -15,21 +20,30 @@ import cats.kernel.CommutativeGroup
   * While all `Financial`s are `Fractional`, the reverse is not true.
   * (At least, not true enough for this domain model architect.)
   */
-final class Financial[N] private (val fractional: Fractional[N]) {
+abstract class Financial[N] private (val fractional: Fractional[N]) {
+
+  type Positive    = N Refined refined.numeric.Positive
+  type NonNegative = N Refined refined.numeric.NonNegative
+  type Whole       = N Refined r9s.Whole
+
+  type `(0,1]` = N Refined r9s.`(0,1]`
+  type `[0,1]` = N Refined r9s.`[0,1]`
+
+  object r9s {
+    type `(0,1]` = Greater[LiterallyZero] And Not[Greater[LiterallyOne]]
+    type `[0,1]` = Not[Less[LiterallyZero]] And Not[Greater[LiterallyOne]]
+
+    final class Whole private () // for validation FIXME finish this
+  }
+
+  type LiterallyZero
+  type LiterallyOne
 
   /**
     * How do we deal with scale and significant digits?
     * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
     * that return `Money`.
-    *
-    * TODO: export some `Refined` types...
-    * will require final subclassing; this class becoms abstract
     */
-  // type Positive
-  // type NonNegative
-  // type ZeroToOneInclusive
-  // type ZeroToOneExclusive
-  //
   def round[C](n: N)(implicit C: Currency[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
@@ -46,21 +60,23 @@ final class Financial[N] private (val fractional: Fractional[N]) {
   def from[T: Financial](t: T): N = t |> fractional.fromType[T]
   def to[R: Financial](n: N): R   = n |> fractional.toType[R]
 
-  /** Extractors and (any) other tools for dealing with integral quantities. */
+  /** Extractor for integral quantities. */
   object IntegralIs {
-
-    // TODO:
-    def unapply[I](n: N)(implicit I: Integral[N]): Option[N] = ???
+    implicit def f: Fractional[N] = fractional
+    import spire.implicits._
+    import cats.implicits._
+    def unapply(n: N): Option[Long] = if (n.isWhole) n.toLong.some else none
   }
 }
 
 /**
   */
 object Financial {
+  import refined.W
 
   def apply[N: Financial]: Financial[N] = implicitly
 
-  def fromFractional[N](N: Fractional[N]): Financial[N] = new Financial(N)
+  // def fromFractional[N](N: Fractional[N]): Financial[N] = new Financial(N)
 
   // type ZeroToOne[N: Fractional] = {
   //   val N = Fractional[N]
@@ -69,9 +85,15 @@ object Financial {
   // }
   // implicit def refinedValidate[N: Financial, P]: Validate[N, P] = ???
 
-  implicit lazy val DoubleIsFinancial = Financial fromFractional Fractional[Double]
+  implicit lazy val DoubleIsFinancial = new Financial(Fractional[Double]) {
+    type LiterallyZero = W.`0.0`.T
+    type LiterallyOne  = W.`1.0`.T
+  }
 
-  implicit lazy val BigDecimalIsFinancial = Financial fromFractional Fractional[BigDecimal]
+  implicit lazy val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
+    type LiterallyZero = W.`0.0`.T
+    type LiterallyOne  = W.`1.0`.T
+  }
 
   /**
     * TODO: read up
@@ -90,5 +112,8 @@ object Financial {
     * Also:
     * > 7.4 Representing Exact Currency Amounts
     */
-  implicit lazy val RationalIsFinancial = Financial fromFractional Fractional[Rational]
+  implicit lazy val RationalIsFinancial = new Financial(Fractional[Rational]) {
+    type LiterallyZero = W.`0.0`.T
+    type LiterallyOne  = W.`1.0`.T
+  }
 }
