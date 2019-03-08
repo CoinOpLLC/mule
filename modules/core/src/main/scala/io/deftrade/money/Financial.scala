@@ -1,14 +1,16 @@
 package io.deftrade
 package money
 
-import spire.math.{ Fractional, Integral, Rational }
-
-import cats.kernel.CommutativeGroup
-
 import eu.timepit.refined
-import refined.api.Refined
+import refined.api.{ Refined, Validate }
 import refined.numeric.{ Greater, Less }
 import refined.boolean.{ And, Not }
+
+import spire.math.{ Fractional, Integral, Rational }
+import spire.implicits._
+
+import cats.kernel.CommutativeGroup
+import cats.implicits._
 
 /**
   * A typeclass for number types suitable for financial calculations.
@@ -22,18 +24,20 @@ import refined.boolean.{ And, Not }
   */
 abstract class Financial[N] private (val fractional: Fractional[N]) {
 
-  type Positive    = N Refined refined.numeric.Positive
-  type NonNegative = N Refined refined.numeric.NonNegative
-  type Whole       = N Refined r9s.Whole
+  final type Positive    = N Refined refined.numeric.Positive
+  final type NonNegative = N Refined refined.numeric.NonNegative
 
-  type `(0,1]` = N Refined r9s.`(0,1]`
-  type `[0,1]` = N Refined r9s.`[0,1]`
+  final type `(0,1)` = N Refined r9s.`(0,1)`
+  final type `[0,1)` = N Refined r9s.`[0,1)`
+  final type `(0,1]` = N Refined r9s.`(0,1]`
+  final type `[0,1]` = N Refined r9s.`[0,1]`
 
   object r9s {
+    type `(0,1)` = Greater[LiterallyZero] And Less[LiterallyOne]
+    type `[0,1)` = Not[Less[LiterallyZero]] And Less[LiterallyOne]
     type `(0,1]` = Greater[LiterallyZero] And Not[Greater[LiterallyOne]]
     type `[0,1]` = Not[Less[LiterallyZero]] And Not[Greater[LiterallyOne]]
 
-    final class Whole private () // for validation FIXME finish this
   }
 
   type LiterallyZero
@@ -60,12 +64,35 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
   def from[T: Financial](t: T): N = t |> fractional.fromType[T]
   def to[R: Financial](n: N): R   = n |> fractional.toType[R]
 
-  /** Extractor for integral quantities. */
-  object IntegralIs {
-    implicit def f: Fractional[N] = fractional
-    import spire.implicits._
-    import cats.implicits._
-    def unapply(n: N): Option[Long] = if (n.isWhole) n.toLong.some else none
+  object WholeIs {
+    implicit def N: Fractional[N] = fractional
+
+    /**
+      * Matches when `isWhole`, and round-trips with equality
+      *  `[N: Fractional] => [I: Integral] => [N: Fractional]`
+      * Client is responsible for choosing a type `I: Integral` that is in range
+      * for the parameter `n`.
+      */
+    def unapply[I: Integral](n: N): Option[I] =
+      if (n.isWhole) {
+        val i         = N.toType[I](n)
+        val roundTrip = Integral[I].toType[N](i)
+        if (n === roundTrip) i.some else none
+      } else none
+  }
+
+  final case class Whole[I]() // for validation FIXME finish this
+
+  /** Extractor for whole numbers. */
+  object Whole {
+
+    implicit def wholeValidate[I: Integral]: Validate.Plain[N, Whole[I]] = {
+      val pred: N => Boolean = {
+        case WholeIs(_) => true
+        case _          => false
+      }
+      Validate.fromPredicate(pred, t => s"$t isn't Whole", Whole[I]())
+    }
   }
 }
 
