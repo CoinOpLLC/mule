@@ -93,8 +93,9 @@ package kves {
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
-    import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
+    import shapeless._
     import shapeless.labelled.FieldType
+    import shapeless.syntax.singleton._
 
     import io.chrisdavenport.cormorant._
     // import io.chrisdavenport.cormorant.generic.semiauto._
@@ -102,23 +103,34 @@ package kves {
     // import io.chrisdavenport.cormorant.implicits._
     // import io.chrisdavenport.cormorant.refined._
 
-    type X <: Symbol // Xplicit Key type
-    type FTK = FieldType[X, Key]
+    val key = "key".witness
+    type KeyFieldType = FieldType[key.T, Key]
+
+    // implicit def deriveLabelledWrite[HV <: HList](
+    //     implicit
+    //     genV: LabelledGeneric.Aux[Value, HV],
+    //     hlw: Lazy[LabelledWrite[KeyFieldType :: HV]]
+    // ): LabelledWrite[Row] =
+    //   new LabelledWrite[Row] {
+    //     type H = KeyFieldType :: HV
+    //     val writeH: LabelledWrite[H] = hlw.value
+    //     def headers: CSV.Headers     = writeH.headers
+    //     def write(r: Row): CSV.Row   = writeH.write(genV to r)
+    //   }
+
     implicit def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlw: Lazy[LabelledRead[FTK :: HV]]
-    ): LabelledRead[Row] = new LabelledRead[Row] {
-      type H = FTK :: HV
-      val readH: LabelledRead[H] = hlw.value
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
-        readH.read(row, headers) map { h =>
-          val k: Key   = h.head
-          val hv: HV   = h.tail
-          val v: Value = genV from hv
-          (k, v)
-        }
-    }
+        hlw: Lazy[LabelledRead[KeyFieldType :: HV]]
+    ): LabelledRead[Row] =
+      new LabelledRead[Row] {
+        type H = KeyFieldType :: HV
+        val readH: LabelledRead[H] = hlw.value
+        def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
+          readH.read(row, headers) map { h =>
+            (h.head, genV from h.tail)
+          }
+      }
 
   }
 

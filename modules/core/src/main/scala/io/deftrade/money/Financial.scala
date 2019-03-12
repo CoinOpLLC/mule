@@ -83,7 +83,8 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
       } else none
   }
 
-  final case class Whole[I]() // for validation FIXME finish this
+  /** Phantom type for `Validate` predicate indicating a whole number (fractional part is zero). */
+  final case class Whole[I]()
 
   /** Extractor for whole numbers. */
   object Whole {

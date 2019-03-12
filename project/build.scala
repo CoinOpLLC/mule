@@ -4,7 +4,7 @@ import Keys._
 
 object Version {
 
-  val Scala          = "2.12.7"
+  val Scala          = "2.12.8"
   val Xml            = "1.1.0"
   val ScalaTest      = "3.0.5"
   val ScalaCheck     = "1.14.0"
