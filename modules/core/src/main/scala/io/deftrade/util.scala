@@ -59,7 +59,7 @@ object camelsnake { outer =>
   }
 }
 
-object csvio {
+object ssv { // seperator separated values ;)
 
   import time._
   import money._
@@ -92,6 +92,11 @@ object csvio {
     lazy val values: IndexedSeq[Nut] = findValues
   }
 
+  case class Bar(i: Int, s: String)
+  object Bar extends WithKeyAndEq[Long, Bar] {
+    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
+  }
+
   /** Serialize this. */
   // case class Foo[C: Currency](
   case class Foo(
@@ -104,6 +109,7 @@ object csvio {
       date: LocalDate,
       time: LocalTime,
       nut: Nut,
+      kBar: Bar.Key,
       x: Double Refined Positive,
       ccy: CurrencyLike,
       // total: Money[Double, Currency.USD],
@@ -127,11 +133,12 @@ object csvio {
       val date = localDate(instant)
       val time = localTime(clockDefaultZone) // FIXME make moar orthogonal pleaz
       val nut  = Nut.Almond
+      val kBar = Bar.Key.reserved
       val x    = refineMV[Positive](3.14)
       val ccy  = Currency.USD // FIXME: why?
       //  val total = Money[Double, Currency.USD]
       val ts = instant
-      Foo(uuid, s, i, l, d, bd, date, time, nut, x, ccy, ts)
+      Foo(uuid, s, i, l, d, bd, date, time, nut, kBar, x, ccy, ts)
     }
   }
 
@@ -144,22 +151,26 @@ object csvio {
   implicit lazy val lr: LabelledRead[Foo]  = deriveLabelledRead
   implicit lazy val lw: LabelledWrite[Foo] = deriveLabelledWrite
 
-  case class Bar(i: Int, d: Double)
+  case class Dummy(key: Foo.Key)
 
-  Get[Double Refined Positive] |> discardValue
-  Get[Foo.Key]                 |> discardValue
+  implicit lazy val dummyKeyRead: LabelledRead[Dummy] = deriveLabelledRead
+  implicit lazy val keyRead: Read[Dummy]              = deriveRead
+
+  implicit def getKVrow[K: Get, V: LabelledRead]: LabelledRead[(K, V)] = ???
+
+  LabelledRead[(Foo.Key, Foo)] |> discardValue
+  LabelledRead[Foo.Row]        |> discardValue
 
   val l: List[Foo] = List.fill(3)(Foo.unsafeRandom)
 
   val csv = l.writeComplete print Printer.default
 
-// From String to Type
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  // From String to Type
+  @SuppressWarnings(Array("org.wartremover.warts.Any")) // FIXME this is probably my bug
   val decoded: Either[Error, List[Foo]] = {
     parseComplete(csv)
       .leftWiden[Error]
       .flatMap(_.readLabelled[Foo].sequence)
   }
-}
 
-object fio {}
+}

@@ -59,6 +59,8 @@ package kves {
 
     def apply[K: Order, P: Eq](k: K): OpaqueKey[K, P] = Refined unsafeApply k
 
+    val fieldName = "key"
+
   }
 
   /**
@@ -85,12 +87,39 @@ package kves {
   }
 
   private[kves] abstract class WithKeyBase[K: Order, V] {
-    final type Key        = OpaqueKey[K, V]
-    final type Value      = V
-    final type Row        = (Key, Value)
-    final type Rows[C[_]] = C[Row]
+    final type Key   = OpaqueKey[K, V]
+    final type Value = V
+    final type Row   = (Key, Value)
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
+
+    import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
+    import shapeless.labelled.FieldType
+
+    import io.chrisdavenport.cormorant._
+    // import io.chrisdavenport.cormorant.generic.semiauto._
+    // import io.chrisdavenport.cormorant.parser._
+    // import io.chrisdavenport.cormorant.implicits._
+    // import io.chrisdavenport.cormorant.refined._
+
+    type X <: Symbol // Xplicit Key type
+    type FTK = FieldType[X, Key]
+    implicit def deriveLabelledReadRow[HV <: HList](
+        implicit
+        genV: LabelledGeneric.Aux[Value, HV],
+        hlw: Lazy[LabelledRead[FTK :: HV]]
+    ): LabelledRead[Row] = new LabelledRead[Row] {
+      type H = FTK :: HV
+      val readH: LabelledRead[H] = hlw.value
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
+        readH.read(row, headers) map { h =>
+          val k: Key   = h.head
+          val hv: HV   = h.tail
+          val v: Value = genV from hv
+          (k, v)
+        }
+    }
+
   }
 
   /** Module-level companion base class with default Key type */
@@ -111,4 +140,5 @@ package kves {
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
   }
+
 }

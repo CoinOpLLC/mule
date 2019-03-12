@@ -15,7 +15,9 @@ import cats.implicits._
 /**
   * A typeclass for number types suitable for financial calculations.
   *
-  * The essential affordance is a `Currency` dependend `round`ing method.
+  * The essential affordances:
+  * - a `Currency` dependend `round`ing method.
+  * - some handy `Refined` types
   *
   * Beyond that, essentially a wrapper around `spire.math.Fractional`.
   *
@@ -102,15 +104,6 @@ object Financial {
   import refined.W
 
   def apply[N: Financial]: Financial[N] = implicitly
-
-  // def fromFractional[N](N: Fractional[N]): Financial[N] = new Financial(N)
-
-  // type ZeroToOne[N: Fractional] = {
-  //   val N = Fractional[N]
-  //   import N._
-  //   Not[Less[zero]] And Not[Greater[one]]
-  // }
-  // implicit def refinedValidate[N: Financial, P]: Validate[N, P] = ???
 
   implicit lazy val DoubleIsFinancial = new Financial(Fractional[Double]) {
     type LiterallyZero = W.`0.0`.T

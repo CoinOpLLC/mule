@@ -24,6 +24,7 @@ object Version {
   val Refined        = "0.9.2"
   val Circe          = "0.8.0"
   val Cormorant      = "0.2.0-M3"
+  val Shapeless      = "2.3.3"
 
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
@@ -60,6 +61,8 @@ object Deps {
   val quicklens = "com.softwaremill.quicklens" %% "quicklens" % Quicklens
 
   val spire = "org.typelevel" %% "spire" % Spire
+
+  val shapeless = "com.chuusai" %% "shapeless" % Shapeless
 
   // val squants = "org.typelevel" %% "squants" % Squants
 
@@ -168,6 +171,7 @@ object Deps {
       // mouse,
       // quicklens,
       spire,
+      shapeless,
     ) ++ fs2s ++ cormorants ++ fuiids
 
   lazy val misclibs =
