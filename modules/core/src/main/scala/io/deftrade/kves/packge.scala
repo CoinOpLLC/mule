@@ -9,6 +9,16 @@ import refined.api.{ Min, Refined, Validate }
 import spire.math.Integral
 import spire.implicits._
 
+import shapeless._
+import shapeless.labelled._
+import shapeless.syntax.singleton._
+
+import io.chrisdavenport.cormorant._
+// import io.chrisdavenport.cormorant.generic.semiauto._
+// import io.chrisdavenport.cormorant.parser._
+// import io.chrisdavenport.cormorant.implicits._
+// import io.chrisdavenport.cormorant.refined._
+
 import scala.language.higherKinds
 
 /**
@@ -50,6 +60,9 @@ package object kves {
     field => s"Failed to decode Enum: $e: Received Field $field"
   )
   final def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
+
+  final val key = "key".witness
+  final type keyT = key.T
 
 }
 
@@ -93,45 +106,33 @@ package kves {
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
-    import shapeless._
-    import shapeless.labelled.FieldType
-    import shapeless.syntax.singleton._
+    // type KeyFieldType = FieldType[key.T, Key]
 
-    import io.chrisdavenport.cormorant._
-    // import io.chrisdavenport.cormorant.generic.semiauto._
-    // import io.chrisdavenport.cormorant.parser._
-    // import io.chrisdavenport.cormorant.implicits._
-    // import io.chrisdavenport.cormorant.refined._
-
-    val key = "key".witness
-    type KeyFieldType = FieldType[key.T, Key]
-
-    // implicit def deriveLabelledWrite[HV <: HList](
-    //     implicit
-    //     genV: LabelledGeneric.Aux[Value, HV],
-    //     hlw: Lazy[LabelledWrite[KeyFieldType :: HV]]
-    // ): LabelledWrite[Row] =
-    //   new LabelledWrite[Row] {
-    //     type H = KeyFieldType :: HV
-    //     val writeH: LabelledWrite[H] = hlw.value
-    //     def headers: CSV.Headers     = writeH.headers
-    //     def write(r: Row): CSV.Row   = writeH.write(genV to r)
-    //   }
+    implicit def deriveLabelledWriteRow[HV <: HList](
+        implicit
+        genV: LabelledGeneric.Aux[Value, HV],
+        hlw: Lazy[LabelledWrite[FieldType[keyT, Key] :: HV]]
+    ): LabelledWrite[Row] =
+      new LabelledWrite[Row] {
+        type H = FieldType[keyT, Key] :: HV
+        val writeH: LabelledWrite[H] = hlw.value
+        def headers: CSV.Headers     = writeH.headers
+        def write(r: Row): CSV.Row   = writeH.write(field[key.T](r._1) :: (genV to r._2))
+      }
 
     implicit def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlw: Lazy[LabelledRead[KeyFieldType :: HV]]
+        hlr: Lazy[LabelledRead[FieldType[keyT, Key] :: HV]]
     ): LabelledRead[Row] =
       new LabelledRead[Row] {
-        type H = KeyFieldType :: HV
-        val readH: LabelledRead[H] = hlw.value
+        type H = FieldType[keyT, Key] :: HV
+        val readH: LabelledRead[H] = hlr.value
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
           readH.read(row, headers) map { h =>
             (h.head, genV from h.tail)
           }
       }
-
   }
 
   /** Module-level companion base class with default Key type */
@@ -147,6 +148,7 @@ package kves {
 
   /** Key type companion base class. */
   private[kves] abstract class OpaqueKeyC[K: Order, P: Eq] {
+
     def apply(k: K) = OpaqueKey[K, P](k)
 
     /** Where the key type is integral, we will reserve the min value. */
