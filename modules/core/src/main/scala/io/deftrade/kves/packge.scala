@@ -40,14 +40,14 @@ import scala.language.higherKinds
 package object kves {
 
   /** Just an alias.  */
-  type OpaqueKey[K, P] = Refined[K, P]
+  type OpaqueKey[K, V] = Refined[K, V]
 
-  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
-  implicit def orderOpaqueKey[K: Order, P]: Order[OpaqueKey[K, P]] =
+  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
+  implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] =
     Order by (_.value)
 
-  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, P] (unquallified for P) */
-  implicit def showOpaqueKey[K: Show: Order, P]: Show[OpaqueKey[K, P]] =
+  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
+  implicit def showOpaqueKey[K: Show: Order, V]: Show[OpaqueKey[K, V]] =
     Show show (key => s"k: ${key.value.show}")
 
   import enumeratum._
@@ -70,9 +70,7 @@ package kves {
 
   object OpaqueKey {
 
-    def apply[K: Order, P: Eq](k: K): OpaqueKey[K, P] = Refined unsafeApply k
-
-    val fieldName = "key"
+    def apply[K: Order, V: Eq](k: K): OpaqueKey[K, V] = Refined unsafeApply k
 
   }
 
@@ -87,7 +85,7 @@ package kves {
 
     def apply[KY: Fresh] = implicitly[Fresh[KY]]
 
-    def zeroBasedIncr[K: Integral, P: Eq]: Fresh[OpaqueKey[K, P]] = {
+    def zeroBasedIncr[K: Integral, V: Eq]: Fresh[OpaqueKey[K, V]] = {
 
       val K = Integral[K]
       import K._
@@ -100,15 +98,17 @@ package kves {
   }
 
   private[kves] abstract class WithKeyBase[K: Order, V] {
+
+    /**
+      * n.b. `V` is used as a phantom type here
+      */
     final type Key   = OpaqueKey[K, V]
     final type Value = V
     final type Row   = (Key, Value)
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
-    // type KeyFieldType = FieldType[key.T, Key]
-
-    implicit def deriveLabelledWriteRow[HV <: HList](
+    final def deriveLabelledWriteRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
         hlw: Lazy[LabelledWrite[FieldType[keyT, Key] :: HV]]
@@ -120,7 +120,7 @@ package kves {
         def write(r: Row): CSV.Row   = writeH.write(field[key.T](r._1) :: (genV to r._2))
       }
 
-    implicit def deriveLabelledReadRow[HV <: HList](
+    final def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
         hlr: Lazy[LabelledRead[FieldType[keyT, Key] :: HV]]
@@ -136,23 +136,23 @@ package kves {
   }
 
   /** Module-level companion base class with default Key type */
-  abstract class WithKey[K: Order, P: Eq] extends WithKeyBase[K, P] {
-    object Key extends OpaqueKeyC[K, P]
+  abstract class WithKey[K: Order, V: Eq] extends WithKeyBase[K, V] {
+    object Key extends OpaqueKeyC[K, V]
   }
 
-  /** Same but with implicit Eq[P] typeclass instance */
-  abstract class WithKeyAndEq[K: Order, P] extends WithKeyBase[K, P] {
-    object Key extends OpaqueKeyC[K, P]
-    implicit lazy val eqP: Eq[P] = Eq.fromUniversalEquals[P]
+  /** Same but with implicit Eq[V] typeclass instance */
+  abstract class WithKeyAndEq[K: Order, V] extends WithKeyBase[K, V] {
+    object Key extends OpaqueKeyC[K, V]
+    implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
   }
 
   /** Key type companion base class. */
-  private[kves] abstract class OpaqueKeyC[K: Order, P: Eq] {
+  private[kves] abstract class OpaqueKeyC[K: Order, V: Eq] {
 
-    def apply(k: K) = OpaqueKey[K, P](k)
+    def apply(k: K) = OpaqueKey[K, V](k)
 
     /** Where the key type is integral, we will reserve the min value. */
-    def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
+    def reserved(implicit K: Min[K]) = OpaqueKey[K, V](K.min)
   }
 
 }

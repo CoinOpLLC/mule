@@ -74,6 +74,10 @@ object ssv { // seperator separated values ;)
 
   import cats.implicits._
 
+  // import shapeless._
+  // import shapeless.labelled._
+  // import shapeless.syntax.singleton._
+
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.generic.semiauto._
   import io.chrisdavenport.cormorant.parser._
@@ -82,14 +86,28 @@ object ssv { // seperator separated values ;)
 
   import java.util.UUID
 
+  /** mixin csv read and write capabilities */
+  trait CsvEnum[A <: EnumEntry] { self: Enum[A] =>
+    implicit lazy val get = enumGet(self)
+    implicit lazy val put = enumPut[A]
+  }
+
   /** */
   sealed trait Nut extends EnumEntry with Product with Serializable
-  object Nut extends Enum[Nut] {
-    case object Hazelnut extends Nut
-    case object Peanut   extends Nut
-    case object Almond   extends Nut
+
+  /** */
+  object Nut extends Enum[Nut] with CsvEnum[Nut] {
+
+    case object Hazelnut   extends Nut
+    case object Peanut     extends Nut
+    case object Almond     extends Nut
+    case object Cashew     extends Nut
+    case object Walnut     extends Nut
+    case object Pecan      extends Nut
+    case object Pistaschio extends Nut
 
     lazy val values: IndexedSeq[Nut] = findValues
+
   }
 
   case class Bar(i: Int, s: String)
@@ -140,14 +158,15 @@ object ssv { // seperator separated values ;)
       val ts = instant
       Foo(uuid, s, i, l, d, bd, date, time, nut, kBar, x, ccy, ts)
     }
-  }
 
-  implicit lazy val nutGet = enumGet(Nut)
-  implicit lazy val nutPut = enumPut[Nut]
+    // implicit lazy val readRow: LabelledRead[Row]   = deriveLabelledReadRow
+    // implicit lazy val writeRow: LabelledWrite[Row] = deriveLabelledWriteRow
+  }
 
   implicit lazy val ccyGet = enumGet(Currency)
   implicit lazy val ccyPut = enumPut[CurrencyLike]
 
+  // FIXME NOTE THE ORDER DEPENDENCE: EVERYBODY TO THEIR CORNER! (Implicits to to comp objs plz k)
   implicit lazy val lr: LabelledRead[Foo]  = deriveLabelledRead
   implicit lazy val lw: LabelledWrite[Foo] = deriveLabelledWrite
 
