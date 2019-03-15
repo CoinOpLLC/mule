@@ -59,13 +59,33 @@ object camelsnake { outer =>
   }
 }
 
-object ssv { // seperator separated values ;)
+import enumeratum._
+
+/** mixin csv read and write capabilities */
+trait CsvEnum[A <: EnumEntry] { self: Enum[A] =>
+  implicit lazy val get = CsvEnum enumGet self
+  implicit lazy val put = CsvEnum.enumPut[A]
+}
+object CsvEnum {
+
+  import cats.implicits._
+
+  import io.chrisdavenport.cormorant._
+  import io.chrisdavenport.cormorant.implicits._
+
+  /** Integrates Enumeratum into Cormorant (CSV). Use these methods to create implicits per Enum. */
+  def enumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get tryOrMessage (
+    field => scala.util.Try { e withName field.x },
+    field => s"Failed to decode Enum: $e: Received Field $field"
+  )
+  def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
+}
+
+object csvHacking {
 
   import time._
   import money._
   import kves._
-
-  import enumeratum._
 
   import eu.timepit.refined
   import refined.refineMV
@@ -73,10 +93,6 @@ object ssv { // seperator separated values ;)
   import refined.numeric.Positive
 
   import cats.implicits._
-
-  // import shapeless._
-  // import shapeless.labelled._
-  // import shapeless.syntax.singleton._
 
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.generic.semiauto._
@@ -86,20 +102,14 @@ object ssv { // seperator separated values ;)
 
   import java.util.UUID
 
-  /** mixin csv read and write capabilities */
-  trait CsvEnum[A <: EnumEntry] { self: Enum[A] =>
-    implicit lazy val get = enumGet(self)
-    implicit lazy val put = enumPut[A]
-  }
-
   /** */
   sealed trait Nut extends EnumEntry with Product with Serializable
 
   /** */
   object Nut extends Enum[Nut] with CsvEnum[Nut] {
 
-    case object Hazelnut   extends Nut
     case object Peanut     extends Nut
+    case object Hazelnut   extends Nut
     case object Almond     extends Nut
     case object Cashew     extends Nut
     case object Walnut     extends Nut
@@ -129,7 +139,7 @@ object ssv { // seperator separated values ;)
       nut: Nut,
       kBar: Bar.Key,
       x: Double Refined Positive,
-      ccy: CurrencyLike,
+      // ccy: CurrencyLike,
       // total: Money[Double, Currency.USD],
       ts: Instant,
   )
@@ -153,32 +163,43 @@ object ssv { // seperator separated values ;)
       val nut  = Nut.Almond
       val kBar = Bar.Key.reserved
       val x    = refineMV[Positive](3.14)
-      val ccy  = Currency.USD // FIXME: why?
+      // val ccy  = Currency.USD // FIXME: why?
       //  val total = Money[Double, Currency.USD]
       val ts = instant
-      Foo(uuid, s, i, l, d, bd, date, time, nut, kBar, x, ccy, ts)
+      Foo(
+        uuid,
+        s,
+        i,
+        l,
+        d,
+        bd,
+        date,
+        time,
+        nut,
+        kBar,
+        x,
+        // ccy,
+        ts
+      )
     }
 
-    // implicit lazy val readRow: LabelledRead[Row]   = deriveLabelledReadRow
-    // implicit lazy val writeRow: LabelledWrite[Row] = deriveLabelledWriteRow
+    implicit lazy val readCsv: LabelledRead[Value]   = deriveLabelledRead
+    implicit lazy val writeCsv: LabelledWrite[Value] = deriveLabelledWrite
+
+    implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
+    implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
+
+    import shapeless._
+    import shapeless.labelled._
+
+    val vlg = LabelledGeneric[Value]
+    type Repr    = vlg.Repr
+    type RowRepr = FieldType[keyT, Key] :: Repr
+
   }
 
-  implicit lazy val ccyGet = enumGet(Currency)
-  implicit lazy val ccyPut = enumPut[CurrencyLike]
-
-  // FIXME NOTE THE ORDER DEPENDENCE: EVERYBODY TO THEIR CORNER! (Implicits to to comp objs plz k)
-  implicit lazy val lr: LabelledRead[Foo]  = deriveLabelledRead
-  implicit lazy val lw: LabelledWrite[Foo] = deriveLabelledWrite
-
-  case class Dummy(key: Foo.Key)
-
-  implicit lazy val dummyKeyRead: LabelledRead[Dummy] = deriveLabelledRead
-  implicit lazy val keyRead: Read[Dummy]              = deriveRead
-
-  implicit def getKVrow[K: Get, V: LabelledRead]: LabelledRead[(K, V)] = ???
-
-  LabelledRead[(Foo.Key, Foo)] |> discardValue
-  LabelledRead[Foo.Row]        |> discardValue
+  LabelledRead[Foo]     |> discardValue
+  LabelledRead[Foo.Row] |> discardValue
 
   val l: List[Foo] = List.fill(3)(Foo.unsafeRandom)
 

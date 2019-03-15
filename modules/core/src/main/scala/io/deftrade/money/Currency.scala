@@ -75,7 +75,7 @@ sealed trait Currency[C] extends CurrencyLike with Product with Serializable { s
 
 }
 
-object Currency extends Enum[CurrencyLike] {
+object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] {
 
   /**
     * Three letter codes: 26 ^ 3 = 17576

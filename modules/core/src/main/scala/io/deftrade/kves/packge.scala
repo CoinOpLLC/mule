@@ -19,7 +19,7 @@ import io.chrisdavenport.cormorant._
 // import io.chrisdavenport.cormorant.implicits._
 // import io.chrisdavenport.cormorant.refined._
 
-import scala.language.higherKinds
+// import scala.language.higherKinds
 
 /**
   * kvse: Key Value Entity Scheme*:
@@ -50,18 +50,7 @@ package object kves {
   implicit def showOpaqueKey[K: Show: Order, V]: Show[OpaqueKey[K, V]] =
     Show show (key => s"k: ${key.value.show}")
 
-  import enumeratum._
-  import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.implicits._
-
-  /** Integrates Enumeratum into Cormorant (CSV). Use these methods to create implicits per Enum. */
-  final def enumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get tryOrMessage (
-    field => scala.util.Try { e withName field.x },
-    field => s"Failed to decode Enum: $e: Received Field $field"
-  )
-  final def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
-
-  final val key = "key".witness
+  final val key = 'key.witness
   final type keyT = key.T
 
 }
@@ -102,9 +91,19 @@ package kves {
     /**
       * n.b. `V` is used as a phantom type here
       */
-    final type Key   = OpaqueKey[K, V]
+    type Key                = OpaqueKey[K, V]
+    final type KeyFieldType = FieldType[keyT, Key]
+
     final type Value = V
-    final type Row   = (Key, Value)
+    // val ValueLG: LabelledGeneric[Value]
+
+    /** `Repr` is more valuable `<: HList` */
+    type Repr <: HList
+
+    final type Row = (Key, Value)
+    // val RowLG: LabelledGeneric[Row]
+
+    type RowRepr <: HList
 
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
@@ -114,7 +113,7 @@ package kves {
         hlw: Lazy[LabelledWrite[FieldType[keyT, Key] :: HV]]
     ): LabelledWrite[Row] =
       new LabelledWrite[Row] {
-        type H = FieldType[keyT, Key] :: HV
+        type H = KeyFieldType :: HV
         val writeH: LabelledWrite[H] = hlw.value
         def headers: CSV.Headers     = writeH.headers
         def write(r: Row): CSV.Row   = writeH.write(field[key.T](r._1) :: (genV to r._2))
@@ -123,16 +122,22 @@ package kves {
     final def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlr: Lazy[LabelledRead[FieldType[keyT, Key] :: HV]]
+        hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
     ): LabelledRead[Row] =
       new LabelledRead[Row] {
-        type H = FieldType[keyT, Key] :: HV
+        type H = KeyFieldType :: HV
         val readH: LabelledRead[H] = hlr.value
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
           readH.read(row, headers) map { h =>
             (h.head, genV from h.tail)
           }
       }
+
+    // implicit def readCsv: LabelledRead[Value]
+    // implicit def writeCsv: LabelledWrite[Value]
+    //
+    // implicit def readRowCsv: LabelledRead[Row]
+    // implicit def writeRowCsv: LabelledWrite[Row]
   }
 
   /** Module-level companion base class with default Key type */
