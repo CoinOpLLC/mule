@@ -247,6 +247,7 @@ trait Api {
 
   type ZoneId = java.time.ZoneId
 
+  def zoneId                                           = ZoneId.systemDefault()
   def zoneId(s: String)                                = ZoneId of s
   def zoneId(s: String, aliasMap: Map[String, String]) = ZoneId of (s, aliasMap.asJava)
   def zoneId(prefix: String, offset: ZoneOffset)       = ZoneId ofOffset (prefix, offset)

@@ -93,6 +93,7 @@ package kves {
       */
     type Key                = OpaqueKey[K, V]
     final type KeyFieldType = FieldType[keyT, Key]
+    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
     final type Value = V
     // val ValueLG: LabelledGeneric[Value]
@@ -105,8 +106,6 @@ package kves {
 
     type RowRepr <: HList
 
-    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
-
     final def deriveLabelledWriteRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
@@ -116,7 +115,7 @@ package kves {
         type H = KeyFieldType :: HV
         val writeH: LabelledWrite[H] = hlw.value
         def headers: CSV.Headers     = writeH.headers
-        def write(r: Row): CSV.Row   = writeH.write(field[key.T](r._1) :: (genV to r._2))
+        def write(r: Row): CSV.Row   = writeH write field[key.T](r._1) :: (genV to r._2)
       }
 
     final def deriveLabelledReadRow[HV <: HList](
@@ -132,12 +131,6 @@ package kves {
             (h.head, genV from h.tail)
           }
       }
-
-    // implicit def readCsv: LabelledRead[Value]
-    // implicit def writeCsv: LabelledWrite[Value]
-    //
-    // implicit def readRowCsv: LabelledRead[Row]
-    // implicit def writeRowCsv: LabelledWrite[Row]
   }
 
   /** Module-level companion base class with default Key type */
