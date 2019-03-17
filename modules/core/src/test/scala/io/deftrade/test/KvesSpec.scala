@@ -148,6 +148,7 @@ object csvUnderTest {
   // case class Foo[C: Currency](
   case class Foo(
       uuid: UUID,
+      ts: Instant,
       s: String,
       i: Int,
       l: Long,
@@ -158,36 +159,31 @@ object csvUnderTest {
       nut: Nut,
       bar: Bar.Key,
       x: Double Refined Positive,
-      // ccy: CurrencyLike,
+      usd: Currency[Currency.USD],
       // total: Money[Double, Currency.USD],
-      ts: Instant,
   )
 
   object Foo extends WithKeyAndEq[Long, Foo] {
 
-    /**
-      * recall: our policy is to specify policy; specifically, to require that policy be specified
-      */
-    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
-
     def unsafeRandom: Foo = {
       val uuid = UUID.randomUUID
+      val ts   = instant
       val s    = uuid.toString
       val i    = s.map(_.toInt).sum
       val l    = (i * 555).toLong
-      val d    = scala.math.sqrt(i.toDouble)
-      val bd   = BigDecimal(d)
-      val rn   = instant atZone zoneId
+      val d    = scala.math sqrt i.toDouble
+      val bd   = d |> BigDecimal.apply
+      val rn   = ts atZone zoneId
       val date = rn.localDate
       val time = rn.localTime
       val nut  = Nut.Almond
       val bar  = Bar.Key.reserved
       val x    = refineMV[Positive](3.14)
-      // val ccy  = Currency.USD // FIXME: why?
+      val usd  = Currency.USD
       //  val total = Money[Double, Currency.USD]
-      val ts = instant
       Foo(
         uuid,
+        ts,
         s,
         i,
         l,
@@ -198,10 +194,14 @@ object csvUnderTest {
         nut,
         bar,
         x,
-        // ccy,
-        ts
+        usd,
       )
     }
+
+    /**
+      * recall: our policy is to specify policy; specifically, to require that policy be specified
+      */
+    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
 
     implicit lazy val readCsv: LabelledRead[Value]   = deriveLabelledRead
     implicit lazy val writeCsv: LabelledWrite[Value] = deriveLabelledWrite

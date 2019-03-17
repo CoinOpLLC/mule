@@ -152,5 +152,4 @@ package kves {
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]) = OpaqueKey[K, V](K.min)
   }
-
 }

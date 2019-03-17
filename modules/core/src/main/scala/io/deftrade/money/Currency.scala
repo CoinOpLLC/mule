@@ -72,10 +72,9 @@ sealed trait Currency[C] extends CurrencyLike with Product with Serializable { s
     implicit val C2 = cb
     Rate[C, C2]
   }
-
 }
 
-object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] {
+object Currency extends Enum[CurrencyLike] { self =>
 
   /**
     * Three letter codes: 26 ^ 3 = 17576
@@ -140,4 +139,23 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] {
   // TODO: MOAR...
 
   val values = findValues
+
+  import cats.implicits._
+
+  import io.chrisdavenport.cormorant._
+  import io.chrisdavenport.cormorant.implicits._
+
+  implicit def enumGet[CCY: Currency]: Get[Currency[CCY]] = new Get[Currency[CCY]] {
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Currency[CCY]] =
+      CsvEnum.enumGet[CurrencyLike](self) get field match {
+        case Right(ccy) if ccy === Currency[CCY] =>
+          Currency[CCY].asRight
+        case _ =>
+          (Error.DecodeFailure
+            single
+              s"Failed to decode Enum: ${Currency[CCY]}: Received Field $field").asLeft
+      }
+  }
+  implicit def put[CCY: Currency]: Put[Currency[CCY]] = CsvEnum.enumPut
+
 }

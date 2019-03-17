@@ -1,9 +1,9 @@
 package io.deftrade
 
 /** mixin csv read and write capabilities */
-trait CsvEnum[A <: enumeratum.EnumEntry] { self: enumeratum.Enum[A] =>
+trait CsvEnum[EE <: enumeratum.EnumEntry] { self: enumeratum.Enum[EE] =>
   implicit lazy val get = CsvEnum enumGet self
-  implicit lazy val put = CsvEnum.enumPut[A]
+  implicit lazy val put = CsvEnum.enumPut[EE]
 }
 
 /**  */
