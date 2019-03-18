@@ -1,28 +1,5 @@
 package io.deftrade
 
-/** mixin csv read and write capabilities */
-trait CsvEnum[EE <: enumeratum.EnumEntry] { self: enumeratum.Enum[EE] =>
-  implicit lazy val get = CsvEnum enumGet self
-  implicit lazy val put = CsvEnum.enumPut[EE]
-}
-
-/**  */
-object CsvEnum {
-
-  import enumeratum._
-  import cats.implicits._
-
-  import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.implicits._
-
-  /** Integrates Enumeratum into Cormorant (CSV). Use these methods to create implicits per Enum. */
-  def enumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get tryOrMessage (
-    field => scala.util.Try { e withName field.x },
-    field => s"Failed to decode Enum: $e: Received Field $field"
-  )
-  def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
-}
-
 object camelsnake { outer =>
 
   def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)

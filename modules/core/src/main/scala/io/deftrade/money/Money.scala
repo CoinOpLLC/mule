@@ -2,6 +2,7 @@ package io.deftrade
 package money
 
 import eu.timepit.refined
+import refined.api.{ RefType, Validate }
 
 import spire.implicits._
 
@@ -58,7 +59,7 @@ object Money {
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
 
   /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
-  implicit def catsOrderMoney[N: Financial, C]: Order[Money[N, C]] =
+  implicit def moneyOrder[N: Financial, C]: Order[Money[N, C]] =
     Order by (_.amount)
 
   /**
@@ -66,23 +67,42 @@ object Money {
     * But we can implement Show[Money[N, C]] for all the N and C we care about.
     * The Currency[_] instance is legit necessary for proper formatting.
     */
-  implicit def showMoney[N: Financial, C: Currency]: Show[Money[N, C]] =
+  implicit def moneyShow[N: Financial, C: Currency]: Show[Money[N, C]] =
     Show show (m => format(m))
 
   /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
-  implicit def commutativeGroupMoney[N: Financial, C]: CommutativeGroup[Money[N, C]] =
+  implicit def moneyCommutativeGroup[N: Financial, C]: CommutativeGroup[Money[N, C]] =
     Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(_ |> fiat[N, C])(_.amount)
 
-  def format[N: Financial, C: Currency](m: Money[N, C]): String = {
-    val flags = """#,(""" // decimal-separator, grouping-separators, parens-for-negative
-    val C     = Currency[C]
-    val fmt   = s"%${flags}.${C.fractionDigits}f" // TODO: this hack won't extend
-    val sfmt  = if ((Financial[N].fractional signum m.amount) < 0) fmt else s" $fmt "
+  def format[N, C](m: Money[N, C])(implicit N: Financial[N], C: Currency[C]): String = {
+
+    // decimal-separator, grouping-separators, parens-for-negative
+    def flags = """#,("""
+
+    // TODO: this hack won't extend to alt currency
+    def fmt = s"%${flags}.${C.fractionDigits}f"
+
+    def isNegative = N.fractional.signum(m.amount) < 0
+
+    def sfmt = if (isNegative) fmt else s" $fmt "
+
     s"${C.currencyCode} ${m.amount formatted sfmt}"
   }
 
+  import cats.implicits._
+
+  import io.chrisdavenport.cormorant._
+  import io.chrisdavenport.cormorant.implicits._
+
+  /** cormorant csv Get */
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] =
+    ??? // Get[Currency[C]] |+| Get[N]
+
+  /** cormorant csv Put */
+  implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
+    stringPut contramap (m => format(m))
+
   /** `Refined` section */
-  import refined.api.{ RefType, Validate }
   implicit lazy val refinedRefType: RefType[Money] =
     new RefType[Money] {
 
