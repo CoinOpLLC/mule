@@ -6,9 +6,9 @@ import refined.api.{ RefType, Validate }
 
 import spire.implicits._
 
+import cats._
 import cats.kernel.{ CommutativeGroup, Order }
-import cats.{ Invariant, Show }
-import cats.syntax.option._
+import cats.implicits._
 
 /**
   * `Money` is a scala value class, with a phantom currency type.
@@ -89,14 +89,26 @@ object Money {
     s"${C.currencyCode} ${m.amount formatted sfmt}"
   }
 
-  import cats.implicits._
-
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.implicits._
 
   /** cormorant csv Get */
-  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] =
-    ??? // Get[Currency[C]] |+| Get[N]
+  implicit def moneyGet[N: Financial, CCY: Currency]: Get[Money[N, CCY]] = {
+
+    val CCY = Currency[CCY]
+
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, CCY]] = {
+      import field.x
+      def troof      = (2 + 2) === 4
+      def isNegative = (x charAt 5) === '(' // fixme wtf
+      val ccy        = (x take 3) |> CSV.Field.apply
+      val amount     = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
+      for {
+        _ <- Get[Currency[CCY]] get ccy
+        n <- Get[N] get amount // FIXME: need to add this to implicit `Financial` instances
+      } yield CCY apply n
+    }
+  }
 
   /** cormorant csv Put */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =

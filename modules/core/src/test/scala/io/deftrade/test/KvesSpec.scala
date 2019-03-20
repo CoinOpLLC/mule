@@ -100,9 +100,10 @@ class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
 
 object csvUnderTest {
 
+  import kves._
   import time._
   import money._
-  import kves._
+  import Currency.USD
 
   import enumeratum._
 
@@ -159,28 +160,28 @@ object csvUnderTest {
       nut: Nut,
       bar: Bar.Key,
       x: Double Refined Positive,
-      usd: Currency[Currency.USD],
-      // total: Money[Double, Currency.USD],
+      usd: Currency[USD],
+      amount: Money[Double, USD],
   )
 
   object Foo extends WithKeyAndEq[Long, Foo] {
 
     def unsafeRandom: Foo = {
-      val uuid = UUID.randomUUID
-      val ts   = instant
-      val s    = uuid.toString
-      val i    = s.map(_.toInt).sum
-      val l    = (i * 555).toLong
-      val d    = scala.math sqrt i.toDouble
-      val bd   = d |> BigDecimal.apply
-      val rn   = ts atZone zoneId
-      val date = rn.localDate
-      val time = rn.localTime
-      val nut  = Nut.Almond
-      val bar  = Bar.Key.reserved
-      val x    = refineMV[Positive](3.14)
-      val usd  = Currency.USD
-      //  val total = Money[Double, Currency.USD]
+      val uuid   = UUID.randomUUID
+      val ts     = instant
+      val s      = uuid.toString
+      val i      = s.map(_.toInt).sum
+      val l      = (i * 555).toLong
+      val d      = scala.math sqrt i.toDouble
+      val bd     = d |> BigDecimal.apply
+      val rn     = ts atZone zoneId
+      val date   = rn.localDate
+      val time   = rn.localTime
+      val nut    = Nut.Almond
+      val bar    = Bar.Key.reserved
+      val x      = refineMV[Positive](3.14)
+      val usd    = Currency.USD
+      val amount = USD(1.0)
       Foo(
         uuid,
         ts,
@@ -195,6 +196,7 @@ object csvUnderTest {
         bar,
         x,
         usd,
+        amount,
       )
     }
 
