@@ -4,8 +4,6 @@ package money
 import eu.timepit.refined
 import refined.api.{ RefType, Validate }
 
-import spire.implicits._
-
 import cats._
 import cats.kernel.{ CommutativeGroup, Order }
 import cats.implicits._
@@ -28,6 +26,7 @@ import cats.implicits._
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
+  import spire.implicits._
   import Money.fiat
 
   def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> fiat
@@ -93,20 +92,21 @@ object Money {
   import io.chrisdavenport.cormorant.implicits._
 
   /** cormorant csv Get */
-  implicit def moneyGet[N: Financial, CCY: Currency]: Get[Money[N, CCY]] = {
+  implicit def moneyGet[N: Financial, CCY: Currency]: Get[Money[N, CCY]] = new Get[Money[N, CCY]] {
 
     val CCY = Currency[CCY]
 
     def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, CCY]] = {
       import field.x
-      def troof      = (2 + 2) === 4
-      def isNegative = (x charAt 5) === '(' // fixme wtf
-      val ccy        = (x take 3) |> CSV.Field.apply
-      val amount     = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
+      import spire.syntax.field._
+      val one    = Financial[N].fractional.one
+      def sign   = if (x.charAt(5) === '(') -one else one
+      val ccy    = (x take 3) |> CSV.Field.apply
+      val amount = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
       for {
         _ <- Get[Currency[CCY]] get ccy
-        n <- Get[N] get amount // FIXME: need to add this to implicit `Financial` instances
-      } yield CCY apply n
+        n <- Get[N] get amount
+      } yield CCY apply sign * n
     }
   }
 

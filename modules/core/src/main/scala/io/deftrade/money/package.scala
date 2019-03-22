@@ -16,7 +16,12 @@
 package io.deftrade
 
 import cats.kernel.CommutativeGroup
+import cats.implicits._
+
 import spire.math.Fractional
+
+import io.chrisdavenport.cormorant._
+import io.chrisdavenport.cormorant.implicits._
 
 /**
   *   requirements for currency / money:
@@ -50,4 +55,12 @@ package object money {
 
   implicit def financialFractional[MA: Financial]: Fractional[MA] =
     Financial[MA].fractional
+
+  implicit def financialGet[N: Financial]: Get[N] = Get tryOrMessage (
+    field => scala.util.Try { Financial[N] fromString field.x },
+    field => s"Failed to parse with ${Financial[N]}: Received Field $field"
+  )
+
+  def enumPut[N: Financial]: Put[N] = stringPut contramap (Financial[N] toString _)
+
 }

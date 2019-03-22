@@ -50,21 +50,24 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
     * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
     * that return `Money`.
     */
-  def round[C](n: N)(implicit C: Currency[C]): N = {
+  final def round[C](n: N)(implicit C: Currency[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
   }
 
   /** section: `spire.math.Fractional` proxies */
-  def commutativeGroup: CommutativeGroup[N] = fractional.additive
+  final def commutativeGroup: CommutativeGroup[N] = fractional.additive
 
-  def fromBigDecimal(bd: BigDecimal): N = fractional.fromBigDecimal(bd)
-  def toBigDecimal(n: N): BigDecimal    = fractional.toBigDecimal(n)
+  final def fromBigDecimal(bd: BigDecimal): N = fractional.fromBigDecimal(bd)
+  final def toBigDecimal(n: N): BigDecimal    = fractional.toBigDecimal(n)
 
-  def fromLong(l: Long): N = fractional.fromLong(l)
+  final def fromLong(l: Long): N = fractional.fromLong(l)
 
-  def from[T: Financial](t: T): N = t |> fractional.fromType[T]
-  def to[R: Financial](n: N): R   = n |> fractional.toType[R]
+  final def from[T: Financial](t: T): N = t |> fractional.fromType[T]
+  final def to[R: Financial](n: N): R   = n |> fractional.toType[R]
+
+  final def toString(n: N): String = fractional toString n
+  def fromString(s: String): N
 
   object WholeIs {
     implicit def N: Fractional[N] = fractional
@@ -109,11 +112,13 @@ object Financial {
   implicit lazy val DoubleIsFinancial = new Financial(Fractional[Double]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
+    def fromString(s: String): Double = java.lang.Double parseDouble s
   }
 
   implicit lazy val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
+    def fromString(s: String): BigDecimal = BigDecimal apply s
   }
 
   /**
@@ -136,5 +141,6 @@ object Financial {
   implicit lazy val RationalIsFinancial = new Financial(Fractional[Rational]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
+    def fromString(s: String): Rational = Rational apply s
   }
 }
