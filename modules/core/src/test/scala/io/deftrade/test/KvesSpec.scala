@@ -33,52 +33,7 @@ class KvesSpec extends FlatSpec {
         .flatMap(_.readLabelled[Foo].sequence)
     }
 
-    decoded |> discardValue
-    // val eur   = EUR
-    // val eurF  = eur[Double] _
-    // val eur20 = 20.0 |> eurF
-    // val e20   = EUR(20.00)
-    //
-    // cats.kernel.Order[Money[Double, USD]]
-    //
-    // assert(eur20 === e20)
-    //
-    // assert(eur20 * 2.0 > e20)
-    // assert(eur20 + eur20 > e20)
-    //
-    // type Dollar = Money[Double, USD] // phantom type per `Currency`
-    //
-    // val d20: Dollar = USD(20.00)
-    // val d21: Dollar = USD(21.00)
-    //
-    // assert(d20 !== d21)
-    // assert(d20 < d21)
-    // assert((d20 max d21) === d21)
-    //
-    // def funge[C](den: Currency[C]): Money[Double, C] = den(19.47)
-    // // def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
-    //
-    // assert(USD(19.47) === funge(USD))
-    //
-    // val usd          = USD
-    // val buck: Dollar = usd(1.0)
-    // assert(buck === USD(1.0))
-    // assert(buck + buck === USD(2.0))
-    //
-    // assert(buck.show === "USD  1.00 ")
-    // assert((-buck).show === "USD (1.00)")
-    //
-    // import pricing._
-    //
-    // implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn.Spread(1.23, 1.22)
-    //
-    // lazy val eurusd = EUR / USD
-    //
-    // val dollarsRequired: Dollar = eurusd buy EUR(100.0)
-    // val dollarsReceived: Dollar = eurusd sell EUR(100.0)
-    //
-    // assert(dollarsReceived < dollarsRequired)
-
+    assert(decoded.right === l)
   }
 }
 class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
@@ -183,20 +138,20 @@ object csvUnderTest {
       val usd    = Currency.USD
       val amount = USD(1.0)
       Foo(
-        uuid,
-        ts,
-        s,
-        i,
-        l,
-        d,
-        bd,
-        date,
-        time,
-        nut,
-        bar,
-        x,
-        usd,
-        amount,
+        uuid = uuid,
+        ts = ts,
+        s = s,
+        i = i,
+        l = l,
+        d = d,
+        bd = bd,
+        date = date,
+        time = time,
+        nut = nut,
+        bar = bar,
+        x = x,
+        usd = usd,
+        amount = amount,
       )
     }
 

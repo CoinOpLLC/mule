@@ -21,7 +21,7 @@ object CsvEnum {
   /** Use these methods to create implicits per Enum. */
   def enumGet[EE <: EnumEntry](e: Enum[EE]): Get[EE] = Get tryOrMessage (
     field => scala.util.Try { e withName field.x },
-    field => s"Failed to decode Enum: $e: Received Field $field"
+    field => s"Failed to decode Enum: $e: Received $field"
   )
   def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
 }

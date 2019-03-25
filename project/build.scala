@@ -10,21 +10,22 @@ object Version {
   val ScalaCheck     = "1.14.0"
   val TypesafeConfig = "1.3.3"
 
-  val Cats           = "1.6.0"
-  val CatsEffect     = "1.2.0"
-  val Kittens        = "1.2.1"
-  val Mouse          = "0.7.0"
-  val CatsScalaCheck = "0.1.0"
-  val Fs2            = "1.0.0"
-  val Fuiid          = "0.1.2"
-  val Quicklens      = "1.4.11"
-  val PureConfig     = "0.9.2"
-  val Enumeratum     = "1.5.13"
-  val Spire          = "0.16.0"
-  val Refined        = "0.9.2"
-  val Circe          = "0.8.0"
-  val Cormorant      = "0.2.0-M3"
-  val Shapeless      = "2.3.3"
+  val Cats                = "1.6.0"
+  val CatsEffect          = "1.2.0"
+  val Kittens             = "1.2.1"
+  val Mouse               = "0.7.0"
+  val CatsScalaCheck      = "0.1.0"
+  val Fs2                 = "1.0.0"
+  val Fuiid               = "0.1.2"
+  val Quicklens           = "1.4.11"
+  val PureConfig          = "0.9.2"
+  val Enumeratum          = "1.5.13"
+  val Spire               = "0.16.0"
+  val Refined             = "0.9.2"
+  val Circe               = "0.8.0"
+  val Cormorant           = "0.2.0-M3"
+  val Shapeless           = "2.3.3"
+  val ShapelessScalaCheck = "1.2.0"
 
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
@@ -104,9 +105,10 @@ object Deps {
   ) map (_ % PureConfig)
 
   val testers = Seq(
-    "org.scalatest"     %% "scalatest"       % ScalaTest,
-    "org.scalacheck"    %% "scalacheck"      % ScalaCheck,
-    "io.chrisdavenport" %% "cats-scalacheck" % CatsScalaCheck
+    "org.scalatest"              %% "scalatest"                 % ScalaTest,
+    "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
+    "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
+    "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
   ) map (_ % Test)
 
   val fuiids = Seq(

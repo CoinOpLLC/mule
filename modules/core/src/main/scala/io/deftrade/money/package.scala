@@ -58,7 +58,7 @@ package object money {
 
   implicit def financialGet[N: Financial]: Get[N] = Get tryOrMessage (
     field => scala.util.Try { Financial[N] fromString field.x },
-    field => s"Failed to parse with ${Financial[N]}: Received Field $field"
+    field => s"Failed to parse with ${Financial[N]}: Received $field"
   )
 
   def enumPut[N: Financial]: Put[N] = stringPut contramap (Financial[N] toString _)

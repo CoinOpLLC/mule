@@ -153,7 +153,7 @@ object Currency extends Enum[CurrencyLike] { self =>
         case _ =>
           (Error.DecodeFailure
             single
-              s"Failed to decode Enum: ${Currency[CCY]}: Received Field $field").asLeft
+              s"Failed to decode: ${Currency[CCY]}: Received $field").asLeft
       }
   }
   implicit def put[CCY: Currency]: Put[Currency[CCY]] = CsvEnum.enumPut

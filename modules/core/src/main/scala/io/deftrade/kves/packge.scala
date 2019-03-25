@@ -50,8 +50,8 @@ package object kves {
   implicit def showOpaqueKey[K: Show: Order, V]: Show[OpaqueKey[K, V]] =
     Show show (key => s"k: ${key.value.show}")
 
+  /** `shapelss.Aux` instance, useful for .T which is the type of key label `Symbol` `'key` */
   final val key = 'key.witness
-  final type keyT = key.T
 
 }
 
@@ -92,7 +92,7 @@ package kves {
       * n.b. `V` is used as a phantom type here
       */
     type Key                = OpaqueKey[K, V]
-    final type KeyFieldType = FieldType[keyT, Key]
+    final type KeyFieldType = FieldType[key.T, Key]
     implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
     final type Value = V
@@ -109,7 +109,7 @@ package kves {
     final def deriveLabelledWriteRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlw: Lazy[LabelledWrite[FieldType[keyT, Key] :: HV]]
+        hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
     ): LabelledWrite[Row] =
       new LabelledWrite[Row] {
         type H = KeyFieldType :: HV
