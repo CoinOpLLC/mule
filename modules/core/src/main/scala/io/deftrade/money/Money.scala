@@ -114,34 +114,34 @@ object Money {
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
     stringPut contramap (m => format(m))
 
-  /** `Refined` section */
-  implicit lazy val refinedRefType: RefType[Money] =
-    new RefType[Money] {
-
-      private type F[T, P] = Money[T, P]
-
-      def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
-
-      def unwrap[T](tp: F[T, _]): T = tp.amount
-
-      def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
-    }
-
-  /**
-    * Design rational(ization?):
-    *
-    * why not the following, which seems more obvious?
-    * `implicit object refinedRefType extends RefType[Money] {`
-    *
-    * because:
-    *
-    * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
-    * in object refinedRefType
-    * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
-    * clashes with definition of the member itself;
-    * both have erased type (t: Object)Object
-    *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
-    */
-  implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
-    Validate alwaysPassed Currency[P]
+  // /** `Refined` section */
+  // implicit lazy val refinedRefType: RefType[Money] =
+  //   new RefType[Money] {
+  //
+  //     private type F[T, P] = Money[T, P]
+  //
+  //     def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
+  //
+  //     def unwrap[T](tp: F[T, _]): T = tp.amount
+  //
+  //     def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
+  //   }
+  //
+  // /**
+  //   * Design rational(ization?):
+  //   *
+  //   * why not the following, which seems more obvious?
+  //   * `implicit object refinedRefType extends RefType[Money] {`
+  //   *
+  //   * because:
+  //   *
+  //   * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+  //   * in object refinedRefType
+  //   * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
+  //   * clashes with definition of the member itself;
+  //   * both have erased type (t: Object)Object
+  //   *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+  //   */
+  // implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
+  //   Validate alwaysPassed Currency[P]
 }

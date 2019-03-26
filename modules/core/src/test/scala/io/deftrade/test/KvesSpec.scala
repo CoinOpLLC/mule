@@ -11,7 +11,9 @@ class KvesSpec extends FlatSpec {
   // import io.chrisdavenport.cormorant.refined._
   import io.chrisdavenport.cormorant.implicits._
 
+  import cats._
   import cats.implicits._
+  import cats.syntax.eq._
 
   // import Currency.{ EUR, USD }
 
@@ -22,9 +24,9 @@ class KvesSpec extends FlatSpec {
     LabelledRead[Foo]     |> discardValue
     LabelledRead[Foo.Row] |> discardValue
 
-    val l: List[Foo] = List.fill(3)(Foo.unsafeRandom)
+    val x: List[Foo] = List.fill(3)(Foo.unsafeRandom)
 
-    val csv = l.writeComplete print Printer.default
+    val csv = x.writeComplete print Printer.default
 
     // From String to Type
     val decoded: Either[Error, List[Foo]] = {
@@ -33,7 +35,8 @@ class KvesSpec extends FlatSpec {
         .flatMap(_.readLabelled[Foo].sequence)
     }
 
-    assert(decoded.right === l)
+    val Some(y: List[Foo]) = decoded.toOption
+    assert(x === y)
   }
 }
 class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
@@ -159,6 +162,8 @@ object csvUnderTest {
       * recall: our policy is to specify policy; specifically, to require that policy be specified
       */
     implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
+
+    import Money.{ moneyGet, moneyPut }
 
     implicit lazy val readCsv: LabelledRead[Value]   = deriveLabelledRead
     implicit lazy val writeCsv: LabelledWrite[Value] = deriveLabelledWrite
