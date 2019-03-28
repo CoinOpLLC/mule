@@ -48,6 +48,31 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type MonetaryAmount = MA
   val MonetaryAmount = Financial[MonetaryAmount]
 
+  /** `Leg` := `Position` in motion */
+  type Leg = Position
+  lazy val Leg = Position
+
+  /** `Trade` := `Folio` in motion */
+  type Trade = Folio
+  lazy val Trade = Folio
+
+  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
+  object PricedTrade {
+    def apply[C: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+
+    /**
+      * Used to convert to the currency as `Instrument` convention.
+      * Consider the set of `Instrument`s which represent bank account balances in dollars.
+      * What is the set of "payable on demand" dollar instruments?
+      * This dictates the normalization.
+      */
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments[C]): Trade = ???
+  }
+
+  final case class TransactionMarker[CCY](
+      mark: Trade => PricedTrade[CCY]
+  )
+
   type AccountType = keys.AccountType
 
   type Debit  = keys.Debit
@@ -74,6 +99,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
         ks: keys.SwapKey[AT],
         amount: Money[MA, CCY]
     ): AccountMap[AT, CCY] = ???
+
+    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, CCY](
+        as: AccountMap[T, CCY]
+    ): AccountMap[R, CCY] =
+      as collect {
+        case (k: R, v) => (k, v)
+      }
   }
 
   implicit class SweetAccountMap[A <: AccountType, CCY](am: AccountMap[A, CCY]) {
@@ -136,28 +168,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def unapply[D <: Debit, C <: Credit, CCY: Currency](
         b: Balance[D, C, CCY]
     ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.ds, b.cs).some
-
-    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, CCY](
-        as: AccountMap[T, CCY]
-    ): AccountMap[R, CCY] =
-      as collect {
-        case (k: R, v) => (k, v)
-      }
-
   }
-  final case class TransactionMarker[CCY](
-      mark: Trade => PricedTrade[CCY]
-  )
-
-  type DeltaCashBooks[CCY]    = (CashFlowStatement[CCY], BalanceSheet[CCY])
-  type DeltaAccrualBooks[CCY] = (IncomeStatement[CCY], CashFlowStatement[CCY], BalanceSheet[CCY])
-
-  /** I call this "cratchiting" */
-  def deltaCashBooksFrom[CCY: Currency](
-      pt: PricedTrade[CCY],
-      p: UnitPartition[AccountType, MA],
-      meta: Transaction.Meta
-  ): DeltaCashBooks[CCY] = ???
 
   /** */
   final case class TrialBalance[CCY] private (
@@ -165,7 +176,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       credits: Credits[CCY]
   ) extends Balance[Debit, Credit, CCY](debits, credits) {
 
-    import Balance.collect
+    import AccountMap.collect
 
     def updated(key: DebitKey, amount: Money[MA, CCY]): TrialBalance[CCY]  = ???
     def updated(key: CreditKey, amount: Money[MA, CCY]): TrialBalance[CCY] = ???
@@ -204,10 +215,10 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
         unapply(_).fold(???)(identity)
       }
 
-    def from[L[_]: Foldable, CCY: Currency](
+    def from[CC[_]: Foldable, CCY: Currency](
         marker: TransactionMarker[CCY]
     )(
-        xs: L[Transaction]
+        xs: CC[Transaction]
     ): TrialBalance[CCY] = ??? // xs.sum // FIXME this is all I should have to say!
 
   }
@@ -282,7 +293,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  sealed trait CoveredPeriod {
+  sealed trait CoversPeriod {
     def date: LocalDate
     def period: Period
     final def startDate = date - period
@@ -293,7 +304,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       period: Period,
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C]
-  ) extends CoveredPeriod {
+  ) extends CoversPeriod {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
@@ -303,7 +314,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
       bs: BalanceSheet[C]
-  ) extends CoveredPeriod {
+  ) extends CoversPeriod {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
@@ -316,4 +327,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       raw: IncomeStatement[CCY] // mixed cash and accrual
   ): (CashFlowStatement[CCY], EquityStatement[CCY]) =
     ???
+
+  type DeltaCashBooks[CCY]    = (CashFlowStatement[CCY], BalanceSheet[CCY])
+  type DeltaAccrualBooks[CCY] = (IncomeStatement[CCY], CashFlowStatement[CCY], BalanceSheet[CCY])
+
+  /**
+    * I call this "cratchiting"
+    * FIXME: ok Cratchit what happens when the distribution over the balance sheet
+    * is a function of the current balance sheet?
+    */
+  def deltaCashBooksFrom[CCY: Currency]()(
+      pt: PricedTrade[CCY],
+      p: UnitPartition[AccountType, MA],
+      meta: Transaction.Meta
+  ): DeltaCashBooks[CCY] = ???
+
 }

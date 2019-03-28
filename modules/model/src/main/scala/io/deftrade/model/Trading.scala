@@ -52,27 +52,6 @@ import scala.language.higherKinds
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
 
-  /** `Leg` := `Position` in motion */
-  type Leg = Position
-  lazy val Leg = Position
-
-  /** `Trade` := `Folio` in motion */
-  type Trade = Folio
-  lazy val Trade = Folio
-
-  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
-  object PricedTrade {
-    def apply[C: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
-
-    /**
-      * Used to convert to the currency as `Instrument` convention.
-      * Consider the set of `Instrument`s which represent bank account balances in dollars.
-      * What is the set of "payable on demand" dollar instruments?
-      * This dictates the normalization.
-      */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments[C]): Trade = ???
-  }
-
   /**
     *`OMS` := Order Management System. Ubiquitous acronym in the domain.
     *
