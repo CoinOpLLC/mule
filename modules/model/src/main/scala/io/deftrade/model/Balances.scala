@@ -332,14 +332,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type DeltaAccrualBooks[CCY] = (IncomeStatement[CCY], CashFlowStatement[CCY], BalanceSheet[CCY])
 
   /**
-    * I call this "cratchiting"
-    * FIXME: ok Cratchit what happens when the distribution over the balance sheet
-    * is a function of the current balance sheet?
+    * Cratchit needs to look at the current state of the books
+    * in order to properly allocate balance sheet items (in the most general case)
     */
-  def deltaCashBooksFrom[CCY: Currency]()(
-      pt: PricedTrade[CCY],
-      p: UnitPartition[AccountType, MA],
-      meta: Transaction.Meta
-  ): DeltaCashBooks[CCY] = ???
+  def deltaCashBooksFrom[CCY: Currency](cbs: CashBookSet[CCY]): (
+      PricedTrade[CCY],
+      UnitPartition[AccountType, MonetaryAmount],
+      Transaction.Meta
+  ) => DeltaCashBooks[CCY] = ???
 
 }
