@@ -48,15 +48,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type MonetaryAmount = MA
   val MonetaryAmount = Financial[MonetaryAmount]
 
-  /** `Leg` := `Position` in motion */
-  type Leg = Position
-  lazy val Leg = Position
-
-  /** `Trade` := `Folio` in motion */
-  type Trade = Folio
-  lazy val Trade = Folio
-
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
+
   object PricedTrade {
     def apply[C: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
 
@@ -68,6 +61,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       */
     def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments[C]): Trade = ???
   }
+
+  /** type alias */
+  type ValuedFolio[C] = PricedTrade[C]
+
+  lazy val ValuedFolio = PricedTrade
 
   final case class TransactionMarker[CCY](
       mark: Trade => PricedTrade[CCY]

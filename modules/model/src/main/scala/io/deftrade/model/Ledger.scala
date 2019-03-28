@@ -90,6 +90,10 @@ abstract class Ledger[Q: Financial] { self =>
   type Position = (Instrument.Key, Quantity)
   object Position
 
+  /** `Leg` := `Position` in motion */
+  type Leg = Position
+  lazy val Leg = Position
+
   /**
     * A `Folio` is a set of `Position`s.
     * Can also be thought of as a `Trade` at rest.
@@ -104,6 +108,10 @@ abstract class Ledger[Q: Financial] { self =>
     def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
   }
   type Folios = Folios.Table
+
+  /** A `Trade` := `Folio` in motion. */
+  type Trade = Folio
+  lazy val Trade = Folio
 
   /**
     * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
