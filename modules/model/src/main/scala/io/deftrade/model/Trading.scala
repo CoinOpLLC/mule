@@ -97,13 +97,10 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     private def settle[C: Currency](p: Account.Key): FK[Execution, Transaction] = ???
   }
 
-  // TODO: revisit, systematize
-  implicit def omsEq[F[_]: Monad] = Eq.fromUniversalEquals[OMS[F]]
-
   /**
     * Where do Order Management Systems come from? (Here.)
     */
-  object OMS extends WithKey[Long, OMS[cats.Id]] {
+  object OMS extends WithKeyAndEq[Long, OMS[cats.Id]] {
 
     type Allocation = UnitPartition[Account.Key, Quantity]
 

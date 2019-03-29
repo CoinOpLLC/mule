@@ -9,11 +9,14 @@ import enumeratum._
 import BigDecimal.RoundingMode._
 
 /**  */
-sealed trait CurrencyLike extends EnumEntry { monetary =>
+sealed trait CurrencyLike extends EnumEntry { self =>
 
+  /** instance phantom type representing currency */
   type Type
+
   def apply[N: Financial](n: N): Money[N, Type]
-  final private lazy val jc = java.util.Currency getInstance monetary.entryName // DRY-fu
+
+  final private lazy val jc = java.util.Currency getInstance self.entryName
 
   final def currencyCode: String = jc.getCurrencyCode
   final def numericCode: Int     = jc.getNumericCode
@@ -32,7 +35,7 @@ sealed trait CurrencyLike extends EnumEntry { monetary =>
   final def pip: BigDecimal = BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
 
   def fractionDigits: Int = defaultFractionDigits
-  def rounding: RoundingMode = monetary.entryName match {
+  def rounding: RoundingMode = self.entryName match {
     case "JPY" => DOWN
     case _     => HALF_UP
   }

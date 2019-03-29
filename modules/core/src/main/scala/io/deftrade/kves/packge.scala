@@ -19,8 +19,6 @@ import io.chrisdavenport.cormorant._
 // import io.chrisdavenport.cormorant.implicits._
 // import io.chrisdavenport.cormorant.refined._
 
-// import scala.language.higherKinds
-
 /**
   * kvse: Key Value Entity Scheme*:
   *
