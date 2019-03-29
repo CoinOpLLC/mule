@@ -114,7 +114,7 @@ object Money {
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
     stringPut contramap (m => format(m))
 
-  // /** `Refined` section */
+  /** `Refined` section HACK  why do we need this? */
   // implicit lazy val refinedRefType: RefType[Money] =
   //   new RefType[Money] {
   //
