@@ -1,7 +1,14 @@
 package io.deftrade
 package test
 
+import cats._
+import cats.implicits._
+import cats.syntax.eq._
+
 import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
+
+import org.scalacheck._
+import org.scalacheck.ScalacheckShapeless._
 
 class KvesSpec extends FlatSpec {
 
@@ -10,10 +17,6 @@ class KvesSpec extends FlatSpec {
   import io.chrisdavenport.cormorant.parser._
   // import io.chrisdavenport.cormorant.refined._
   import io.chrisdavenport.cormorant.implicits._
-
-  import cats._
-  import cats.implicits._
-  import cats.syntax.eq._
 
   // import Currency.{ EUR, USD }
 
@@ -41,17 +44,10 @@ class KvesSpec extends FlatSpec {
 }
 class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
-  property("unit is as unit does") {
-    forAll { ewie: Unit =>
-      assert(ewie === (()))
-    }
-  }
-  property("doubles gonna double") {
-    forAll { xs: List[Double] =>
-      whenever(xs.nonEmpty) {
-        import scala.language.postfixOps
-        assert(math.sqrt(xs map (x => x * x) sum) >= 0)
-      }
+  import demoUnderTest._
+  property("some property about Foo") {
+    forAll { foo: Foo =>
+      // Ensure foo has the required property
     }
   }
 }
@@ -180,4 +176,19 @@ object csvUnderTest {
     type RowRepr = rlg.Repr // =:= labelled.FieldType[keyT, Key] :: Repr
 
   }
+}
+
+object demoUnderTest {
+
+  case class Foo(i: Int, s: String, blah: Boolean)
+  case class Bar(foo: Foo, other: String)
+
+  sealed trait Base
+  case class BaseIntString(i: Int, s: String)         extends Base
+  case class BaseDoubleBoolean(d: Double, b: Boolean) extends Base
+
+  implicitly[Arbitrary[Foo]]
+  implicitly[Arbitrary[Bar]]
+  implicitly[Arbitrary[Base]]
+
 }
