@@ -180,12 +180,37 @@ object csvUnderTest {
 
 object demoUnderTest {
 
-  case class Foo(i: Int, s: String, blah: Boolean)
-  case class Bar(foo: Foo, other: String)
+  import time._
+  import enumeratum._
+
+  /** */
+  sealed trait Nut extends EnumEntry with Product with Serializable
+
+  /** */
+  object Nut extends Enum[Nut] with CsvEnum[Nut] {
+
+    case object Peanut     extends Nut
+    case object Hazelnut   extends Nut
+    case object Almond     extends Nut
+    case object Cashew     extends Nut
+    case object Walnut     extends Nut
+    case object Pecan      extends Nut
+    case object Pistaschio extends Nut
+    case object Brazil     extends Nut
+
+    lazy val values: IndexedSeq[Nut] = findValues
+
+  }
+
+  case class Foo(i: Int, s: String, b: Boolean, nut: Nut)
+
+  case class Bar(foo: Foo, s: String, z: Instant)
 
   sealed trait Base
   case class BaseIntString(i: Int, s: String)         extends Base
   case class BaseDoubleBoolean(d: Double, b: Boolean) extends Base
+
+  implicit def arbitraryBar: Arbitrary[Bar] = ???
 
   implicitly[Arbitrary[Foo]]
   implicitly[Arbitrary[Bar]]
