@@ -7,6 +7,35 @@ import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
+// NANO_OF_SECOND
+// NANO_OF_DAY
+// MICRO_OF_SECOND
+// MICRO_OF_DAY
+// MILLI_OF_SECOND
+// MILLI_OF_DAY
+// SECOND_OF_MINUTE
+// SECOND_OF_DAY
+// MINUTE_OF_HOUR
+// MINUTE_OF_DAY
+// HOUR_OF_AMPM
+// CLOCK_HOUR_OF_AMPM
+// HOUR_OF_DAY
+// CLOCK_HOUR_OF_DAY
+// AMPM_OF_DAY
+// DAY_OF_WEEK
+// ALIGNED_DAY_OF_WEEK_IN_MONTH
+// ALIGNED_DAY_OF_WEEK_IN_YEAR
+// DAY_OF_MONTH
+// DAY_OF_YEAR
+// EPOCH_DAY
+// ALIGNED_WEEK_OF_MONTH
+// ALIGNED_WEEK_OF_YEAR
+// MONTH_OF_YEAR
+// PROLEPTIC_MONTH
+// YEAR_OF_ERA
+// YEAR
+// ERA
+
 /**
   * Single-import package providing minimal scala-ideomatic bindings for java.time.
   */
@@ -307,13 +336,13 @@ trait Api {
   implicit lazy val shoLocalDate =
     new FormatShowHashOrder[ChronoLocalDate, LocalDate](
       DateTimeFormatter.ISO_LOCAL_DATE_TIME,
-      LocalDate.from(_)
+      LocalDate from _
     ) with Hash[LocalDate] with cats.Order[LocalDate]
 
   implicit lazy val shoLocalTime =
     new FormatShowHashOrder[LocalTime, LocalTime](
       DateTimeFormatter.ISO_LOCAL_DATE_TIME,
-      LocalTime.from(_)
+      LocalTime from _
     ) with Hash[LocalTime] with cats.Order[LocalTime]
 
   // TODO make sure to test this
@@ -321,14 +350,19 @@ trait Api {
   implicit lazy val shoLocalDateTime =
     new FormatShowHashOrder[ChronoLocalDateTime[_], LocalDateTime](
       DateTimeFormatter.ISO_LOCAL_DATE_TIME,
-      LocalDateTime.from(_)
+      LocalDateTime from _
     ) with Hash[LocalDateTime] with cats.Order[LocalDateTime]
 
   implicit lazy val shoInstant =
-    new FormatShowHashOrder[Instant, Instant](DateTimeFormatter.ISO_LOCAL_DATE_TIME, Instant.from(_)) with Hash[Instant]
-    with cats.Order[Instant]
+    new FormatShowHashOrder[Instant, Instant](
+      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      Instant from _
+    ) with Hash[Instant] with cats.Order[Instant]
 
-  // // TODO: add cats stuff to io.deftrade.time?
+  // TODO: flesh these out with other typeclasses
+
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
+
+  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
 }

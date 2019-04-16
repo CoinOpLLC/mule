@@ -89,12 +89,12 @@ package kves {
     /**
       * n.b. `V` is used as a phantom type here
       */
-    type Key                = OpaqueKey[K, V]
-    final type KeyFieldType = FieldType[key.T, Key]
-    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
-
+    final type Key   = OpaqueKey[K, V]
     final type Value = V
-    // val ValueLG: LabelledGeneric[Value]
+
+    final type KeyFieldType = FieldType[key.T, Key]
+
+    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
 
     /** `Repr` is more valuable `<: HList` */
     type Repr <: HList

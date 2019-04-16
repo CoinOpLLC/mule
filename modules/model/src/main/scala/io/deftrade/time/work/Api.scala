@@ -38,7 +38,6 @@ trait Api {
   // val dow: jtt.TemporalField = iso.dayOfWeek
 
   // n.b.: all `jtt.Temporal`s are also `Comparable`
-  implicit def temporalOrder[T <: Temporal with Comparable[T]]: Order[T]   = Order.fromComparable[T]
   implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
   def yesterday = today - 1.day
