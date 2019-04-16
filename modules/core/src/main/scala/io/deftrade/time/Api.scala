@@ -5,7 +5,7 @@ import cats.{ Eq, Hash, Order, Show }
 
 import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
-import jtt._, ChronoUnit._
+import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
 /**
   * Single-import package providing minimal scala-ideomatic bindings for java.time.
@@ -22,8 +22,23 @@ trait Api {
 
   def clock(zone: ZoneId) = Clock system zone
 
-  // Duration
+  type ChronoUnit = JCU
+  val chronoUnits = JCU.values
+  val durationChronoUnitLimits = Map(
+    HOURS   -> 24L,
+    MINUTES -> 60L,
+    SECONDS -> 60L,
+    MILLIS  -> 1000L,
+    NANOS   -> 1000000L
+  )
+  val durationChronoUnits: Set[ChronoUnit] = durationChronoUnitLimits.keys.toSet
+  val nanosPerDay: Long                    = durationChronoUnitLimits.values.fold(1L)(_ * _)
+  val periodChronoUnits: Set[ChronoUnit]   = Set(YEARS, MONTHS, DAYS)
 
+  /**
+    * Duration is a type alias for `java.time.Duration`
+    * Package level methods provide succinct access to the static methods of that class.
+    */
   type Duration = java.time.Duration
 
   def duration(unit: ChronoUnit)(n: Long) = Duration of (n, unit)
@@ -269,7 +284,11 @@ trait Api {
   type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
   type ZoneRulesException               = java.time.zone.ZoneRulesException
 
-  abstract class FormatShow[TA <: TemporalAccessor](val formatter: DateTimeFormatter, tq: TemporalAccessor => TA) extends Show[TA] {
+  abstract class FormatShowHashOrder[CTA <: TemporalAccessor, TA <: TemporalAccessor with Comparable[CTA]](
+      val formatter: DateTimeFormatter,
+      tq: TemporalAccessor => TA
+  )(implicit ev: TA <:< CTA)
+      extends Show[TA] {
     override def show(x: TA): String = formatter format x
 
     // TODO: refactor this where it belongs (i.e. will pick up operator)
@@ -277,30 +296,39 @@ trait Api {
       scala.util.Try {
         tq(formatter parse s)
       }.toEither
+
+    def hash(x: TA): Int           = x.hashCode
+    def compare(x: TA, y: TA): Int = x compareTo y
+
   }
 
+  import java.time.chrono.{ ChronoLocalDate, ChronoLocalDateTime }
+
   implicit lazy val shoLocalDate =
-    new FormatShow[LocalDate](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDate.from(_)) with Hash[LocalDate] with cats.Order[LocalDate] {
-      override def hash(x: LocalDate): Int                  = x.hashCode
-      override def compare(x: LocalDate, y: LocalDate): Int = x compareTo y
-    }
+    new FormatShowHashOrder[ChronoLocalDate, LocalDate](
+      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      LocalDate.from(_)
+    ) with Hash[LocalDate] with cats.Order[LocalDate]
 
   implicit lazy val shoLocalTime =
-    new FormatShow[LocalTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalTime.from(_)) with Hash[LocalTime] with cats.Order[LocalTime] {
-      override def hash(x: LocalTime): Int                  = x.hashCode
-      override def compare(x: LocalTime, y: LocalTime): Int = x compareTo y
-    }
+    new FormatShowHashOrder[LocalTime, LocalTime](
+      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      LocalTime.from(_)
+    ) with Hash[LocalTime] with cats.Order[LocalTime]
 
+  // TODO make sure to test this
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   implicit lazy val shoLocalDateTime =
-    new FormatShow[LocalDateTime](DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime.from(_)) with Hash[LocalDateTime]
-    with cats.Order[LocalDateTime] {
-      override def hash(x: LocalDateTime): Int                      = x.hashCode
-      override def compare(x: LocalDateTime, y: LocalDateTime): Int = x compareTo y
-    }
+    new FormatShowHashOrder[ChronoLocalDateTime[_], LocalDateTime](
+      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      LocalDateTime.from(_)
+    ) with Hash[LocalDateTime] with cats.Order[LocalDateTime]
 
   implicit lazy val shoInstant =
-    new FormatShow[Instant](DateTimeFormatter.ISO_LOCAL_DATE_TIME, Instant.from(_)) with Hash[Instant] with cats.Order[Instant] {
-      override def hash(x: Instant): Int                = x.hashCode
-      override def compare(x: Instant, y: Instant): Int = x compareTo y
-    }
+    new FormatShowHashOrder[Instant, Instant](DateTimeFormatter.ISO_LOCAL_DATE_TIME, Instant.from(_)) with Hash[Instant]
+    with cats.Order[Instant]
+
+  // // TODO: add cats stuff to io.deftrade.time?
+  implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
+
 }

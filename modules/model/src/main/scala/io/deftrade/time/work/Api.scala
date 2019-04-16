@@ -5,7 +5,8 @@ package work
 import enumeratum._
 import cats._
 import cats.implicits._
-import scala.collection.SortedSet
+import cats.data.NonEmptySet
+import scala.collection.immutable.SortedSet
 import java.time.{ Month, DayOfWeek, temporal => jtt }
 import jtt.{ Temporal /*, WeekFields */ }
 
@@ -46,10 +47,7 @@ trait Api {
 
   // stick with ISO and be rigorous about others
   // TODO: make use of locale?
-  type WorkWeek = SortedSet[DayOfWeek] // NonEmpty would be nice, too. Otherwise stay in bed.
-
-  // TODO: add cats stuff to io.deftrade.time?
-  implicit val monthOrder: Order[Month] = Order.fromComparable[Month]
+  type WorkWeek = NonEmptySet[DayOfWeek]
 
   @annotation.tailrec
   final def plusWorkDays(nwds: Int)(ld: LocalDate)(implicit wd: IsWorkDay): LocalDate = {
@@ -104,6 +102,15 @@ sealed abstract class WorkDay private (signum: Int, sameMonth: Boolean) extends 
 }
 
 object WorkDay extends Enum[WorkDay] {
+
+  case object Next         extends WorkDay(signum = 1, sameMonth = false)
+  case object ModifiedNext extends WorkDay(signum = 1, sameMonth = true)
+  case object Prev         extends WorkDay(signum = -1, sameMonth = false)
+  case object ModifiedPrev extends WorkDay(signum = -1, sameMonth = true)
+  // TODO: `Nearest` from Strata
+
+  lazy val values = findValues
+
   // FIXME: .conf this shit
   val fixedHolidays = Set(
     (1, 1),
@@ -112,7 +119,7 @@ object WorkDay extends Enum[WorkDay] {
   )
 
   implicit lazy val workWeek: WorkWeek =
-    SortedSet.empty[DayOfWeek] ++ DayOfWeek.values - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
+    NonEmptySet(DayOfWeek.MONDAY, SortedSet(DayOfWeek.values: _*) - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY)
 
   implicit lazy val sheduledHoliday: IsScheduledHoliday =
     IsScheduledHoliday(fixedHolidays contains _.monthDay)
@@ -128,13 +135,6 @@ object WorkDay extends Enum[WorkDay] {
     (workWeek contains ld.dayOfWeek) && !sheduledHoliday(ld) && !unsheduledHoliday(ld)
   }
 
-  case object Next         extends WorkDay(signum = 1, sameMonth = false)
-  case object ModifiedNext extends WorkDay(signum = 1, sameMonth = true)
-  case object Prev         extends WorkDay(signum = -1, sameMonth = false)
-  case object ModifiedPrev extends WorkDay(signum = -1, sameMonth = true)
-  // TODO: `Nearest` from Strata
-
-  lazy val values = findValues
 }
 
 // TODO: finish this
