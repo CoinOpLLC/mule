@@ -110,3 +110,5 @@ package object test {
   // @formatter:on
 
 }
+
+package test {}

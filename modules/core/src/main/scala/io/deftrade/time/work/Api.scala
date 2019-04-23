@@ -3,20 +3,29 @@ package time
 package work
 
 import enumeratum._
+
 import cats._
 import cats.implicits._
 import cats.data.NonEmptySet
+
 import scala.collection.immutable.SortedSet
+
 import java.time.{ Month, DayOfWeek, temporal => jtt }
 import jtt.{ Temporal /*, WeekFields */ }
 
+/** */
+object IsDay {
+  type Predicate = LocalDate => Boolean
+}
+
+/** */
 sealed trait IsDay extends Any {
-  def is: LocalDate => Boolean
+  def is: IsDay.Predicate
   final def apply(ld: LocalDate): Boolean = is(ld)
 }
-final case class IsScheduledHoliday(val is: LocalDate => Boolean)   extends AnyVal with IsDay
-final case class IsUnscheduledHoliday(val is: LocalDate => Boolean) extends AnyVal with IsDay
-final case class IsWorkDay(val is: LocalDate => Boolean)            extends AnyVal with IsDay
+final case class IsScheduledHoliday(val is: IsDay.Predicate)   extends AnyVal with IsDay
+final case class IsUnscheduledHoliday(val is: IsDay.Predicate) extends AnyVal with IsDay
+final case class IsWorkDay(val is: IsDay.Predicate)            extends AnyVal with IsDay
 
 trait Api {
 
@@ -36,9 +45,6 @@ trait Api {
 
   // val iso: WeekFields        = WeekFields.ISO
   // val dow: jtt.TemporalField = iso.dayOfWeek
-
-  // n.b.: all `jtt.Temporal`s are also `Comparable`
-  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
   def yesterday = today - 1.day
   def today     = localDate
@@ -110,12 +116,14 @@ object WorkDay extends Enum[WorkDay] {
 
   lazy val values = findValues
 
-  // FIXME: .conf this shit
+  // FIXME: .conf and i18n of all the implicits
   val fixedHolidays = Set(
     (1, 1),
     (7, 4),
     (12, 25)
   )
+
+  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
   implicit lazy val workWeek: WorkWeek =
     NonEmptySet(DayOfWeek.MONDAY, SortedSet(DayOfWeek.values: _*) - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY)

@@ -363,6 +363,4 @@ trait Api {
 
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
 
-  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
-
 }
