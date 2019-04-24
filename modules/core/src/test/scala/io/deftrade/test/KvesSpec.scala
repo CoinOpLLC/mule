@@ -1,8 +1,6 @@
 package io.deftrade
 package test
 
-import time._
-
 import cats._
 import cats.implicits._
 import cats.syntax.eq._
@@ -52,11 +50,6 @@ class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
       // Ensure foo has the required property
     }
   }
-}
-
-object Jt8Gen {
-  def finiteDurationGen(range: Duration): Gen[Duration] = ???
-  def localDateTimeInPeriod(): Gen[LocalDateTime]       = ???
 }
 
 object csvUnderTest {
@@ -204,7 +197,6 @@ object demoUnderTest {
     case object Pecan      extends Nut
     case object Pistaschio extends Nut
     case object Brazil     extends Nut
-    case object Macadamia  extends Nut
 
     lazy val values: IndexedSeq[Nut] = findValues
 
@@ -219,6 +211,8 @@ object demoUnderTest {
   case class BaseDoubleBoolean(d: Double, b: Boolean) extends Base
 
   implicit def arbitraryBar: Arbitrary[Bar] = ???
+
+  // Instant, LocalDateTime, LocalDate, LocalTime, Period
 
   implicitly[Arbitrary[Foo]]
   implicitly[Arbitrary[Bar]]

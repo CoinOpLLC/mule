@@ -7,6 +7,7 @@ import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
+// jtt.ChronoField: (java) enum values
 // NANO_OF_SECOND
 // NANO_OF_DAY
 // MICRO_OF_SECOND
@@ -318,6 +319,7 @@ trait Api {
       tq: TemporalAccessor => TA
   )(implicit ev: TA <:< CTA)
       extends Show[TA] {
+
     override def show(x: TA): String = formatter format x
 
     // TODO: refactor this where it belongs (i.e. will pick up operator)
@@ -335,13 +337,13 @@ trait Api {
 
   implicit lazy val shoLocalDate =
     new FormatShowHashOrder[ChronoLocalDate, LocalDate](
-      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      DateTimeFormatter.ISO_LOCAL_DATE,
       LocalDate from _
     ) with Hash[LocalDate] with cats.Order[LocalDate]
 
   implicit lazy val shoLocalTime =
     new FormatShowHashOrder[LocalTime, LocalTime](
-      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      DateTimeFormatter.ISO_LOCAL_TIME,
       LocalTime from _
     ) with Hash[LocalTime] with cats.Order[LocalTime]
 
@@ -355,7 +357,7 @@ trait Api {
 
   implicit lazy val shoInstant =
     new FormatShowHashOrder[Instant, Instant](
-      DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+      DateTimeFormatter.ISO_INSTANT,
       Instant from _
     ) with Hash[Instant] with cats.Order[Instant]
 
