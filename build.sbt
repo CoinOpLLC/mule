@@ -30,6 +30,11 @@ lazy val common = Seq(
 
   scalafmtOnCompile            := true,
 
+  // TODO: add this warranty disclaiming language:
+  // This is free software; see the source for copying conditions.
+  // There is no warranty, not even for merchantability or fitness
+  // for a particular purpose.
+
   startYear := Some(2017),
   licenses  += ("Apache-2.0", Args.alv2url),
   headerLicense := Some(

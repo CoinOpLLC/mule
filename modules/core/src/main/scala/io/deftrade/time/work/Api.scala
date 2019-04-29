@@ -31,6 +31,8 @@ trait Api {
 
   import WorkDay._
 
+  implicit def fixedHolidays: FixedHolidays = ???
+
   def workDay(ld: LocalDate): Boolean = { val is = implicitly[IsWorkDay]; is(ld) }
   // def workDaysBetween(start: LocalDate, end: LocalDate): Int
   // def isLastWorkDayOfMonth(date: LocalDate): Boolean
@@ -106,6 +108,11 @@ sealed abstract class WorkDay private (signum: Int, sameMonth: Boolean) extends 
     }
 }
 
+/** All civilized financial calendars have at least one holiday: domain invariant. */
+// FIXME NonEmptySet impl artifact error; work around it
+/// case class FixedHolidays(val holidays: NonEmptySet[LocalDate]) extends AnyVal
+case class FixedHolidays(val holidays: SortedSet[LocalDate]) extends AnyVal
+
 object WorkDay extends Enum[WorkDay] {
 
   case object Next         extends WorkDay(signum = 1, sameMonth = false)
@@ -116,20 +123,13 @@ object WorkDay extends Enum[WorkDay] {
 
   lazy val values = findValues
 
-  // FIXME: .conf and i18n of all the implicits
-  val fixedHolidays = Set(
-    (1, 1),
-    (7, 4),
-    (12, 25)
-  )
-
   implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
   implicit lazy val workWeek: WorkWeek =
     NonEmptySet(DayOfWeek.MONDAY, SortedSet(DayOfWeek.values: _*) - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY)
 
-  implicit lazy val sheduledHoliday: IsScheduledHoliday =
-    IsScheduledHoliday(fixedHolidays contains _.monthDay)
+  implicit def sheduledHoliday(implicit fhs: FixedHolidays): IsScheduledHoliday =
+    IsScheduledHoliday(fhs.holidays contains _)
 
   implicit lazy val unscheduledHolidays: IsUnscheduledHoliday =
     IsUnscheduledHoliday(Set.empty[LocalDate])
