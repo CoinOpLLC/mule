@@ -10,8 +10,8 @@ object Version {
   val ScalaCheck     = "1.14.0"
   val TypesafeConfig = "1.3.3"
 
-  val Cats                = "1.6.0"
-  val CatsEffect          = "1.2.0"
+  val Cats                = "2.0.0-M1"
+  val CatsEffect          = "1.3.0"
   val Kittens             = "1.2.1"
   val Mouse               = "0.7.0"
   val CatsScalaCheck      = "0.1.0"

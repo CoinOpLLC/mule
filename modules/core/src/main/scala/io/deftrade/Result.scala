@@ -1,9 +1,10 @@
 package io.deftrade
 
+import cats.implicits._
+import scala.util.Try
+import cats.data.Validated
+
 object Result {
-  import cats.implicits._
-  import scala.util.Try
-  import cats.data.Validated
 
   private lazy val throw2fail: Throwable => Fail = x => Fail(s"${x.getClass}: ${x.getMessage}")
 

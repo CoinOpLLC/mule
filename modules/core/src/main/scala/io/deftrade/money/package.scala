@@ -32,7 +32,7 @@ import io.chrisdavenport.cormorant.implicits._
   *      -  but lose the whole "is market convention" thing - yagni
   *
   *   implementation
-  *   - minimal to no overhead (value classes on [N: Financial])
+  *   - minimal to no overheOad (value classes on [N: Financial])
   *   - distinct types for each currency
   *   - summon implicit Currency[C] typeclass instance given a currency type C
   *   - exploit java Currency support

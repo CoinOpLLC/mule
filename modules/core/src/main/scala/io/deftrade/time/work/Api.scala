@@ -16,17 +16,17 @@ import jtt.{ Temporal /*, WeekFields */ }
 
 /** */
 object IsDay {
-  type Predicate = LocalDate => Boolean
+  type Pred = LocalDate => Boolean
 }
 
 /** */
 sealed trait IsDay extends Any {
-  def is: IsDay.Predicate
+  def is: IsDay.Pred
   final def apply(ld: LocalDate): Boolean = is(ld)
 }
-final case class IsScheduledHoliday(val is: IsDay.Predicate)   extends AnyVal with IsDay
-final case class IsUnscheduledHoliday(val is: IsDay.Predicate) extends AnyVal with IsDay
-final case class IsWorkDay(val is: IsDay.Predicate)            extends AnyVal with IsDay
+final case class IsScheduledHoliday(val is: IsDay.Pred)   extends AnyVal with IsDay
+final case class IsUnscheduledHoliday(val is: IsDay.Pred) extends AnyVal with IsDay
+final case class IsWorkDay(val is: IsDay.Pred)            extends AnyVal with IsDay
 
 trait Api {
 
@@ -116,10 +116,10 @@ case class FixedHolidays(val holidays: SortedSet[LocalDate]) extends AnyVal
 
 object WorkDay extends Enum[WorkDay] {
 
-  case object Next         extends WorkDay(signum = 1, sameMonth = false)
-  case object ModifiedNext extends WorkDay(signum = 1, sameMonth = true)
-  case object Prev         extends WorkDay(signum = -1, sameMonth = false)
-  case object ModifiedPrev extends WorkDay(signum = -1, sameMonth = true)
+  case object Next        extends WorkDay(signum = 1, sameMonth = false)
+  case object BoundedNext extends WorkDay(signum = 1, sameMonth = true)
+  case object Prev        extends WorkDay(signum = -1, sameMonth = false)
+  case object BoundedPrev extends WorkDay(signum = -1, sameMonth = true)
   // TODO: `Nearest` from Strata
 
   lazy val values = findValues
@@ -159,23 +159,3 @@ object WorkMonth extends Enum[WorkMonth] {
   case object LastBusinessDay extends WorkMonth
 
 }
-
-//////
-
-// type TqReader[R] = Reader[LocalDate, Option[R]]
-// type TaReader[R] = Reader[LocalDate, R]
-
-// // there is quite a bit to critique here - not very efficient.
-// val sameMonthAdjustWorkDay: LocalDate => LocalDate =
-//   (for {
-//     twd <- Reader(identity: LocalDate => LocalDate)
-//     nwd <- Reader(adjustWorkDay)
-//     pwd <- Reader(prevWorkDay)
-//   } yield if (twd.getMonth === nwd.getMonth) nwd else pwd).run
-
-// need to define an ordering on DayOfWeek. Which would be great.
-// TODO: when does the week roll around?
-// TODO: what about that succ stuff from scalaz?
-
-// `TemporalQuery` is the way to do the "is this a working day or not" thing.
-// Just build an immutable list of `WorkWeek`s out as far as you can.

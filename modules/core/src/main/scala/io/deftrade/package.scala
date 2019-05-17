@@ -37,6 +37,7 @@ package object deftrade {
 
   def fail[T](msg: String): Result[T] = Fail(msg).asLeft
 
+  /** generic groupBy in F[_] where F is Applicative, Foldable, and SemigroupKinded */
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](
       as: F[A]
   )(
@@ -50,6 +51,7 @@ package object deftrade {
       val key = f(a)
       val v   = a.pure[F]
       acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
+    // FIXME: Monoid[Map[K, F[A]]].combine(acc, Map(key -> v))
     }
   }
 
