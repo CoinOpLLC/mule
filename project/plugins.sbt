@@ -1,7 +1,9 @@
-/**
-  *
-  */
 scalafmtOnCompile in ThisBuild := true // all projects
+
+/**
+  * TODO use this
+  */
+addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
 
 /**
   * [Flyway database migrations tool](https://flywaydb.org/):
