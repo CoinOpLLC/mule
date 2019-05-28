@@ -70,11 +70,10 @@ object Deps {
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
-  val refined = (Seq(
-    "eu.timepit" %% "refined",
-    "eu.timepit" %% "refined-cats",
-    "eu.timepit" %% "refined-pureconfig",
-  ) map (_ % Refined)) :+ ("eu.timepit" %% "refined-scalacheck" % Refined % Test)
+  def refinedLibs = Seq("", "-eval", "-cats", "-pureconfig", "-shapeless")
+  val refined = refinedLibs map { x =>
+    "eu.timepit" %% s"refined$x" % Refined
+  }
 
   val enumerata = Seq(
     "com.beachape" %% "enumeratum" % Enumeratum,
@@ -83,15 +82,16 @@ object Deps {
   )
 
   val circeii = Seq(
-    "io.circe" %% "circe-core",
-    "io.circe" %% "circe-generic",
-    // "io.circe" %% "circe-generic-extras",
-    "io.circe" %% "circe-parser",
-    "io.circe" %% "circe-shapes",
-    "io.circe" %% "circe-scodec",
-    "io.circe" %% "circe-refined",
-    "io.circe" %% "circe-java8",
-  ) map (_ % Circe)
+    "core",
+    "generic",
+    "parser",
+    "shapes",
+    "scodec",
+    "refined",
+    "java8",
+  ) map { x =>
+    "io.circe" %% s"circe-$x" % Circe
+  }
 
   /**
     * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
@@ -105,6 +105,7 @@ object Deps {
   val testers = Seq(
     "org.scalatest"              %% "scalatest"                 % ScalaTest,
     "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
+    "eu.timepit"                 %% "refined-scalacheck"        % Refined,
     "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
   ) map (_ % Test)
