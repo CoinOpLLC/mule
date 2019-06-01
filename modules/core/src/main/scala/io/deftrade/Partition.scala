@@ -103,7 +103,7 @@ final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extend
       fail(s"bad params: key=$key, share=$share, kvs=$kvs")
 
   /** share returned to each according to their proportion */
-  def buyOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
+  def sellOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
     UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
 
