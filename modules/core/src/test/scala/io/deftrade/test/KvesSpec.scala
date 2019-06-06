@@ -52,6 +52,13 @@ class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
   }
 }
 
+object Jt8Gen {
+  import time._
+  def durationGen: Gen[Duration]                           = ???
+  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
+  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
+}
+
 object csvUnderTest {
 
   import kves._
