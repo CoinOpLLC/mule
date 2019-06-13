@@ -54,7 +54,7 @@ addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.3.5")
 /**
   * [Coursier](https://github.com/coursier/coursier#command-line)
   */
-addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-RC11")
+// addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.0-RC11")
 
 /**
   * [source code formatter (scalafmt)](https://github.com/lucidsoftware/neo-sbt-scalafmt)
@@ -81,7 +81,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.0")
   * [scaladoc: other API resolution](https://github.com/ThoughtWorksInc/sbt-api-mappings)
   */
 // addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "1.1.0") // for SBT 0.13_
-addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
+// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
 
 /**
   * [TUT](https://github.com/tpolecat/tut)
