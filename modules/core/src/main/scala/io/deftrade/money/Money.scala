@@ -55,6 +55,7 @@ object Money {
   def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
     Financial[N].round[C](amount) |> fiat
 
+  /** TODO: should both amount and currency be extracted here?... */
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
 
   /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */

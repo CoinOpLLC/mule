@@ -9,7 +9,7 @@ import refined.api.{ Min, Refined, Validate }
 import spire.math.Integral
 import spire.implicits._
 
-import shapeless._
+import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
 import shapeless.syntax.singleton._
 

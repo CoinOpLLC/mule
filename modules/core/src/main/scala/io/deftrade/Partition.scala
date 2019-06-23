@@ -60,7 +60,7 @@ object Partition {
   /** total shares outstanding computed from the sum of `shares` */
   def fromShares[K: Order, V: Fractional](shares: (K, V)*): Result[Partition[K, V]] =
     if (shares.toList.nonEmpty) unsafe(shares |> SortedMap.apply[K, V]).asRight
-    else fail("wtf scrooge you don't know how to share do you?")
+    else fail("must be non-empty")
 
   /**
     * Creates an allocation function (`V => Partition`) from a set of tranches,

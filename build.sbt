@@ -13,6 +13,7 @@ lazy val common = Seq(
 
   // scalaVersion      := "2.12.4-bin-typelevel-4",
   // scalaOrganization := "org.typelevel",
+  //
   // scalacOptions                           += "-Yliteral-types",
 
   scalacOptions                           ++= Args.allScalaCflags,

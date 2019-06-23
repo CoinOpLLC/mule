@@ -4,14 +4,14 @@ import Keys._
 
 object Version {
 
-  val Scala          = "2.12.8"
-  val Xml            = "1.1.0"
-  val ScalaTest      = "3.0.5"
-  val ScalaCheck     = "1.14.0"
-  val TypesafeConfig = "1.3.3"
+  val Scala = "2.12.8"
+  val Xml   = "1.1.0"
+
+  val ScalaTest  = "3.0.8"
+  val ScalaCheck = "1.14.0"
 
   val Enumeratum = "1.5.13"
-  val Refined    = "0.9.5"
+  val Refined    = "0.9.8"
   val Shapeless  = "2.3.3"
   val Spire      = "0.16.1"
   val Cats       = "2.0.0-M1"
@@ -19,11 +19,14 @@ object Version {
 
   val CatsEffect = "1.3.0"
   val Fs2        = "1.0.0"
+  // ZIO?
 
-  val Fuiid      = "0.1.2"
-  val PureConfig = "0.9.2"
-  val Circe      = "0.8.0"
-  val Cormorant  = "0.2.0-M3"
+  val TypesafeConfig = "1.3.3"
+  val PureConfig     = "0.9.2"
+  val Cormorant      = "0.2.0-M3"
+
+  val Fuiid = "0.1.2"
+  val Circe = "0.8.0"
 
   val CatsScalaCheck      = "0.1.1"
   val ShapelessScalaCheck = "1.2.0"
@@ -32,8 +35,8 @@ object Version {
   val AkkaHttp    = "10.1.5"
   val HttpSession = "0.5.5"
   // val Quill       = "2.3.1"
-  val Ammonite = "0.8.3"
-  val Fansi    = "0.2.5"
+  // val Ammonite = "1.6.8"
+  val Fansi    = "0.2.7"
 
   val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
   // val PgJdbc = "9.4-1201-jdbc41"
@@ -103,8 +106,9 @@ object Deps {
   ) map (_ % PureConfig)
 
   val testers = Seq(
-    "org.scalatest"              %% "scalatest"                 % ScalaTest,
-    "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
+    "org.scalatest"  %% "scalatest"  % ScalaTest,
+    "org.scalacheck" %% "scalacheck" % ScalaCheck,
+    /** FIXME version crap with 2.13.0 */
     "eu.timepit"                 %% "refined-scalacheck"        % Refined,
     "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
@@ -199,6 +203,7 @@ object Args {
     "-Xcheckinit", // Wrap field accessors to throw an exception on uninitialized access.
     "-Xfuture", // Turn on future language features.
     "-Yno-adapted-args",
+    // "-Yliteral-types",
     "-Ypartial-unification" // Enable partial unification in type constructor inference
   )
 
