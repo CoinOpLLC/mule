@@ -226,3 +226,13 @@ object demoUnderTest {
   implicitly[Arbitrary[Base]]
 
 }
+
+object order {
+  import java.time._
+  sealed abstract case class EID(id: Long)
+  sealed abstract case class Order(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String)
+  object Order {
+    def mk(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String): Order =
+      new Order(no, date, drawOn, payTo, amount, memo) {}
+  }
+}

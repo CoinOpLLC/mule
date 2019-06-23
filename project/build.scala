@@ -7,42 +7,47 @@ object Version {
   val Scala = "2.12.8"
   val Xml   = "1.1.0"
 
-  val ScalaTest  = "3.0.8"
-  val ScalaCheck = "1.14.0"
-
-  val Enumeratum = "1.5.13"
   val Refined    = "0.9.8"
   val Shapeless  = "2.3.3"
   val Spire      = "0.16.1"
-  val Cats       = "2.0.0-M1"
+  val Cats       = "2.0.0-M4"
   val Kittens    = "1.2.1"
 
   val CatsEffect = "1.3.0"
-  val Fs2        = "1.0.0"
-  // ZIO?
+  val Fs2        = "1.0.5"
+  val Zio        = "1.0.0-RC8-12"
+
+  val Enumeratum = "1.5.13"
 
   val TypesafeConfig = "1.3.3"
   val PureConfig     = "0.9.2"
-  val Cormorant      = "0.2.0-M3"
 
+  val Cormorant      = "0.2.0-M3"
   val Fuiid = "0.1.2"
   val Circe = "0.8.0"
-
-  val CatsScalaCheck      = "0.1.1"
-  val ShapelessScalaCheck = "1.2.0"
 
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
   val HttpSession = "0.5.5"
   // val Quill       = "2.3.1"
-  // val Ammonite = "1.6.8"
-  val Fansi    = "0.2.7"
+
+  // random shit
+  val Ammonite = "1.6.8"
+
+  val Fansi = "0.2.7"
 
   val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
   // val PgJdbc = "9.4-1201-jdbc41"
 
   val OpenGamma = "2.3.2"
 
+  // Test libs
+
+  val ScalaTest  = "3.0.8"
+  val ScalaCheck = "1.14.0"
+
+  val CatsScalaCheck      = "0.1.1"
+  val ShapelessScalaCheck = "1.2.0"
 }
 
 object Deps {
@@ -86,10 +91,10 @@ object Deps {
 
   val circeii = Seq(
     "core",
-    "generic",
-    "parser",
-    "shapes",
-    "scodec",
+    // "generic",
+    // "parser",
+    // "shapes",
+    // "scodec",
     "refined",
     "java8",
   ) map { x =>
@@ -99,11 +104,11 @@ object Deps {
   /**
     * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
     */
-  val pureConfigs = Seq(
-    "com.github.pureconfig" %% "pureconfig",
-    "com.github.pureconfig" %% "pureconfig-enumeratum",
-    "com.github.pureconfig" %% "pureconfig-squants",
-  ) map (_ % PureConfig)
+  val pureConfigs = List(
+    "pureconfig",
+    "pureconfig-enumeratum",
+    "pureconfig-squants",
+  ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
   val testers = Seq(
     "org.scalatest"  %% "scalatest"  % ScalaTest,
@@ -114,21 +119,21 @@ object Deps {
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
   ) map (_ % Test)
 
-  val fuiids = Seq(
-    "io.chrisdavenport" %% "fuuid", // core
-    "io.chrisdavenport" %% "fuuid-circe", // Circe integration
-    "io.chrisdavenport" %% "fuuid-http4s", // Http4s integration
-    "io.chrisdavenport" %% "fuuid-doobie" // Doobie integration
-  ) map (_ % Fuiid)
+  val fuiids = List(
+    "fuuid", // core
+    "fuuid-circe", // Circe integration
+    "fuuid-http4s", // Http4s integration
+    "fuuid-doobie" // Doobie integration
+  ) map (x => "io.chrisdavenport" %% x % Fuiid)
 
-  val cormorants = Seq(
-    "io.chrisdavenport" %% "cormorant-core",
-    "io.chrisdavenport" %% "cormorant-generic",
-    "io.chrisdavenport" %% "cormorant-parser",
-    "io.chrisdavenport" %% "cormorant-fs2",
-    "io.chrisdavenport" %% "cormorant-http4s",
-    "io.chrisdavenport" %% "cormorant-refined"
-  ) map (_ % Cormorant)
+  val cormorants = List(
+    "core",
+    "generic",
+    "parser",
+    "fs2",
+    "http4s",
+    "refined"
+  ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
 
   val fs2s = List(
     "co.fs2" %% "fs2-core",
@@ -136,6 +141,11 @@ object Deps {
     "co.fs2" %% "fs2-reactive-streams",
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
+
+  val zios = List(
+    "zio",
+    "zio-streams",
+  ) map (s => "dev.zio" %% s % Zio)
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
