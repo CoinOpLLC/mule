@@ -61,16 +61,25 @@ package kves {
 
   }
 
+  /** Key type companion base class. */
+  abstract class OpaqueKeyCompanion[K: Order, V: Eq] {
+
+    def apply(k: K) = OpaqueKey[K, V](k)
+
+    /** Where the key type is integral, we will reserve the min value. */
+    def reserved(implicit K: Min[K]) = OpaqueKey[K, V](K.min)
+  }
+
   /**
     * Make a fresh *globally unique* key, suitable to be persisted.
     * TODO: consider threading F[_] thru Fresh.
     */
-  final case class Fresh[I](init: I, next: I => I)
+  final case class Fresh[K](init: K, next: K => K)
 
   /** fresh `Fresh` */
   object Fresh {
 
-    def apply[KY: Fresh] = implicitly[Fresh[KY]]
+    def apply[K: Fresh] = implicitly[Fresh[K]]
 
     def zeroBasedIncr[K: Integral, V: Eq]: Fresh[OpaqueKey[K, V]] = {
 
@@ -84,17 +93,26 @@ package kves {
     }
   }
 
-  private[kves] abstract class WithKeyBase[K: Order, V] {
+  abstract class WithKeyCompanion[K: Order, V] {
 
     /**
       * n.b. `V` is used as a phantom type here
       */
-    final type Key   = OpaqueKey[K, V]
     final type Value = V
 
-    final type KeyFieldType = FieldType[key.T, Key]
+    /**
+      * By convention, we tag keys with the value type of the record table we are indexing.
+      * (This is the phantom type [[[Value]]]).
+      * This is a policy decision, and, as such, is subject to revision.
+      */
+    final type Key = OpaqueKey[K, Value]
 
-    implicit lazy val keyValidate: Validate[K, V] = Validate alwaysPassed (())
+    /** No constraint on validation. */
+    implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
+
+    // final type KeyColTag = key.T
+
+    final type KeyFieldType = FieldType[key.T, Key]
 
     /** `Repr` is more valuable `<: HList` */
     type Repr <: HList
@@ -132,22 +150,14 @@ package kves {
   }
 
   /** Module-level companion base class with default Key type */
-  abstract class WithKey[K: Order, V: Eq] extends WithKeyBase[K, V] {
-    object Key extends OpaqueKeyC[K, V]
+  abstract class WithKey[K: Order, V: Eq] extends WithKeyCompanion[K, V] {
+    object Key extends OpaqueKeyCompanion[K, V]
   }
 
   /** Same but with implicit Eq[V] typeclass instance */
-  abstract class WithKeyAndEq[K: Order, V] extends WithKeyBase[K, V] {
-    object Key extends OpaqueKeyC[K, V]
+  abstract class WithKeyAndEq[K: Order, V] extends WithKeyCompanion[K, V] {
+    object Key extends OpaqueKeyCompanion[K, V]
     implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
   }
 
-  /** Key type companion base class. */
-  private[kves] abstract class OpaqueKeyC[K: Order, V: Eq] {
-
-    def apply(k: K) = OpaqueKey[K, V](k)
-
-    /** Where the key type is integral, we will reserve the min value. */
-    def reserved(implicit K: Min[K]) = OpaqueKey[K, V](K.min)
-  }
 }

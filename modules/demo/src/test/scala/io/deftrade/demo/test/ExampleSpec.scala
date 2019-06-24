@@ -3,7 +3,7 @@ package test
 
 import org.scalatest._, prop._
 
-class ExampleFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
+class ExampleFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
   "A Stack" should "pop values in last-in-first-out order" in {
     var stack = List.empty[Int]
@@ -27,7 +27,7 @@ class ExampleFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropert
   }
 }
 
-class ExamplePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
+class ExamplePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   property("unit is as unit does") {
     forAll { ewie: Unit =>

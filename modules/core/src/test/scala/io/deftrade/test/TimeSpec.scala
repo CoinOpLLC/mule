@@ -6,9 +6,10 @@ import io.deftrade.time._
 import cats.implicits._
 import cats.syntax.eq._ // FIXME: don't understand why this works, or is necessary
 
-import org.scalatest._, prop._
+import org.scalatest._
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class TimeFlatSpec extends FlatSpec with Matchers with GeneratorDrivenPropertyChecks {
+class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
   "time" should "move forward" in {
     val today = localDateTime
@@ -81,7 +82,7 @@ class TimeSpec extends FlatSpec with Matchers {
   }
 }
 
-class TimePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
+class TimePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   // import org.scalacheck.Gen._
   // import java.time._
@@ -94,7 +95,7 @@ class TimePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
   // }
 }
 
-class CamelCasePropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
+class CamelCasePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
   import io.deftrade.camelsnake._
 
   // Our Gold standard (for testing): yet another take on an old fav:

@@ -7,11 +7,11 @@ object Version {
   val Scala = "2.12.8"
   val Xml   = "1.1.0"
 
-  val Refined    = "0.9.8"
-  val Shapeless  = "2.3.3"
-  val Spire      = "0.16.1"
-  val Cats       = "2.0.0-M4"
-  val Kittens    = "1.2.1"
+  val Refined   = "0.9.8"
+  val Shapeless = "2.3.3"
+  val Spire     = "0.16.1"
+  val Cats      = "2.0.0-M4"
+  val Kittens   = "1.2.1"
 
   val CatsEffect = "1.3.0"
   val Fs2        = "1.0.5"
@@ -22,9 +22,9 @@ object Version {
   val TypesafeConfig = "1.3.3"
   val PureConfig     = "0.9.2"
 
-  val Cormorant      = "0.2.0-M3"
-  val Fuiid = "0.1.2"
-  val Circe = "0.8.0"
+  val Cormorant = "0.2.0-M3"
+  val Fuiid     = "0.1.2"
+  val Circe     = "0.8.0"
 
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"

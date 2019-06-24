@@ -5,7 +5,9 @@ import cats._
 import cats.implicits._
 import cats.syntax.eq._
 
-import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
+import org.scalatest.{ FlatSpec, PropSpec }
+
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
@@ -42,7 +44,7 @@ class KvesSpec extends FlatSpec {
     assert(x === y)
   }
 }
-class KvesPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
+class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   import demoUnderTest._
   property("some property about Foo") {

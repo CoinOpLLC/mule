@@ -1,7 +1,8 @@
 package io.deftrade
 package money
 
-import org.scalatest.{ prop, FlatSpec, PropSpec }, prop.GeneratorDrivenPropertyChecks
+import org.scalatest.{ FlatSpec, PropSpec }
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class MoneySpec extends FlatSpec {
 
@@ -59,7 +60,7 @@ class MoneySpec extends FlatSpec {
 
   }
 }
-class MoneyPropSpec extends PropSpec with GeneratorDrivenPropertyChecks {
+class MoneyPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   property("unit is as unit does") {
     forAll { ewie: Unit =>
