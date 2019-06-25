@@ -114,7 +114,7 @@ package kves {
 
     final type KeyFieldType = FieldType[key.T, Key]
 
-    /** `Repr` is more valuable `<: HList` */
+    /** `Repr` is more valuable `<: HList` FIXME this does nothing */
     type Repr <: HList
 
     final type Row = (Key, Value)
