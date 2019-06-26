@@ -229,12 +229,30 @@ object demoUnderTest {
 
 }
 
-object order {
-  import java.time._
-  sealed abstract case class EID(id: Long)
-  sealed abstract case class Order(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String)
-  object Order {
-    def mk(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String): Order =
-      new Order(no, date, drawOn, payTo, amount, memo) {}
-  }
+object xaction {
+  import io.deftrade.time._
+  import io.deftrade.money._
+  import eu.timepit.refined
+  import refined.refineMV
+  import refined.api.{ Refined }
+  import refined.numeric.Positive
+
+  type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
+  type SsnRx      = refined.string.MatchesRegex[SsnPattern]
+  type Ssn        = String Refined SsnRx
+
+  import refined.collection.NonEmpty
+
+  sealed abstract case class Entity(ssn: Ssn)
+  sealed abstract case class Xaction(
+      ts: Instant,
+      // drawOn: EID,
+      // payTo: EID,
+      amount: BigDecimal,
+      memo: String
+  )
+  // object XAction extends WithKeyAndEq[Long, XAction] {
+  //   def mk(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String): Order =
+  //     new Order(no, date, drawOn, payTo, amount, memo) {}
+  // }
 }

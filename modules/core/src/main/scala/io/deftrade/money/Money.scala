@@ -23,6 +23,7 @@ import cats.implicits._
   * value class.
   *
   * Therefore we make use of the `RefType` and `Validated` classes to integrate with `Refined`.
+  * FIXME: turns out not. Delete comment?
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
