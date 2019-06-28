@@ -114,7 +114,7 @@ object Money {
 
   /** cormorant csv Put */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
-    stringPut contramap (m => format(m))
+    stringPut contramap format[N, C]
 
   /** `Refined` section HACK  why do we need this? */
   // implicit lazy val refinedRefType: RefType[Money] =

@@ -107,20 +107,17 @@ package kves {
       */
     final type Key = OpaqueKey[K, Value]
 
-    /** No constraint on validation. */
-    implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
+    /** Think spreadsheet or relational table. Keep in mind that [[Value]]s are compound. */
+    final type Row = (Key, Value)
 
-    // final type KeyColTag = key.T
+    /** A basic in-memory table structure. TODO: revisit this. */
+    final type Table = Map[Key, Value]
 
+    /** The full type of the [[Key]] column. */
     final type KeyFieldType = FieldType[key.T, Key]
 
-    /** `Repr` is more valuable `<: HList` FIXME this does nothing */
-    type Repr <: HList
-
-    final type Row = (Key, Value)
-    // val RowLG: LabelledGeneric[Row]
-
-    type RowRepr <: HList
+    /** No constraint on validation. */
+    final implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
     final def deriveLabelledWriteRow[HV <: HList](
         implicit
@@ -128,10 +125,10 @@ package kves {
         hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
     ): LabelledWrite[Row] =
       new LabelledWrite[Row] {
-        type H = KeyFieldType :: HV
-        val writeH: LabelledWrite[H] = hlw.value
-        def headers: CSV.Headers     = writeH.headers
-        def write(r: Row): CSV.Row   = writeH write field[key.T](r._1) :: (genV to r._2)
+        type HKV = KeyFieldType :: HV
+        val writeH: LabelledWrite[HKV] = hlw.value
+        def headers: CSV.Headers       = writeH.headers
+        def write(r: Row): CSV.Row     = writeH write field[key.T](r._1) :: (genV to r._2)
       }
 
     final def deriveLabelledReadRow[HV <: HList](
@@ -140,8 +137,8 @@ package kves {
         hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
     ): LabelledRead[Row] =
       new LabelledRead[Row] {
-        type H = KeyFieldType :: HV
-        val readH: LabelledRead[H] = hlr.value
+        type HKV = KeyFieldType :: HV
+        val readH: LabelledRead[HKV] = hlr.value
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
           readH.read(row, headers) map { h =>
             (h.head, genV from h.tail)

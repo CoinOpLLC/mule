@@ -1,6 +1,13 @@
 package io.deftrade
 package test
 
+import eu.timepit.refined
+import refined.{ refineMV, refineV }
+import refined.api.Refined
+
+import refined.collection.NonEmpty
+import refined.numeric.Positive
+
 import cats._
 import cats.implicits._
 import cats.syntax.eq._
@@ -12,7 +19,58 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
 
+import enumeratum._
+
+/** Nuts exist in the test package. Make of that what you will. */
+sealed trait Nut extends EnumEntry with Product with Serializable
+
+/** All the nuts I could think of. */
+object Nut extends Enum[Nut] with CsvEnum[Nut] {
+
+  case object Peanut     extends Nut
+  case object Hazelnut   extends Nut
+  case object Almond     extends Nut
+  case object Cashew     extends Nut
+  case object Walnut     extends Nut
+  case object Pecan      extends Nut
+  case object Pistaschio extends Nut
+  case object Brazil     extends Nut
+
+  lazy val values: IndexedSeq[Nut] = findValues
+
+}
+
+object xaction {
+
+  import time._
+  import money._
+  import kves._
+
+  type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
+  type IsSsn      = refined.string.MatchesRegex[SsnPattern]
+  type Ssn        = String Refined IsSsn
+
+  type NonEmptyString = String Refined NonEmpty
+
+  sealed abstract case class Entity private (ssn: Ssn, name: NonEmptyString)
+
+  object Entity extends WithKeyAndEq[Long, Entity] {
+    def apply(ssn: Ssn, name: NonEmptyString): Entity = new Entity(ssn, name) {}
+  }
+
+  sealed abstract case class Xaction[N: Financial, CCY: Currency](
+      asOf: Instant,
+      debitFrom: Entity.Key,
+      creditTo: Entity.Key,
+      amount: Money[N, CCY],
+      memo: String
+  )
+  object Xaction extends WithKeyAndEq[Long, Xaction[_, _]] // FIXME this is broken
+}
+
 class KvesSpec extends FlatSpec {
+
+  import io.deftrade.kves._
 
   import io.chrisdavenport.cormorant._
   // import io.chrisdavenport.cormorant.generic.semiauto._
@@ -26,22 +84,20 @@ class KvesSpec extends FlatSpec {
 
     import csvUnderTest._
 
-    LabelledRead[Foo]     |> discardValue
-    LabelledRead[Foo.Row] |> discardValue
-
-    val x: List[Foo] = List.fill(3)(Foo.unsafeRandom)
-
-    val csv = x.writeComplete print Printer.default
+    val xs: List[Foo]       = List.fill(3)(Foo.unsafeRandom)
+    val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
+    val rows: List[Foo.Row] = ks zip xs
+    val csv                 = rows.writeComplete print Printer.default
 
     // From String to Type
-    val decoded: Either[Error, List[Foo]] = {
+    val decoded: Either[Error, List[Foo.Row]] = {
       parseComplete(csv)
         .leftWiden[Error]
-        .flatMap(_.readLabelled[Foo].sequence)
+        .flatMap(_.readLabelled[Foo.Row].sequence)
     }
 
-    val Some(y: List[Foo]) = decoded.toOption
-    assert(x === y)
+    val Some(roundTripRows: List[Foo.Row]) = decoded.toOption
+    assert(rows === roundTripRows)
   }
 }
 class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
@@ -70,11 +126,6 @@ object csvUnderTest {
 
   import enumeratum._
 
-  import eu.timepit.refined
-  import refined.refineMV
-  import refined.api.{ Refined }
-  import refined.numeric.Positive
-
   import cats.implicits._
 
   import io.chrisdavenport.cormorant._
@@ -84,24 +135,6 @@ object csvUnderTest {
   import io.chrisdavenport.cormorant.refined._
 
   import java.util.UUID
-
-  /** */
-  sealed trait Nut extends EnumEntry with Product with Serializable
-
-  /** */
-  object Nut extends Enum[Nut] with CsvEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-
-    lazy val values: IndexedSeq[Nut] = findValues
-
-  }
 
   case class Bar(i: Int, s: String)
   object Bar extends WithKeyAndEq[Long, Bar] {
@@ -170,19 +203,8 @@ object csvUnderTest {
 
     import Money.{ moneyGet, moneyPut }
 
-    implicit lazy val readCsv: LabelledRead[Value]   = deriveLabelledRead
-    implicit lazy val writeCsv: LabelledWrite[Value] = deriveLabelledWrite
-
     implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
     implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
-
-    import shapeless._
-
-    val vlg = LabelledGeneric[Value]
-    type Repr = vlg.Repr
-
-    val rlg = LabelledGeneric[Row]
-    type RowRepr = rlg.Repr // =:= labelled.FieldType[keyT, Key] :: Repr
 
   }
 }
@@ -190,26 +212,6 @@ object csvUnderTest {
 object demoUnderTest {
 
   import time._
-  import enumeratum._
-
-  /** */
-  sealed trait Nut extends EnumEntry with Product with Serializable
-
-  /** */
-  object Nut extends Enum[Nut] with CsvEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-    case object Brazil     extends Nut
-
-    lazy val values: IndexedSeq[Nut] = findValues
-
-  }
 
   case class Foo(i: Int, s: String, b: Boolean, nut: Nut)
 
@@ -227,32 +229,4 @@ object demoUnderTest {
   implicitly[Arbitrary[Bar]]
   implicitly[Arbitrary[Base]]
 
-}
-
-object xaction {
-  import io.deftrade.time._
-  import io.deftrade.money._
-  import eu.timepit.refined
-  import refined.refineMV
-  import refined.api.{ Refined }
-  import refined.numeric.Positive
-
-  type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
-  type SsnRx      = refined.string.MatchesRegex[SsnPattern]
-  type Ssn        = String Refined SsnRx
-
-  import refined.collection.NonEmpty
-
-  sealed abstract case class Entity(ssn: Ssn)
-  sealed abstract case class Xaction(
-      ts: Instant,
-      // drawOn: EID,
-      // payTo: EID,
-      amount: BigDecimal,
-      memo: String
-  )
-  // object XAction extends WithKeyAndEq[Long, XAction] {
-  //   def mk(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String): Order =
-  //     new Order(no, date, drawOn, payTo, amount, memo) {}
-  // }
 }
