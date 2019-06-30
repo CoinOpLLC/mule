@@ -23,7 +23,7 @@ package wip
   */
 import scala.language.higherKinds
 
-import cats.{ Eq, Functor, Key, Monad }
+import cats.{ Eq, Functor, Id, Monad }
 import cats.syntax.all._
 
 /**
@@ -129,14 +129,14 @@ trait MuhMonad[F[_]] extends Functor[F] {
   override def map[A, B](value: F[A])(func: A => B): F[B] = flatMap(value)(_ |> func |> pure)
 }
 object MuhMonadInstances {
-  implicit val id = new MuhMonad[Key] {
-    override def pure[A](a: A): Key[A]                                 = a
-    override def flatMap[A, B](value: Key[A])(func: A => Key[B]): Key[B] = value |> func
+  implicit val id = new MuhMonad[Id] {
+    override def pure[A](a: A): Id[A]                                 = a
+    override def flatMap[A, B](value: Id[A])(func: A => Id[B]): Id[B] = value |> func
 
     /**
       * Note we don't need to override here; but for Key we can optimize...
       */
-    override def map[A, B](value: Key[A])(func: A => B): Key[B] = value |> func // |> pure
+    override def map[A, B](value: Id[A])(func: A => B): Id[B] = value |> func // |> pure
   }
 }
 

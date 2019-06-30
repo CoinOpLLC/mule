@@ -93,12 +93,20 @@ package kves {
     }
   }
 
-  abstract class WithKeyCompanion[K: Order, V] {
+  // FIXME this is what I want ideally but sadly no...
+  // abstract class WithKeyCompanion[K: Order, V: LabelledGeneric]
+
+  abstract class WithKeyCompanion[K: Order, V]()(implicit val lgV: LabelledGeneric.Aux[V, _]) {
+
+    // FIXME this is broken because I'm not DERIVING (letting the compiler assign)
+    // a free type parameter `HV` via `Aux[V, HV]` where `HV <: HList`.
 
     /**
       * n.b. `V` is used as a phantom type here
       */
     final type Value = V
+
+    final type HV = lgV.Repr
 
     /**
       * By convention, we tag keys with the value type of the record table we are indexing.
@@ -107,34 +115,25 @@ package kves {
       */
     final type Key = OpaqueKey[K, Value]
 
-    /** No constraint on validation. */
-    implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
+    final type Row = (Key, Value)
 
-    // final type KeyColTag = key.T
+    final type Table = Map[Key, Value]
 
     final type KeyFieldType = FieldType[key.T, Key]
 
-    /** `Repr` is more valuable `<: HList` FIXME this does nothing */
-    type Repr <: HList
+    final type HKV = KeyFieldType :: HV
 
-    final type Row = (Key, Value)
-    // val RowLG: LabelledGeneric[Row]
+    /** No constraint on validation. */
+    implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
-    type RowRepr <: HList
-
-    final def deriveLabelledWriteRow[HV <: HList](
-        implicit
-        genV: LabelledGeneric.Aux[Value, HV],
-        hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
-    ): LabelledWrite[Row] =
+    final def labelledWriteRow(implicit hlw: Lazy[LabelledWrite[HKV]]): LabelledWrite[Row] =
       new LabelledWrite[Row] {
-        type H = KeyFieldType :: HV
-        val writeH: LabelledWrite[H] = hlw.value
-        def headers: CSV.Headers     = writeH.headers
-        def write(r: Row): CSV.Row   = writeH write field[key.T](r._1) :: (genV to r._2)
+        val writeHKV: LabelledWrite[HKV] = hlw.value
+        def headers: CSV.Headers         = writeHKV.headers
+        def write(r: Row): CSV.Row       = writeHKV write field[key.T](r._1) :: (lgV to r._2)
       }
 
-    final def deriveLabelledReadRow[HV <: HList](
+    final def labelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
         hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
@@ -148,6 +147,36 @@ package kves {
           }
       }
   }
+
+  // FIXME: decide if I want to keep an on-the-fly derivation of csv persistence for case classes
+  // because that's what this is :|
+
+  //   final def deriveLabelledWriteRow[HV <: HList](
+  //       implicit
+  //       genV: LabelledGeneric.Aux[Value, HV],
+  //       hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
+  //   ): LabelledWrite[Row] =
+  //     new LabelledWrite[Row] {
+  //       // type H = KeyFieldType :: HV
+  //       val writeH: LabelledWrite[HV] = hlw.value
+  //       def headers: CSV.Headers      = writeH.headers
+  //       def write(r: Row): CSV.Row    = writeH write field[key.T](r._1) :: (genV to r._2)
+  //     }
+  //
+  //   final def deriveLabelledReadRow[HV <: HList](
+  //       implicit
+  //       genV: LabelledGeneric.Aux[Value, HV],
+  //       hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
+  //   ): LabelledRead[Row] =
+  //     new LabelledRead[Row] {
+  //       type H = KeyFieldType :: HV
+  //       val readH: LabelledRead[H] = hlr.value
+  //       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
+  //         readH.read(row, headers) map { h =>
+  //           (h.head, genV from h.tail)
+  //         }
+  //     }
+  // }
 
   /** Module-level companion base class with default Key type */
   abstract class WithKey[K: Order, V: Eq] extends WithKeyCompanion[K, V] {

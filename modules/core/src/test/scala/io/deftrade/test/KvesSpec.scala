@@ -12,6 +12,58 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
 
+
+object xaction {
+import enumeratum._
+
+/** */
+sealed trait Nut extends EnumEntry with Product with Serializable
+
+/** */
+object Nut extends Enum[Nut] with CsvEnum[Nut] {
+
+  case object Peanut     extends Nut
+  case object Hazelnut   extends Nut
+  case object Almond     extends Nut
+  case object Cashew     extends Nut
+  case object Walnut     extends Nut
+  case object Pecan      extends Nut
+  case object Pistaschio extends Nut
+  case object Brazil     extends Nut
+
+  lazy val values: IndexedSeq[Nut] = findValues
+
+}
+
+  import time._, money._, kves._
+
+  import eu.timepit.refined
+  import refined.{ refineMV, refineV, W }
+  import refined.api.{ Refined }
+  import refined.string.MatchesRegex
+  import refined.numeric.Positive
+  import refined.collection.NonEmpty
+
+  type SsnPattern = W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
+  type IsSsn      = MatchesRegex[SsnPattern]
+
+  type Ssn      = String Refined IsSsn
+  type NEString = String Refined NonEmpty
+
+  // sealed abstract
+  case class Entity(ssn: Ssn, name: NEString)
+  object Entity extends WithKeyAndEq[Long, Entity]
+
+  case class Xaction(
+      asOfThis: Instant,
+      debitFrom: Entity.Key,
+      creditTo: Entity.Key,
+      amount: BigDecimal,
+      memo: String
+  )
+  object Xaction extends WithKeyAndEq[Long, Xaction]
+}
+
 class KvesSpec extends FlatSpec {
 
   import io.chrisdavenport.cormorant._
@@ -44,31 +96,11 @@ class KvesSpec extends FlatSpec {
     assert(x === y)
   }
 }
-class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
-// with TableDrivenPropertyChecks {
-  import demoUnderTest._
-  property("some property about Foo") {
-    forAll { foo: Foo =>
-      // Ensure foo has the required property
-    }
-  }
-}
-
-object Jt8Gen {
-  import time._
-  def durationGen: Gen[Duration]                           = ???
-  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
-  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
-}
 
 object csvUnderTest {
 
-  import kves._
-  import time._
-  import money._
+  import kves._, time._, money._
   import Currency.USD
-
-  import enumeratum._
 
   import eu.timepit.refined
   import refined.refineMV
@@ -86,23 +118,6 @@ object csvUnderTest {
   import java.util.UUID
 
   /** */
-  sealed trait Nut extends EnumEntry with Product with Serializable
-
-  /** */
-  object Nut extends Enum[Nut] with CsvEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-
-    lazy val values: IndexedSeq[Nut] = findValues
-
-  }
-
   case class Bar(i: Int, s: String)
   object Bar extends WithKeyAndEq[Long, Bar] {
     implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
@@ -128,6 +143,11 @@ object csvUnderTest {
   )
 
   object Foo extends WithKeyAndEq[Long, Foo] {
+
+    /**
+      * recall: our policy is to specify policy; specifically, to require that policy be specified
+      */
+    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
 
     def unsafeRandom: Foo = {
       val uuid   = UUID.randomUUID
@@ -163,11 +183,6 @@ object csvUnderTest {
       )
     }
 
-    /**
-      * recall: our policy is to specify policy; specifically, to require that policy be specified
-      */
-    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
-
     import Money.{ moneyGet, moneyPut }
 
     implicit lazy val readCsv: LabelledRead[Value]   = deriveLabelledRead
@@ -176,41 +191,25 @@ object csvUnderTest {
     implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
     implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
 
-    import shapeless._
-
-    val vlg = LabelledGeneric[Value]
-    type Repr = vlg.Repr
-
-    val rlg = LabelledGeneric[Row]
-    type RowRepr = rlg.Repr // =:= labelled.FieldType[keyT, Key] :: Repr
+    // val rlg = LabelledGeneric[Row]
+    // type RowRepr = rlg.Repr
+    // =:= labelled.FieldType[keyT, Key] :: Repr
+    // =:= KeyFieldType :: Repr
 
   }
 }
 
+object Jt8Gen {
+  import time._
+  def durationGen: Gen[Duration]                           = ???
+  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
+  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
+}
+
+/** FIXME working on narrowing down `Arbitrary` problems */
 object demoUnderTest {
 
   import time._
-  import enumeratum._
-
-  /** */
-  sealed trait Nut extends EnumEntry with Product with Serializable
-
-  /** */
-  object Nut extends Enum[Nut] with CsvEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-    case object Brazil     extends Nut
-
-    lazy val values: IndexedSeq[Nut] = findValues
-
-  }
-
   case class Foo(i: Int, s: String, b: Boolean, nut: Nut)
 
   case class Bar(foo: Foo, s: String, z: Instant)
@@ -228,31 +227,12 @@ object demoUnderTest {
   implicitly[Arbitrary[Base]]
 
 }
-
-object xaction {
-  import io.deftrade.time._
-  import io.deftrade.money._
-  import eu.timepit.refined
-  import refined.refineMV
-  import refined.api.{ Refined }
-  import refined.numeric.Positive
-
-  type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
-  type SsnRx      = refined.string.MatchesRegex[SsnPattern]
-  type Ssn        = String Refined SsnRx
-
-  import refined.collection.NonEmpty
-
-  sealed abstract case class Entity(ssn: Ssn)
-  sealed abstract case class Xaction(
-      ts: Instant,
-      // drawOn: EID,
-      // payTo: EID,
-      amount: BigDecimal,
-      memo: String
-  )
-  // object XAction extends WithKeyAndEq[Long, XAction] {
-  //   def mk(no: Long, date: LocalDate, drawOn: EID, payTo: EID, amount: BigDecimal, memo: String): Order =
-  //     new Order(no, date, drawOn, payTo, amount, memo) {}
-  // }
+class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
+// with TableDrivenPropertyChecks {
+  import demoUnderTest._
+  property("some property about Foo") {
+    forAll { foo: Foo =>
+      // Ensure foo has the required property
+    }
+  }
 }
