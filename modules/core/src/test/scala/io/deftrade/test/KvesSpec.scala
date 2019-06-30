@@ -65,7 +65,7 @@ object xaction {
       amount: Money[N, CCY],
       memo: String
   )
-  object Xaction extends WithKeyAndEq[Long, Xaction[_, _]] // FIXME this is broken
+  object Xaction extends WithKeyAndEq[Long, Xaction[BigDecimal, Currency.USD]]
 }
 
 class KvesSpec extends FlatSpec {
@@ -196,15 +196,10 @@ object csvUnderTest {
       )
     }
 
-    /**
-      * recall: our policy is to specify policy; specifically, to require that policy be specified
-      */
-    implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
+    // import Money.{ moneyGet, moneyPut }
 
-    import Money.{ moneyGet, moneyPut }
-
-    implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
-    implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
+    // implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
+    // implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
 
   }
 }

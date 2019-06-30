@@ -22,16 +22,21 @@ import io.chrisdavenport.cormorant._
 /**
   * kvse: Key Value Entity Scheme*:
   *
-  * - keys: opaque identifiers with `Order`, `Eq`, `Hash` and `Show` (uses `refined`).
+  * - keys: opaque identifiers with `Order`, `Hash` and `Show` typeclass instances
   * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
-  * - entities: ("aggregate roots") `Map`s of Key -> Value entries: repos, logs...
+  * - entities: `Map`s of Key -> Value entries: repos, logs...
   *
   * This shall be the law: A `type Foo` may not depend on any type used as a key for `Foo`s.
   *
   * This package will enforce the law by
   * - aliasing `Refined` as an opaque key for a collection of a given type of values
-  * - using the type of the `Value` to be the phantom types
+  * - assinging the `Value` type to be the phantom type parameter for the Refined type constructor
   * - providing the `Key` types and instances as companion base classes.
+  *
+  * Further, the package supports the instantiaton of the scheme by
+  * - providing a `Row` type (`Key` -> `Value`)
+  * - providing a `Table` type (Map[Key, Value])
+  * - providing implicit derivations for CSV file readers and writers of `Row`s and `Tables`s.
   *
   * *It's a scheme because calling it a "schema" is too grand.
   */
@@ -45,10 +50,17 @@ package object kves {
     Order by (_.value)
 
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
-  implicit def showOpaqueKey[K: Show: Order, V]: Show[OpaqueKey[K, V]] =
-    Show show (key => s"k: ${key.value.show}")
+  implicit def showOpaqueKey[K: Show: Integral, V]: Show[OpaqueKey[K, V]] =
+    Show show (key => s"key=${key.value.show}")
 
-  /** `shapelss.Aux` instance, useful for .T which is the type of key label `Symbol` `'key` */
+  /**
+    * Key column type literal witness.
+    *
+    * The [[Key]] column is by convention assigned a key column label: `'key: Symbol`.
+    *
+    * The `key` member is a `shapeless.Aux[Symbol @@ String(key)]` instance,
+    * useful for type member `T`, which is the (singleton) type of the key column label.
+    */
   final val key = 'key.witness
 
 }
@@ -117,9 +129,11 @@ package kves {
     final type KeyFieldType = FieldType[key.T, Key]
 
     /** No constraint on validation. */
-    final implicit lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
+    implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
-    final def deriveLabelledWriteRow[HV <: HList](
+    // import io.deftrade.money.Money.{ moneyGet, moneyPut }
+
+    implicit final def deriveLabelledWriteRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
         hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
@@ -131,7 +145,7 @@ package kves {
         def write(r: Row): CSV.Row     = writeH write field[key.T](r._1) :: (genV to r._2)
       }
 
-    final def deriveLabelledReadRow[HV <: HList](
+    implicit final def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
         hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
@@ -144,17 +158,26 @@ package kves {
             (h.head, genV from h.tail)
           }
       }
+
   }
 
   /** Module-level companion base class with default Key type */
   abstract class WithKey[K: Order, V: Eq] extends WithKeyCompanion[K, V] {
     object Key extends OpaqueKeyCompanion[K, V]
+
+    /**
+      */
+    implicit def freshKey(implicit K: Integral[K]): Fresh[Key] = Fresh.zeroBasedIncr[K, V]
   }
 
   /** Same but with implicit Eq[V] typeclass instance */
   abstract class WithKeyAndEq[K: Order, V] extends WithKeyCompanion[K, V] {
     object Key extends OpaqueKeyCompanion[K, V]
     implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
+
+    /**
+      */
+    implicit def freshKey(implicit K: Integral[K]): Fresh[Key] = Fresh.zeroBasedIncr[K, V]
   }
 
 }
