@@ -74,7 +74,7 @@ class KvesSpec extends FlatSpec {
 
   import io.chrisdavenport.cormorant._
   // import io.chrisdavenport.cormorant.generic.semiauto._
-  import io.chrisdavenport.cormorant.parser._
+  // import io.chrisdavenport.cormorant.parser._
   // import io.chrisdavenport.cormorant.refined._
   import io.chrisdavenport.cormorant.implicits._
 
@@ -87,7 +87,11 @@ class KvesSpec extends FlatSpec {
     val xs: List[Foo]       = List.fill(3)(Foo.unsafeRandom)
     val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
     val rows: List[Foo.Row] = ks zip xs
-    val csv                 = rows.writeComplete print Printer.default
+
+    val lrFoo = LabelledRead[Foo]
+    val lwFoo = LabelledWrite[Foo]
+
+    val csv = rows.writeComplete print Printer.default
 
     // From String to Type
     val decoded: Either[Error, List[Foo.Row]] = {
@@ -123,16 +127,6 @@ object csvUnderTest {
   import time._
   import money._
   import Currency.USD
-
-  import enumeratum._
-
-  import cats.implicits._
-
-  import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.generic.semiauto._
-  // import io.chrisdavenport.cormorant.parser._
-  import io.chrisdavenport.cormorant.implicits._
-  import io.chrisdavenport.cormorant.refined._
 
   import java.util.UUID
 
