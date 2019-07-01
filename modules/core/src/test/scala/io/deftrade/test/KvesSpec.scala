@@ -1,16 +1,28 @@
 package io.deftrade
 package test
 
-import eu.timepit.refined
-import refined.{ refineMV, refineV }
-import refined.api.Refined
+import time._
+import money._
+import kves._
 
-import refined.collection.NonEmpty
-import refined.numeric.Positive
+import enumeratum._
 
 import cats._
 import cats.implicits._
-import cats.syntax.eq._
+import cats.syntax.eq._ // ups the implicit priority (?!)
+
+import eu.timepit.refined
+import refined.{ refineMV, refineV }
+import refined.api.Refined
+import refined.collection.NonEmpty
+import refined.numeric.Positive
+
+import io.chrisdavenport.cormorant
+import cormorant._
+import cormorant.generic.auto._
+// import cormorant.parser._
+// import cormorant.refined._
+import cormorant.implicits._
 
 import org.scalatest.{ FlatSpec, PropSpec }
 
@@ -18,8 +30,6 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
-
-import enumeratum._
 
 /** Nuts exist in the test package. Make of that what you will. */
 sealed trait Nut extends EnumEntry with Product with Serializable
@@ -41,10 +51,6 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
 }
 
 object xaction {
-
-  import time._
-  import money._
-  import kves._
 
   type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
   type IsSsn      = refined.string.MatchesRegex[SsnPattern]
@@ -70,17 +76,9 @@ object xaction {
 
 class KvesSpec extends FlatSpec {
 
-  import io.deftrade.kves._
-
-  import io.chrisdavenport.cormorant._
-  // import io.chrisdavenport.cormorant.generic.semiauto._
-  // import io.chrisdavenport.cormorant.parser._
-  // import io.chrisdavenport.cormorant.refined._
-  import io.chrisdavenport.cormorant.implicits._
-
-  // import Currency.{ EUR, USD }
-
   "`Foo`s" should "be created randomly" in {
+
+    import shapeless._
 
     import csvUnderTest._
 
@@ -88,20 +86,23 @@ class KvesSpec extends FlatSpec {
     val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
     val rows: List[Foo.Row] = ks zip xs
 
-    val lrFoo = LabelledRead[Foo]
-    val lwFoo = LabelledWrite[Foo]
+    val lgFoo = LabelledGeneric[Foo]
+    // val lwFoo    = LabelledWrite[Foo]
+    // val lrFoo    = LabelledRead[Foo]
+    // val lrFooRow = LabelledRead[Foo.Row]
+    // val lwFooRow = LabelledWrite[Foo.Row]
 
-    val csv = rows.writeComplete print Printer.default
+    // val csv = rows.writeComplete print Printer.default
 
-    // From String to Type
-    val decoded: Either[Error, List[Foo.Row]] = {
-      parseComplete(csv)
-        .leftWiden[Error]
-        .flatMap(_.readLabelled[Foo.Row].sequence)
-    }
+    // // From String to Type
+    // val decoded: Either[Error, List[Foo.Row]] = {
+    //   parseComplete(csv)
+    //     .leftWiden[Error]
+    //     .flatMap(_.readLabelled[Foo.Row].sequence)
+    // }
 
-    val Some(roundTripRows: List[Foo.Row]) = decoded.toOption
-    assert(rows === roundTripRows)
+    // val Some(roundTripRows: List[Foo.Row]) = decoded.toOption
+    // assert(rows === roundTripRows)
   }
 }
 class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
@@ -189,12 +190,6 @@ object csvUnderTest {
         amount = amount,
       )
     }
-
-    // import Money.{ moneyGet, moneyPut }
-
-    // implicit lazy val readRowCsv: LabelledRead[Row]   = deriveLabelledReadRow
-    // implicit lazy val writeRowCsv: LabelledWrite[Row] = deriveLabelledWriteRow
-
   }
 }
 

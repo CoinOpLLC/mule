@@ -113,7 +113,7 @@ package kves {
     final type Value = V
 
     /**
-      * By convention, we tag keys with the value type of the record table we are indexing.
+      * **By convention**, we tag keys with the value type of the record table we are indexing.
       * (This is the phantom type [[[Value]]]).
       * This is a policy decision, and, as such, is subject to revision.
       */
