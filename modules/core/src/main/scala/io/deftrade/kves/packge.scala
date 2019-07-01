@@ -128,6 +128,8 @@ package kves {
     /** The full type of the [[Key]] column. */
     final type KeyFieldType = FieldType[key.T, Key]
 
+    final val lgValue = LabelledGeneric[Value]
+
     /** No constraint on validation. */
     implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
