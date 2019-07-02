@@ -14,10 +14,10 @@ import shapeless.labelled._
 import shapeless.syntax.singleton._
 
 import io.chrisdavenport.cormorant._
-// import io.chrisdavenport.cormorant.generic.semiauto._
-// import io.chrisdavenport.cormorant.parser._
-// import io.chrisdavenport.cormorant.implicits._
-// import io.chrisdavenport.cormorant.refined._
+import io.chrisdavenport.cormorant.generic.semiauto._
+import io.chrisdavenport.cormorant.parser._
+import io.chrisdavenport.cormorant.implicits._
+import io.chrisdavenport.cormorant.refined._
 
 /**
   * kvse: Key Value Entity Scheme*:
@@ -43,7 +43,7 @@ import io.chrisdavenport.cormorant._
 package object kves {
 
   /** Just an alias, bssically.  */
-  type OpaqueKey[K0, V] = Refined[K0, V] with kves.OpaqueKeyLike { type K = K0 }
+  type OpaqueKey[K, V] = Refined[K, V]
 
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
   implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] =
@@ -67,16 +67,9 @@ package object kves {
 
 package kves {
 
-  trait OpaqueKeyLike extends Any {
-    type K
-    def value: K
-    final def key: K = value
-  }
-
   object OpaqueKey {
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def apply[K: Order, V](k: K) = (Refined unsafeApply k).asInstanceOf[OpaqueKey[K, V]]
+    def apply[K: Order, V](k: K): OpaqueKey[K, V] = (Refined unsafeApply k)
 
   }
 
@@ -109,7 +102,7 @@ package kves {
       import K._
 
       Fresh(
-        OpaqueKey[K, V](zero),
+        OpaqueKey(zero),
         key => OpaqueKey(key.value + one)
       )
     }
@@ -168,7 +161,6 @@ package kves {
             (h.head, genV from h.tail)
           }
       }
-
   }
 
   /** Same but with implicit Eq[V] typeclass instance */

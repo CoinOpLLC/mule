@@ -20,8 +20,8 @@ import refined.numeric.Positive
 import io.chrisdavenport.cormorant
 import cormorant._
 import cormorant.generic.auto._
-// import cormorant.parser._
-// import cormorant.refined._
+import cormorant.parser._
+import cormorant.refined._
 import cormorant.implicits._
 
 import org.scalatest.{ FlatSpec, PropSpec }
@@ -51,16 +51,20 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
 }
 
 object minviablethingie {
-  import shapeless._
-  final case class Foo(d: Double, s: String, b: Boolean)
+
+  final case class Foo(d: Double, s: String Refined NonEmpty, b: Boolean)
+
   object Foo extends WithKey[Long, Foo] {
-    def mk(s: String): Foo =
+    def mk(s: String Refined NonEmpty): Foo =
       Foo(
         s = s,
-        d = s.length / 17.0,
-        b = s.isEmpty || ((s.head.toInt % 2) == 0)
+        d = s.value.length / 17.0,
+        b = s.value.isEmpty || ((s.value.head.toInt % 2) == 0)
       )
   }
+
+  final case class Bar(fk: Foo.Key)
+  object Bar extends WithKey[Long, Bar]
 
 }
 
@@ -94,17 +98,24 @@ class KvesSpec extends FlatSpec {
   "`Foo`s" should "be created randomly" in {
 
     import shapeless._
+    import refined.auto._
 
-    import csvUnderTest._
+    // import csvUnderTest._
+    import minviablethingie._
 
-    val xs: List[Foo]       = List.fill(3)(Foo.unsafeRandom)
+    val xs: List[Foo]       = List.fill(3)(Foo mk "yo wtf")
     val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
     val rows: List[Foo.Row] = ks zip xs
 
-    // val lwFoo    = LabelledWrite[Foo]
-    // val lrFoo    = LabelledRead[Foo]
-    // val lrFooRow = LabelledRead[Foo.Row]
-    // val lwFooRow = LabelledWrite[Foo.Row]
+    val lwFoo = LabelledWrite[Foo]
+    val lrFoo = LabelledRead[Foo]
+
+    val lgFoo = LabelledGeneric[Foo]
+    // val lgFooKey = LabelledGeneric[Foo.Key]
+    val lgBar = LabelledGeneric[Bar]
+
+    val lrFooRow = LabelledRead[Foo.Row]
+    val lwFooRow = LabelledWrite[Foo.Row]
 
     // val csv = rows.writeComplete print Printer.default
 
@@ -127,13 +138,6 @@ class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
       // Ensure foo has the required property
     }
   }
-}
-
-object Jt8Gen {
-  import time._
-  def durationGen: Gen[Duration]                           = ???
-  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
-  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
 }
 
 object csvUnderTest {
@@ -227,4 +231,11 @@ object demoUnderTest {
   implicitly[Arbitrary[Bar]]
   implicitly[Arbitrary[Base]]
 
+}
+
+object Jt8Gen {
+  import time._
+  def durationGen: Gen[Duration]                           = ???
+  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
+  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
 }
