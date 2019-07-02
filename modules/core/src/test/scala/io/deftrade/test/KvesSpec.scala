@@ -97,7 +97,6 @@ class KvesSpec extends FlatSpec {
 
   "`Foo`s" should "be created randomly" in {
 
-    import shapeless._
     import refined.auto._
 
     // import csvUnderTest._
@@ -110,24 +109,20 @@ class KvesSpec extends FlatSpec {
     val lwFoo = LabelledWrite[Foo]
     val lrFoo = LabelledRead[Foo]
 
-    val lgFoo = LabelledGeneric[Foo]
-    // val lgFooKey = LabelledGeneric[Foo.Key]
-    val lgBar = LabelledGeneric[Bar]
-
     val lrFooRow = LabelledRead[Foo.Row]
     val lwFooRow = LabelledWrite[Foo.Row]
 
-    // val csv = rows.writeComplete print Printer.default
+    val csv = rows.writeComplete print Printer.default
 
-    // // From String to Type
-    // val decoded: Either[Error, List[Foo.Row]] = {
-    //   parseComplete(csv)
-    //     .leftWiden[Error]
-    //     .flatMap(_.readLabelled[Foo.Row].sequence)
-    // }
+    // From String to Type
+    val decoded: Either[Error, List[Foo.Row]] = {
+      parseComplete(csv)
+        .leftWiden[Error]
+        .flatMap(_.readLabelled[Foo.Row].sequence)
+    }
 
-    // val Some(roundTripRows: List[Foo.Row]) = decoded.toOption
-    // assert(rows === roundTripRows)
+    val Some(roundTripRows: List[Foo.Row]) = decoded.toOption
+    assert(rows === roundTripRows)
   }
 }
 class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
