@@ -115,14 +115,12 @@ package kves {
     }
   }
 
-  abstract class WithKeyCompanion[K: Order, V]()(implicit HV: LabelledGeneric[V]) {
+  abstract class WithKeyCompanion[K: Order, V] {
 
     /**
-      * n.b. `V` is used as a phantom type here
+      * n.b. `V` is the [[Value]] type used as a phanton type to tag the [[Key]] with.
       */
     final type Value = V
-    final val lgv = HV
-    final type LGV = lgv.Repr
 
     /**
       * **By convention**, we tag keys with the value type of the record table we are indexing.
@@ -174,7 +172,7 @@ package kves {
   }
 
   /** Same but with implicit Eq[V] typeclass instance */
-  abstract class WithKey[K: Order, V: LabelledGeneric] extends WithKeyCompanion[K, V] {
+  abstract class WithKey[K: Order, V] extends WithKeyCompanion[K, V] {
     object Key extends OpaqueKeyCompanion[K, V]
     implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
 

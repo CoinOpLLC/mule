@@ -53,7 +53,6 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
 object minviablethingie {
   import shapeless._
   final case class Foo(d: Double, s: String, b: Boolean)
-  val deleteMe = LabelledGeneric[Foo]
   object Foo extends WithKey[Long, Foo] {
     def mk(s: String): Foo =
       Foo(
