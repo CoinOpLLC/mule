@@ -42,8 +42,8 @@ import io.chrisdavenport.cormorant._
   */
 package object kves {
 
-  /** Just an alias.  */
-  type OpaqueKey[K, V] = Refined[K, V]
+  /** Just an alias, bssically.  */
+  type OpaqueKey[K0, V] = Refined[K0, V] with kves.OpaqueKeyLike { type K = K0 }
 
   /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
   implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] =
@@ -67,14 +67,21 @@ package object kves {
 
 package kves {
 
+  trait OpaqueKeyLike extends Any {
+    type K
+    def value: K
+    final def key: K = value
+  }
+
   object OpaqueKey {
 
-    def apply[K: Order, V: Eq](k: K): OpaqueKey[K, V] = Refined unsafeApply k
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def apply[K: Order, V](k: K) = (Refined unsafeApply k).asInstanceOf[OpaqueKey[K, V]]
 
   }
 
   /** Key type companion base class. */
-  abstract class OpaqueKeyCompanion[K: Order, V: Eq] {
+  abstract class OpaqueKeyCompanion[K: Order, V] {
 
     def apply(k: K) = OpaqueKey[K, V](k)
 
@@ -88,29 +95,34 @@ package kves {
     */
   final case class Fresh[K](init: K, next: K => K)
 
-  /** fresh `Fresh` */
+  /**
+    * fresh `Fresh`
+    * FIXME this is horrible
+    */
   object Fresh {
 
     def apply[K: Fresh] = implicitly[Fresh[K]]
 
-    def zeroBasedIncr[K: Integral, V: Eq]: Fresh[OpaqueKey[K, V]] = {
+    def zeroBasedIncr[K: Integral, V]: Fresh[OpaqueKey[K, V]] = {
 
       val K = Integral[K]
       import K._
 
       Fresh(
-        OpaqueKey(zero),
+        OpaqueKey[K, V](zero),
         key => OpaqueKey(key.value + one)
       )
     }
   }
 
-  abstract class WithKeyCompanion[K: Order, V] {
+  abstract class WithKeyCompanion[K: Order, V]()(implicit HV: LabelledGeneric[V]) {
 
     /**
       * n.b. `V` is used as a phantom type here
       */
     final type Value = V
+    final val lgv = HV
+    final type LGV = lgv.Repr
 
     /**
       * **By convention**, we tag keys with the value type of the record table we are indexing.
@@ -127,8 +139,6 @@ package kves {
 
     /** The full type of the [[Key]] column. */
     final type KeyFieldType = FieldType[key.T, Key]
-
-    final val lgValue = LabelledGeneric[Value]
 
     /** No constraint on validation. */
     implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
@@ -163,17 +173,8 @@ package kves {
 
   }
 
-  /** Module-level companion base class with default Key type */
-  abstract class WithKey[K: Order, V: Eq] extends WithKeyCompanion[K, V] {
-    object Key extends OpaqueKeyCompanion[K, V]
-
-    /**
-      */
-    implicit def freshKey(implicit K: Integral[K]): Fresh[Key] = Fresh.zeroBasedIncr[K, V]
-  }
-
   /** Same but with implicit Eq[V] typeclass instance */
-  abstract class WithKeyAndEq[K: Order, V] extends WithKeyCompanion[K, V] {
+  abstract class WithKey[K: Order, V: LabelledGeneric] extends WithKeyCompanion[K, V] {
     object Key extends OpaqueKeyCompanion[K, V]
     implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
 

@@ -50,6 +50,21 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
 
 }
 
+object minviablethingie {
+  import shapeless._
+  final case class Foo(d: Double, s: String, b: Boolean)
+  val deleteMe = LabelledGeneric[Foo]
+  object Foo extends WithKey[Long, Foo] {
+    def mk(s: String): Foo =
+      Foo(
+        s = s,
+        d = s.length / 17.0,
+        b = s.isEmpty || ((s.head.toInt % 2) == 0)
+      )
+  }
+
+}
+
 object xaction {
 
   type SsnPattern = refined.W.`"[0-9]{3}-[0-9]{2}-[0-9]{4}"`.T
@@ -60,7 +75,7 @@ object xaction {
 
   sealed abstract case class Entity private (ssn: Ssn, name: NonEmptyString)
 
-  object Entity extends WithKeyAndEq[Long, Entity] {
+  object Entity extends WithKey[Long, Entity] {
     def apply(ssn: Ssn, name: NonEmptyString): Entity = new Entity(ssn, name) {}
   }
 
@@ -71,7 +86,8 @@ object xaction {
       amount: Money[N, CCY],
       memo: String
   )
-  object Xaction extends WithKeyAndEq[Long, Xaction[BigDecimal, Currency.USD]]
+
+  object Xaction extends WithKey[Long, Xaction[BigDecimal, Currency.USD]]
 }
 
 class KvesSpec extends FlatSpec {
@@ -131,7 +147,7 @@ object csvUnderTest {
   import java.util.UUID
 
   case class Bar(i: Int, s: String)
-  object Bar extends WithKeyAndEq[Long, Bar] {
+  object Bar extends WithKey[Long, Bar] {
     implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
   }
 
@@ -154,7 +170,7 @@ object csvUnderTest {
       amount: Money[Double, USD],
   )
 
-  object Foo extends WithKeyAndEq[Long, Foo] {
+  object Foo extends WithKey[Long, Foo] {
 
     def unsafeRandom: Foo = {
       val uuid   = UUID.randomUUID

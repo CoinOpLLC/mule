@@ -32,7 +32,7 @@ sealed trait LegalEntity extends Product with Serializable {
 }
 
 /** `LegalEntity`s recognized by the system. */
-object LegalEntity extends WithKeyAndEq[Long, LegalEntity] {
+object LegalEntity extends WithKey[Long, LegalEntity] {
 
   /**
     * RDB friendly `String`s that are born usable as is.

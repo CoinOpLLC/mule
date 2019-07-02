@@ -100,7 +100,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   /**
     * Where do Order Management Systems come from? (Here.)
     */
-  object OMS extends WithKeyAndEq[Long, OMS[cats.Id]] {
+  object OMS extends WithKey[Long, OMS[cats.Id]] {
 
     type Allocation = UnitPartition[Account.Key, Quantity]
 
@@ -130,7 +130,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     ) {
       def currency = Currency[C]
     }
-    implicit def orderEq[C: Currency] = Eq.fromUniversalEquals[Order[C]]
 
     /** */
     object Order extends WithKey[Long, Order[USD]] {
