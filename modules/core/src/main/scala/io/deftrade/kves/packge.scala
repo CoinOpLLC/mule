@@ -142,10 +142,9 @@ package kves {
         hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
     ): LabelledWrite[Row] =
       new LabelledWrite[Row] {
-        type HKV = KeyFieldType :: HV
-        val writeH: LabelledWrite[HKV] = hlw.value
-        def headers: CSV.Headers       = writeH.headers
-        def write(r: Row): CSV.Row     = writeH write field[key.T](r._1) :: (genV to r._2)
+        val writeHKV: LabelledWrite[KeyFieldType :: HV] = hlw.value
+        def headers: CSV.Headers                        = writeHKV.headers
+        def write(r: Row): CSV.Row                      = writeHKV write field[key.T](r._1) :: (genV to r._2)
       }
 
     implicit final def deriveLabelledReadRow[HV <: HList](
@@ -154,10 +153,9 @@ package kves {
         hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
     ): LabelledRead[Row] =
       new LabelledRead[Row] {
-        type HKV = KeyFieldType :: HV
-        val readH: LabelledRead[HKV] = hlr.value
+        val readHKV: LabelledRead[KeyFieldType :: HV] = hlr.value
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
-          readH.read(row, headers) map { h =>
+          readHKV.read(row, headers) map { h =>
             (h.head, genV from h.tail)
           }
       }

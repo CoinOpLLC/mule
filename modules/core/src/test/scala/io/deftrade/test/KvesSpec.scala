@@ -106,12 +106,6 @@ class KvesSpec extends FlatSpec {
     val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
     val rows: List[Foo.Row] = ks zip xs
 
-    val lwFoo = LabelledWrite[Foo]
-    val lrFoo = LabelledRead[Foo]
-
-    val lrFooRow = LabelledRead[Foo.Row]
-    val lwFooRow = LabelledWrite[Foo.Row]
-
     val csv = rows.writeComplete print Printer.default
 
     // From String to Type

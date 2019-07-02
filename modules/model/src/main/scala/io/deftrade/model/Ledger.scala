@@ -21,15 +21,6 @@ import io.circe.Json
 import scala.language.higherKinds
 
 /**
-  * FIXME wtf is this even, besides eponymous
-  */
-sealed abstract class Fail extends Product with Serializable { def msg: String }
-object Fail {
-  final case class Impl(val msg: String) extends Fail
-  def apply(msg: String): Fail = Impl(msg)
-}
-
-/**
   * `Instrument`s in the house.
   * TODO:
   * - use the XBRL definitions for these, a la OpenGamma
