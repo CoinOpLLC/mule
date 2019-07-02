@@ -90,6 +90,7 @@ object Money {
     s"${C.currencyCode} ${m.amount formatted sfmt}"
   }
 
+  /** FIXME move the cormorant stuff somewhere else */
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.implicits._
 
@@ -117,6 +118,7 @@ object Money {
     stringPut contramap format[N, C]
 
   /** `Refined` section HACK  why do we need this? */
+
   // implicit lazy val refinedRefType: RefType[Money] =
   //   new RefType[Money] {
   //

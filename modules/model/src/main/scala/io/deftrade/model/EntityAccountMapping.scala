@@ -69,6 +69,7 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
 
   import refined.boolean.Or
   lazy val rf = refinements
+  // type DTID = String Refined Or[rf.SSN, rf.EIN Or rf.AIN] // adding another Or kills auto derivation
   type DTID = String Refined Or[rf.SSN, rf.EIN] // adding another Or kills auto derivation
 
   import refined.auto._
