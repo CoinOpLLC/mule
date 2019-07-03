@@ -38,39 +38,39 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     * RDB friendly `String`s that are born usable as is.
     * Defaults to Postgres, which is the shorter limit (126)
     */
-  type VarChar = VarChar126
+  type VarChar = IsVarChar126
 
   /** Postgres optimizes strings less than this. */
-  type VarChar126 = String Refined refinements.VarChar126
+  type IsVarChar126 = String Refined refinements.IsVarChar126
 
   /** Typical SQL */
-  type VarChar255 = String Refined refinements.VarChar255
+  type IsVarChar255 = String Refined refinements.IsVarChar255
 
   /**
-    * Post Randomization SSN validation: i.e., cursory only.
+    * Post Randomization IsSSN validation: i.e., cursory only.
     * See also:
     * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
     * https://www.ssa.gov/employer/randomization.html
     * https://www.ssa.gov/history/ssn/geocard.html
     */
-  type SSN = String Refined refinements.SSN
+  type IsSSN = String Refined refinements.IsSSN
 
   /**
     * An `LegalEntity` represents a legal (e.g. corporate, or non-profit) body.
     * TODO: refine (no pun intended) the requirements on US EINs.
     * TODO: Internationalize with an ADT.
     */
-  type EIN = String Refined refinements.EIN
+  type IsEIN = String Refined refinements.IsEIN
 
   /**
     * An algo in my head told me to do this.
     */
-  type AIN = String Refined refinements.AIN
+  type IsAIN = String Refined refinements.IsAIN
 
   import refined.boolean.Or
   lazy val rf = refinements
-  // type DTID = String Refined Or[rf.SSN, rf.EIN Or rf.AIN] // adding another Or kills auto derivation
-  type DTID = String Refined Or[rf.SSN, rf.EIN] // adding another Or kills auto derivation
+  // type DTID = String Refined Or[rf.IsSSN, rf.IsEIN Or rf.IsAIN] // adding another Or kills auto derivation
+  type DTID = String Refined Or[rf.IsSSN, rf.IsEIN] // adding another Or kills auto derivation
 
   import refined.auto._
 
@@ -79,7 +79,7 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     */
   final case class NaturalPerson(
       name: VarChar,
-      ssn: SSN,
+      ssn: IsSSN,
       dob: LocalDate,
       meta: Json
   ) extends LegalEntity {
@@ -89,12 +89,12 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
-  final case class Corporation(name: VarChar, ein: EIN, meta: Json) extends LegalEntity {
+  final case class Corporation(name: VarChar, ein: IsEIN, meta: Json) extends LegalEntity {
     def dtid = ein
   }
 
   /** TODO flesh this concept out... minimum viable PM */
-  final case class Algorithm(name: VarChar, ain: AIN, meta: Json) extends LegalEntity {
+  final case class Algorithm(name: VarChar, ain: IsAIN, meta: Json) extends LegalEntity {
     def dtid = ??? // ain FIXME
   }
 
@@ -290,13 +290,16 @@ object refinements {
 
   import refined.api.Validate
 
+  type IsVarChar126 = NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
+  type IsVarChar255 = NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
+
   type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
 
-  final case class SSN private ()
-  object SSN {
+  final case class IsSSN private ()
+  object IsSSN {
 
-    implicit def ssnValidate: Validate.Plain[String, SSN] =
-      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid SSN", SSN())
+    implicit def ssnValidate: Validate.Plain[String, IsSSN] =
+      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSSN", IsSSN())
 
     private val regex = "^(\\d{3})-(\\d{2})-(\\d{4})$".r.pattern
     private val predicate: String => Boolean = s => {
@@ -312,18 +315,17 @@ object refinements {
     }
   }
 
-  type EIN = EIN.MRx
-  object EIN {
-    type Pattern = W.`"[0-9]{2}-[0-9]{7}"`.T
-    type MRx     = MatchesRegex[Pattern]
-  }
+  import shapeless.syntax.singleton._
 
-  type AIN = AIN.MRx
-  object AIN {
-    type Pattern = W.`"666-[A-F]{2}-[0-9]{6}"`.T
-    type MRx     = MatchesRegex[Pattern]
-  }
+  object IsEIN extends RxPredicate("[0-9]{2}-[0-9]{7}".witness)
+  type IsEIN = IsEIN.MRx
 
-  type VarChar126 = NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
-  type VarChar255 = NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
+  type IsAIN = IsAIN.MRx
+  object IsAIN extends RxPredicate("666-[A-F]{2}-[0-9]{6}".witness)
+
+  private[model] sealed abstract class RxPredicate[P](p: P) {
+    val Pattern = p
+    type Pattern   = P // =:= p.T
+    final type MRx = MatchesRegex[Pattern]
+  }
 }
