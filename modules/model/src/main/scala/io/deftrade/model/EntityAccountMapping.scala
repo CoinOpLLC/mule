@@ -26,7 +26,7 @@ import io.circe.Json
   * See Also: `model.Role`s.
   */
 sealed trait LegalEntity extends Product with Serializable {
-  def name: LegalEntity.VarChar
+  def name: LegalEntity.IsVarChar
   def dtid: LegalEntity.DTID
   def meta: Json
 }
@@ -38,7 +38,7 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     * RDB friendly `String`s that are born usable as is.
     * Defaults to Postgres, which is the shorter limit (126)
     */
-  type VarChar = IsVarChar126
+  type IsVarChar = IsVarChar126
 
   /** Postgres optimizes strings less than this. */
   type IsVarChar126 = String Refined refinements.IsVarChar126
@@ -78,7 +78,7 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
     */
   final case class NaturalPerson(
-      name: VarChar,
+      name: IsVarChar,
       ssn: IsSSN,
       dob: LocalDate,
       meta: Json
@@ -89,12 +89,12 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
-  final case class Corporation(name: VarChar, ein: IsEIN, meta: Json) extends LegalEntity {
+  final case class Corporation(name: IsVarChar, ein: IsEIN, meta: Json) extends LegalEntity {
     def dtid = ein
   }
 
   /** TODO flesh this concept out... minimum viable PM */
-  final case class Algorithm(name: VarChar, ain: IsAIN, meta: Json) extends LegalEntity {
+  final case class Algorithm(name: IsVarChar, ain: IsAIN, meta: Json) extends LegalEntity {
     def dtid = ??? // ain FIXME
   }
 
@@ -287,13 +287,16 @@ object refinements {
   import refined.boolean.{ And }
   import refined.collection.{ MaxSize, NonEmpty }
   import refined.string.{ MatchesRegex, Trimmed }
+  import refined.char.{ Digit }
 
   import refined.api.Validate
 
-  type IsVarChar126 = NonEmpty And Trimmed And MaxSize[`W`.`126`.T]
-  type IsVarChar255 = NonEmpty And Trimmed And MaxSize[`W`.`255`.T]
+  import shapeless.syntax.singleton._
 
   type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+
+  type IsVarChar126 = Trimmed And MaxSize[W.`126`.T]
+  type IsVarChar255 = Trimmed And MaxSize[W.`255`.T]
 
   final case class IsSSN private ()
   object IsSSN {
@@ -301,7 +304,7 @@ object refinements {
     implicit def ssnValidate: Validate.Plain[String, IsSSN] =
       Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSSN", IsSSN())
 
-    private val regex = "^(\\d{3})-(\\d{2})-(\\d{4})$".r.pattern
+    private val regex = """^(\d{3})-(\d{2})-(\d{4})$""".r.pattern
     private val predicate: String => Boolean = s => {
       val matcher = regex matcher s
       matcher.find() && matcher.matches() && {
@@ -317,15 +320,70 @@ object refinements {
 
   import shapeless.syntax.singleton._
 
-  object IsEIN extends RxPredicate("[0-9]{2}-[0-9]{7}".witness)
+  object IsEIN extends RxPredicate("[0-9]{2}-[0-9]{7}".narrow)
   type IsEIN = IsEIN.MRx
 
   type IsAIN = IsAIN.MRx
-  object IsAIN extends RxPredicate("666-[A-F]{2}-[0-9]{6}".witness)
+  object IsAIN extends RxPredicate("666-[A-F]{2}-[0-9]{6}".narrow)
 
   private[model] sealed abstract class RxPredicate[P](p: P) {
+    type Pattern = P // =:= p.T
     val Pattern = p
-    type Pattern   = P // =:= p.T
     final type MRx = MatchesRegex[Pattern]
   }
+}
+
+object IsinScratch {
+  import refined.boolean.{ And }
+  import refined.collection.{ MaxSize, NonEmpty }
+  import refined.string.{ MatchesRegex, Trimmed }
+  import refined.char.{ Digit }
+
+  import refined.api.Validate
+
+  import shapeless.syntax.singleton._
+  import scala.util.Try
+
+  val isins = List(
+    "US0378331005",
+    "US0373831005",
+    "U50378331005",
+    "US03378331005",
+    "AU0000XVGZA3",
+    "AU0000VXGZA3",
+    "FR0000988040"
+  )
+
+  type IsIsin       = MatchesRxIsin And LuhnyIsin
+  type StringIsIsin = String Refined IsIsin
+
+  val isinRx = """[A-Z]{2}[A-Z0-9]{9}\d""".witness
+  type MatchesRxIsin = MatchesRegex[isinRx.T]
+
+  sealed abstract case class LuhnyIsin()
+  object LuhnyIsin {
+
+    implicit def isinValidate: Validate.Plain[String, LuhnyIsin] =
+      Validate fromPredicate (predicate, t => s"$t is not Luhny", new LuhnyIsin() {})
+
+    private def predicate(isin: String): Boolean =
+      Try {
+
+        val digits = for {
+          c <- isin.trim.toUpperCase
+          d <- Character.digit(c, 36).toString
+        } yield d.asDigit
+
+        val checksum = digits.reverse.zipWithIndex.foldLeft(0) {
+          case (sum, (digit, i)) =>
+            if (i % 2 == 0)
+              sum + digit
+            else
+              sum + (digit * 2) / 10 + (digit * 2) % 10
+        }
+        checksum % 10 === 0
+
+      } getOrElse false
+  }
+
 }
