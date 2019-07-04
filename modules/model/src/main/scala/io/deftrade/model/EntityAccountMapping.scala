@@ -12,7 +12,7 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 import eu.timepit.refined
 import refined.W
 import refined.api.Refined
-import refined.boolean.AnyOf
+import refined.boolean.Or
 import refined.numeric._
 // import refined.{ cats => refinedCats, _ }
 
@@ -31,11 +31,10 @@ sealed trait LegalEntity extends Product with Serializable {
 /** `LegalEntity`s recognized by the system. */
 object LegalEntity extends WithKey[Long, LegalEntity] {
 
-  import shapeless.{ ::, HNil }
   import refined.auto._
 
   /** Domain Typed Id */
-  type Dtid = String Refined AnyOf[IsSsn :: IsEin :: IsAin :: HNil]
+  type Dtid = String Refined (IsSsn Or IsEin)
 
   /**
     *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
@@ -56,11 +55,6 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     def dtid = ein
   }
 
-  /** TODO flesh this concept out... minimum viable PM */
-  final case class Algorithm(name: VarChar, ain: Ain, meta: Json) extends LegalEntity {
-    def dtid = ain
-  }
-
   implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
 
   implicit def showEntity = Show.show[LegalEntity] {
@@ -75,16 +69,15 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
 }
 
 /**
-  * Every `LegalEntity` needs a `Role`.
-  * There are a finite enumeration of `Role`s.
+  * There are a finite enumeration of [[Roles]].
+  * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]].
   */
 sealed trait Role extends EnumEntry
 
 /**
-  * There is _always_ a distinguished `Role`, the `Principle`.
-  * `Principle` `LegalEntity` status may enforced by the type system using this.
+  * There is _always_ a distinguished `Role`, the `Principal`.
   */
-sealed trait Principle extends Role
+sealed trait Principal extends Role
 
 /**
   * A type representing all `Role`s _other_ than `Princple`.
@@ -97,18 +90,18 @@ sealed trait NonPrinciple extends Role
 object Role extends Enum[Role] with CatsEnum[Role] {
 
   /**
-    * The `LegalEntity` which is the economic actor responsible for establishing the `Account`.
+    * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
     *
-    * Semantics for `Principle` are conditioned on the status of account, for examples:
+    * Semantics for `Principal` are conditioned on the status of account, for examples:
     * - beneficial owner for an asset
     * - responsible party for a liability
     * - shareholder for equity
     * - business unit chief for revenue and expenses
     */
-  case object Principle extends Principle
+  case object Principal extends Principal
 
   /**
-    * The primary delegate selected by a `Principle`.
+    * The primary delegate selected by a `Principal`.
     * Also, simply, the `LegalEntity`(s) whose names are listed on the `Account`,
     * and the primary point of contact for the `Account`.
     *
@@ -155,7 +148,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 
-  lazy val nonPrinciples: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
+  lazy val nonPrincipals: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
 object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
@@ -167,35 +160,45 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type LegalEntities = LegalEntities.Table
 
   /**
-    * Who does what. Or should. And shouldn't.
+    * Each [[Account]] is created with a `Roster`, specifying the beneficial owners and their crew.
     */
-  final case class Roster private (
-      principles: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrinciples: NonPrinciple => NonEmptySet[LegalEntity.Key]
+  sealed abstract case class Roster private (
+      principals: UnitPartition[LegalEntity.Key, Quantity],
+      nonPrincipals: NonPrinciple => NonEmptySet[LegalEntity.Key]
   ) {
     lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
       NonEmptyMap of (
-        Role.Principle -> principles.keys,
-        Role.nonPrinciples.map(np => (np, nonPrinciples(np))): _*
+        Role.Principal -> principals.keys,
+        Role.nonPrincipals.map(np => (np, nonPrincipals(np))): _*
     )
 
     def withAgent(agent: LegalEntity.Key): Roster =
-      copy(nonPrinciples = {
-        case Role.Agent => NonEmptySet one agent
-        case np         => nonPrinciples(np)
-      })
+      Roster.unsafe(
+        principals,
+        role =>
+          role match {
+            case Role.Agent => NonEmptySet one agent
+            case np         => nonPrincipals(np)
+        }
+      )
 
     def withAuditor(auditor: LegalEntity.Key): Roster = ??? // refactor with above
   }
 
   object Roster {
 
+    private def unsafe(
+        principals: UnitPartition[LegalEntity.Key, Quantity],
+        nonPrincipals: NonPrinciple => NonEmptySet[LegalEntity.Key]
+    ) = new Roster(principals, nonPrincipals) {}
+
+    /** Pplits partition equally among `Principal`s - especially useful for singleton principals. */
     def fromRoles(rs: Map[Role, LegalEntity.Key]): Result[Roster] = ???
 
     def single(key: LegalEntity.Key): Roster =
-      Roster(
-        principles = UnitPartition single key,
-        nonPrinciples = _ => NonEmptySet one key
+      unsafe(
+        principals = UnitPartition single key,
+        nonPrincipals = _ => NonEmptySet one key
       )
   }
 
@@ -239,7 +242,8 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   /**
     * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
     * the `Account.Key`'s would be ideal.
-    * another approoach would be to merkelize the `Roster` to expose only the relevant bits.
+    *
+    * Another approoach might be to merkelize the `Roster` to expose only the relevant bits.
     */
   type AccountAuth           = (Account.Key, Signature)
   type FolioAuth             = (Folio.Key, AccountAuth)
