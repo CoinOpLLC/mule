@@ -22,7 +22,7 @@ import io.circe.Json
   * `LegalEntities` model real world actors.
   * See Also: `model.Role`s.
   */
-sealed trait LegalEntity extends Product with Serializable {
+sealed trait LegalEntity extends Serializable {
   def name: VarChar
   def dtid: LegalEntity.Dtid
   def meta: Json
@@ -240,8 +240,8 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type Accounts = Accounts.Table
 
   /**
-    * TODO: this scheme is adequate for my purposes, but a ZK validation scheme which didn't expose
-    * the `Account.Key`'s would be ideal.
+    * TODO: this scheme seems fit to current purposes,
+    * but a ZK validation scheme which didn't expose the `Account.Key`'s would be ideal.
     *
     * Another approoach might be to merkelize the `Roster` to expose only the relevant bits.
     */

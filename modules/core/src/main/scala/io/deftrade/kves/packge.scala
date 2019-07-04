@@ -14,10 +14,10 @@ import shapeless.labelled._
 import shapeless.syntax.singleton._
 
 import io.chrisdavenport.cormorant._
-import io.chrisdavenport.cormorant.generic.semiauto._
-import io.chrisdavenport.cormorant.parser._
-import io.chrisdavenport.cormorant.implicits._
-import io.chrisdavenport.cormorant.refined._
+// import io.chrisdavenport.cormorant.generic.semiauto._
+// import io.chrisdavenport.cormorant.parser._
+// import io.chrisdavenport.cormorant.implicits._
+// import io.chrisdavenport.cormorant.refined._
 
 /**
   * kvse: Key Value Entity Scheme*:
@@ -74,6 +74,9 @@ package kves {
   }
 
   /** Key type companion base class. */
+  abstract class KeyCompanion[K: Order, P, V] {}
+
+  /** Key type companion mez class. */
   abstract class OpaqueKeyCompanion[K: Order, V] {
 
     def apply(k: K) = OpaqueKey[K, V](k)
@@ -89,14 +92,13 @@ package kves {
   final case class Fresh[K](init: K, next: K => K)
 
   /**
-    * fresh `Fresh`
-    * FIXME this is horrible
+    * FIXME use lifted functions from K to Refined[K, Value]
     */
   object Fresh {
 
     def apply[K: Fresh] = implicitly[Fresh[K]]
 
-    def zeroBasedIncr[K: Integral, V]: Fresh[OpaqueKey[K, V]] = {
+    def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
 
       val K = Integral[K]
       import K._
@@ -108,19 +110,31 @@ package kves {
     }
   }
 
-  abstract class WithKeyCompanion[K: Order, V] {
+  /**
+    * Companion object base class for "value types".
+    * (Value types in the DDD sense, not the scala sense.)
+    */
+  abstract class WithRefinedKey[K: Order, P, V] {
 
     /**
-      * n.b. `V` is the [[Value]] type used as a phanton type to tag the [[Key]] with.
+      * The type of the underlying record being indexed.
       */
     final type Value = V
 
     /**
-      * **By convention**, we tag keys with the value type of the record table we are indexing.
-      * (This is the phantom type [[[Value]]]).
-      * This is a policy decision, and, as such, is subject to revision.
+      * Phantom type used to tag the key, which has type K as its underlying representation.
+      * This can either be a trivial tag which encodes the independance of a key from the record
+      * that it indexes, or, some other kind of constraint.
+      *
+      * The assumption is that some kind of tagging (e.g. `Refine` or `@@`) is
+      * combining `K` and `P` to create the `Key` type.
       */
-    final type Key = OpaqueKey[K, Value]
+    final type Tag = P
+
+    /**
+      * So `Foo`s are indexed with `Foo.Key`s
+      */
+    final type Key = OpaqueKey[K, Tag]
 
     /** Think spreadsheet or relational table. Keep in mind that [[Value]]s are compound. */
     final type Row = (Key, Value)
@@ -130,9 +144,6 @@ package kves {
 
     /** The full type of the [[Key]] column. */
     final type KeyFieldType = FieldType[key.T, Key]
-
-    /** No constraint on validation. */
-    implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
     // import io.deftrade.money.Money.{ moneyGet, moneyPut }
 
@@ -161,14 +172,21 @@ package kves {
       }
   }
 
-  /** Same but with implicit Eq[V] typeclass instance */
-  abstract class WithKey[K: Order, V] extends WithKeyCompanion[K, V] {
+  /**
+    * **By convention**, this companion tag keys with the value type of the
+    * record table we are indexing.
+    *
+    * This phantom type for the `Refined` Key type is [[[Value]]]).
+    */
+  abstract class WithKey[K: Order, V] extends WithRefinedKey[K, V, V] {
     object Key extends OpaqueKeyCompanion[K, V]
+
+    /** No constraint on validation. */
+    implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
+
+    /** FIXME: use kittens? extend to show and hash? break into separate trait or add to base? */
     implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
 
-    /**
-      */
-    implicit def freshKey(implicit K: Integral[K]): Fresh[Key] = Fresh.zeroBasedIncr[K, V]
   }
 
 }
