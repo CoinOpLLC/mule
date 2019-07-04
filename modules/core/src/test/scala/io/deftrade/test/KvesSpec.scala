@@ -121,6 +121,7 @@ class KvesSpec extends FlatSpec {
     assert(rows === roundTripRows)
   }
 }
+
 class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   import demoUnderTest._

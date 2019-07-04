@@ -19,75 +19,25 @@ import refined.numeric._
 import io.circe.Json
 
 /**
-  * `LegalEntities` model real world actors.
-  * See Also: `model.Role`s.
-  */
-sealed trait LegalEntity extends Serializable {
-  def name: VarChar
-  def dtid: LegalEntity.Dtid
-  def meta: Json
-}
-
-/** `LegalEntity`s recognized by the system. */
-object LegalEntity extends WithKey[Long, LegalEntity] {
-
-  import refined.auto._
-
-  /** Domain Typed Id */
-  type Dtid = String Refined (IsSsn Or IsEin)
-
-  /**
-    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
-    */
-  final case class NaturalPerson(
-      name: VarChar,
-      ssn: Ssn,
-      dob: LocalDate,
-      meta: Json
-  ) extends LegalEntity {
-    def dtid = ssn
-  }
-
-  /**
-    * `Corporation`s are `LegalEntity`s too!
-    */
-  final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
-    def dtid = ein
-  }
-
-  implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
-
-  implicit def showEntity = Show.show[LegalEntity] {
-    _.toString // this can evolve!
-  }
-
-  /**
-    * The default `Fresh` instance placed in scope by `LegalEntity` is zeroBasedIncr.
-    * This is one possible policy decision; there are others. TODO: revisit.
-    */
-  implicit def freshEntityKey: Fresh[Key] = Fresh.zeroBasedIncr
-}
-
-/**
   * There are a finite enumeration of [[Roles]].
   * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]].
   */
 sealed trait Role extends EnumEntry
 
 /**
-  * There is _always_ a distinguished `Role`, the `Principal`.
-  */
-sealed trait Principal extends Role
-
-/**
-  * A type representing all `Role`s _other_ than `Princple`.
-  */
-sealed trait NonPrinciple extends Role
-
-/**
   * Enumerated `Role`s.
   */
 object Role extends Enum[Role] with CatsEnum[Role] {
+
+  /**
+    * There is _always_ a distinguished `Role`, the `Principal`.
+    */
+  sealed trait Principal extends Role
+
+  /**
+    * A type representing all `Role`s _other_ than `Princple`.
+    */
+  sealed trait NonPrinciple extends Role
 
   /**
     * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
@@ -151,7 +101,55 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   lazy val nonPrincipals: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
 }
 
-object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
+/**
+  * `LegalEntities` model real world actors.
+  * See Also: `model.Role`s.
+  */
+sealed trait LegalEntity extends Serializable {
+  def name: VarChar
+  def dtid: LegalEntity.Dtid
+  def meta: Json
+}
+
+/** `LegalEntity`s recognized by the system. */
+object LegalEntity extends WithKey[Long, LegalEntity] {
+
+  import refined.auto._
+
+  /** Domain Typed Id */
+  type Dtid = String Refined (IsSsn Or IsEin)
+
+  /**
+    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
+    */
+  final case class NaturalPerson(
+      name: VarChar,
+      ssn: Ssn,
+      dob: LocalDate,
+      meta: Json
+  ) extends LegalEntity {
+    def dtid = ssn
+  }
+
+  /**
+    * `Corporation`s are `LegalEntity`s too!
+    */
+  final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
+    def dtid = ein
+  }
+
+  implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
+
+  implicit def showEntity = Show.show[LegalEntity] {
+    _.toString // this can evolve!
+  }
+
+  /**
+    * The default `Fresh` instance placed in scope by `LegalEntity` is zeroBasedIncr.
+    * This is one possible policy decision; there are others. TODO: revisit.
+    */
+  implicit def freshEntityKey: Fresh[Key] = Fresh.zeroBasedIncr
+}
 
 /** package level API */
 abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
@@ -164,7 +162,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrincipals: NonPrinciple => NonEmptySet[LegalEntity.Key]
+      nonPrincipals: Role.NonPrinciple => NonEmptySet[LegalEntity.Key]
   ) {
     lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
       NonEmptyMap of (
@@ -189,7 +187,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
     private def unsafe(
         principals: UnitPartition[LegalEntity.Key, Quantity],
-        nonPrincipals: NonPrinciple => NonEmptySet[LegalEntity.Key]
+        nonPrincipals: Role.NonPrinciple => NonEmptySet[LegalEntity.Key]
     ) = new Roster(principals, nonPrincipals) {}
 
     /** Pplits partition equally among `Principal`s - especially useful for singleton principals. */
@@ -213,6 +211,8 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * - that's it (you're welcome.)
     */
   case class Account(roster: Roster, folioKey: Folio.Key)
+
+  /** */
   object Account {
 
     type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
@@ -220,6 +220,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
 
     type Key = Long Refined ValidRange // remember you only get one free (value class) wrapper
+
     object Key {
       implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
       implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
@@ -234,11 +235,6 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
 
-  import Account.Key._ // for implicits
-
-  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
-  type Accounts = Accounts.Table
-
   /**
     * TODO: this scheme seems fit to current purposes,
     * but a ZK validation scheme which didn't expose the `Account.Key`'s would be ideal.
@@ -249,4 +245,13 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type FolioAuth             = (Folio.Key, AccountAuth)
   type FolioAuths            = (FolioAuth, FolioAuth)
   type AuthorizedTransaction = (Transaction, FolioAuths)
+
+  /** FIXME this needs to move to test / sample client */
+  object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
+
+  import Account.Key._ // for implicits
+
+  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
+  type Accounts = Accounts.Table
+
 }
