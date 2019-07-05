@@ -74,10 +74,10 @@ package kves {
   }
 
   /** Key type companion base class. */
-  abstract class KeyCompanion[K: Order, P, V] {}
+  abstract class RefinedKeyCompanion[K: Order, P, V]
 
   /** Key type companion mez class. */
-  abstract class OpaqueKeyCompanion[K: Order, V] {
+  abstract class OpaqueKeyCompanion[K: Order, V] extends RefinedKeyCompanion[K, V, V] {
 
     def apply(k: K) = OpaqueKey[K, V](k)
 
@@ -114,7 +114,7 @@ package kves {
     * Companion object base class for "value types".
     * (Value types in the DDD sense, not the scala sense.)
     */
-  abstract class WithRefinedKey[K: Order, P, V] {
+  abstract class WithRefinedKeyBase[K: Order, P, V] {
 
     /**
       * The type of the underlying record being indexed.
@@ -172,13 +172,17 @@ package kves {
       }
   }
 
+  abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V] {
+    object Key extends RefinedKeyCompanion[K, P, V]
+  }
+
   /**
     * **By convention**, this companion tag keys with the value type of the
     * record table we are indexing.
     *
     * This phantom type for the `Refined` Key type is [[[Value]]]).
     */
-  abstract class WithKey[K: Order, V] extends WithRefinedKey[K, V, V] {
+  abstract class WithKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
     object Key extends OpaqueKeyCompanion[K, V]
 
     /** No constraint on validation. */

@@ -154,9 +154,6 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
 /** package level API */
 abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
-  /**  */
-  type LegalEntities = LegalEntities.Table
-
   /**
     * Each [[Account]] is created with a `Roster`, specifying the beneficial owners and their crew.
     */
@@ -200,6 +197,9 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       )
   }
 
+  type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+  implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
+
   /**
     * `Account`s consist of:
     * - a `Roster`: who gets to do what, and who are the beneficial owners.
@@ -210,27 +210,21 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     * - conjuction.
     * - that's it (you're welcome.)
     */
-  case class Account(roster: Roster, folioKey: Folio.Key)
+  sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 
   /** */
-  object Account {
+  object Account extends WithRefinedKey[Long, ValidRange, Account] {
 
-    type ValidRange = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+    def unsafe(roster: Roster, folioKey: Folio.Key) = new Account(roster, folioKey) {}
 
-    implicit def eqValidRangeHackHackHack: Eq[ValidRange] = Eq.fromUniversalEquals[ValidRange]
+    // type Key = Long Refined ValidRange // remember you only get one free (value class) wrapper
+    //
+    // object Key {
+    //   implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
+    //   implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
+    // }
 
-    type Key = Long Refined ValidRange // remember you only get one free (value class) wrapper
-
-    object Key {
-      implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
-      implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, ValidRange]
-    }
-
-    def freshFolioKey: Folio.Key = ??? // FIXME: this is now repo-dependent
-
-    def empty(key: LegalEntity.Key) = simple(key, freshFolioKey)
-
-    def simple(le: LegalEntity.Key, f: Folio.Key) = Account(Roster single le, f)
+    def simple(le: LegalEntity.Key, f: Folio.Key): Account = unsafe(Roster single le, f)
 
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
@@ -246,11 +240,16 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   type FolioAuths            = (FolioAuth, FolioAuth)
   type AuthorizedTransaction = (Transaction, FolioAuths)
 
-  /** FIXME this needs to move to test / sample client */
+  /**
+  FIXME this needs to move to test / sample client
+    */
+  type LegalEntities = LegalEntities.Table
+
   object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
 
   import Account.Key._ // for implicits
 
+  implicit val freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
   object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
   type Accounts = Accounts.Table
 
