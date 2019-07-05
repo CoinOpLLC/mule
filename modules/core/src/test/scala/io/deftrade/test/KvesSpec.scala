@@ -3,7 +3,7 @@ package test
 
 import time._
 import money._
-import kves._
+import keyval._
 
 import enumeratum._
 
@@ -134,7 +134,7 @@ class KvesPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
 
 object csvUnderTest {
 
-  import kves._
+  import keyval._
   import time._
   import money._
   import Currency.USD
@@ -230,4 +230,17 @@ object Jt8Gen {
   def durationGen: Gen[Duration]                           = ???
   def finiteDurationGen(range: Duration): Gen[Duration]    = ???
   def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
+}
+
+object IsinScratch {
+  val isins = List(
+    "US0378331005",
+    "US0373831005",
+    "U50378331005",
+    "US03378331005",
+    "AU0000XVGZA3",
+    "AU0000VXGZA3",
+    "FR0000988040"
+  )
+
 }

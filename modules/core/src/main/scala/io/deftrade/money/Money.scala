@@ -71,7 +71,7 @@ object Money {
   implicit def moneyShow[N: Financial, C: Currency]: Show[Money[N, C]] =
     Show show (m => format(m))
 
-  /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
+  /** Money is a commutative group under addition */
   implicit def moneyCommutativeGroup[N: Financial, C]: CommutativeGroup[Money[N, C]] =
     Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(_ |> fiat[N, C])(_.amount)
 

@@ -40,7 +40,7 @@ import io.chrisdavenport.cormorant._
   *
   * *It's a scheme because calling it a "schema" is too grand.
   */
-package object kves {
+package object keyval {
 
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
@@ -65,7 +65,7 @@ package object kves {
 
 }
 
-package kves {
+package keyval {
 
   object OpaqueKey {
 

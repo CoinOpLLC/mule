@@ -3,7 +3,7 @@ package repos
 
 import io.deftrade.time._
 
-import io.deftrade.kves._
+import io.deftrade.keyval._
 
 import cats._
 import cats.implicits._

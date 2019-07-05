@@ -17,7 +17,7 @@
 package io.deftrade
 package model
 
-import kves._
+import keyval._
 import time._
 import money._, pricing._
 import repos._

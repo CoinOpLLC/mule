@@ -4,7 +4,7 @@ package model
 import time._
 import money._
 
-import kves._
+import keyval._
 
 import repos._
 
@@ -38,7 +38,7 @@ object Instrument {
   */
 abstract class Ledger[Q: Financial] { self =>
 
-  import io.deftrade.kves.Fresh
+  import io.deftrade.keyval.Fresh
 
   /** n.b. this is where fresh key policy is decided for the ledger */
   implicit def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
