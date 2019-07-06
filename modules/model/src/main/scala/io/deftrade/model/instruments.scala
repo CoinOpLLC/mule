@@ -7,23 +7,43 @@ import io.deftrade.model.refinements.{ Isin, Psin, Usin }
 import cats.{ Order }
 import cats.instances.string._
 
+sealed trait InstrumentIdentifier { def usin: Usin }
+
+object InstrumentIdentifier extends Basics with Exotics with Fx with Ibor with Lending
+
 sealed trait Derivative { self: InstrumentIdentifier =>
   def underlyer: InstrumentIdentifier
 }
 object Derivative
 
-sealed trait InstrumentIdentifier { def usin: Usin }
-
-object InstrumentIdentifier {
+trait Basics {
 
   // A FixedCouponBond or CapitalIndexedBond.
   case class Bond(val usin: Usin) extends InstrumentIdentifier
   // A BondFuture.
+  case class CommonStock(val usin: Usin) extends InstrumentIdentifier
+
+  case class PreferredStock(val usin: Usin) extends InstrumentIdentifier
+
   case class BondFuture(val usin: Usin) extends InstrumentIdentifier
   // A BondFutureOption.
   case class BondFutureOption(val usin: Usin) extends InstrumentIdentifier
-  // A BulletPayment.
-  case class BulletPayment(val usin: Usin) extends InstrumentIdentifier
+  // Exchange Traded Derivative - Future (ETD)
+  case class EtdFuture(val usin: Usin) extends InstrumentIdentifier // FIXME: this conflicts wtih mine...
+  // Exchange Traded Derivative - Option (ETD)
+  case class EtdOption(val usin: Usin) extends InstrumentIdentifier
+  // I mean, right?
+  case class EtdFutureOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+
+  /** FIXME: "Index" anything should reference the index - need a Table of Indexes */
+  case class IndexOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+
+  case class StockOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+
+  implicit lazy val order: Order[InstrumentIdentifier] = Order by (_.usin.value)
+}
+
+trait Exotics {
   // A product only used for calibration.
   case class Calibration(val usin: Usin) extends InstrumentIdentifier
   // CreditAccount Default Swap (CDS)
@@ -35,12 +55,17 @@ object InstrumentIdentifier {
   // A Deliverable Swap Forward
   // https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf
   case class Dsf(val usin: Usin) extends InstrumentIdentifier
-  // Exchange Traded Derivative - Future (ETD)
-  case class EtdFuture(val usin: Usin) extends InstrumentIdentifier // FIXME: this conflicts wtih mine...
-  // Exchange Traded Derivative - Option (ETD)
-  case class EtdOption(val usin: Usin) extends InstrumentIdentifier
   // Forward Rate Agreement
   case class Fra(val usin: Usin) extends InstrumentIdentifier
+  // // A representation based on sensitivities.
+  case class Sensitivities(val usin: Usin) extends InstrumentIdentifier
+  // A Swap.
+  case class Swap(val usin: Usin) extends InstrumentIdentifier
+  // A Swaption.
+  case class Swaption(val usin: Usin) extends InstrumentIdentifier
+}
+
+trait Fx {
   // FX Non-Deliverable Forward
   case class FxNdf(val usin: Usin) extends InstrumentIdentifier
   // A FxSingle.
@@ -51,33 +76,26 @@ object InstrumentIdentifier {
   case class FxSwap(val usin: Usin) extends InstrumentIdentifier
   // A FxVanillaOption.
   case class FxVanillaOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+}
+
+trait Ibor {
   // A IborCapFloor.
   case class IborCapFloor(val usin: Usin) extends InstrumentIdentifier
   // A IborFuture.
   case class IborFuture(val usin: Usin) extends InstrumentIdentifier
   // A IborFutureOption.
   case class IborFutureOption(val usin: Usin) extends InstrumentIdentifier
-  // // A representation based on sensitivities.
-  case class Sensitivities(val usin: Usin) extends InstrumentIdentifier
-  // A Swap.
-  case class Swap(val usin: Usin) extends InstrumentIdentifier
-  // A Swaption.
-  case class Swaption(val usin: Usin) extends InstrumentIdentifier
+}
+
+trait Lending {
+  // A BulletPayment.
+  case class BulletPayment(val usin: Usin) extends InstrumentIdentifier
   // A TermDeposit.
   case class TermDeposit(val usin: Usin) extends InstrumentIdentifier
 
-  case class AmortizingLoan(val usin: Usin)  extends InstrumentIdentifier
+  case class AmortizingLoan(val usin: Usin) extends InstrumentIdentifier
+
   case class ConvertibleLoan(val usin: Usin) extends InstrumentIdentifier
-
-  case class CommonStock(val usin: Usin)    extends InstrumentIdentifier
-  case class PreferredStock(val usin: Usin) extends InstrumentIdentifier
-
-  case class StockIndexFutureOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
-  case class StockIndexOption(val usin: Usin, val underlyer: InstrumentIdentifier)       extends InstrumentIdentifier with Derivative
-  case class StockIndexFuture(val usin: Usin, val underlyer: InstrumentIdentifier)       extends InstrumentIdentifier with Derivative
-  case class StockOption(val usin: Usin, val underlyer: InstrumentIdentifier)            extends InstrumentIdentifier with Derivative
-
-  implicit lazy val order: Order[InstrumentIdentifier] = Order by (_.usin.value)
 }
 
 import io.deftrade.money.Financial
