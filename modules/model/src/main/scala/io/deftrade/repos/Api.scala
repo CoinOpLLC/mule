@@ -13,14 +13,6 @@ import spire.math.interval._
 
 import scala.language.higherKinds
 
-sealed abstract class Fail extends Product with Serializable {
-  def msg: String
-}
-object Fail {
-  final case class Impl(val msg: String) extends Fail
-  def apply(msg: String): Fail = Impl(msg)
-}
-
 /**
   * TODO: There is a single `F[_]` type - `IO` - below.
   * split into an effect type and a container type (IO/Pure vs Stream/Chain)

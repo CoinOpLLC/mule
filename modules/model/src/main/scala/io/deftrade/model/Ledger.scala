@@ -1,10 +1,7 @@
 package io.deftrade
 package model
 
-import time._
-import money._
-
-import keyval._
+import time._, money._, keyval._
 
 import repos._
 
@@ -19,19 +16,6 @@ import io.circe.Json
 
 // import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
-
-/**
-  * `Instrument`s in the house.
-  * TODO:
-  * - use the XBRL definitions for these, a la OpenGamma
-  * - see implementations in `Refine` library
-  */
-final case class Instrument(meta: Json)
-object Instrument {
-  type Key = keys.InstrumentIdentifier
-  val Key                         = keys.InstrumentIdentifier
-  implicit def eq: Eq[Instrument] = Eq by (_.meta)
-}
 
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
@@ -53,7 +37,7 @@ abstract class Ledger[Q: Financial] { self =>
   type Quantity = Q
   val Quantity = Financial[Quantity]
 
-  /** Working repository of `Instrument`s, for the working Trader. */
+  /** */
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
   type Instruments = Instruments.Table
 
@@ -130,6 +114,8 @@ abstract class Ledger[Q: Financial] { self =>
         */
       metaSha: Sha256
   )
+
+  /** */
   object Transaction {
 
     type Meta = io.circe.Json // f'rinstance

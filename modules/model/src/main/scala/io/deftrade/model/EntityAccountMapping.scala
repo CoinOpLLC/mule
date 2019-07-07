@@ -107,7 +107,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   */
 sealed trait LegalEntity extends Serializable {
   def name: VarChar
-  def dtid: LegalEntity.Dtid
+  def id: LegalEntity.Id
   def meta: Json
 }
 
@@ -117,7 +117,7 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
   import refined.auto._
 
   /** Domain Typed Id */
-  type Dtid = String Refined (IsSsn Or IsEin)
+  type Id = String Refined (IsSsn Or IsEin)
 
   /**
     *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
@@ -128,14 +128,14 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
       dob: LocalDate,
       meta: Json
   ) extends LegalEntity {
-    def dtid = ssn
+    def id = ssn
   }
 
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
   final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
-    def dtid = ein
+    def id = ein
   }
 
   implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]

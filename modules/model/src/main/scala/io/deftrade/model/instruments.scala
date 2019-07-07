@@ -2,10 +2,26 @@ package io.deftrade
 package model
 package keys
 
-import io.deftrade.model.refinements.{ Isin, Psin, Usin }
+import keyval._, model.refinements.{ Isin, Psin, Usin }
 
-import cats.{ Order }
+import cats.{ Eq, Hash, Order, Show }
 import cats.instances.string._
+
+import io.circe.Json
+
+/**
+  * `Instrument`s in the house.
+  * TODO:
+  * - use the XBRL definitions for these, a la OpenGamma
+  * - see implementations in `Refine` library
+  */
+final case class Instrument(displayName: String, meta: Json)
+
+object Instrument {
+  type Key = keys.InstrumentIdentifier
+  val Key                         = keys.InstrumentIdentifier
+  implicit def eq: Eq[Instrument] = Eq by (_.meta)
+}
 
 sealed trait InstrumentIdentifier { def usin: Usin }
 
@@ -16,19 +32,25 @@ sealed trait Derivative { self: InstrumentIdentifier =>
 }
 object Derivative
 
-trait Basics {
+trait CapitalStack {
+
+  import refinements.Ein
+
+  final case class CommonStock(usin: Usin, ein: Ein) extends InstrumentIdentifier
+
+  final case class PreferredStock(val usin: Usin, ein: Ein) extends InstrumentIdentifier
 
   // A FixedCouponBond or CapitalIndexedBond.
-  case class Bond(val usin: Usin) extends InstrumentIdentifier
-  // A BondFuture.
-  case class CommonStock(val usin: Usin) extends InstrumentIdentifier
+  // Question: What is the EIN of the United States Treasury?
+  // We will need to use one to represent that Entity. :|
+  final case class Bond(val usin: Usin, ein: Ein) extends InstrumentIdentifier
+}
 
-  case class PreferredStock(val usin: Usin) extends InstrumentIdentifier
+trait Basics {
 
-  case class BondFuture(val usin: Usin) extends InstrumentIdentifier
-  // A BondFutureOption.
-  case class BondFutureOption(val usin: Usin) extends InstrumentIdentifier
-  // Exchange Traded Derivative - Future (ETD)
+  case class Index(usin: Usin) extends InstrumentIdentifier
+  case class TreasurySecurity(isin: Isin)
+
   case class EtdFuture(val usin: Usin) extends InstrumentIdentifier // FIXME: this conflicts wtih mine...
   // Exchange Traded Derivative - Option (ETD)
   case class EtdOption(val usin: Usin) extends InstrumentIdentifier
@@ -39,6 +61,11 @@ trait Basics {
   case class IndexOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
 
   case class StockOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+
+  case class BondFuture(val usin: Usin) extends InstrumentIdentifier
+  // A BondFutureOption.
+  case class BondFutureOption(val usin: Usin) extends InstrumentIdentifier
+  // Exchange Traded Derivative - Future (ETD)
 
   implicit lazy val order: Order[InstrumentIdentifier] = Order by (_.usin.value)
 }
@@ -95,7 +122,7 @@ trait Lending {
 
   case class AmortizingLoan(val usin: Usin) extends InstrumentIdentifier
 
-  case class ConvertibleLoan(val usin: Usin) extends InstrumentIdentifier
+  case class ConvertibleNote(val usin: Usin) extends InstrumentIdentifier
 }
 
 import io.deftrade.money.Financial

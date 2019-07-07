@@ -20,8 +20,9 @@ import io.chrisdavenport.cormorant._
 // import io.chrisdavenport.cormorant.refined._
 
 /**
-  * kvse: Key Value Entity Scheme*:
+  * Defines types and implicit methods for a given domain value type (typically a case class).
   *
+  * - ids:
   * - keys: opaque identifiers with `Order`, `Hash` and `Show` typeclass instances
   * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
   * - entities: `Map`s of Key -> Value entries: repos, logs...
@@ -73,16 +74,13 @@ package keyval {
 
   }
 
-  /** Key type companion base class. */
-  abstract class RefinedKeyCompanion[K: Order, P, V]
-
   /** Key type companion mez class. */
-  abstract class OpaqueKeyCompanion[K: Order, V] extends RefinedKeyCompanion[K, V, V] {
+  abstract class KeyCompanion[K: Order, P] {
 
-    def apply(k: K) = OpaqueKey[K, V](k)
+    def apply(k: K) = OpaqueKey[K, P](k)
 
     /** Where the key type is integral, we will reserve the min value. */
-    def reserved(implicit K: Min[K]) = OpaqueKey[K, V](K.min)
+    def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
   }
 
   /**
@@ -131,6 +129,14 @@ package keyval {
       */
     final type Tag = P
 
+    /** An permanent identifier (e.g. auto-increment in a db col)*/
+    final type Id = OpaqueKey[Long, Value]
+
+    /** */
+    object Id {
+      implicit lazy val freshId: Fresh[Id] = Fresh.zeroBasedIncr
+    }
+
     /**
       * So `Foo`s are indexed with `Foo.Key`s
       */
@@ -173,7 +179,9 @@ package keyval {
   }
 
   abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V] {
-    object Key extends RefinedKeyCompanion[K, P, V]
+
+    /** */
+    object Key extends KeyCompanion[K, P]
   }
 
   /**
@@ -183,7 +191,9 @@ package keyval {
     * This phantom type for the `Refined` Key type is [[[Value]]]).
     */
   abstract class WithKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
-    object Key extends OpaqueKeyCompanion[K, V]
+
+    /** Uses Value type as (phantom) predicate type */
+    object Key extends KeyCompanion[K, V]
 
     /** No constraint on validation. */
     implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
