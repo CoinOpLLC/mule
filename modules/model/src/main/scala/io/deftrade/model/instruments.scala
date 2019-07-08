@@ -2,6 +2,9 @@ package io.deftrade
 package model
 package keys
 
+
+import money.Financial
+import time.ZonedDateTime
 import keyval._, model.refinements.{ Isin, Psin, Usin }
 
 import cats.{ Eq, Hash, Order, Show }
@@ -15,21 +18,16 @@ import io.circe.Json
   * - use the XBRL definitions for these, a la OpenGamma
   * - see implementations in `Refine` library
   */
-final case class Instrument(displayName: String, meta: Json)
+sealed abstract class Instrument(final val displayName: String, final val meta: Json)
 
-object Instrument {
-  type Key = keys.InstrumentIdentifier
-  val Key                         = keys.InstrumentIdentifier
-  implicit def eq: Eq[Instrument] = Eq by (_.meta)
+object Instrument extends WithRefinedKey[String, IsUsin, Instrument] { // nopun
+
 }
 
 sealed trait InstrumentIdentifier { def usin: Usin }
 
 object InstrumentIdentifier extends Basics with Exotics with Fx with Ibor with Lending
 
-sealed trait Derivative { self: InstrumentIdentifier =>
-  def underlyer: InstrumentIdentifier
-}
 object Derivative
 
 trait CapitalStack {
@@ -51,13 +49,14 @@ trait Basics {
   case class Index(usin: Usin) extends InstrumentIdentifier
   case class TreasurySecurity(isin: Isin)
 
-  case class EtdFuture(val usin: Usin) extends InstrumentIdentifier // FIXME: this conflicts wtih mine...
+  case class EtdFuture(val usin: Usin) extends InstrumentIdentifier
+
   // Exchange Traded Derivative - Option (ETD)
   case class EtdOption(val usin: Usin) extends InstrumentIdentifier
+
   // I mean, right?
   case class EtdFutureOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
 
-  /** FIXME: "Index" anything should reference the index - need a Table of Indexes */
   case class IndexOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
 
   case class StockOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
@@ -102,7 +101,7 @@ trait Fx {
   // A FxSwap.
   case class FxSwap(val usin: Usin) extends InstrumentIdentifier
   // A FxVanillaOption.
-  case class FxVanillaOption(val usin: Usin, val underlyer: InstrumentIdentifier) extends InstrumentIdentifier with Derivative
+  case class FxVanillaOption(val usin: Usin) extends InstrumentIdentifier
 }
 
 trait Ibor {
@@ -125,20 +124,45 @@ trait Lending {
   case class ConvertibleNote(val usin: Usin) extends InstrumentIdentifier
 }
 
-import io.deftrade.money.Financial
+/** FIXME: "Index" anything should reference the index - need a Table of Indexes */
 
-sealed trait Strike[N] extends Any { def value: N }
+sealed trait Derivative { self: Instrument =>
+  def underlyer: InstrumentIdentifier
+}
+
+sealed trait Index { self: Instrument =>
+  def underlyer: InstrumentIdentifier
+}
+
+
+sealed trait Maturity { self => Instrument
+  def matures: ZonedDateTime
+}
+
+sealed trait Expiry { self => Instrument
+  def expires: time.ZonedDateTime
+}
+
+sealed trait Strike[N] { self => Instrument
+  def strike: N
+}
+
+
 object Strike {
 
-  final case class SimpleStrike[N] private (val value: N) extends AnyVal with Strike[N]
+  sealed abstract case class SimpleStrike[N] private (
+    val strike: N
+  ) extends AnyVal with Strike[N]
   object SimpleStrike {
-    def apply[N: Financial](value: N): SimpleStrike[N] = new SimpleStrike(value)
+    def apply[N: Financial](strike: N): SimpleStrike[N] = new SimpleStrike(value){}
   }
 
-  final case class LogMoneynessStrike[N] private (val value: N) extends AnyVal with Strike[N]
+  sealed abstract case class LogMoneynessStrike[N] private (
+    val Strike: N
+  ) extends AnyVal with Strike[N]
   object LogMoneynessStrike {
-    def apply[N: Financial](value: N): LogMoneynessStrike[N] = new LogMoneynessStrike(value)
+    def apply[N: Financial](strike: N): LogMoneynessStrike[N] = new LogMoneynessStrike(strike)
     def apply[N: Financial](strike: N, forward: N): LogMoneynessStrike[N] =
-      ??? // apply(ln(strike / forward))
+      ??? // apply(ln(strike / forward)) TODO abstract ln over Financial[N] ?!
   }
 }

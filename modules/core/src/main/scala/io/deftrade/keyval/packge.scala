@@ -55,14 +55,17 @@ package object keyval {
     Show show (key => s"key=${key.value.show}")
 
   /**
-    * Key column type literal witness.
+    * The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
     *
-    * The [[Key]] column is by convention assigned a key column label: `'key: Symbol`.
-    *
-    * The `key` member is a `shapeless.Aux[Symbol @@ String(key)]` instance,
-    * useful for type member `T`, which is the (singleton) type of the key column label.
+    * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
+    * useful for type member `T`, which is the (singleton) type of the id column label.
     */
-  final val key = 'key.witness
+  private[keyval] final val id = Symbol("id").witness
+
+  /**
+    * [[Key]] column type literal witness - same purpose as [[id]].
+    */
+  private[keyval] final val key = Symbol("key").witness
 
 }
 
@@ -84,18 +87,17 @@ package keyval {
   }
 
   /**
-    * Make a fresh *globally unique* key, suitable to be persisted.
+    * Intance which defines how to create a fresh *globally unique* key, suitable to be persisted.
+    *
     * TODO: consider threading F[_] thru Fresh.
     */
   final case class Fresh[K](init: K, next: K => K)
 
-  /**
-    * FIXME use lifted functions from K to Refined[K, Value]
-    */
   object Fresh {
 
     def apply[K: Fresh] = implicitly[Fresh[K]]
 
+    /** FIXME use lifted functions from K to Refined[K, Value] */
     def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
 
       val K = Integral[K]
@@ -112,40 +114,49 @@ package keyval {
     * Companion object base class for "value types".
     * (Value types in the DDD sense, not the scala sense.)
     */
-  abstract class WithRefinedKeyBase[K: Order, P, V] {
+  abstract class WithKeyBase[K: Order, V] {
+
+    /**
+      * So `Foo`s are indexed with `Foo.Key`s
+      */
+    type Key
 
     /**
       * The type of the underlying record being indexed.
       */
     final type Value = V
 
-    /**
-      * Phantom type used to tag the key, which has type K as its underlying representation.
-      * This can either be a trivial tag which encodes the independance of a key from the record
-      * that it indexes, or, some other kind of constraint.
-      *
-      * The assumption is that some kind of tagging (e.g. `Refine` or `@@`) is
-      * combining `K` and `P` to create the `Key` type.
-      */
-    final type Tag = P
-
     /** An permanent identifier (e.g. auto-increment in a db col)*/
     final type Id = OpaqueKey[Long, Value]
 
-    /** */
+    /**
+      * Standard auto-increment behavior on Long permanent id numbers.
+      * Resisting the tempation to parameterize this for now.
+      */
     object Id {
       implicit lazy val freshId: Fresh[Id] = Fresh.zeroBasedIncr
     }
 
-    /**
-      * So `Foo`s are indexed with `Foo.Key`s
-      */
-    final type Key = OpaqueKey[K, Tag]
-
     /** Think spreadsheet or relational table. Keep in mind that [[Value]]s are compound. */
     final type Row = (Key, Value)
+    object Row {
+      final type T = Row
+    }
 
-    /** A basic in-memory table structure. TODO: revisit this. */
+    final type PermaRow = (Id, Row)
+    object PermaRow {
+      final type T = PermaRow
+    }
+
+    final type PitRow = (time.Instant, PermaRow)
+    object PitRow {
+      final type T = PitRow
+    }
+
+    /**
+      * Basic in-memory table structures.
+      * (Be kind, naming is hard.)
+      */
     final type Table = Map[Key, Value]
 
     /** The full type of the [[Key]] column. */
@@ -178,7 +189,30 @@ package keyval {
       }
   }
 
-  abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V] {
+  abstract class WithOpaqueKeyBase[K: Order, P, V] extends WithKeyBase[K, V] {
+
+    /**
+      * Phantom type used to tag the key, which has type K as its underlying representation.
+      * This can either be a trivial tag which encodes the independance of a key from the record
+      * that it indexes, or, some other kind of constraint.
+      *
+      * The assumption is that some kind of tagging (e.g. `Refine` or `@@`) is
+      * combining `K` and `P` to create the `Key` type.
+      */
+    final type Tag = P
+
+    /**
+      * Keys type is auto generated and uniform
+      */
+    final type Key = OpaqueKey[K, Tag]
+
+  }
+
+  abstract class WithAdtKeyBase[K: Order, V] {
+    sealed abstract class Key(val k: K)
+  }
+
+  abstract class WithOpaqueKey[K: Order, P, V] extends WithOpaqueKeyBase[K, P, V] {
 
     /** */
     object Key extends KeyCompanion[K, P]
@@ -190,7 +224,7 @@ package keyval {
     *
     * This phantom type for the `Refined` Key type is [[[Value]]]).
     */
-  abstract class WithKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
+  abstract class WithKey[K: Order, V] extends WithOpaqueKeyBase[K, V, V] {
 
     /** Uses Value type as (phantom) predicate type */
     object Key extends KeyCompanion[K, V]
