@@ -54,7 +54,7 @@ object minviablethingie {
 
   final case class Foo(d: Double, s: String Refined NonEmpty, b: Boolean)
 
-  object Foo extends WithKey[Long, Foo] {
+  object Foo extends WithOpaqueKey[Long, Foo] {
     def mk(s: String Refined NonEmpty): Foo =
       Foo(
         s = s,
@@ -64,7 +64,7 @@ object minviablethingie {
   }
 
   final case class Bar(fk: Foo.Key)
-  object Bar extends WithKey[Long, Bar]
+  object Bar extends WithOpaqueKey[Long, Bar]
 
 }
 
@@ -78,7 +78,7 @@ object xaction {
 
   sealed abstract case class Entity private (ssn: Ssn, name: NonEmptyString)
 
-  object Entity extends WithKey[Long, Entity] {
+  object Entity extends WithOpaqueKey[Long, Entity] {
     def apply(ssn: Ssn, name: NonEmptyString): Entity = new Entity(ssn, name) {}
   }
 
@@ -90,7 +90,7 @@ object xaction {
       memo: String
   )
 
-  object Xaction extends WithKey[Long, Xaction[BigDecimal, Currency.USD]]
+  object Xaction extends WithOpaqueKey[Long, Xaction[BigDecimal, Currency.USD]]
 }
 
 class KvesSpec extends FlatSpec {
@@ -142,7 +142,7 @@ object csvUnderTest {
   import java.util.UUID
 
   case class Bar(i: Int, s: String)
-  object Bar extends WithKey[Long, Bar] {
+  object Bar extends WithOpaqueKey[Long, Bar] {
     implicit lazy val freshKey: Fresh[Key] = Fresh.zeroBasedIncr
   }
 
@@ -165,7 +165,7 @@ object csvUnderTest {
       amount: Money[Double, USD],
   )
 
-  object Foo extends WithKey[Long, Foo] {
+  object Foo extends WithOpaqueKey[Long, Foo] {
 
     def unsafeRandom: Foo = {
       val uuid   = UUID.randomUUID

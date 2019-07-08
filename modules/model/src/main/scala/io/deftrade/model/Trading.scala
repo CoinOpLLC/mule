@@ -17,10 +17,8 @@
 package io.deftrade
 package model
 
-import keyval._
-import time._
-import money._, pricing._
-import repos._
+import keys.Instrument
+import keyval._, repos._, time._, money._, pricing._
 import Currency.USD
 
 import cats._
@@ -51,6 +49,17 @@ import scala.language.higherKinds
   * to trade blind with respect to account sums - these calcs are intrinsic to margin (I think)
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
+
+  /**
+  FIXME this needs to move to test / sample client
+    */
+  type LegalEntities = LegalEntity.Table
+  implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
+  object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
+
+  implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
+  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
+  type Accounts = Accounts.Table
 
   /**
     *`OMS` := Order Management System. Ubiquitous acronym in the domain.
@@ -100,7 +109,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   /**
     * Where do Order Management Systems come from? (Here.)
     */
-  object OMS extends WithKey[Long, OMS[cats.Id]] {
+  object OMS extends WithOpaqueKey[Long, OMS[cats.Id]] {
 
     type Allocation = UnitPartition[Account.Key, Quantity]
 
@@ -123,7 +132,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       */
     final case class Order[C: Currency](
         market: Market.Key,
-        auth: AccountAuth,
+        // auth: AccountAuth,
         ts: Instant,
         trade: Trade,
         limit: Option[Money[MA, C]]
@@ -132,7 +141,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     }
 
     /** */
-    object Order extends WithKey[Long, Order[USD]] {
+    object Order extends WithOpaqueKey[Long, Order[USD]] {
 
       /** `Market` orders */
       def buy[C: Currency]: Order[C]  = ???
@@ -169,7 +178,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     /** Executions are sorted first by Order.Key, and then by timestamp – that should do it! ;) */
     implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.orderKey) // FIXME add ts
     // FIXME here's your problem right here cats.Order[Instant] |> discardValue
-    object Execution extends WithKey[Long, Execution] {
+    object Execution extends WithOpaqueKey[Long, Execution] {
       implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
     }
 
@@ -187,7 +196,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     */
   sealed trait Market { def key: LegalEntity.Key }
   implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
-  object Market extends WithKey[Long, Market] {
+  object Market extends WithOpaqueKey[Long, Market] {
 
     def quote[F[_]: Monad, C: Currency](
         m: Market

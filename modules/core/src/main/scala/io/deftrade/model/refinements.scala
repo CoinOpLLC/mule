@@ -22,6 +22,9 @@ import shapeless.syntax.singleton._
   */
 object refinements {
 
+  val Mic = """[A-Z]{3,4}""".witness
+  type Mic = String Refined MatchesRegex[Mic.T] // market venue
+
   /**
     * RDB friendly `String`s that are born usable as is.
     * Defaults to Postgres, which is the shorter limit (126)

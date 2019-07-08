@@ -11,7 +11,7 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
 import refined.W
-import refined.api.Refined
+// import refined.api.Refined
 import refined.boolean.Or
 import refined.numeric._
 // import refined.{ cats => refinedCats, _ }
@@ -37,7 +37,8 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   /**
     * A type representing all `Role`s _other_ than `Princple`.
     */
-  sealed trait NonPrinciple extends Role
+  sealed trait NonPrincipal extends Role
+  object NonPrincipal // TODO extractor
 
   /**
     * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
@@ -60,7 +61,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     *
     * By convention a `Princple` is their own `Agent` unless otherwise specified.
     */
-  case object Agent extends NonPrinciple
+  case object Agent extends NonPrincipal
 
   /**
     * The primary delegate selected by the `Agent`.
@@ -76,7 +77,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     *
     * An `Agent` is their own `Manager` unless otherwise specified.
     */
-  case object Manager extends NonPrinciple
+  case object Manager extends NonPrincipal
 
   /**
     * `Auditor`s are first class entities, each with a package of rights and responsibilities
@@ -93,12 +94,13 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
     * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
     */
-  case object Auditor extends NonPrinciple
+  case object Auditor extends NonPrincipal
 
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values: IndexedSeq[Role] = findValues
 
-  lazy val nonPrincipals: IndexedSeq[NonPrinciple] = values collect { case np: NonPrinciple => np }
+  /** FIXME use NonPrincipal::extractor */
+  lazy val nonPrincipals: IndexedSeq[NonPrincipal] = values collect { case np: NonPrincipal => np }
 }
 
 /**
@@ -107,17 +109,14 @@ object Role extends Enum[Role] with CatsEnum[Role] {
   */
 sealed trait LegalEntity extends Serializable {
   def name: VarChar
-  def id: LegalEntity.Id
+  def key: LegalEntity.Key
   def meta: Json
 }
 
 /** `LegalEntity`s recognized by the system. */
-object LegalEntity extends WithKey[Long, LegalEntity] {
+object LegalEntity extends WithRefinedKey[String, IsSsn Or IsEin, LegalEntity] {
 
   import refined.auto._
-
-  /** Domain Typed Id */
-  type Id = String Refined (IsSsn Or IsEin)
 
   /**
     *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
@@ -128,14 +127,14 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
       dob: LocalDate,
       meta: Json
   ) extends LegalEntity {
-    def id = ssn
+    def key = ssn
   }
 
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
   final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
-    def id = ein
+    def key = ein
   }
 
   implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
@@ -144,11 +143,6 @@ object LegalEntity extends WithKey[Long, LegalEntity] {
     _.toString // this can evolve!
   }
 
-  /**
-    * The default `Fresh` instance placed in scope by `LegalEntity` is zeroBasedIncr.
-    * This is one possible policy decision; there are others. TODO: revisit.
-    */
-  implicit def freshEntityKey: Fresh[Key] = Fresh.zeroBasedIncr
 }
 
 /** package level API */
@@ -159,7 +153,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrincipals: Role.NonPrinciple => NonEmptySet[LegalEntity.Key]
+      nonPrincipals: Role.NonPrincipal => NonEmptySet[LegalEntity.Key]
   ) {
     lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
       NonEmptyMap of (
@@ -184,7 +178,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
     private def unsafe(
         principals: UnitPartition[LegalEntity.Key, Quantity],
-        nonPrincipals: Role.NonPrinciple => NonEmptySet[LegalEntity.Key]
+        nonPrincipals: Role.NonPrincipal => NonEmptySet[LegalEntity.Key]
     ) = new Roster(principals, nonPrincipals) {}
 
     /** Pplits partition equally among `Principal`s - especially useful for singleton principals. */
@@ -228,29 +222,4 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
-
-  /**
-    * TODO: this scheme seems fit to current purposes,
-    * but a ZK validation scheme which didn't expose the `Account.Key`'s would be ideal.
-    *
-    * Another approoach might be to merkelize the `Roster` to expose only the relevant bits.
-    */
-  type AccountAuth           = (Account.Key, Signature)
-  type FolioAuth             = (Folio.Key, AccountAuth)
-  type FolioAuths            = (FolioAuth, FolioAuth)
-  type AuthorizedTransaction = (Transaction, FolioAuths)
-
-  /**
-  FIXME this needs to move to test / sample client
-    */
-  type LegalEntities = LegalEntities.Table
-
-  object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
-
-  import Account.Key._ // for implicits
-
-  implicit val freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
-  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
-  type Accounts = Accounts.Table
-
 }

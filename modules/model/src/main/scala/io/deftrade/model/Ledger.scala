@@ -1,6 +1,8 @@
 package io.deftrade
 package model
 
+import keys.Instrument
+
 import time._, money._, keyval._
 
 import repos._
@@ -27,19 +29,13 @@ abstract class Ledger[Q: Financial] { self =>
   /** n.b. this is where fresh key policy is decided for the ledger */
   implicit def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
 
-  /** independent of type params - FIXME placeholder */
-  type Signature = String
-
-  /** independent of type params - FIXME placeholder */
-  type Sha256 = Array[Byte]
-
   /** Domain specific tools for dealing with `Quantity`s */
   type Quantity = Q
   val Quantity = Financial[Quantity]
 
   /** */
   object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
-  type Instruments = Instruments.Table
+  type Instruments = Instrument.Table
 
   /** */
   type CashInstruments[C] = NonEmptySet[(Instrument.Key, Folio.Key)] // phantom type `C`
@@ -74,7 +70,7 @@ abstract class Ledger[Q: Financial] { self =>
     * Can also be thought of as a `Trade` at rest.
     */
   type Folio = Map[Instrument.Key, Quantity]
-  object Folio extends WithKey[Long, Folio] {
+  object Folio extends WithOpaqueKey[Long, Folio] {
     def empty: Folio                = Map.empty
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
   }
@@ -112,7 +108,7 @@ abstract class Ledger[Q: Financial] { self =>
       /**
         * In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is.
         */
-      metaSha: Sha256
+      sha: Array[Byte]
   )
 
   /** */

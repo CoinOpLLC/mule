@@ -78,7 +78,7 @@ package keyval {
   }
 
   /** Key type companion mez class. */
-  abstract class KeyCompanion[K: Order, P] {
+  abstract class OpaqueKeyCompanion[K: Order, P] {
 
     def apply(k: K) = OpaqueKey[K, P](k)
 
@@ -114,7 +114,7 @@ package keyval {
     * Companion object base class for "value types".
     * (Value types in the DDD sense, not the scala sense.)
     */
-  abstract class WithKeyBase[K: Order, V] {
+  private[keyval] abstract class WithKeyBase[V] {
 
     /**
       * So `Foo`s are indexed with `Foo.Key`s
@@ -125,6 +125,9 @@ package keyval {
       * The type of the underlying record being indexed.
       */
     final type Value = V
+
+    /** FIXME: use kittens? extend to show and hash? */
+    implicit lazy val eqP: Eq[Value] = Eq.fromUniversalEquals[Value]
 
     /** An permanent identifier (e.g. auto-increment in a db col)*/
     final type Id = OpaqueKey[Long, Value]
@@ -189,7 +192,7 @@ package keyval {
       }
   }
 
-  abstract class WithOpaqueKeyBase[K: Order, P, V] extends WithKeyBase[K, V] {
+  private[keyval] abstract class WithRefinedKeyBase[K: Order, P, V] extends WithKeyBase[V] {
 
     /**
       * Phantom type used to tag the key, which has type K as its underlying representation.
@@ -208,14 +211,17 @@ package keyval {
 
   }
 
-  abstract class WithAdtKeyBase[K: Order, V] {
-    sealed abstract class Key(val k: K)
+  abstract class WithAdtKey[K: Order, V] extends WithKeyBase[V] {
+    final case class Key(val k: K)
+    object Key {
+      implicit def orderKey: Order[Key] = Order by (_.k)
+    }
   }
 
-  abstract class WithOpaqueKey[K: Order, P, V] extends WithOpaqueKeyBase[K, P, V] {
+  abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V] {
 
     /** */
-    object Key extends KeyCompanion[K, P]
+    object Key extends OpaqueKeyCompanion[K, P]
   }
 
   /**
@@ -224,16 +230,13 @@ package keyval {
     *
     * This phantom type for the `Refined` Key type is [[[Value]]]).
     */
-  abstract class WithKey[K: Order, V] extends WithOpaqueKeyBase[K, V, V] {
+  abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
 
     /** Uses Value type as (phantom) predicate type */
-    object Key extends KeyCompanion[K, V]
+    object Key extends OpaqueKeyCompanion[K, V]
 
     /** No constraint on validation. */
     implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
-
-    /** FIXME: use kittens? extend to show and hash? break into separate trait or add to base? */
-    implicit lazy val eqP: Eq[V] = Eq.fromUniversalEquals[V]
 
   }
 

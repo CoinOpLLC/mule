@@ -9,7 +9,7 @@ import enumeratum._
 import BigDecimal.RoundingMode._
 
 /**  */
-sealed trait CurrencyLike extends EnumEntry { self =>
+sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
 
   /** instance phantom type representing currency */
   type Type
@@ -50,7 +50,7 @@ private[money] object CurrencyLike {
 /**
   * Per-real-world-instance of ISO 4217 currencies.
   */
-sealed trait Currency[C] extends CurrencyLike with Product with Serializable { self =>
+sealed trait Currency[C] extends CurrencyLike { self =>
 
   final type Type = C
 
