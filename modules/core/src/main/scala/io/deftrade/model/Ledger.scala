@@ -33,27 +33,6 @@ abstract class Ledger[Q: Financial] { self =>
   type Quantity = Q
   val Quantity = Financial[Quantity]
 
-  /** */
-  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
-  type Instruments = Instrument.Table
-
-  /** */
-  type CashInstruments[C] = NonEmptySet[(Instrument.Key, Folio.Key)] // phantom type `C`
-  object CashInstruments
-
-  /**
-    * `CashInstruments`:
-    * - is a configuration parameter only.
-    * - is not as a repository, or store.
-    * - shall nevery have F[_] threaded through it.
-    *
-    * All `Currency` instances in scope are required to have a `CashInstruments` instance.
-    *
-    * TODO: capture the fact that the sets of instruments are disjoint.
-    */
-  implicit def cashInstruments[C: Currency]: CashInstruments[C] = cashInstrumentsMap(Currency[C])
-
-  private lazy val cashInstrumentsMap: Map[Currency[_], CashInstruments[_]] = Map.empty // cfg!
   /**
     * How much of a given `Instrument` is held.
     * Can also be thought of as a `Leg` at rest.
@@ -75,14 +54,27 @@ abstract class Ledger[Q: Financial] { self =>
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
   }
 
-  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
-    def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
-  }
-  type Folios = Folios.Table
-
   /** A `Trade` := `Folio` in motion. */
   type Trade = Folio
   lazy val Trade = Folio
+
+  /**
+    * Models ready cash per currency.
+    * n.b. the `C` type parameter is purely phantom
+    */
+  sealed abstract case class Wallet[C] private (val folio: Folio)
+
+  /**
+    * Wallet folios are guarranteed non-empty. (TODO: is this worth a new type?)
+    * Also, when creating `Wallet`s, the `C` type parameter is checked for `Currency` status.
+    */
+  object Wallet {
+
+    private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
+
+    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
+      new Wallet[C](Folio(p +: ps: _*)) {}
+  }
 
   /**
     * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
@@ -91,24 +83,26 @@ abstract class Ledger[Q: Financial] { self =>
       /**
         * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`
         * - the transaction is provisional until dated, returned as a receipt
-        * The exact semantics can vary depending on the higher level context
+        *
+        * The exact semantics will depend on the higher level context
         * - (e.g. booking a trade vs receiving notice of settlement).
+        *
+        * n.b.: there is no currency field; cash payments are reified in currency-as-instrument.
         */
       recordedAt: Option[Instant],
       /**
-        * *Exactly* two parties to a `Transaction`.
-        * Convention: (from, to)
-        * - Use `AllOrNone` to compose multiparty `Transaction`s
         */
-      parties: (Folio.Key, Folio.Key),
+      debitFrom: Folio.Key,
       /**
-        * Note: cash payments are reified in currency-as-instrument.
         */
-      trade: Folio,
+      creditTo: Folio.Key,
       /**
-        * In the `Ledger`, store the _cryptographic hash_ of whatever metadata there is.
         */
-      sha: Array[Byte]
+      trade: Trade,
+      /**
+        * Store the _cryptographic hash_ of whatever metadata there is.
+        */
+      metaSha: Array[Byte]
   )
 
   /** */
@@ -130,14 +124,5 @@ abstract class Ledger[Q: Financial] { self =>
 
   /** Support for multiple contingent deal legs */
   final case class AllOrNone(xs: List[Transaction])
-
-  // FIXME this is a hack placeholder
-  type Transactions[F[_]] = Foldable[F]
-
-  /**
-    */
-  object Transactions { // FIME this becomes a stream like repo (???)
-
-  }
 
 }

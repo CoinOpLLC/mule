@@ -22,7 +22,7 @@ import keyval._, repos._, time._, money._, pricing._
 import Currency.USD
 
 import cats._
-import cats.data.{ EitherT, Kleisli, NonEmptySet }
+import cats.data.{ EitherT, Kleisli, NonEmptyMap, NonEmptySet }
 import cats.implicits._
 
 import eu.timepit.refined
@@ -35,7 +35,7 @@ import scala.language.higherKinds
 
 /**
   * What does "double entry bookkeeping" mean in the context of a shared distributed ledger with
-  * OMS gateways to external markets?
+  * multiple OMS gateways to external markets?
   *
   * It means this:
   * - we keep contra accounts per OMS gateway
@@ -49,6 +49,42 @@ import scala.language.higherKinds
   * to trade blind with respect to account sums - these calcs are intrinsic to margin (I think)
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
+
+  /** */
+  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
+  type Instruments = Instrument.Table
+
+  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
+    def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
+  }
+  type Folios = Folio.Table
+
+  /**
+    * `CashInstruments`:
+    * - is a configuration parameter only.
+    * - is not as a repository, or store.
+    * - shall never have F[_] threaded through it.
+    *
+    * All `Currency` instances in scope are required to have a `CashInstruments` instance.
+    */
+  object CashInstruments {
+
+    def apply[C: Currency]: Wallet[C] = (cash get Currency[C]).fold(???) { x =>
+      Wallet apply [C] Folios(x)
+    }
+
+    private lazy val cash: Map[CurrencyLike, Folio.Key] = Map.empty
+  }
+
+  // FIXME this is a hack placeholder
+  // and a refugee from Ledger.scala
+  type Transactions[F[_]] = Foldable[F]
+
+  /**
+    */
+  object Transactions { // FIME this becomes a stream like repo (???)
+
+  }
 
   /**
   FIXME this needs to move to test / sample client

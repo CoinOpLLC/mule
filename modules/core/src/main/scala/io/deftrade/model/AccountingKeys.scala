@@ -1,5 +1,8 @@
 package io.deftrade
-package model.keys
+package model
+package keys
+
+import money._
 
 import cats.{ Eq, Order }
 import cats.data.NonEmptySet
@@ -178,50 +181,4 @@ object LiabilitySwapKey extends Enum[LiabilitySwapKey] {
 
   // def unapply(lsk: LOQSwapKey): Option[(LOQ, LOQ)] = Some(lsk.from -> lsk.to)
   lazy val values = findValues
-}
-
-sealed trait NettableLike extends EnumEntry with Product with Serializable {
-  type AssetType <: Debit
-  def gross: AssetType
-  def less: AssetType
-}
-
-abstract class Nettable[D <: Asset](
-    val gross: D,
-    val less: D
-) extends NettableLike {
-
-  import io.deftrade.model.{ Balance, MonetaryAmount }
-  import io.deftrade.money._
-
-  final type AssetType = D
-
-  final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MonetaryAmount, CCY] = b match {
-    case Balance(ds, _) => ds(gross) - ds(less)
-  }
-  // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
-}
-object Nettable extends Enum[NettableLike] {
-
-  import Asset._
-
-  case object Depreciable
-      extends Nettable(
-        BuildingsAndOtherDepreciableAssets,
-        LessAccumulatedDepreciation
-      )
-
-  case object Depletable
-      extends Nettable(
-        DepletableAssets,
-        LessAccumulatedDepletion
-      )
-  case object Amortizable
-      extends Nettable(
-        IntangibleAssets,
-        LessAccumulatedAmortization
-      )
-
-  val values = findValues
-
 }

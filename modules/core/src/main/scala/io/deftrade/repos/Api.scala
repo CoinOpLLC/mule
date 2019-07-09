@@ -19,6 +19,10 @@ import scala.language.higherKinds
   *
   * n.b. doobie can return `Streams`
   *
+  * FIXME: The "toy repository model" becomes:
+  * - append-only file of `WithXyxKey.PitRow`s
+  * - in memory `WithXyxKey.Table`
+  *
   */
 trait Api {
 

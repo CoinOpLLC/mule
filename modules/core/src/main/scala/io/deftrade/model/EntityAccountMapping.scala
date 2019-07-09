@@ -197,12 +197,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   /**
     * `Account`s consist of:
     * - a `Roster`: who gets to do what, and who are the beneficial owners.
-    * = a `Folio` (list of instruments and their quantities), OR a list of sub `Account`s.
-    * = (Tree structures only. No loops, no reconvergence at all permitted.)
-    *
-    * How composition of `Roster`s and `Vault::SubAccount`s works:
-    * - conjuction.
-    * - that's it (you're welcome.)
+    * - a `Folio` (list of instruments and their quantities)
     */
   sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 

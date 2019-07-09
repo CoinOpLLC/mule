@@ -51,15 +51,12 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
 
   object PricedTrade {
-    def apply[C: Currency](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+    def apply[C: Currency: Wallet](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
 
     /**
       * Used to convert to the currency as `Instrument` convention.
-      * Consider the set of `Instrument`s which represent bank account balances in dollars.
-      * What is the set of "payable on demand" dollar instruments?
-      * This dictates the normalization.
       */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: CashInstruments[C]): Trade = ???
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
   }
 
   /** type alias */
@@ -231,7 +228,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       val revenues: Revenues[CCY]
   ) extends Balance(expenses, revenues) {
 
-    def partition(implicit ci: CashInstruments[CCY]): (IncomeStatement[CCY], CashFlowStatement[CCY]) =
+    def partition(implicit ci: Wallet[CCY]): (IncomeStatement[CCY], CashFlowStatement[CCY]) =
       ???
   }
 
@@ -316,10 +313,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
-  def trialBalance[F[_]: Foldable: Monad: SemigroupK, CCY: Currency](ts: Transactions[F]): TrialBalance[CCY] =
-    ???
+  def trialBalance[F[_]: Foldable: Monad: SemigroupK, CCY: Currency](
+      ts: F[Transaction]
+  ): TrialBalance[CCY] = ???
 
-  def breakdown[CCY: Currency: CashInstruments](
+  def breakdown[CCY: Currency: Wallet](
       prior: BalanceSheet[CCY],
       delta: BalanceSheet[CCY], // delta and raw come from TrialBalance
       raw: IncomeStatement[CCY] // mixed cash and accrual
@@ -339,4 +337,50 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       Transaction.Meta
   ) => DeltaCashBooks[CCY] = ???
 
+  import enumeratum._
+
+  sealed trait NettableLike extends EnumEntry with Product with Serializable {
+    type AssetType <: Debit
+    def gross: AssetType
+    def less: AssetType
+  }
+
+  abstract class Nettable[D <: Asset](
+      val gross: D,
+      val less: D
+  ) extends NettableLike {
+
+    final type AssetType = D
+
+    final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MA, CCY] = b match {
+      case Balance(ds, _) => ds(gross) - ds(less)
+    }
+    // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
+  }
+
+  /** FIXME this can move outside of Cake */
+  object Nettable extends Enum[NettableLike] {
+
+    import keys.Asset._
+
+    case object Depreciable
+        extends Nettable(
+          BuildingsAndOtherDepreciableAssets,
+          LessAccumulatedDepreciation
+        )
+
+    case object Depletable
+        extends Nettable(
+          DepletableAssets,
+          LessAccumulatedDepletion
+        )
+    case object Amortizable
+        extends Nettable(
+          IntangibleAssets,
+          LessAccumulatedAmortization
+        )
+
+    val values = findValues
+
+  }
 }
