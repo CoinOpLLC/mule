@@ -50,53 +50,6 @@ import scala.language.higherKinds
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
 
-  /** */
-  object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
-  type Instruments = Instrument.Table
-
-  object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
-    def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
-  }
-  type Folios = Folio.Table
-
-  /**
-    * `CashInstruments`:
-    * - is a configuration parameter only.
-    * - is not as a repository, or store.
-    * - shall never have F[_] threaded through it.
-    *
-    * All `Currency` instances in scope are required to have a `CashInstruments` instance.
-    */
-  object CashInstruments {
-
-    def apply[C: Currency]: Wallet[C] = (cash get Currency[C]).fold(???) { x =>
-      Wallet apply [C] Folios(x)
-    }
-
-    private lazy val cash: Map[CurrencyLike, Folio.Key] = Map.empty
-  }
-
-  // FIXME this is a hack placeholder
-  // and a refugee from Ledger.scala
-  type Transactions[F[_]] = Foldable[F]
-
-  /**
-    */
-  object Transactions { // FIME this becomes a stream like repo (???)
-
-  }
-
-  /**
-  FIXME this needs to move to test / sample client
-    */
-  type LegalEntities = LegalEntity.Table
-  implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
-  object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
-
-  implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
-  object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
-  type Accounts = Accounts.Table
-
   /**
     *`OMS` := Order Management System. Ubiquitous acronym in the domain.
     *
@@ -190,6 +143,53 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       implicit def freshOrderKey: Fresh[Key] = Fresh.zeroBasedIncr
 
     }
+
+    /** */
+    object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
+    type Instruments = Instrument.Table
+
+    object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
+      def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
+    }
+    type Folios = Folio.Table
+
+    /**
+      * `CashInstruments`:
+      * - is a configuration parameter only.
+      * - is not as a repository, or store.
+      * - shall never have F[_] threaded through it.
+      *
+      * All `Currency` instances in scope are required to have a `CashInstruments` instance.
+      */
+    object CashInstruments {
+
+      def apply[C: Currency]: Wallet[C] = (cash get Currency[C]).fold(???) { x =>
+        Wallet apply [C] Folios(x)
+      }
+
+      private lazy val cash: Map[CurrencyLike, Folio.Key] = Map.empty
+    }
+
+    // FIXME this is a hack placeholder
+    // and a refugee from Ledger.scala
+    type Transactions[F[_]] = Foldable[F]
+
+    /**
+      */
+    object Transactions { // FIME this becomes a stream like repo (???)
+
+    }
+
+    /**
+  FIXME this needs to move to test / sample client
+      */
+    type LegalEntities = LegalEntity.Table
+    implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
+    object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
+
+    implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
+    object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
+    type Accounts = Accounts.Table
 
     /**
       *

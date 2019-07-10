@@ -23,7 +23,6 @@ import cats.implicits._
   * value class.
   *
   * Therefore we make use of the `RefType` and `Validated` classes to integrate with `Refined`.
-  * FIXME: turns out not. Delete comment?
   */
 final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
 
@@ -90,62 +89,76 @@ object Money {
     s"${C.currencyCode} ${m.amount formatted sfmt}"
   }
 
+  /**
+    * [[Refined]] integration
+    *
+    * TODO why do we need this? The `Validate` mechanism and related inferences
+    * do nothing for us. YAGNI?
+    */
+  implicit lazy val refinedRefType: RefType[Money] =
+    new RefType[Money] {
+
+      private type F[T, P] = Money[T, P]
+
+      def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
+
+      def unwrap[T](tp: F[T, _]): T = tp.amount
+
+      def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
+    }
+
+  /**
+    * Policy for validating: Any `C` with a [[Currency]] implicit instance.
+    *
+    * Design rational(ization?):
+    *
+    * why not the following, which seems more obvious?
+    * {{{
+    * implicit object refinedRefType extends RefType[Money] { ... }
+    * }}}
+    *
+    * because:
+    *
+    * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+    * in object refinedRefType
+    * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
+    * clashes with definition of the member itself;
+    * both have erased type (t: Object)Object
+    *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+    */
+  implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
+    Validate alwaysPassed Currency[P]
+
   /** FIXME move the cormorant stuff somewhere else */
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.implicits._
+
+  private def scan[N: Financial, CCY: Currency](
+      x: String
+  ): Either[Error.DecodeFailure, Money[N, CCY]] = {
+    import spire.syntax.field._
+    val CCY    = Currency[CCY]
+    val one    = Financial[N].fractional.one
+    def sign   = if (x.charAt(5) === '(') -one else one
+    val ccy    = (x take 3) |> CSV.Field.apply
+    val amount = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
+    for {
+      _ <- Get[Currency[CCY]] get ccy
+      n <- Get[N] get amount
+    } yield CCY apply sign * n
+  }
 
   /** cormorant csv Get */
   implicit def moneyGet[N: Financial, CCY: Currency]: Get[Money[N, CCY]] = new Get[Money[N, CCY]] {
 
     val CCY = Currency[CCY]
 
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, CCY]] = {
-      import field.x
-      import spire.syntax.field._
-      val one    = Financial[N].fractional.one
-      def sign   = if (x.charAt(5) === '(') -one else one
-      val ccy    = (x take 3) |> CSV.Field.apply
-      val amount = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
-      for {
-        _ <- Get[Currency[CCY]] get ccy
-        n <- Get[N] get amount
-      } yield CCY apply sign * n
-    }
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, CCY]] = scan(field.x)
+
   }
 
   /** cormorant csv Put */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
     stringPut contramap format[N, C]
 
-  /** `Refined` section HACK  why do we need this? */
-
-  // implicit lazy val refinedRefType: RefType[Money] =
-  //   new RefType[Money] {
-  //
-  //     private type F[T, P] = Money[T, P]
-  //
-  //     def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
-  //
-  //     def unwrap[T](tp: F[T, _]): T = tp.amount
-  //
-  //     def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
-  //   }
-  //
-  // /**
-  //   * Design rational(ization?):
-  //   *
-  //   * why not the following, which seems more obvious?
-  //   * `implicit object refinedRefType extends RefType[Money] {`
-  //   *
-  //   * because:
-  //   *
-  //   * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
-  //   * in object refinedRefType
-  //   * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
-  //   * clashes with definition of the member itself;
-  //   * both have erased type (t: Object)Object
-  //   *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
-  //   */
-  // implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
-  //   Validate alwaysPassed Currency[P]
 }
