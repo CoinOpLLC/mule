@@ -22,7 +22,7 @@ import keyval._, repos._, time._, money._, pricing._
 import Currency.USD
 
 import cats._
-import cats.data.{ EitherT, Kleisli, NonEmptyMap, NonEmptySet }
+import cats.data.{ EitherT, Kleisli, NonEmptySet }
 import cats.implicits._
 
 import eu.timepit.refined
@@ -96,6 +96,50 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   }
 
   /**
+    * Price all the things.
+    * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
+    * - this isn't how data typically comes, especially cheap data.
+    * - smart routers (and internalizers!) introduce another layer of conceptual complexity
+    * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
+    * isn't good enough, don't offer it.
+    */
+  sealed trait Market { def key: LegalEntity.Key }
+  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
+  object Market extends WithOpaqueKey[Long, Market] {
+
+    def quote[F[_]: Monad, C: Currency](
+        m: Market
+    )(
+        id: Instrument.Key
+    ): F[Money[MonetaryAmount, C]] = ???
+    // Currency[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+
+    def quotedIn[C: Currency](m: Market)(id: Instrument.Key): Instrument.Key QuotedIn C = ???
+
+    /**
+      * Single effective counterparty: the `Exchange` itself.
+      * - seller for all buyers and vice versa.)
+      * - activity recorded in a `contra account`
+      */
+    final case class Exchange(key: LegalEntity.Key, contraAk: Account.Key) extends Market
+    object Exchange {}
+
+    /**
+      * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
+      * assumed to be "real" (not a contra account) although it can assume those characteristics
+      * when the `Counterparty` is sourcing `Instruments` from private flows.
+      * - (e.g. exempt Securities for accredited individuals or qualified institutions)
+      */
+    final case class Counterparty(val key: LegalEntity.Key) extends Market
+    object Counterparty {}
+
+    implicit def eqMarket: Eq[Market] = Eq by (_.key) // FIXME: fuck this shit
+
+    implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
+
+  }
+
+  /**
     * Where do Order Management Systems come from? (Here.)
     */
   object OMS extends WithOpaqueKey[Long, OMS[cats.Id]] {
@@ -144,14 +188,37 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
     }
 
+    /**
+      * What actually happened.
+      */
+    final case class Execution(ts: Instant, oms: OMS.Key, orderKey: Order.Key, tx: Transaction)
+
+    object Execution extends WithOpaqueKey[Long, Execution] {
+      implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
+    }
+
+    // extract the below into the fruitcake
+    /*************************************************************** */
     /** */
     object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
     type Instruments = Instrument.Table
 
+    lazy val Markets: Repository[cats.Id, Market.Key, Market] =
+      SimplePointInTimeRepository[cats.Id, Market.Key, Market]()
+    type Markets = Markets.Table
+
+    /**
+      */
+    type LegalEntities = LegalEntity.Table
+    implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
+    object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
+
+    implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
+    object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
+
     object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
       def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
     }
-    type Folios = Folio.Table
 
     /**
       * `CashInstruments`:
@@ -171,7 +238,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     }
 
     // FIXME this is a hack placeholder
-    // and a refugee from Ledger.scala
     type Transactions[F[_]] = Foldable[F]
 
     /**
@@ -179,17 +245,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     object Transactions { // FIME this becomes a stream like repo (???)
 
     }
-
-    /**
-  FIXME this needs to move to test / sample client
-      */
-    type LegalEntities = LegalEntity.Table
-    implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
-    object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
-
-    implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
-    object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
-    type Accounts = Accounts.Table
 
     /**
       *
@@ -206,69 +261,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     type Orders = Orders.Table
     object Orders extends SimplePointInTimeRepository[cats.Id, OMS.Order.Key, OMS.Order[USD]]
 
-    /**
-      * What actually happened.
-      */
-    final case class Execution(ts: Instant, oms: OMS.Key, orderKey: Order.Key, tx: Transaction)
-
-    /** Executions are sorted first by Order.Key, and then by timestamp – that should do it! ;) */
-    implicit def catsOrderExecution: Eq[Execution] = cats.Order by (x => x.orderKey) // FIXME add ts
-    // FIXME here's your problem right here cats.Order[Instant] |> discardValue
-    object Execution extends WithOpaqueKey[Long, Execution] {
-      implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
-    }
-
     type Executions = Executions.Table
     object Executions extends MemAppendableRepository[cats.Id, Execution.Key, Execution]
   }
-
-  /**
-    * Price all the things.
-    * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
-    * - this isn't how data typically comes, especially cheap data.
-    * - smart routers (and internalizers!) introduce another layer of conceptual complexity
-    * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
-    * isn't good enough, don't offer it.
-    */
-  sealed trait Market { def key: LegalEntity.Key }
-  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
-  object Market extends WithOpaqueKey[Long, Market] {
-
-    def quote[F[_]: Monad, C: Currency](
-        m: Market
-    )(
-        id: Instrument.Key
-    ): F[Money[MonetaryAmount, C]] = ???
-    // Currency[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
-
-    def quotedIn[C: Currency](m: Market)(id: Instrument.Key): Instrument.Key QuotedIn C = ???
-
-    /**
-      * Single effective counterparty: the `Exchange` itself.
-      * - seller for all buyers and vice versa.)
-      * - activity recorded in a `contra account`
-      */
-    final case class Exchange(key: LegalEntity.Key, contraAk: Account.Key) extends Market
-    object Exchange {}
-
-    /**
-      * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
-      * assumed to be "real" (not a contra account) although it can assume those characteristics
-      * when the `Counterparty` is sourcing `Instruments` from private flows.
-      * - (e.g. exempt Securities for accredited individuals or qualified institutions)
-      */
-    final case class Counterparty(val key: LegalEntity.Key) extends Market
-    object Counterparty {}
-
-    implicit def eqMarket: Eq[Market] = Eq by (_.key) // FIXME: fuck this shit
-
-    implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
-
-  }
-
-  lazy val Markets: Repository[cats.Id, Market.Key, Market] =
-    SimplePointInTimeRepository[cats.Id, Market.Key, Market]()
-  type Markets = Markets.Table
 
   /** top level methods */
   def quoteLeg[C: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, C] =
@@ -289,6 +284,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   def settled = ???
 
   def error = ???
+
+  type Folios   = Folio.Table
+  type Accounts = Account.Table
 
   /**
     * FIXME Accounts are needed to verify sigs and allocate partitions
