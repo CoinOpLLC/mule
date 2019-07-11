@@ -244,3 +244,6 @@ object IsinScratch {
   )
 
 }
+
+// abstract class Playground[MA: Financial, Q: Financial] extends Fruitcake[MA, Q] { api =>
+// }

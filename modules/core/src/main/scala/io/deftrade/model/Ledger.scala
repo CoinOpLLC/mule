@@ -68,7 +68,7 @@ abstract class Ledger[Q: Financial] { self =>
     * Wallet folios are guarranteed non-empty. (TODO: is this worth a new type?)
     * Also, when creating `Wallet`s, the `C` type parameter is checked for `Currency` status.
     */
-  object Wallet {
+  object Wallet extends WithOpaqueKey[Long, Folio] {
 
     private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
 
