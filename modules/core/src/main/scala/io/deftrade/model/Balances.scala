@@ -4,7 +4,7 @@ package model
 import money._
 import time._
 
-import keys.{ AssetSwapKey, CreditKey, DebitKey, LiabilitySwapKey, SwapKey }
+import capital.{ AssetSwapKey, CreditKey, DebitKey, LiabilitySwapKey, SwapKey }
 
 import cats.{ Foldable, Invariant, Monad, Reducible, SemigroupK }
 import cats.data.NonEmptyList
@@ -68,19 +68,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       mark: Trade => PricedTrade[CCY]
   )
 
-  type AccountType = keys.AccountType
+  type AccountType = capital.AccountType
 
-  type Debit  = keys.Debit
-  type Credit = keys.Credit
+  type Debit  = capital.Debit
+  type Credit = capital.Credit
 
-  type Expense = keys.Expense
-  type Revenue = keys.Revenue
+  type Expense = capital.Expense
+  type Revenue = capital.Revenue
 
-  type Asset     = keys.Asset
-  type Liability = keys.Liability
+  type Asset     = capital.Asset
+  type Liability = capital.Liability
 
-  type Income = keys.Income
-  type Equity = keys.Equity
+  type Income = capital.Income
+  type Equity = capital.Equity
 
   /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
   final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
@@ -91,7 +91,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def empty[AT <: AccountType, CCY]: AccountMap[AT, CCY] = Map.empty[AT, Money[MA, CCY]]
 
     def from[AT <: AccountType, CCY](
-        ks: keys.SwapKey[AT],
+        ks: capital.SwapKey[AT],
         amount: Money[MA, CCY]
     ): AccountMap[AT, CCY] = ???
 
@@ -247,7 +247,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /**
     * - `CashFlowStatement` is a Balance(debit, credit) like the IncomeStatement.
     * - Follow the `Money`. Operations, Investment, Financing
-    * - TODO: cash keys should get their own flavors; for now reuse `Revenue` and `Expense`.
+    * - TODO: cash capital should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
   final case class CashFlowStatement[CCY] private (
       val outflows: Expenses[CCY],
@@ -361,7 +361,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /** FIXME this can move outside of Cake */
   object Nettable extends Enum[NettableLike] {
 
-    import keys.Asset._
+    import capital.Asset._
 
     case object Depreciable
         extends Nettable(

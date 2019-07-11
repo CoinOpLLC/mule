@@ -17,7 +17,7 @@
 package io.deftrade
 package model
 
-import keys.Instrument
+import capital.Instrument
 import keyval._, repos._, time._, money._, pricing._
 import Currency.USD
 
@@ -200,97 +200,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     private def newContraAccount: Account.Key = ???
   }
 
-  /** */
-  object Repos extends WithOpaqueKey[Long, OMS[cats.Id]] {
-
-    /** */
-    type LegalEntities = LegalEntity.Table
-
-    /** */
-    implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
-    /** */
-    object LegalEntities extends SimplePointInTimeRepository[cats.Id, LegalEntity.Key, LegalEntity]
-
-    /**
-      * `CashInstruments`:
-      * - is a configuration parameter only.
-      * - is not as a repository, or store.
-      * - shall never have F[_] threaded through it.
-      *
-      * All `Currency` instances in scope are required to have a `CashInstruments` instance.
-      */
-    object CashInstruments {
-
-      def apply[C: Currency]: Wallet[C] = (cash get Currency[C]).fold(???) { x =>
-        Wallet apply [C] Folios(x)
-      }
-
-      private lazy val cash: Map[CurrencyLike, Folio.Key] = Map.empty
-    }
-
-    /** */
-    type CashInstruments = Wallet.Table
-
-    /** */
-    object Instruments extends MemInsertableRepository[cats.Id, Instrument.Key, Instrument]
-
-    /** */
-    type Instruments = Instrument.Table
-
-    /** */
-    object Folios extends SimplePointInTimeRepository[cats.Id, Folio.Key, Folio] {
-      def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
-    }
-
-    /** */
-    type Folios = Folio.Table
-
-    /** */
-    implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
-    /** */
-    object Accounts extends SimplePointInTimeRepository[cats.Id, Account.Key, Account]
-
-    /** */
-    type Accounts = Account.Table
-
-    /** FIXME: this is just a placeholder - needs to reference [[Transaction]] */
-    type Transactions[F[_]] = Foldable[F]
-
-    /** FIME this becomes a stream like repo (???)      */
-    object Transactions {}
-
-    /** */
-    lazy val Markets: Repository[cats.Id, Market.Key, Market] =
-      SimplePointInTimeRepository[cats.Id, Market.Key, Market]()
-
-    /** */
-    type Markets = Markets.Table
-
-    /**
-      *
-      *  this is something of an abuse of the original PiT concept,
-      * which models slowly evolving entities *with identity (key) which survives updates.
-      *
-      *  `Orders` is exactly the opposite.
-      *
-      *  But the open date range for "current `Table`" models the "open orders" concept perfectly.
-      *
-      *  TODO: is this really worthwhile?
-      *
-      */
-    type Orders = Orders.Table
-
-    /** */
-    object Orders extends SimplePointInTimeRepository[cats.Id, Order.Key, Order[USD]]
-
-    /**  n.b. `Exectutions` are recorded as [[Transactions]] this completing the life cycle */
-    type Executions = Executions.Table
-
-    /** */
-    object Executions extends MemAppendableRepository[cats.Id, Execution.Key, Execution]
-
-  }
-
   /** top level methods */
   def quoteLeg[C: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, C] =
     leg match {
@@ -311,15 +220,13 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
   def error = ???
 
-  type Folios   = Folio.Table
-  type Accounts = Account.Table
-
   /**
-    * FIXME Accounts are needed to verify sigs and allocate partitions
-    * BUT can we break this down into two methods (anonymous, and not)
+    * TODO: Revisit the privacy issues here.
+    * Account keys are are needed e.g to verify sigs and allocate partitions
+    * Can we break this down into two methods: anonymous, and not?
     */
   def recorded[F[_]: Foldable: Monad: SemigroupK](
-      fs: Folios,
-      accounts: Accounts
-  ): Execution => F[Folios] = ???
+      fs: Folio.Table,
+      accounts: Account.Table
+  ): Execution => F[Folio.Table] = ???
 }

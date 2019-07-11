@@ -1,6 +1,6 @@
 package io.deftrade
 package model
-package keys
+package capital
 
 import money.{ CurrencyLike, Financial }
 import time.ZonedDateTime

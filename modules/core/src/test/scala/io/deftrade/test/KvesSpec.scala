@@ -1,9 +1,7 @@
 package io.deftrade
 package test
 
-import time._
-import money._
-import keyval._
+import time._, money._, keyval._, model._, repos._, capital.Instrument, Currency.USD
 
 import enumeratum._
 
@@ -245,5 +243,98 @@ object IsinScratch {
 
 }
 
+/** */
+object Repos extends WithOpaqueKey[Long, OMS[Id]] {
+
+  /** */
+  type LegalEntities = LegalEntity.Table
+
+  /** */
+  implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
+  /** */
+  object LegalEntities extends SimplePointInTimeRepository[_root_.cats.Id, LegalEntity.Key, LegalEntity]
+
+  /**
+    * `CashInstruments`:
+    * - is a configuration parameter only.
+    * - is not as a repository, or store.
+    * - shall never have F[_] threaded through it.
+    *
+    * All `Currency` instances in scope are required to have a `CashInstruments` instance.
+    */
+  object CashInstruments {
+
+    def apply[C: Currency]: Wallet[C] = (cash get Currency[C]).fold(???) { x =>
+      Wallet apply [C] Folios(x)
+    }
+
+    private lazy val cash: Map[CurrencyLike, Folio.Key] = Map.empty
+  }
+
+  /** */
+  type CashInstruments = Wallet.Table
+
+  /** */
+  object Instruments extends MemInsertableRepository[_root_.cats.Id, Instrument.Key, Instrument]
+
+  /** */
+  type Instruments = Instrument.Table
+
+  implicit def eq: Eq[Folio] = ???
+
+  /** */
+  object Folios extends SimplePointInTimeRepository[_root_.cats.Id, Folio.Key, Folio] {
+    def apply(id: Folio.Key): Folio = get(id).fold(Folio.empty)(identity)
+  }
+
+  /** */
+  type Folios = Folio.Table
+
+  /** */
+  implicit def freshAccountNo: Fresh[Account.Key] = ??? // to compile duh
+
+  /** */
+  object Accounts extends SimplePointInTimeRepository[_root_.cats.Id, Account.Key, Account]
+
+  /** */
+  type Accounts = Account.Table
+
+  /** FIXME: this is just a placeholder - needs to reference [[Transaction]] */
+  type Transactions[F[_]] = Foldable[F]
+
+  /** FIME this becomes a stream like repo (???)      */
+  object Transactions {}
+
+  /** */
+  lazy val Markets: Repository[_root_.cats.Id, Market.Key, Market] =
+    SimplePointInTimeRepository[_root_.cats.Id, Market.Key, Market]()
+
+  /** */
+  type Markets = Markets.Table
+
+  /**
+    *
+    *  this is something of an abuse of the original PiT concept,
+    * which models slowly evolving entities *with identity (key) which survives updates.
+    *
+    *  `Orders` is exactly the opposite.
+    *
+    *  But the open date range for "current `Table`" models the "open orders" concept perfectly.
+    *
+    *  TODO: is this really worthwhile?
+    *
+    */
+  type Orders = model.Order.Table
+
+  /** */
+  object Orders extends SimplePointInTimeRepository[_root_.cats.Id, model.Order.Key, model.Order[USD]]
+
+  /**  n.b. `Exectutions` are recorded as [[Transactions]] this completing the life cycle */
+  type Executions = Executions.Table
+
+  /** */
+  object Executions extends MemAppendableRepository[_root_.cats.Id, Execution.Key, Execution]
+
+}
 // abstract class Playground[MA: Financial, Q: Financial] extends Fruitcake[MA, Q] { api =>
 // }

@@ -1,22 +1,13 @@
 package io.deftrade
 package model
 
-import keys.Instrument
-
-import time._, money._, keyval._
-
-import repos._
+import time._, money._, keyval._, capital.Instrument
 
 import cats._
-import cats.data.NonEmptySet // which is also Sorted
 import cats.implicits._
-
-import eu.timepit.refined
-import refined.auto._
 
 import io.circe.Json
 
-// import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
 
 /**

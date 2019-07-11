@@ -1,6 +1,6 @@
 package io.deftrade
 package model
-package keys
+package capital
 
 import money._
 
@@ -99,7 +99,7 @@ object Income extends Enum[Income] with CatsEnum[Income] {
 }
 
 /** Single amount principle: one leg is singular */
-sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private[keys] (
+sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private[capital] (
     entry: X,
     contras: DoubleEntryKey.KeySet[Y]
 ) extends EnumEntry
@@ -128,7 +128,7 @@ object DebitKey extends Enum[DebitKey] {
   import cats.instances.string._
 
   /** this is just a hack to use `SortedSet`s etc */
-  private implicit def orderKeys[AT <: AccountType]: Order[AT] = Order by (_.entryName)
+  private implicit def orderKeys[AT <: AccountType]: cats.Order[AT] = cats.Order by (_.entryName)
 
   /** bill payment */
   case object PayBills extends DebitKey(Asset.Cash, NonEmptySet one Liability.AccountsPayable)
@@ -143,13 +143,13 @@ object DebitKey extends Enum[DebitKey] {
   * `SwapKey`'s type parameter restricts the swap to occur
   * within the same "column" of the `Balance`.
   */
-sealed abstract class SwapKey[T <: AccountType] private[keys] (
+sealed abstract class SwapKey[T <: AccountType] private[capital] (
     val from: T,
     val to: KeySet[T]
 ) extends DoubleEntryKey(from, to)
 object SwapKey
 
-private[keys] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
+private[capital] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
     extends SwapKey[Asset](
       from = from,
       to = NonEmptySet one to
