@@ -14,7 +14,7 @@ lazy val common = Seq(
   // scalaVersion      := "2.12.4-bin-typelevel-4",
   // scalaOrganization := "org.typelevel",
   //
-  // scalacOptions                           += "-Yliteral-types", 
+  // scalacOptions                           += "-Yliteral-types",
 
   scalacOptions                           ++= Args.allScalaCflags,
   scalacOptions in (Compile, console)     --= Args.nonConsoleScalaCflags.to[Seq],
@@ -56,29 +56,29 @@ lazy val macros = module("macros", "macros go here")
       Seq(reflection, scompiler)
   )
 
-lazy val core = module("core", "identity, time, and money, Scalazzi style")
-  .dependsOn(macros)
+lazy val core = module(
+  "core",
+  """foundational finance VOs and aggregate entity primitives:
+    time, money
+    core finance fns
+    key -> val entities
+    """.stripMargin
+)
+  // .dependsOn(macros) // or did... no more
   .settings(common)
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ misclibs ++ testers
   )
 
-lazy val model = module("model", "foundational finance VOs/keys/fns/MTLs")
-  .dependsOn(core)
-  .settings(common)
-  .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
-  )
-
-lazy val api = module("api", "domain entities as aecore/cqrs-es instances")
-  .dependsOn(model)
-  .settings(common)
-  .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
-  )
-
+// lazy val api = module("api", "domain entities as aecore/cqrs-es instances")
+//   .dependsOn(model)
+//   .settings(common)
+//   .settings(
+//     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
+//   )
+//
 lazy val demo = module("demo", "something to run")
-  .dependsOn(api)
+  .dependsOn(core)
   .settings(common)
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
@@ -86,7 +86,7 @@ lazy val demo = module("demo", "something to run")
 
 // wip := work in progress
 lazy val wip = module("wip", "back on my bullshit")
-  .dependsOn(api)
+  .dependsOn(core)
   .settings(common)
   .settings(
     libraryDependencies ++= httplibs ++ testers ++ Seq(opengamma)
@@ -94,7 +94,7 @@ lazy val wip = module("wip", "back on my bullshit")
 
 // top level project - TODO: eventually this should only  (no active dev)
 lazy val deftrade = (project in file("."))
-  .dependsOn(macros, core, model, api, demo, wip)
+  .dependsOn(macros, core, demo, wip)
 
   // lazy val flyway = Seq(
   //   flywayCleanOnValidationError := true,

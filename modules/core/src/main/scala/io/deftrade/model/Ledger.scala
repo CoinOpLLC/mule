@@ -96,7 +96,11 @@ abstract class Ledger[Q: Financial] { self =>
       metaSha: Array[Byte]
   )
 
-  /** */
+  /**
+    * Do we mean in the business sense or the computer science sense?
+    *
+    * Yes: both parties must agree upon the result .
+    */
   object Transaction extends WithOpaqueKey[Long, Transaction] {
 
     /** */
