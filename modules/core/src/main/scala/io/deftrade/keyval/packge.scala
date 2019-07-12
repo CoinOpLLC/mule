@@ -163,28 +163,35 @@ package keyval {
     final type Table = Map[Key, Value]
 
     /** The full type of the [[Key]] column. */
-    final type KeyFieldType = FieldType[key.T, Key]
+    final type KeyField = FieldType[key.T, Key]
 
     // import io.deftrade.money.Money.{ moneyGet, moneyPut }
+
+    implicit final def deriveLabelledGenericRow[HR <: HList, HV <: HList](
+        implicit
+        lgR: LabelledGeneric.Aux[Row, HR],
+        lgV: LabelledGeneric.Aux[Value, HV],
+    ): LabelledGeneric[KeyField :: HV] = ???
+    // FIXME really what I want to do is LabelledGeneric[Row], but flattened
 
     implicit final def deriveLabelledWriteRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlw: Lazy[LabelledWrite[FieldType[key.T, Key] :: HV]]
+        hlw: Lazy[LabelledWrite[KeyField :: HV]]
     ): LabelledWrite[Row] =
       new LabelledWrite[Row] {
-        val writeHKV: LabelledWrite[KeyFieldType :: HV] = hlw.value
-        def headers: CSV.Headers                        = writeHKV.headers
-        def write(r: Row): CSV.Row                      = writeHKV write field[key.T](r._1) :: (genV to r._2)
+        val writeHKV: LabelledWrite[KeyField :: HV] = hlw.value
+        def headers: CSV.Headers                    = writeHKV.headers
+        def write(r: Row): CSV.Row                  = writeHKV write field[key.T](r._1) :: (genV to r._2)
       }
 
     implicit final def deriveLabelledReadRow[HV <: HList](
         implicit
         genV: LabelledGeneric.Aux[Value, HV],
-        hlr: Lazy[LabelledRead[KeyFieldType :: HV]]
+        hlr: Lazy[LabelledRead[KeyField :: HV]]
     ): LabelledRead[Row] =
       new LabelledRead[Row] {
-        val readHKV: LabelledRead[KeyFieldType :: HV] = hlr.value
+        val readHKV: LabelledRead[KeyField :: HV] = hlr.value
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
           readHKV.read(row, headers) map { h =>
             (h.head, genV from h.tail)
