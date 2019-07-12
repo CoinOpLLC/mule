@@ -79,6 +79,8 @@ sealed trait Currency[C] extends CurrencyLike { self =>
 
 object Currency extends Enum[CurrencyLike] { self =>
 
+  import cats.implicits._
+
   /**
     * Three letter codes: 26 ^ 3 = 17576
     * over two hundred assigned; several "dead" currencies (not reused)
@@ -94,7 +96,8 @@ object Currency extends Enum[CurrencyLike] { self =>
     */
   def apply[C: Currency]: Currency[C] = implicitly
 
-  def unapply[N: Financial, C: Currency](money: Money[N, C]): Option[(N, Currency[C])] = ???
+  def unapply[N: Financial, C: Currency](money: Money[N, C]): Option[(N, Currency[C])] =
+    ((money.amount, Currency[C])).some
 
   /**
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)

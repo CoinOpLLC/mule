@@ -46,7 +46,7 @@ import scala.language.higherKinds
   * to trade blind with respect to account sums:
   * risk controls, margin calcs depend on them.
   */
-abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
+abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
 
   /** All things financial begin with an allocation. */
   type Allocation = UnitPartition[Account.Key, Quantity]
@@ -62,11 +62,11 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * - nonetheless, these are the semantics any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed trait Market { def mic: Mic; def entity: Option[LegalEntity.Key] }
+  sealed trait Market { def entity: Option[LegalEntity.Key] }
 
   /** `Mic`s are unique */
   object Market extends WithOpaqueKey[Long, Market] {
-    implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.mic)
+    implicit def eq: cats.Eq[Market] = cats.Eq by (_.entity)
 
     def quote[F[_]: Monad, C: Currency](
         m: Market
@@ -117,7 +117,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     */
   sealed abstract case class Order[C: Currency](
       market: Market.Key,
-      // auth: AccountAuth,
       ts: Instant,
       trade: Trade,
       limit: Option[Money[MA, C]]
@@ -149,14 +148,20 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   /**
     * What actually happened.
     */
-  final case class Execution(ts: Instant, oms: OMS.Key, orderKey: Order.Key, tx: Transaction)
+  sealed abstract case class Execution(
+      ts: Instant,
+      oms: OMS.Key,
+      orderKey: Order.Key,
+      tx: Transaction
+  )
 
+  /** */
   object Execution extends WithOpaqueKey[Long, Execution] {
     implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
   }
 
   /**
-    *`OMS` := Order Management System. Ubiquitous acronym in the domain.
+    *`OMS` := Order Management System. Ubiquitous domain acronym.
     *
     * Note: The methods on `OMS` return `Kliesli` arrows, which are intended to be chained with
     * `andThen`.
@@ -170,10 +175,10 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * FIXME: Maybe make this a full MTL thing because SemigroupK for Kleisli is restrictive.
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     */
-  final case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
-      key: LegalEntity.Key,
+  sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
+      entity: LegalEntity.Key,
       contra: Account.Key,
-      markets: NonEmptySet[Market]
+      markets: NonEmptySet[Market.Key]
   ) {
 
     /** */
@@ -210,15 +215,15 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       */
     def apply[F[_]: Monad: SemigroupK: Foldable](
         key: LegalEntity.Key,
-        market: Market,
-        ms: Market*
+        market: Market.Key,
+        ms: Market.Key*
     ): OMS[F] =
-      OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*)))
+      new OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*))) {}
 
     private def newContraAccount: Account.Key = ???
   }
 
-  /** top level methods */
+  /** top level package methods */
   def quoteLeg[C: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, C] =
     leg match {
       case (security, quantity) => Market.quote[cats.Id, C](market)(security) * quantity
@@ -226,17 +231,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
   def quote[C: Currency](market: Market)(trade: Trade): Money[MonetaryAmount, C] =
     trade.toList foldMap quoteLeg[C](market)
-
-  def ordered = ???
-  sealed trait Ordered
-
-  def executed = ???
-  sealed trait Executed
-
-  sealed trait Settled
-  def settled = ???
-
-  def error = ???
 
   /**
     * TODO: Revisit the privacy issues here.

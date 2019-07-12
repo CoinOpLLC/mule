@@ -70,7 +70,7 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
     */
-  final case class Transaction(
+  sealed abstract case class Transaction(
       /**
         * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`
         * - the transaction is provisional until dated, returned as a receipt
@@ -97,9 +97,25 @@ abstract class Ledger[Q: Financial] { self =>
   )
 
   /** */
-  object Transaction {
+  object Transaction extends WithOpaqueKey[Long, Transaction] {
 
+    /** */
     type Meta = io.circe.Json // f'rinstance
+
+    def apply(
+        debitFrom: Folio.Key,
+        creditTo: Folio.Key,
+        instrument: Instrument.Key,
+        amount: Quantity
+    ): Transaction =
+      new Transaction(
+        none,
+        debitFrom,
+        creditTo,
+        Trade(instrument -> amount),
+        /** FIXME you see the problem */
+        Array.empty[Byte]
+      ) {}
 
     /**
       * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
@@ -110,10 +126,7 @@ abstract class Ledger[Q: Financial] { self =>
     implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }
 
-  /** fold over me */
-  final case class Entry(ax: Transaction, meta: Json)
-
   /** Support for multiple contingent deal legs */
-  final case class AllOrNone(xs: List[Transaction])
-
+  sealed abstract case class AllOrNone(xs: List[Transaction])
+  object AllOrNone {}
 }
