@@ -90,8 +90,11 @@ object Currency extends Enum[CurrencyLike] { self =>
 
   /**
     * Given a currency (phantom) type, get a `Currency` instance.
+    * TODO: does it buy anything to move to `shapeless.the` ?
     */
   def apply[C: Currency]: Currency[C] = implicitly
+
+  def unapply[N: Financial, C: Currency](money: Money[N, C]): Option[(N, Currency[C])] = ???
 
   /**
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)

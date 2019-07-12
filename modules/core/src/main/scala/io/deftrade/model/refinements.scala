@@ -18,7 +18,7 @@ import shapeless.syntax.singleton._
 /**
   * A palette of domain specific refined types.
   *
-  * Prêt à porter, as it were.
+  * Prêt à porter, batteries included, your metaphore here (civil pull requests considered).
   */
 object refinements {
 
@@ -128,10 +128,8 @@ object refinements {
     implicit def isinValidate: Validate.Plain[String, CheckedPsin] =
       Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
 
-    /** FIXME  factor the shit out of this */
-    private def predicate(isin: String): Boolean =
-      /**
-        * TODO need to add country checks,
+    /**
+      * TODO need to add country checks,
         and break them out into a separate function
 
         - green-light only a predefined list of juristictions for registered securities
@@ -139,7 +137,8 @@ object refinements {
             - ZZ: unregistered securities with house-issued numbers.
             - XB: Interactive Brokers `ConId` number
         - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
-        */
+      */
+    private def predicate(isin: String): Boolean =
       failsafe {
 
         val digits = for {
@@ -150,7 +149,6 @@ object refinements {
         val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
 
         check.sum % 10 === 0
-
       }
   }
 

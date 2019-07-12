@@ -17,9 +17,8 @@
 package io.deftrade
 package model
 
-import capital.Instrument
-import keyval._, repos._, time._, money._, pricing._
-import Currency.USD
+import keyval._, time._, money._, pricing._
+import capital.Instrument, refinements.Mic, Currency.USD
 
 import cats._
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
@@ -44,7 +43,8 @@ import scala.language.higherKinds
   *
   * TODO - provisional:
   * we depend on `Balances` because it makes no sense
-  * to trade blind with respect to account sums - these calcs are intrinsic to margin (I think)
+  * to trade blind with respect to account sums:
+  * risk controls, margin calcs depend on them.
   */
 abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { api =>
 
@@ -59,12 +59,14 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
     * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
     * - this isn't how data typically comes, especially cheap data.
     * - smart routers (and internalizers!) introduce another layer of conceptual complexity
-    * - nonetheless, these are the semantics (bound) any sane developer needs... if best effort
+    * - nonetheless, these are the semantics any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
-  sealed trait Market { def key: LegalEntity.Key }
-  implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.key)
+  sealed trait Market { def mic: Mic; def entity: Option[LegalEntity.Key] }
+
+  /** `Mic`s are unique */
   object Market extends WithOpaqueKey[Long, Market] {
+    implicit def marketCatsOrder: cats.Order[Market] = cats.Order by (_.mic)
 
     def quote[F[_]: Monad, C: Currency](
         m: Market
@@ -80,8 +82,20 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * - seller for all buyers and vice versa.)
       * - activity recorded in a `contra account`
       */
-    final case class Exchange(key: LegalEntity.Key, contraAk: Account.Key) extends Market
-    object Exchange {}
+    sealed abstract case class Exchange private (
+        final val mic: Mic,
+        final val contra: Account.Key,
+        final val entity: Option[LegalEntity.Key]
+    ) extends Market
+
+    /** Fluent constructors. */
+    object Exchange {
+      def fromMic(mic: Mic): Exchange = ??? // make new contra account
+
+      /** */
+      def withEntity(lek: LegalEntity.Key): Exchange => Exchange =
+        x => new Exchange(x.mic, x.contra, lek.some) {}
+    }
 
     /**
       * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
@@ -89,10 +103,8 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
       * when the `Counterparty` is sourcing `Instruments` from private flows.
       * - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
-    final case class Counterparty(val key: LegalEntity.Key) extends Market
+    sealed abstract case class Counterparty(val key: LegalEntity.Key) extends Market
     object Counterparty {}
-
-    implicit def eqMarket: Eq[Market] = Eq by (_.key) // FIXME: fuck this shit
 
     implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
 
@@ -101,9 +113,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
   /**
     * Minimum viable `Order` type. What the client would _like_ to have happen.
     * TODO: revisit parent/child orders
-    * FIXME: Eliminate `C`. Normalize the trade. MA and Currency as separate fields.
+    * TODO: Eliminate `C` ?! Normalize the trade. MA and Currency as separate fields.
     */
-  final case class Order[C: Currency](
+  sealed abstract case class Order[C: Currency](
       market: Market.Key,
       // auth: AccountAuth,
       ts: Instant,
@@ -115,6 +127,12 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] { ap
 
   /** */
   object Order extends WithOpaqueKey[Long, Order[USD]] {
+
+    def market[C: Currency](market: Market.Key, trade: Trade): Order[C] =
+      new Order(market, instant, trade, none) {}
+
+    def limit[C: Currency](market: Market.Key, trade: Trade, limit: Money[MA, C]): Order[C] =
+      new Order(market, instant, trade, limit.some) {}
 
     /** `Market` orders */
     def buy[C: Currency]: Order[C]  = ???
