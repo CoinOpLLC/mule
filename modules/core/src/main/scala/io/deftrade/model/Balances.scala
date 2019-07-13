@@ -1,12 +1,11 @@
 package io.deftrade
 package model
 
-import money._
-import time._
+import money._, time._, keyval._
 
-import capital.{ AssetSwapKey, CreditKey, DebitKey, LiabilitySwapKey, SwapKey }
+import accounting.{ AssetSwapKey, CreditKey, DebitKey, SwapKey }
 
-import cats.{ Foldable, Invariant, Monad, Reducible, SemigroupK }
+import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
@@ -64,23 +63,27 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   lazy val ValuedFolio = PricedTrade
 
-  final case class TransactionMarker[CCY](
-      mark: Trade => PricedTrade[CCY]
+  type Pricer[CCY] = Trade => PricedTrade[CCY]
+  sealed abstract case class TransactionMarker[CCY](
+      mark: Pricer[CCY]
   )
+  object TransactionMarker extends WithOpaqueKey[Long, TransactionMarker[Currency.USD]] {
+    def apply[C: Currency](mark: Pricer[C]): TransactionMarker[C] = new TransactionMarker(mark) {}
+  }
 
-  type AccountType = capital.AccountType
+  type AccountType = accounting.AccountType
 
-  type Debit  = capital.Debit
-  type Credit = capital.Credit
+  type Debit  = accounting.Debit
+  type Credit = accounting.Credit
 
-  type Expense = capital.Expense
-  type Revenue = capital.Revenue
+  type Expense = accounting.Expense
+  type Revenue = accounting.Revenue
 
-  type Asset     = capital.Asset
-  type Liability = capital.Liability
+  type Asset     = accounting.Asset
+  type Liability = accounting.Liability
 
-  type Income = capital.Income
-  type Equity = capital.Equity
+  type Income = accounting.Income
+  type Equity = accounting.Equity
 
   /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
   final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
@@ -91,7 +94,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def empty[AT <: AccountType, CCY]: AccountMap[AT, CCY] = Map.empty[AT, Money[MA, CCY]]
 
     def from[AT <: AccountType, CCY](
-        ks: capital.SwapKey[AT],
+        ks: accounting.SwapKey[AT],
         amount: Money[MA, CCY]
     ): AccountMap[AT, CCY] = ???
 
@@ -247,7 +250,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /**
     * - `CashFlowStatement` is a Balance(debit, credit) like the IncomeStatement.
     * - Follow the `Money`. Operations, Investment, Financing
-    * - TODO: cash capital should get their own flavors; for now reuse `Revenue` and `Expense`.
+    * - TODO: cash accounting should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
   final case class CashFlowStatement[CCY] private (
       val outflows: Expenses[CCY],
@@ -361,7 +364,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   /** FIXME this can move outside of Cake */
   object Nettable extends Enum[NettableLike] {
 
-    import capital.Asset._
+    import accounting.Asset._
 
     case object Depreciable
         extends Nettable(

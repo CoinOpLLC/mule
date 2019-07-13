@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._, repos._, refinements._
+import money._, keyval._
 
 import enumeratum._
 
@@ -12,141 +12,98 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 import eu.timepit.refined
 import refined.W
 // import refined.api.Refined
-import refined.boolean.Or
 import refined.numeric._
 // import refined.{ cats => refinedCats, _ }
 
-import io.circe.Json
-
-/**
-  * There are a finite enumeration of [[Roles]].
-  * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]].
-  */
-sealed trait Role extends EnumEntry
-
-/**
-  * Enumerated `Role`s.
-  */
-object Role extends Enum[Role] with CatsEnum[Role] {
-
-  /**
-    * There is _always_ a distinguished `Role`, the `Principal`.
-    */
-  sealed trait Principal extends Role
-
-  /**
-    * A type representing all `Role`s _other_ than `Princple`.
-    */
-  sealed trait NonPrincipal extends Role
-  object NonPrincipal // TODO extractor
-
-  /**
-    * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
-    *
-    * Semantics for `Principal` are conditioned on the status of account, for examples:
-    * - beneficial owner for an asset
-    * - responsible party for a liability
-    * - shareholder for equity
-    * - business unit chief for revenue and expenses
-    */
-  case object Principal extends Principal
-
-  /**
-    * The primary delegate selected by a `Principal`.
-    * Also, simply, the `LegalEntity`(s) whose names are listed on the `Account`,
-    * and the primary point of contact for the `Account`.
-    *
-    * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
-    * from the `Ledger`.
-    *
-    * By convention a `Princple` is their own `Agent` unless otherwise specified.
-    */
-  case object Agent extends NonPrincipal
-
-  /**
-    * The primary delegate selected by the `Agent`.
-    * `LegalEntity`(s) with responsibility for, and authority over,
-    * the disposition of assets in the `Account`.
-    *
-    * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
-    * so long as the `Position`s are already entered in the `Ledger` - i.e. the `Instrument` is
-    * known to be tradeable on the ledger.
-    *
-    * (All publicly listed and traded assets are treated as tradeable on the `Ledger`
-    * by convention.)
-    *
-    * An `Agent` is their own `Manager` unless otherwise specified.
-    */
-  case object Manager extends NonPrincipal
-
-  /**
-    * `Auditor`s are first class entities, each with a package of rights and responsibilities
-    * which is situation and juristiction specific.
-    *
-    * Practically, what this means is that `Auditor`s will have a (possibly limited) view
-    * into the state of the `Ledger`,
-    * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
-    * or even intitiate `Transaction`s.
-    *
-    * Actions of the `Auditor` may include the publishing of specific summaries of its views
-    * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
-    *
-    * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
-    * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
-    */
-  case object Auditor extends NonPrincipal
-
-  /** The `findValues` macro collects all `value`s in the order written. */
-  lazy val values: IndexedSeq[Role] = findValues
-
-  /** FIXME use NonPrincipal::extractor */
-  lazy val nonPrincipals: IndexedSeq[NonPrincipal] = values collect { case np: NonPrincipal => np }
-}
-
-/**
-  * `LegalEntities` model real world actors.
-  * See Also: `model.Role`s.
-  */
-sealed trait LegalEntity extends Serializable {
-  def name: VarChar
-  def key: LegalEntity.Key
-  def meta: Json
-}
-
-/** `LegalEntity`s recognized by the system. */
-object LegalEntity extends WithRefinedKey[String, IsSsn Or IsEin, LegalEntity] {
-
-  import refined.auto._
-
-  /**
-    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
-    */
-  final case class NaturalPerson(
-      name: VarChar,
-      ssn: Ssn,
-      dob: LocalDate,
-      meta: Json
-  ) extends LegalEntity {
-    def key = ssn
-  }
-
-  /**
-    * `Corporation`s are `LegalEntity`s too!
-    */
-  final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
-    def key = ein
-  }
-
-  implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
-
-  implicit def showEntity = Show.show[LegalEntity] {
-    _.toString // this can evolve!
-  }
-
-}
-
 /** package level API */
 abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
+
+  /**
+    * There are a finite enumeration of [[Roles]].
+    * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]].
+    */
+  sealed trait Role extends EnumEntry
+
+  /**
+    * Enumerated `Role`s.
+    * Note: this enum is not dependant on the type parameter and so may be hoisted up.
+    * Actually a primitive, in other words.
+    */
+  object Role extends Enum[Role] with CatsEnum[Role] {
+
+    /**
+      * There is _always_ a distinguished `Role`, the `Principal`.
+      */
+    sealed trait Principal extends Role
+
+    /**
+      * A type representing all `Role`s _other_ than `Princple`.
+      */
+    sealed trait NonPrincipal extends Role
+    object NonPrincipal // TODO extractor
+
+    /**
+      * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
+      *
+      * Semantics for `Principal` are conditioned on the status of account, for examples:
+      * - beneficial owner for an asset
+      * - responsible party for a liability
+      * - shareholder for equity
+      * - business unit chief for revenue and expenses
+      */
+    case object Principal extends Principal
+
+    /**
+      * The primary delegate selected by a `Principal`.
+      * Also, simply, the `LegalEntity`(s) whose names are listed on the `Account`,
+      * and the primary point of contact for the `Account`.
+      *
+      * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
+      * from the `Ledger`.
+      *
+      * By convention a `Princple` is their own `Agent` unless otherwise specified.
+      */
+    case object Agent extends NonPrincipal
+
+    /**
+      * The primary delegate selected by the `Agent`.
+      * `LegalEntity`(s) with responsibility for, and authority over,
+      * the disposition of assets in the `Account`.
+      *
+      * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
+      * so long as the `Position`s are already entered in the `Ledger` - i.e. the `Instrument` is
+      * known to be tradeable on the ledger.
+      *
+      * (All publicly listed and traded assets are treated as tradeable on the `Ledger`
+      * by convention.)
+      *
+      * An `Agent` is their own `Manager` unless otherwise specified.
+      */
+    case object Manager extends NonPrincipal
+
+    /**
+      * `Auditor`s are first class entities, each with a package of rights and responsibilities
+      * which is situation and juristiction specific.
+      *
+      * Practically, what this means is that `Auditor`s will have a (possibly limited) view
+      * into the state of the `Ledger`,
+      * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
+      * or even intitiate `Transaction`s.
+      *
+      * Actions of the `Auditor` may include the publishing of specific summaries of its views
+      * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
+      *
+      * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
+      * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
+      */
+    case object Auditor extends NonPrincipal
+
+    /** The `findValues` macro collects all `value`s in the order written. */
+    lazy val values: IndexedSeq[Role] = findValues
+
+    /** FIXME use NonPrincipal::extractor */
+    lazy val nonPrincipals: IndexedSeq[NonPrincipal] = values collect { case np: NonPrincipal => np }
+  }
 
   /**
     * Each [[Account]] is created with a `Roster`, specifying the beneficial owners and their crew.

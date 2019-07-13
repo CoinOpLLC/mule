@@ -1,6 +1,6 @@
 package io.deftrade
 package model
-package capital
+package accounting
 
 import money._
 
@@ -99,7 +99,7 @@ object Income extends Enum[Income] with CatsEnum[Income] {
 }
 
 /** Single amount principle: one leg is singular */
-sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private[capital] (
+sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private[accounting] (
     entry: X,
     contras: DoubleEntryKey.KeySet[Y]
 ) extends EnumEntry
@@ -143,13 +143,13 @@ object DebitKey extends Enum[DebitKey] {
   * `SwapKey`'s type parameter restricts the swap to occur
   * within the same "column" of the `Balance`.
   */
-sealed abstract class SwapKey[T <: AccountType] private[capital] (
+sealed abstract class SwapKey[T <: AccountType] private[accounting] (
     val from: T,
     val to: KeySet[T]
 ) extends DoubleEntryKey(from, to)
 object SwapKey
 
-private[capital] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
+private[accounting] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
     extends SwapKey[Asset](
       from = from,
       to = NonEmptySet one to
