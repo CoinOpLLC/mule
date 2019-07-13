@@ -6,8 +6,6 @@ import time._, money._, keyval._, capital.Instrument
 import cats._
 import cats.implicits._
 
-import io.circe.Json
-
 import scala.language.higherKinds
 
 /**

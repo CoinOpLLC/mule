@@ -159,19 +159,19 @@ object Currency extends Enum[CurrencyLike] { self =>
   import cats.implicits._
 
   import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.implicits._
+  // import io.chrisdavenport.cormorant.implicits._
 
-  implicit def enumGet[CCY: Currency]: Get[Currency[CCY]] = new Get[Currency[CCY]] {
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Currency[CCY]] =
+  implicit def enumGet[C: Currency]: Get[Currency[C]] = new Get[Currency[C]] {
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Currency[C]] =
       CsvEnum.enumGet[CurrencyLike](self) get field match {
-        case Right(ccy) if ccy === Currency[CCY] =>
-          Currency[CCY].asRight
+        case Right(ccy) if ccy === Currency[C] =>
+          Currency[C].asRight
         case _ =>
           (Error.DecodeFailure
             single
-              s"Failed to decode: ${Currency[CCY]}: Received $field").asLeft
+              s"Failed to decode: ${Currency[C]}: Received $field").asLeft
       }
   }
-  implicit def put[CCY: Currency]: Put[Currency[CCY]] = CsvEnum.enumPut
+  implicit def put[C: Currency]: Put[Currency[C]] = CsvEnum.enumPut
 
 }

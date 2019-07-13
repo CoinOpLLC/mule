@@ -4,7 +4,6 @@ package accounting
 
 import money._
 
-import cats.{ Eq, Order }
 import cats.data.NonEmptySet
 
 import enumeratum._

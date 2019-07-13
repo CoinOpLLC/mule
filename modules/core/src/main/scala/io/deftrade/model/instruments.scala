@@ -4,13 +4,13 @@ package capital
 
 import money.{ CurrencyLike, Financial }
 import time.ZonedDateTime
-import model.refinements.{ Isin, Mic, Psin, Usin, VarChar }
+import model.refinements.{ Isin, Mic, Usin, VarChar }
 import keyval._
 
-import cats.{ Eq, Hash, Order, Show }
+// import cats.{ Eq, Hash, Order, Show }
 import cats.instances.string._
 
-import shapeless.syntax.singleton._
+// import shapeless.syntax.singleton._
 
 import io.circe.Json
 
@@ -30,7 +30,7 @@ object Instrument extends WithAdtKey[Usin, Instrument]
 
 trait PrimaryCapital {
 
-  final case class CommonStock(
+  case class CommonStock(
       mic: Mic,
       c: CurrencyLike,
       tclass: Option[VarChar]
@@ -38,7 +38,7 @@ trait PrimaryCapital {
 
   object CommonStock extends WithAdtKey[Usin, CommonStock]
 
-  final case class PreferredStock(
+  case class PreferredStock(
       mic: Mic,
       c: CurrencyLike,
       series: VarChar,
@@ -47,89 +47,89 @@ trait PrimaryCapital {
   object PreferredStock extends WithAdtKey[Usin, PreferredStock]
 
   /** */
-  final case class Bond(matures: ZonedDateTime) extends Maturity
+  case class Bond(matures: ZonedDateTime) extends Maturity
 
   /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
   object Bond extends WithAdtKey[Isin, Bond]
 
-  final case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
+  case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
 }
 
 trait VanillaDerivatives {
 
-  final case class Index()
+  case class Index()
 
-  final case class EtdFuture()
+  case class EtdFuture()
 
   // Exchange Traded Derivative - Option (ETD)
-  final case class EtdOption()
+  case class EtdOption()
 
   // I mean, right?
-  final case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative
+  case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative
 
-  final case class IndexOption(underlyer: Instrument.Key) extends Derivative
+  case class IndexOption(underlyer: Instrument.Key) extends Derivative
 
-  final case class StockOption(underlyer: Instrument.Key) extends Derivative
+  case class StockOption(underlyer: Instrument.Key) extends Derivative
 
-  final case class BondFuture()
+  case class BondFuture()
   // A BondFutureOption.
-  final case class BondFutureOption()
+  case class BondFutureOption()
   // Exchange Traded Derivative - Future (ETD)
 }
 
 trait Exotics {
   // A product only used for calibration.
-  final case class Calibration()
+  case class Calibration()
   // Credit Default Swap (CDS)
-  final case class Cds()
+  case class Cds()
   // CDS index
-  final case class CdsIndex()
+  case class CdsIndex()
   // Constant Maturity Swap (CMS)
-  final case class Cms()
+  case class Cms()
   // A Deliverable Swap Forward
   // https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf
-  final case class Dsf()
+  case class Dsf()
   // Forward Rate Agreement
-  final case class Fra()
+  case class Fra()
   // // A representation based on sensitivities.
-  final case class Sensitivities()
+  case class Sensitivities()
   // A Swap.
-  final case class Swap()
+  case class Swap()
   // A Swaption.
-  final case class Swaption()
+  case class Swaption()
 }
 
 trait Fx {
   // FX Non-Deliverable Forward
-  final case class FxNdf()
+  case class FxNdf()
   // A FxSingle.
-  final case class FxSingle()
+  case class FxSingle()
   // A FxSingleBarrierOption.
-  final case class FxSingleBarrierOption()
+  case class FxSingleBarrierOption()
   // A FxSwap.
-  final case class FxSwap()
+  case class FxSwap()
   // A FxVanillaOption.
-  final case class FxVanillaOption()
+  case class FxVanillaOption()
 }
 
 trait Ibor {
   // A IborCapFloor.
-  final case class IborCapFloor()
+  case class IborCapFloor()
   // A IborFuture.
-  final case class IborFuture()
+  case class IborFuture()
   // A IborFutureOption.
-  final case class IborFutureOption()
+  case class IborFutureOption()
 }
 
 trait Lending {
   // A BulletPayment.
-  final case class BulletPayment()
+  case class BulletPayment()
   // A TermDeposit.
-  final case class TermDeposit()
+  case class TermDeposit()
 
-  final case class AmortizingLoan()
+  case class AmortizingLoan()
 
-  final case class ConvertibleNote()
+  case class ConvertibleNote()
 }
 
 /** FIXME: "Index" anything should reference the index - need a Table of Indexes */

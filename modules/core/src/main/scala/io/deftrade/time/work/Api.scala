@@ -11,8 +11,7 @@ import cats.data.NonEmptySet
 
 import scala.collection.immutable.SortedSet
 
-import java.time.{ Month, DayOfWeek, temporal => jtt }
-import jtt.{ Temporal /*, WeekFields */ }
+import java.time.DayOfWeek
 
 /** */
 object IsDay {

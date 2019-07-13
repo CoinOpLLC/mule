@@ -1,6 +1,8 @@
 package io.deftrade
 package test
 
+import scala.language.higherKinds
+
 import time._, money._, keyval._, model._, repos._, capital.Instrument, Currency.USD
 
 import enumeratum._
@@ -10,7 +12,7 @@ import cats.implicits._
 import cats.syntax.eq._ // ups the implicit priority (?!)
 
 import eu.timepit.refined
-import refined.{ refineMV, refineV }
+import refined.{ refineMV }
 import refined.api.Refined
 import refined.collection.NonEmpty
 import refined.numeric.Positive
@@ -80,11 +82,11 @@ object xaction {
     def apply(ssn: Ssn, name: NonEmptyString): Entity = new Entity(ssn, name) {}
   }
 
-  sealed abstract case class Xaction[N: Financial, CCY: Currency](
+  sealed abstract case class Xaction[N: Financial, C: Currency](
       asOf: Instant,
       debitFrom: Entity.Key,
       creditTo: Entity.Key,
-      amount: Money[N, CCY],
+      amount: Money[N, C],
       memo: String
   )
 

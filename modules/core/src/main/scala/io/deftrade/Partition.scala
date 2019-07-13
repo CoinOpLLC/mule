@@ -5,8 +5,8 @@ import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
-import refined.api.Refined
-import refined.numeric.Positive
+// import refined.api.Refined
+// import refined.numeric.Positive
 import refined.auto._
 
 import spire.math.Fractional

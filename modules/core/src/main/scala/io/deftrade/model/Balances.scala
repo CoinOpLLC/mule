@@ -63,9 +63,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
 
   lazy val ValuedFolio = PricedTrade
 
-  type Pricer[CCY] = Trade => PricedTrade[CCY]
-  sealed abstract case class TransactionMarker[CCY](
-      mark: Pricer[CCY]
+  type Pricer[C] = Trade => PricedTrade[C]
+  sealed abstract case class TransactionMarker[C](
+      mark: Pricer[C]
   )
   object TransactionMarker extends WithOpaqueKey[Long, TransactionMarker[Currency.USD]] {
     def apply[C: Currency](mark: Pricer[C]): TransactionMarker[C] = new TransactionMarker(mark) {}
@@ -86,50 +86,50 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Equity = accounting.Equity
 
   /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
-  final type AccountMap[A <: AccountType, CCY] = Map[A, Money[MA, CCY]]
+  final type AccountMap[A <: AccountType, C] = Map[A, Money[MA, C]]
 
   /* */
   object AccountMap {
 
-    def empty[AT <: AccountType, CCY]: AccountMap[AT, CCY] = Map.empty[AT, Money[MA, CCY]]
+    def empty[AT <: AccountType, C]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
 
-    def from[AT <: AccountType, CCY](
+    def from[AT <: AccountType, C](
         ks: accounting.SwapKey[AT],
-        amount: Money[MA, CCY]
-    ): AccountMap[AT, CCY] = ???
+        amount: Money[MA, C]
+    ): AccountMap[AT, C] = ???
 
-    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, CCY](
-        as: AccountMap[T, CCY]
-    ): AccountMap[R, CCY] =
+    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, C](
+        as: AccountMap[T, C]
+    ): AccountMap[R, C] =
       as collect {
         case (k: R, v) => (k, v)
       }
   }
 
-  implicit class SweetAccountMap[A <: AccountType, CCY](am: AccountMap[A, CCY]) {
+  implicit class SweetAccountMap[A <: AccountType, C](am: AccountMap[A, C]) {
 
-    def total(implicit CCY: Currency[CCY]): Money[MA, CCY] =
-      CCY(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
+    def total(implicit C: Currency[C]): Money[MA, C] =
+      C(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
 
   }
 
   /** convenience and domain semantics only */
-  def emptyAccount[A <: AccountType, CCY: Currency]: AccountMap[A, CCY] = AccountMap.empty
+  def emptyAccount[A <: AccountType, C: Currency]: AccountMap[A, C] = AccountMap.empty
 
-  final type Debits[CCY]      = AccountMap[Debit, CCY]
-  final type Credits[CCY]     = AccountMap[Credit, CCY]
-  final type Revenues[CCY]    = AccountMap[Revenue, CCY]
-  final type Assets[CCY]      = AccountMap[Asset, CCY]
-  final type Expenses[CCY]    = AccountMap[Expense, CCY]
-  final type Liabilities[CCY] = AccountMap[Liability, CCY]
-  final type Incomes[CCY]     = AccountMap[Income, CCY]
-  final type Equities[CCY]    = AccountMap[Equity, CCY]
+  final type Debits[C]      = AccountMap[Debit, C]
+  final type Credits[C]     = AccountMap[Credit, C]
+  final type Revenues[C]    = AccountMap[Revenue, C]
+  final type Assets[C]      = AccountMap[Asset, C]
+  final type Expenses[C]    = AccountMap[Expense, C]
+  final type Liabilities[C] = AccountMap[Liability, C]
+  final type Incomes[C]     = AccountMap[Income, C]
+  final type Equities[C]    = AccountMap[Equity, C]
 
   /** pure trait for the enum base */
   private[model] sealed trait BalanceLike extends Product with Serializable {
 
     type CurrencyType
-    def currency(implicit CCY: Currency[CurrencyType]): Currency[CurrencyType] = CCY
+    def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
 
     type DebitType <: Debit
     def ds: AccountMap[DebitType, CurrencyType]
@@ -169,55 +169,59 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   /** */
-  final case class TrialBalance[CCY] private (
-      debits: Debits[CCY],
-      credits: Credits[CCY]
-  ) extends Balance[Debit, Credit, CCY](debits, credits) {
+  sealed abstract case class TrialBalance[C] private (
+      debits: Debits[C],
+      credits: Credits[C]
+  ) extends Balance[Debit, Credit, C](debits, credits) {
 
-    import AccountMap.collect
+    // FIXME import AccountMap.collect
 
-    def updated(key: DebitKey, amount: Money[MA, CCY]): TrialBalance[CCY]  = ???
-    def updated(key: CreditKey, amount: Money[MA, CCY]): TrialBalance[CCY] = ???
+    def updated(key: DebitKey, amount: Money[MA, C]): TrialBalance[C]  = ???
+    def updated(key: CreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
-    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, CCY]): TrialBalance[CCY] = {
-
-      def CG[AT <: AccountType] = CommutativeGroup[AccountMap[AT, CCY]]
-
+    // implicit def CG[AT <: AccountType] = CommutativeGroup[AccountMap[AT, C]]
+    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
       sk match {
         // FIXME: make syntax work
-        case ks @ AssetSwapKey(_, _) => ???
+        case AssetSwapKey(_, _) =>
+          ???
         // case ks @ LiabilitySwapKey(_, _)   => ???
       }
-    }
 
-    def partition: (IncomeStatement[CCY], BalanceSheet[CCY]) =
-      (
-        IncomeStatement(debits |> collect, credits |> collect),
-        BalanceSheet(debits    |> collect, credits |> collect)
-      )
+    def partition: (IncomeStatement[C], BalanceSheet[C]) = ???
+    // FIXME `Any` problems
+    // (
+    //   IncomeStatement(debits |> collect, credits |> collect),
+    //   BalanceSheet(debits    |> collect, credits |> collect)
+    // )
   }
 
   /** */
   object TrialBalance {
 
-    def empty[CCY: Currency]: TrialBalance[CCY] =
-      TrialBalance(
-        debits = emptyAccount[Debit, CCY],
-        credits = emptyAccount[Credit, CCY]
+    private[model] def apply[C: Currency](
+        debits: Debits[C],
+        credits: Credits[C]
+    ): TrialBalance[C] = new TrialBalance(debits, credits) {}
+
+    def empty[C: Currency]: TrialBalance[C] =
+      apply(
+        debits = emptyAccount[Debit, C],
+        credits = emptyAccount[Credit, C]
       )
 
-    implicit def trialBalanceCommutativeGroup[CCY: Currency]: CommutativeGroup[TrialBalance[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[CCY], Credits[CCY])]) {
+    implicit def trialBalanceCommutativeGroup[C: Currency]: CommutativeGroup[TrialBalance[C]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
       }
 
-    def from[CC[_]: Foldable, CCY: Currency](
-        marker: TransactionMarker[CCY]
+    def from[CC[_]: Foldable, C: Currency](
+        marker: TransactionMarker[C]
     )(
         xs: CC[Transaction]
-    ): TrialBalance[CCY] = ??? // xs.sum // FIXME this is all I should have to say!
+    ): TrialBalance[C] = ??? // xs.sum // FIXME this is all I should have to say!
 
   }
 
@@ -226,12 +230,12 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * A cash account can be determined from its `Instrument.Key`.
     * This can be used to create a filter for `CashFlowStatement`s.
     */
-  final case class IncomeStatement[CCY] private (
-      val expenses: Expenses[CCY],
-      val revenues: Revenues[CCY]
+  sealed abstract case class IncomeStatement[C] private (
+      val expenses: Expenses[C],
+      val revenues: Revenues[C]
   ) extends Balance(expenses, revenues) {
 
-    def partition(implicit ci: Wallet[CCY]): (IncomeStatement[CCY], CashFlowStatement[CCY]) =
+    def partition(implicit ci: Wallet[C]): (IncomeStatement[C], CashFlowStatement[C]) =
       ???
   }
 
@@ -239,8 +243,15 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     *
     */
   object IncomeStatement {
-    implicit def incomeStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[IncomeStatement[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[CCY], Revenues[CCY])]) {
+
+    private[model] def apply[C: Currency](
+        expenses: Expenses[C],
+        revenues: Revenues[C]
+    ): IncomeStatement[C] = new IncomeStatement(expenses, revenues) {}
+
+    /** */
+    implicit def incomeStatementCommutativeGroup[C: Currency]: CommutativeGroup[IncomeStatement[C]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[C], Revenues[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -252,15 +263,21 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     * - Follow the `Money`. Operations, Investment, Financing
     * - TODO: cash accounting should get their own flavors; for now reuse `Revenue` and `Expense`.
     */
-  final case class CashFlowStatement[CCY] private (
-      val outflows: Expenses[CCY],
-      val inflows: Revenues[CCY]
+  sealed abstract case class CashFlowStatement[C] private (
+      val outflows: Expenses[C],
+      val inflows: Revenues[C]
   ) extends Balance(outflows, inflows)
 
   /**  */
   object CashFlowStatement {
-    implicit def cashflowStatementCommutativeGroup[CCY: Currency]: CommutativeGroup[CashFlowStatement[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[CCY], Revenues[CCY])]) {
+
+    private[model] def apply[C: Currency](
+        outflows: Expenses[C],
+        inflows: Revenues[C]
+    ): CashFlowStatement[C] = new CashFlowStatement(outflows, inflows) {}
+
+    implicit def cashflowStatementCommutativeGroup[C: Currency]: CommutativeGroup[CashFlowStatement[C]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[C], Revenues[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -269,22 +286,28 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     /** outputs: YearBegin, YearEnd, NetIncrease = YearEnd - YearBegin */
   }
 
-  final case class EquityStatement[CCY] private (wut: Null)
+  sealed abstract case class EquityStatement[C] private (wut: Null)
   object EquityStatement
 
   /**
     * `BalanceSheet`s form a `CommutativeGroup`.
     *  All operations are double entry by construction.
     */
-  final case class BalanceSheet[CCY] private (
-      val assets: Assets[CCY],
-      val liabilities: Liabilities[CCY]
+  sealed abstract case class BalanceSheet[C] private (
+      val assets: Assets[C],
+      val liabilities: Liabilities[C]
   ) extends Balance(assets, liabilities)
 
   /** tax free implicits */
   object BalanceSheet {
-    implicit def balanceCommutativeGroup[CCY: Currency]: CommutativeGroup[BalanceSheet[CCY]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets[CCY], Liabilities[CCY])]) {
+
+    private[model] def apply[C: Currency](
+        assets: Assets[C],
+        liabilities: Liabilities[C]
+    ): BalanceSheet[C] = new BalanceSheet(assets, liabilities) {}
+
+    implicit def balanceCommutativeGroup[C: Currency]: CommutativeGroup[BalanceSheet[C]] =
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets[C], Liabilities[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -297,7 +320,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     final def startDate = date - period
   }
 
-  final case class CashBookSet[C: Currency](
+  sealed abstract case class CashBookSet[C: Currency](
       date: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
@@ -306,7 +329,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
-  final case class AccrualBookSet[C: Currency](
+  sealed abstract case class AccrualBookSet[C: Currency](
       date: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
@@ -316,29 +339,29 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
-  def trialBalance[F[_]: Foldable: Monad: SemigroupK, CCY: Currency](
+  def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](
       ts: F[Transaction]
-  ): TrialBalance[CCY] = ???
+  ): TrialBalance[C] = ???
 
-  def breakdown[CCY: Currency: Wallet](
-      prior: BalanceSheet[CCY],
-      delta: BalanceSheet[CCY], // delta and raw come from TrialBalance
-      raw: IncomeStatement[CCY] // mixed cash and accrual
-  ): (CashFlowStatement[CCY], EquityStatement[CCY]) =
+  def breakdown[C: Currency: Wallet](
+      prior: BalanceSheet[C],
+      delta: BalanceSheet[C], // delta and raw come from TrialBalance
+      raw: IncomeStatement[C] // mixed cash and accrual
+  ): (CashFlowStatement[C], EquityStatement[C]) =
     ???
 
-  type DeltaCashBooks[CCY]    = (CashFlowStatement[CCY], BalanceSheet[CCY])
-  type DeltaAccrualBooks[CCY] = (IncomeStatement[CCY], CashFlowStatement[CCY], BalanceSheet[CCY])
+  type DeltaCashBooks[C]    = (CashFlowStatement[C], BalanceSheet[C])
+  type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
   /**
     * Cratchit needs to look at the current state of the books
     * in order to properly allocate balance sheet items (in the most general case)
     */
-  def deltaCashBooksFrom[CCY: Currency](cbs: CashBookSet[CCY]): (
-      PricedTrade[CCY],
+  def deltaCashBooksFrom[C: Currency](cbs: CashBookSet[C]): (
+      PricedTrade[C],
       UnitPartition[AccountType, MonetaryAmount],
       Transaction.Meta
-  ) => DeltaCashBooks[CCY] = ???
+  ) => DeltaCashBooks[C] = ???
 
   import enumeratum._
 

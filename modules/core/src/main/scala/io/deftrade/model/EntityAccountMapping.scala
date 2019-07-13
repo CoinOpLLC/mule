@@ -31,19 +31,24 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     */
   object Role extends Enum[Role] with CatsEnum[Role] {
 
-    /**
-      * There is _always_ a distinguished `Role`, the `Principal`.
-      */
-    sealed trait Principal extends Role
+    /** */
+    object NonPrincipal {
+
+      /**
+        * A test for all `Role`s _other_ than `Princple`.
+        */
+      def unapply(role: Role): Option[Role] = role match {
+        case Principal                        => none
+        case np @ (Agent | Manager | Auditor) => np.some
+      }
+    }
 
     /**
-      * A type representing all `Role`s _other_ than `Princple`.
-      */
-    sealed trait NonPrincipal extends Role
-    object NonPrincipal // TODO extractor
-
-    /**
-      * The [[LegalEntity]] which is the economic actor responsible for establishing the [[Account]].
+      *
+      * There is _always_ a distinguished [[Role]], the `Principal`.
+      *
+      * The [[LegalEntity]] which is the market participant
+      * responsible for establishing the [[Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
       * - beneficial owner for an asset
@@ -51,7 +56,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       * - shareholder for equity
       * - business unit chief for revenue and expenses
       */
-    case object Principal extends Principal
+    case object Principal extends Role
 
     /**
       * The primary delegate selected by a `Principal`.
@@ -63,7 +68,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       *
       * By convention a `Princple` is their own `Agent` unless otherwise specified.
       */
-    case object Agent extends NonPrincipal
+    case object Agent extends Role
 
     /**
       * The primary delegate selected by the `Agent`.
@@ -79,7 +84,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       *
       * An `Agent` is their own `Manager` unless otherwise specified.
       */
-    case object Manager extends NonPrincipal
+    case object Manager extends Role
 
     /**
       * `Auditor`s are first class entities, each with a package of rights and responsibilities
@@ -96,13 +101,13 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
       * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
       * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
       */
-    case object Auditor extends NonPrincipal
+    case object Auditor extends Role
 
     /** The `findValues` macro collects all `value`s in the order written. */
     lazy val values: IndexedSeq[Role] = findValues
 
-    /** FIXME use NonPrincipal::extractor */
-    lazy val nonPrincipals: IndexedSeq[NonPrincipal] = values collect { case np: NonPrincipal => np }
+    /** */
+    lazy val nonPrincipals: IndexedSeq[Role] = values collect { case NonPrincipal(np) => np }
   }
 
   /**
@@ -110,7 +115,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrincipals: Role.NonPrincipal => NonEmptySet[LegalEntity.Key]
+      nonPrincipals: Role => NonEmptySet[LegalEntity.Key]
   ) {
     lazy val roles: NonEmptyMap[Role, NonEmptySet[LegalEntity.Key]] =
       NonEmptyMap of (
@@ -135,7 +140,7 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
 
     private def unsafe(
         principals: UnitPartition[LegalEntity.Key, Quantity],
-        nonPrincipals: Role.NonPrincipal => NonEmptySet[LegalEntity.Key]
+        nonPrincipals: Role => NonEmptySet[LegalEntity.Key]
     ) = new Roster(principals, nonPrincipals) {}
 
     /** Pplits partition equally among `Principal`s - especially useful for singleton principals. */

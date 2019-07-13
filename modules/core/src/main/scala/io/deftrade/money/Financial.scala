@@ -87,7 +87,7 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
   }
 
   /** Phantom type for `Validate` predicate indicating a whole number (fractional part is zero). */
-  final case class Whole[I]()
+  sealed abstract case class Whole[I]()
 
   /** Extractor for whole numbers. */
   object Whole {
@@ -97,7 +97,7 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
         case WholeIs(_) => true
         case _          => false
       }
-      Validate.fromPredicate(pred, t => s"$t isn't Whole", Whole[I]())
+      Validate.fromPredicate(pred, t => s"$t isn't Whole", new Whole[I]() {})
     }
   }
 }

@@ -5,18 +5,11 @@ package market
 import io.deftrade.time.work._
 
 import scala.collection.immutable.SortedSet
-import scala.concurrent.{ duration => scd }
-
-import cats.Order
-import cats.data.Reader
 import cats.implicits._
 
-import enumeratum._, values._
+import enumeratum._
 
-import java.{ time => jt }
-import jt.{ chrono, format, temporal => jtt }, jtt.TemporalUnit
-import chrono.{ Chronology, IsoChronology }
-import format.DateTimeFormatter
+import java.{ time => jt }, jt.{ temporal => jtt }
 
 trait Api {
 

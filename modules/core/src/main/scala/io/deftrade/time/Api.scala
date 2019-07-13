@@ -1,7 +1,7 @@
 package io.deftrade
 package time
 
-import cats.{ Eq, Hash, Order, Show }
+import cats.{ Hash, Order, Show }
 
 import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }

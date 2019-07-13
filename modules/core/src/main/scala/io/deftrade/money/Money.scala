@@ -133,27 +133,25 @@ object Money {
   import io.chrisdavenport.cormorant._
   import io.chrisdavenport.cormorant.implicits._
 
-  private def scan[N: Financial, CCY: Currency](
+  private def scan[N: Financial, C: Currency](
       x: String
-  ): Either[Error.DecodeFailure, Money[N, CCY]] = {
+  ): Either[Error.DecodeFailure, Money[N, C]] = {
     import spire.syntax.field._
-    val CCY    = Currency[CCY]
+    val C      = Currency[C]
     val one    = Financial[N].fractional.one
     def sign   = if (x.charAt(5) === '(') -one else one
     val ccy    = (x take 3) |> CSV.Field.apply
     val amount = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
     for {
-      _ <- Get[Currency[CCY]] get ccy
+      _ <- Get[Currency[C]] get ccy
       n <- Get[N] get amount
-    } yield CCY apply sign * n
+    } yield C apply sign * n
   }
 
   /** cormorant csv Get */
-  implicit def moneyGet[N: Financial, CCY: Currency]: Get[Money[N, CCY]] = new Get[Money[N, CCY]] {
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
 
-    val CCY = Currency[CCY]
-
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, CCY]] = scan(field.x)
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] = scan(field.x)
 
   }
 

@@ -1,19 +1,13 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._, repos._, refinements._
-
-import enumeratum._
+import money._, time._, keyval._, refinements._
 
 import cats._
 import cats.implicits._
-import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
-import refined.W
-// import refined.api.Refined
 import refined.boolean.Or
-import refined.numeric._
 // import refined.{ cats => refinedCats, _ }
 
 import io.circe.Json

@@ -219,8 +219,9 @@ package keyval {
   }
 
   abstract class WithAdtKey[K: Order, V] extends WithKeyBase[V] {
-    final case class Key(val k: K)
+    sealed abstract class Key(val k: K)
     object Key {
+      def apply(k: K): Key              = new Key(k) {}
       implicit def orderKey: Order[Key] = Order by (_.k)
     }
   }
