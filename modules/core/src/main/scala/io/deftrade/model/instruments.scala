@@ -2,12 +2,15 @@ package io.deftrade
 package model
 package capital
 
+import scala.language.higherKinds
+
+import keyval._
 import money.{ CurrencyLike, Financial }
 import time.ZonedDateTime
 import model.refinements.{ Isin, Mic, Usin, VarChar }
-import keyval._
 
 // import cats.{ Eq, Hash, Order, Show }
+import cats.Id
 import cats.instances.string._
 
 // import shapeless.syntax.singleton._
@@ -57,7 +60,9 @@ trait PrimaryCapital {
 
 trait VanillaDerivatives {
 
-  case class Index()
+  case class Index(underlyer: List[Instrument.Key]) extends Derivative[List] {
+    def components: List[Instrument.Key] = underlyer
+  }
 
   case class EtdFuture()
 
@@ -65,11 +70,11 @@ trait VanillaDerivatives {
   case class EtdOption()
 
   // I mean, right?
-  case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative
+  case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative[Id]
 
-  case class IndexOption(underlyer: Instrument.Key) extends Derivative
+  case class IndexOption(underlyer: Instrument.Key) extends Derivative[Id]
 
-  case class StockOption(underlyer: Instrument.Key) extends Derivative
+  case class StockOption(underlyer: Instrument.Key) extends Derivative[Id]
 
   case class BondFuture()
   // A BondFutureOption.
@@ -133,8 +138,8 @@ trait Lending {
 }
 
 /** FIXME: "Index" anything should reference the index - need a Table of Indexes */
-sealed trait Derivative {
-  def underlyer: Instrument.Key
+sealed trait Derivative[F[_]] {
+  def underlyer: F[Instrument.Key]
 }
 
 sealed trait Index {

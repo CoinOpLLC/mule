@@ -7,23 +7,31 @@ import cats._
 import cats.implicits._
 
 import eu.timepit.refined
+import refined.api.Refined
 import refined.boolean.Or
-// import refined.{ cats => refinedCats, _ }
 
 import io.circe.Json
 
 /**
-  * `LegalEntities` model real world actors.
+  * This value class models real world actors under the aegis of, and registered with, real world
+  * justistictions.
+  *
+  * Privacy by design: [[TaxId]]'s are not used as keys.
   * See Also: `model.Role`s.
   */
 sealed trait LegalEntity extends Serializable {
   def name: VarChar
-  def key: LegalEntity.Key
+  def taxId: LegalEntity.TaxId
   def meta: Json
 }
 
-/** `LegalEntity`s recognized by the system. */
-object LegalEntity extends WithRefinedKey[String, IsSsn Or IsEin, LegalEntity] {
+/**
+  * `LegalEntity`s recognized by the system.
+  */
+object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
+
+  type IsTaxId = IsSsn Or IsEin
+  type TaxId   = String Refined IsTaxId
 
   import refined.auto._
 
@@ -36,14 +44,14 @@ object LegalEntity extends WithRefinedKey[String, IsSsn Or IsEin, LegalEntity] {
       dob: LocalDate,
       meta: Json
   ) extends LegalEntity {
-    def key = ssn
+    def taxId = ssn
   }
 
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
   final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
-    def key = ein
+    def taxId = ein
   }
 
   implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
