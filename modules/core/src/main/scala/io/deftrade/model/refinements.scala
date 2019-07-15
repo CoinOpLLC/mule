@@ -9,11 +9,14 @@ import eu.timepit.refined
 import refined.api.Refined
 import refined.W
 import refined.boolean.{ And, Or }
-import refined.collection.{ MaxSize }
+import refined.collection.{ MaxSize, NonEmpty }
+import refined.numeric.Positive
 import refined.string.{ MatchesRegex, Trimmed }
 import refined.api.Validate
 
 import shapeless.syntax.singleton._
+
+import scala.language.existentials
 
 /**
   * A palette of domain specific refined types.
@@ -21,6 +24,23 @@ import shapeless.syntax.singleton._
   * Prêt à porter, batteries included, your metaphore here (civil pull requests considered).
   */
 object refinements {
+
+  import refined.auto._
+
+  private def alpha = "[A-Z]"
+  private def num   = "[0-9]"
+
+  private def witnesseth[T](t: T)                          = { val tv = t; tv.witness }
+  private def patRep(pat: String)(n: Int Refined Positive) = s"""$pat{$n}""" |> witnesseth
+
+  val Alpha2 = patRep(alpha)(2)
+  type Alpha2 = String Refined MatchesRegex[Alpha2.T]
+
+  val Alpha3 = patRep(alpha)(3)
+  type Alpha3 = String Refined MatchesRegex[Alpha3.T]
+
+  val Num3 = patRep(num)(3)
+  type Num3 = String Refined MatchesRegex[Num3.T]
 
   val Mic = """[A-Z]{3,4}""".witness
   type Mic = String Refined MatchesRegex[Mic.T] // market venue
@@ -31,6 +51,13 @@ object refinements {
     */
   type IsVarChar = IsVarChar126
   type VarChar   = String Refined IsVarChar
+  object VarChar {
+    import refined.auto._
+
+    val empty: VarChar = ""
+
+  }
+  type NonEmptyVarChar = String Refined (IsVarChar And NonEmpty)
 
   /** Postgres optimizes strings less than this. */
   type IsVarChar126 = Trimmed And MaxSize[W.`126`.T]
@@ -121,6 +148,8 @@ object refinements {
 
   /** Psin: Pseudo Isin: matches regex, but uses the 9 digit body for proprietary mappings. */
   sealed abstract case class CheckedPsin()
+
+  /** */
   object CheckedPsin {
 
     lazy val instance: CheckedPsin = new CheckedPsin() {}

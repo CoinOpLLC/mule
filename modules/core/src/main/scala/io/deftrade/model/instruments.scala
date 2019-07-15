@@ -63,8 +63,9 @@ trait VanillaDerivatives {
   case class Index(underlyer: List[Instrument.Key]) extends Derivative[List] {
     def components: List[Instrument.Key] = underlyer
   }
+  object Index extends WithAdtKey[Isin, Index]
 
-  case class EtdFuture()
+  case class EtdFuture(underlyer: Instrument.Key) extends Derivative[Id]
 
   // Exchange Traded Derivative - Option (ETD)
   case class EtdOption()
@@ -78,7 +79,11 @@ trait VanillaDerivatives {
 
   case class BondFuture()
   // A BondFutureOption.
-  case class BondFutureOption()
+  case class BondFutureOption(index: Index.Key) extends Derivative[Id] {
+
+    /** FIXME need to be able to derive this */
+    def underlyer: Instrument.Key = ??? // index
+  }
   // Exchange Traded Derivative - Future (ETD)
 }
 
