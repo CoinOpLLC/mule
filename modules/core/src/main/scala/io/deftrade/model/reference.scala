@@ -10,7 +10,10 @@ import eu.timepit.refined
 import refined.api.Refined
 import refined.collection.NonEmpty
 
+/** */
 object reference {
+
+  /** */
   sealed abstract case class CountryCode(
       alpha2: Alpha2,
       alpha3: Alpha3,
@@ -24,6 +27,8 @@ object reference {
       intermediateRegion: VarChar,
       // iso_3166_2: NonEmptyVarChar,
   )
+
+  /** */
   object CountryCode extends WithOpaqueKey[Int, CountryCode] {
 
     def regions: Map[Num3, VarChar]             = ???

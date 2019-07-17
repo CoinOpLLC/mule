@@ -78,6 +78,8 @@ object refinements {
     * https://www.ssa.gov/history/ssn/geocard.html
     */
   sealed abstract case class CheckedSsn private ()
+
+  /** */
   object CheckedSsn {
 
     lazy val instance: CheckedSsn = new CheckedSsn() {}
@@ -121,29 +123,28 @@ object refinements {
     implicit def isinValidate: Validate.Plain[String, CheckedIsin] =
       Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
 
-    private def predicate(isin: String): Boolean =
-      /**
-        * TODO need to add country checks,
-        and break them out into a separate function
+    /**
+      * * TODO need to add country checks,
+      * and break them out into a separate function
+      *
+      *   - green-light only a predefined list of juristictions for registered securities
+      *   - two-letter code mappings reserved for "users" are adopted by deftrade:
+      *   - ZZ: unregistered securities with house-issued numbers.
+      *   - XB: Interactive Brokers `ConId` number
+      *   - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
+      */
+    private def predicate(isin: String): Boolean = failsafe {
 
-        - green-light only a predefined list of juristictions for registered securities
-        - two-letter code mappings reserved for "users" are adopted by deftrade:
-            - ZZ: unregistered securities with house-issued numbers.
-            - XB: Interactive Brokers `ConId` number
-        - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
-        */
-      failsafe {
+      val digits = for {
+        c <- isin
+        d <- Character.digit(c, 36).toString
+      } yield d.asDigit
 
-        val digits = for {
-          c <- isin
-          d <- Character.digit(c, 36).toString
-        } yield d.asDigit
+      val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
 
-        val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
+      check.sum % 10 === 0
 
-        check.sum % 10 === 0
-
-      }
+    }
   }
 
   /** Psin: Pseudo Isin: matches regex, but uses the 9 digit body for proprietary mappings. */
@@ -157,28 +158,17 @@ object refinements {
     implicit def isinValidate: Validate.Plain[String, CheckedPsin] =
       Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
 
-    /**
-      * TODO need to add country checks,
-        and break them out into a separate function
+    private def predicate(isin: String): Boolean = failsafe {
 
-        - green-light only a predefined list of juristictions for registered securities
-        - two-letter code mappings reserved for "users" are adopted by deftrade:
-            - ZZ: unregistered securities with house-issued numbers.
-            - XB: Interactive Brokers `ConId` number
-        - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
-      */
-    private def predicate(isin: String): Boolean =
-      failsafe {
+      val digits = for {
+        c <- isin
+        d <- Character.digit(c, 36).toString
+      } yield d.asDigit
 
-        val digits = for {
-          c <- isin
-          d <- Character.digit(c, 36).toString
-        } yield d.asDigit
+      val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
 
-        val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
-
-        check.sum % 10 === 0
-      }
+      check.sum % 10 === 0
+    }
   }
 
   type IsIsin = MatchesRxIsin And CheckedIsin
