@@ -282,8 +282,6 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       } {
         unapply(_).fold(???)(identity)
       }
-
-    /** outputs: YearBegin, YearEnd, NetIncrease = YearEnd - YearBegin */
   }
 
   sealed abstract case class EquityStatement[C] private (wut: Null)

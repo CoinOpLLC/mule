@@ -121,9 +121,8 @@ object refinements {
     implicit def isinValidate: Validate.Plain[String, CheckedIsin] =
       Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
 
-    private def predicate(isin: String): Boolean =
-      /**
-        * TODO need to add country checks,
+    /**
+      * TODO need to add country checks,
         and break them out into a separate function
 
         - green-light only a predefined list of juristictions for registered securities
@@ -131,7 +130,8 @@ object refinements {
             - ZZ: unregistered securities with house-issued numbers.
             - XB: Interactive Brokers `ConId` number
         - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
-        */
+      */
+    private def predicate(isin: String): Boolean =
       failsafe {
 
         val digits = for {
@@ -233,7 +233,8 @@ object refinements {
     private def predicate(isin: String): Boolean =
       failsafe {
 
-        /** FIXME flesh this out */
+        // FIXME flesh this out
+
         true
 
       }

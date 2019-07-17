@@ -35,11 +35,11 @@ import scala.language.higherKinds
   * multiple OMS gateways to external markets?
   *
   * It means this:
-  * - we keep contra accounts per OMS gateway
-  * - we debit that account when we "buy shares" (creates negative balance)
-  * - we credit that account when settlement happens (zeros out the balance)
-  * - we "reverse polarity" when we enter a short position.
-  * - we can indexAndSum settled positions for reconcilliation
+  *   - we keep contra accounts per OMS gateway
+  *   - we debit that account when we "buy shares" (creates negative balance)
+  *   - we credit that account when settlement happens (zeros out the balance)
+  *   - we "reverse polarity" when we enter a short position.
+  *   - we can indexAndSum settled positions for reconcilliation
   *
   * TODO - provisional:
   * we depend on `Balances` because it makes no sense
@@ -57,14 +57,13 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   /**
     * Price all the things.
     * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
-    * - this isn't how data typically comes, especially cheap data.
-    * - smart routers (and internalizers!) introduce another layer of conceptual complexity
-    * - nonetheless, these are the semantics any sane developer needs... if best effort
+    *   - this isn't how data typically comes, especially cheap data.
+    *   - smart routers (and internalizers!) introduce another layer of conceptual complexity
+    *   - nonetheless, these are the semantics any sane developer needs... if best effort
     * isn't good enough, don't offer it.
     */
   sealed trait Market { def entity: Option[LegalEntity.Key] }
 
-  /** `Mic`s are unique */
   object Market extends WithOpaqueKey[Long, Market] {
     implicit def eq: cats.Eq[Market] = cats.Eq by (_.entity)
 
@@ -79,8 +78,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
 
     /**
       * Single effective counterparty: the `Exchange` itself.
-      * - seller for all buyers and vice versa.)
-      * - activity recorded in a `contra account`
+      *   - [[Mic]]s are unique.
+      *   - seller for all buyers and vice versa.
+      *   - activity recorded in a `contra account`
       */
     sealed abstract case class Exchange private (
         final val mic: Mic,
@@ -98,10 +98,12 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     }
 
     /**
-      * Models a direct deal facing a private `Counterparty`. Their `Ledger` `Account` is
+      * Models a direct deal facing a private party.
+      *
+      * Their [[Ledger]] [[Account]] is
       * assumed to be "real" (not a contra account) although it can assume those characteristics
       * when the `Counterparty` is sourcing `Instruments` from private flows.
-      * - (e.g. exempt Securities for accredited individuals or qualified institutions)
+      *   - (e.g. exempt Securities for accredited individuals or qualified institutions)
       */
     sealed abstract case class Counterparty(val key: LegalEntity.Key) extends Market
     object Counterparty {}

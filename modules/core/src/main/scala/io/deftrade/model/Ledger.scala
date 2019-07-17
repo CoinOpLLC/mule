@@ -6,6 +6,8 @@ import time._, money._, keyval._, capital.Instrument
 import cats._
 import cats.implicits._
 
+import io.circe.Json
+
 import scala.language.higherKinds
 
 /**
@@ -23,19 +25,21 @@ abstract class Ledger[Q: Financial] { self =>
   val Quantity = Financial[Quantity]
 
   /**
-    * How much of a given `Instrument` is held.
-    * Can also be thought of as a `Leg` at rest.
+    * How much of a given [[Instrument]] is held.
+    *
+    * Can also be thought of as a [[Leg]] at rest.
     */
   type Position = (Instrument.Key, Quantity)
   object Position
 
-  /** `Leg` := `Position` in motion */
+  /** A [[Position]] in motion */
   type Leg = Position
   lazy val Leg = Position
 
   /**
-    * A `Folio` is a set of `Position`s.
-    * Can also be thought of as a `Trade` at rest.
+    * A set of [[Position]]s.
+    *
+    * Can also be thought of as a [[Trade]] at rest.
     */
   type Folio = Map[Instrument.Key, Quantity]
   object Folio extends WithOpaqueKey[Long, Folio] {
@@ -43,12 +47,13 @@ abstract class Ledger[Q: Financial] { self =>
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
   }
 
-  /** A `Trade` := `Folio` in motion. */
+  /** A [[Folio]] in motion. */
   type Trade = Folio
   lazy val Trade = Folio
 
   /**
     * Models ready cash per currency.
+    *
     * n.b. the `C` type parameter is purely phantom
     */
   sealed abstract case class Wallet[C] private (val folio: Folio)
@@ -66,31 +71,22 @@ abstract class Ledger[Q: Financial] { self =>
   }
 
   /**
-    * For `Ledger` changes, the `Transaction` is the concrete record of record, so to speak.
+    * For [[Ledger]] updates, the `Transaction` is the concrete record of record, so to speak.
+    *
+    * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`:
+    *  the transaction is provisional until dated, returned as a receipt.
+    *
+    * The exact semantics will depend on the higher level context
+    *  (e.g. booking a trade vs receiving notice of settlement).
+    *
+    * n.b.: there is no currency field; cash payments are reified in currency-as-instrument.
+    * Store the _cryptographic hash_ of whatever metadata there is.
     */
   sealed abstract case class Transaction(
-      /**
-        * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`
-        * - the transaction is provisional until dated, returned as a receipt
-        *
-        * The exact semantics will depend on the higher level context
-        * - (e.g. booking a trade vs receiving notice of settlement).
-        *
-        * n.b.: there is no currency field; cash payments are reified in currency-as-instrument.
-        */
       recordedAt: Option[Instant],
-      /**
-        */
       debitFrom: Folio.Key,
-      /**
-        */
       creditTo: Folio.Key,
-      /**
-        */
       trade: Trade,
-      /**
-        * Store the _cryptographic hash_ of whatever metadata there is.
-        */
       metaSha: Array[Byte]
   )
 
@@ -108,15 +104,15 @@ abstract class Ledger[Q: Financial] { self =>
         debitFrom: Folio.Key,
         creditTo: Folio.Key,
         instrument: Instrument.Key,
-        amount: Quantity
+        amount: Quantity,
+        meta: Option[Json]
     ): Transaction =
       new Transaction(
         none,
         debitFrom,
         creditTo,
         Trade(instrument -> amount),
-        /** FIXME you see the problem */
-        Array.empty[Byte]
+        Array.empty[Byte] // FIXME, and notice that typesafety is no help here - need moar shapeless
       ) {}
 
     /**
