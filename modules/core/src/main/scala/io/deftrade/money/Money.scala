@@ -90,7 +90,8 @@ object Money {
   }
 
   /**
-    * [[Refined]] integration
+    * Typeclass instance which integrates [[Money]] with the
+    * [[https://github.com/fthomas/refined Refined]] library.
     *
     * TODO why do we need this? The `Validate` mechanism and related inferences
     * do nothing for us. YAGNI?
@@ -108,7 +109,7 @@ object Money {
     }
 
   /**
-    * Policy for validating: Any `C` with a [[Currency]] implicit instance.
+    * Valiation policy: Any `C` with a [[Currency]] implicit instance.
     *
     * Design rational(ization?):
     *

@@ -20,26 +20,27 @@ import io.chrisdavenport.cormorant._
 // import io.chrisdavenport.cormorant.refined._
 
 /**
-  * Defines types and implicit methods for a given domain value type (typically a case class).
+  * Defines a scheme* for enriching domain value types (typically case classes) with additional
+  * types and implicit methods useful for persistence and caching.
   *
-  * - ids:
-  * - keys: opaque identifiers with `Order`, `Hash` and `Show` typeclass instances
-  * - values: value objects (case classes) with `Eq`, `Hash` and `Show`
-  * - entities: `Map`s of Key -> Value entries: repos, logs...
+  *   - `id`s: opaque Long based `id` (with `Order` instances)
+  *   - `key`s: opaque identifiers with `Order`, `Hash` and `Show` typeclass instances
+  *   - `value`s: value class typeclass instances (`Eq`, `Hash` and `Show`).
+  *   - etc.
   *
   * This shall be the law: A `type Foo` may not depend on any type used as a key for `Foo`s.
   *
   * This package will enforce the law by
-  * - aliasing `Refined` as an opaque key for a collection of a given type of values
-  * - assinging the `Value` type to be the phantom type parameter for the Refined type constructor
-  * - providing the `Key` types and instances as companion base classes.
+  *   - aliasing `Refined` as an opaque key for a collection of a given type of values
+  *   - assinging the `Value` type to be the phantom type parameter for the Refined type constructor
+  *   - providing the `Key` types and instances as companion base classes.
   *
   * Further, the package supports the instantiaton of the scheme by
-  * - providing a `Row` type (`Key` -> `Value`)
-  * - providing a `Table` type (Map[Key, Value])
-  * - providing implicit derivations for CSV file readers and writers of `Row`s and `Tables`s.
+  *   - providing a `Row` type (`Key` -> `Value`)
+  *   - providing a `Table` type (Map[Key, Value])
+  *   - providing implicit derivations for CSV file readers and writers of `Row`s and `Tables`s.
   *
-  * *It's a scheme because calling it a "schema" is too grand.
+  * *,,it's just a scheme because calling it a "schema" is too grand,,
   */
 package object keyval {
 
@@ -87,7 +88,8 @@ package keyval {
   }
 
   /**
-    * Intance which defines how to create a fresh *globally unique* key, suitable to be persisted.
+    * Intance which defines how to create a fresh '''globally unique''' key which
+    * is suitable to be persisted.
     *
     * TODO: consider threading F[_] thru Fresh.
     */
@@ -212,7 +214,7 @@ package keyval {
     final type Tag = P
 
     /**
-      * Keys type is auto generated and uniform
+      * Keys type is auto generated and presents a uniform convention.
       */
     final type Key = OpaqueKey[K, Tag]
 
@@ -233,14 +235,14 @@ package keyval {
   }
 
   /**
-    * **By convention**, this companion tag keys with the value type of the
+    * '''By convention''', this companion tag keys with the value type of the
     * record table we are indexing.
     *
     * This phantom type for the `Refined` Key type is [[[Value]]]).
     */
   abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
 
-    /** Uses Value type as (phantom) predicate type */
+    /** Uses Value type as (phantom) predicate type. */
     object Key extends OpaqueKeyCompanion[K, V]
 
     /** No constraint on validation. */

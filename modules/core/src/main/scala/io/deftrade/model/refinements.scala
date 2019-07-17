@@ -223,7 +223,8 @@ object refinements {
     private def predicate(isin: String): Boolean =
       failsafe {
 
-        /** FIXME flesh this out */
+        // FIXME flesh this out
+
         true
 
       }

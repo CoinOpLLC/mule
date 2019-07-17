@@ -5,6 +5,7 @@ object pricing {
 
   /**
     * - `QuotedIn` is a binary typeclass: `A QuotedIn B`. The domain vocabulary usage supports this.
+    *
     * - can come from a variety of sources including live market
     * - "Orderly market" invariant: `ask` < `bid`.
     * - must model disorderly markets: not everything that comes at you down the wire makes sense.

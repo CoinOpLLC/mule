@@ -18,10 +18,11 @@ import cats.instances.string._
 import io.circe.Json
 
 /**
-  * `Instrument`s in the house.
+  * Models a tradeable thing.
+  *
   * TODO:
-  * - use the XBRL definitions for these, a la OpenGamma
-  * - see implementations in `Refine` library
+  *   - use the XBRL definitions for these, a la OpenGamma
+  *   - see implementations in `Refine` library
   */
 final case class Instrument(
     symbol: VarChar,
