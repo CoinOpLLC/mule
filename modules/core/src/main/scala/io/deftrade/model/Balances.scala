@@ -71,7 +71,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def apply[C: Currency](mark: Pricer[C]): TransactionMarker[C] = new TransactionMarker(mark) {}
   }
 
-  type AccountType = accounting.AccountType
+  type AccountingKey = accounting.AccountingKey
 
   type Debit  = accounting.Debit
   type Credit = accounting.Credit
@@ -86,19 +86,19 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   type Equity = accounting.Equity
 
   /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
-  final type AccountMap[A <: AccountType, C] = Map[A, Money[MA, C]]
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Money[MA, C]]
 
   /* */
   object AccountMap {
 
-    def empty[AT <: AccountType, C]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
+    def empty[AT <: AccountingKey, C]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
 
-    def from[AT <: AccountType, C](
+    def from[AT <: AccountingKey, C](
         ks: accounting.SwapKey[AT],
         amount: Money[MA, C]
     ): AccountMap[AT, C] = ???
 
-    def collect[T <: AccountType, R <: T: scala.reflect.ClassTag, C](
+    def collect[T <: AccountingKey, R <: T: scala.reflect.ClassTag, C](
         as: AccountMap[T, C]
     ): AccountMap[R, C] =
       as collect {
@@ -106,7 +106,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
       }
   }
 
-  implicit class SweetAccountMap[A <: AccountType, C](am: AccountMap[A, C]) {
+  implicit class SweetAccountMap[A <: AccountingKey, C](am: AccountMap[A, C]) {
 
     def total(implicit C: Currency[C]): Money[MA, C] =
       C(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
@@ -114,7 +114,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
   }
 
   /** convenience and domain semantics only */
-  def emptyAccount[A <: AccountType, C: Currency]: AccountMap[A, C] = AccountMap.empty
+  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = AccountMap.empty
 
   final type Debits[C]      = AccountMap[Debit, C]
   final type Credits[C]     = AccountMap[Credit, C]
@@ -179,8 +179,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     def updated(key: DebitKey, amount: Money[MA, C]): TrialBalance[C]  = ???
     def updated(key: CreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
-    // implicit def CG[AT <: AccountType] = CommutativeGroup[AccountMap[AT, C]]
-    def swapped[T <: AccountType](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
+    // implicit def CG[AT <: AccountingKey] = CommutativeGroup[AccountMap[AT, C]]
+    def swapped[T <: AccountingKey](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
       sk match {
         // FIXME: make syntax work
         case AssetSwapKey(_, _) =>
@@ -357,13 +357,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMappin
     */
   def deltaCashBooksFrom[C: Currency](cbs: CashBookSet[C]): (
       PricedTrade[C],
-      UnitPartition[AccountType, MonetaryAmount],
+      UnitPartition[AccountingKey, MonetaryAmount],
       Transaction.Meta
   ) => DeltaCashBooks[C] = ???
 
   import enumeratum._
 
-  sealed trait NettableLike extends EnumEntry with Product with Serializable {
+  sealed trait NettableLike extends EnumEntry with Serializable {
     type AssetType <: Debit
     def gross: AssetType
     def less: AssetType

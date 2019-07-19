@@ -1,5 +1,9 @@
 package io.deftrade
 package model
+
+/**
+  * IRS Form 1065 Schedule L ontology
+  */
 package accounting
 
 import money._
@@ -14,15 +18,15 @@ import enumeratum._
    A + X = Q + L + I.
   }}}
   */
-sealed trait AccountType extends EnumEntry with Product with Serializable
-object AccountType
+sealed trait AccountingKey extends EnumEntry with Serializable
+object AccountingKey
 
-sealed trait Debit extends AccountType
+sealed trait Debit extends AccountingKey
 object Debit {
   lazy val values = Asset.values ++ Expense.values ++ Income.values
 }
 
-sealed trait Credit extends AccountType
+sealed trait Credit extends AccountingKey
 object Credit {
   lazy val values = Liability.values ++ Equity.values ++ Revenue.values
 }
@@ -99,7 +103,7 @@ object Income extends Enum[Income] with CatsEnum[Income] {
 }
 
 /** Single amount principle: one leg is singular */
-sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private[accounting] (
+sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] private[accounting] (
     entry: X,
     contras: DoubleEntryKey.KeySet[Y]
 ) extends EnumEntry
@@ -107,7 +111,7 @@ sealed abstract class DoubleEntryKey[X <: AccountType, Y <: AccountType] private
     with Serializable
 
 object DoubleEntryKey {
-  type KeySet[AT <: AccountType] = NonEmptySet[AT]
+  type KeySet[AT <: AccountingKey] = NonEmptySet[AT]
 }
 
 import DoubleEntryKey.KeySet
@@ -128,7 +132,7 @@ object DebitKey extends Enum[DebitKey] {
   import cats.instances.string._
 
   /** this is just a hack to use `SortedSet`s etc */
-  private implicit def orderKeys[AT <: AccountType]: cats.Order[AT] = cats.Order by (_.entryName)
+  private implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
 
   /** bill payment */
   case object PayBills extends DebitKey(Asset.Cash, NonEmptySet one Liability.AccountsPayable)
@@ -143,7 +147,7 @@ object DebitKey extends Enum[DebitKey] {
   * `SwapKey`'s type parameter restricts the swap to occur
   * within the same "column" of the `Balance`.
   */
-sealed abstract class SwapKey[T <: AccountType] private[accounting] (
+sealed abstract class SwapKey[T <: AccountingKey] private[accounting] (
     val from: T,
     val to: KeySet[T]
 ) extends DoubleEntryKey(from, to)

@@ -50,9 +50,14 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
         nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
     ) = new Roster(principals, nonPrincipals) {}
 
-    /** Pplits partition equally among [[Principal]]s - especially useful for singleton principals. */
-    def fromRoles(rs: Map[LegalEntity.Role, LegalEntity.Key]): Result[Roster] = ???
+    /**
+      * Splits partition equally among [[LegalEntity.Role.Principal]]s.
+      */
+    def equalSplitFrom(rs: Map[LegalEntity.Role, LegalEntity.Key]): Result[Roster] = ???
 
+    /**
+      *
+      */
     def single(key: LegalEntity.Key): Roster =
       unsafe(
         principals = UnitPartition single key,
@@ -74,13 +79,6 @@ abstract class EntityAccountMapping[Q: Financial] extends Ledger[Q] { self =>
   object Account extends WithRefinedKey[Long, AccountNo, Account] {
 
     def unsafe(roster: Roster, folioKey: Folio.Key) = new Account(roster, folioKey) {}
-
-    // type Key = Long Refined AccountNo // remember you only get one free (value class) wrapper
-    //
-    // object Key {
-    //   implicit def orderAccountId: cats.Order[Key] = cats.Order by { _.value }
-    //   implicit lazy val fresh: Fresh[Key]          = Fresh.zeroBasedIncr[Long, AccountNo]
-    // }
 
     def simple(le: LegalEntity.Key, f: Folio.Key): Account = unsafe(Roster single le, f)
 

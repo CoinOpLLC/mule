@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import time._, money._, keyval._, capital.Instrument
+import time._, money._, keyval._, capital._
 
 import cats._
 import cats.implicits._
@@ -25,7 +25,7 @@ abstract class Ledger[Q: Financial] { self =>
   val Quantity = Financial[Quantity]
 
   /**
-    * How much of a given [[Instrument]] is held.
+    * How much of a given [[capital.Instrument]] is held.
     *
     * Can also be thought of as a [[Leg]] at rest.
     */
@@ -39,7 +39,10 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * A set of [[Position]]s.
     *
-    * Can also be thought of as a [[Trade]] at rest.
+    * A `Folio` can be thought of as a "flat portfolio", i.e. a portfolio without
+    * sub portfolios.
+    *
+    * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
     */
   type Folio = Map[Instrument.Key, Quantity]
   object Folio extends WithOpaqueKey[Long, Folio] {
