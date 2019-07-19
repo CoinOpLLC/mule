@@ -78,7 +78,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
 
     /**
       * Single effective counterparty: the `Exchange` itself.
-      *   - [[Mic]]s are unique.
+      *   - [[refinements.Mic]]s are unique.
       *   - seller for all buyers and vice versa.
       *   - activity recorded in a `contra account`
       */

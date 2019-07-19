@@ -32,7 +32,7 @@ import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
 
 /** Nuts exist in the test package. Make of that what you will. */
-sealed trait Nut extends EnumEntry with Product with Serializable
+sealed trait Nut extends EnumEntry with Serializable
 
 /** All the nuts I could think of. */
 object Nut extends Enum[Nut] with CsvEnum[Nut] {
