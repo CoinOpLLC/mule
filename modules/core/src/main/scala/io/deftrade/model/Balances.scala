@@ -41,7 +41,7 @@ import scala.language.higherKinds
   * Note the explicit binding to `Ledger` with `Folio.Key` dependence.
   * FIXME: really only depends on `Ledger` - could merge but would need 2 type params
   */
-abstract class Balances[MA: Financial, Q: Financial] extends EntityAccountMapping[Q] {
+abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   type MonetaryAmount = MA
