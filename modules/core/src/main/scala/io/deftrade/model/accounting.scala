@@ -8,10 +8,11 @@ import cats.data.NonEmptySet
 
 import enumeratum._
 
-/** IRS Form 1065 Schedule L ontology */
-/**
-  Assets + eXpenses = eQuity + Liabilities + Income
-  A + X = Q + L + I.
+/** IRS Form 1065 Schedule L ontology: partnerships and `LLC`s taxed as partnerships.
+  {{{
+   Assets + eXpenses = eQuity + Liabilities + Income
+   A + X = Q + L + I.
+  }}}
   */
 sealed trait AccountType extends EnumEntry with Product with Serializable
 object AccountType
@@ -153,6 +154,7 @@ private[accounting] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
       from = from,
       to = NonEmptySet one to
     )
+
 object AssetSwapKey extends Enum[AssetSwapKey] {
 
   import Asset._

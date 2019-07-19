@@ -16,6 +16,7 @@ import refined.api.Validate
 
 import shapeless.syntax.singleton._
 
+import scala.util.Try
 import scala.language.existentials
 
 /**
@@ -259,6 +260,6 @@ object refinements {
   private def luhn(digit: Int, idx: Int): Int =
     if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10
 
-  private def failsafe(predcomp: => Boolean): Boolean = scala.util.Try(predcomp) getOrElse false
+  private def failsafe(predcomp: => Boolean): Boolean = Try(predcomp).fold(_ => false, identity)
 
 }
