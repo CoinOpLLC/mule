@@ -4,7 +4,8 @@ package money
 object pricing {
 
   /**
-    * - `QuotedIn` is a binary typeclass: `A QuotedIn B`. The domain vocabulary usage supports this.
+    * - Two parameter typeclass which takes advantage of the infix syntax; `A QuotedIn B`is
+    * a human-legible expression in the domain of market quotes.
     *
     * - can come from a variety of sources including live market
     * - "Orderly market" invariant: `ask` < `bid`.
