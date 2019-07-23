@@ -74,7 +74,9 @@ package keyval {
 
   object OpaqueKey {
 
-    def apply[K: Order, V](k: K): OpaqueKey[K, V] = (Refined unsafeApply k)
+    private[keyval] def apply[K: Order, V](k: K): OpaqueKey[K, V] = (Refined unsafeApply k)
+
+    def unsafe[K: Order, V](k: K): OpaqueKey[K, V] = apply(k)
 
   }
 
@@ -91,7 +93,7 @@ package keyval {
     * Intance which defines how to create a fresh '''globally unique''' key which
     * is suitable to be persisted.
     *
-    * TODO: consider threading F[_] thru Fresh.
+    * TODO: consider using a Ref.
     */
   final case class Fresh[K](init: K, next: K => K)
 
@@ -206,7 +208,7 @@ package keyval {
     /**
       * Phantom type used to tag the key, which has type K as its underlying representation.
       * This can either be a trivial tag which encodes the independance of a key from the record
-      * that it indexes, or, some other kind of constraint.
+      * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
       *
       * The assumption is that some kind of tagging (e.g. `Refine` or `@@`) is
       * combining `K` and `P` to create the `Key` type.

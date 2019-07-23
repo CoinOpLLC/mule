@@ -23,27 +23,29 @@ import cats.implicits._
   *
   * While all `Financial`s are `Fractional`, the reverse is not true.
   * (At least, not true enough for this domain model architect.)
+  *
+  * TODO: facilities for representing / displaying percentages.
   */
 abstract class Financial[N] private (val fractional: Fractional[N]) {
+
+  type LiterallyZero
+  type LiterallyOne
 
   final type Positive    = N Refined refined.numeric.Positive
   final type NonNegative = N Refined refined.numeric.NonNegative
 
-  final type `(0,1)` = N Refined r9s.`(0,1)`
-  final type `[0,1)` = N Refined r9s.`[0,1)`
-  final type `(0,1]` = N Refined r9s.`(0,1]`
-  final type `[0,1]` = N Refined r9s.`[0,1]`
+  final type `(0,1)` = N Refined Is.`(0,1)`
+  final type `[0,1)` = N Refined Is.`[0,1)`
+  final type `(0,1]` = N Refined Is.`(0,1]`
+  final type `[0,1]` = N Refined Is.`[0,1]`
 
-  object r9s {
+  object Is {
     type `(0,1)` = Greater[LiterallyZero] And Less[LiterallyOne]
     type `[0,1)` = Not[Less[LiterallyZero]] And Less[LiterallyOne]
     type `(0,1]` = Greater[LiterallyZero] And Not[Greater[LiterallyOne]]
     type `[0,1]` = Not[Less[LiterallyZero]] And Not[Greater[LiterallyOne]]
 
   }
-
-  type LiterallyZero
-  type LiterallyOne
 
   /**
     * How do we deal with scale and significant digits?
@@ -107,14 +109,23 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 object Financial {
   import refined.W
 
+  abstract class Aux[N, ZED, UNO](N: Fractional[N]) extends Financial(N) {
+    type LiterallyZero = ZED
+    type LiterallyOne  = UNO
+  }
+
+  /** FIXME: check the `shapeless` examples here - this probably doesn't work */
   def apply[N: Financial]: Financial[N] = implicitly
 
-  implicit lazy val DoubleIsFinancial = new Financial(Fractional[Double]) {
-    type LiterallyZero = W.`0.0`.T
-    type LiterallyOne  = W.`1.0`.T
+  implicit lazy val DoubleIsFinancial = new Financial.Aux[
+    Double,
+    W.`0.0`.T,
+    W.`1.0`.T
+  ](Fractional[Double]) {
     def fromString(s: String): Double = java.lang.Double parseDouble s
   }
 
+  /** FIXME: test the Aux pattern thing; also: use BigDecimal(1.0).witness ?! */
   implicit lazy val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
