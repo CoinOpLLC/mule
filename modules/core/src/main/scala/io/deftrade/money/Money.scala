@@ -5,16 +5,16 @@ import eu.timepit.refined
 import refined.api.{ RefType, Validate }
 
 import cats._
-import cats.kernel.{ CommutativeGroup, Order }
 import cats.implicits._
+import cats.kernel.{ CommutativeGroup, Order }
 
 /**
   * `Money` is a scala value class, with a phantom currency type.
   *
   * So why can't we just say
-  * ```
+  * {{{
   *   type  Money[N, C] = Refined[N, C]
-  * ```
+  * }}}
   *
   * and be done?
   *
