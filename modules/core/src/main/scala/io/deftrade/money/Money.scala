@@ -55,10 +55,11 @@ object Money {
   def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
     Financial[N].round[C](amount) |> fiat
 
-  /** TODO: should both amount and currency be extracted here?... */
-  def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[N] = m.amount.some
+  /** Unpacks into a `(N, C)`. */
+  def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[(N, Currency[C])] =
+    (m.amount, Currency[C]).some
 
-  /** Policy: algebras should not have arbitrary and domain restrictions on the phantom types. */
+  /** */
   implicit def moneyOrder[N: Financial, C]: Order[Money[N, C]] =
     Order by (_.amount)
 
