@@ -24,7 +24,7 @@ import cats.kernel.{ CommutativeGroup, Order }
   *
   * Therefore we make use of the `RefType` and `Validated` classes to integrate with `Refined`.
   */
-final class Money[N, C] private (val amount: N) extends AnyVal { lhs =>
+final class Money[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
 
   import spire.implicits._
   import Money.fiat
