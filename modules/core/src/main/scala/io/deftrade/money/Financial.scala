@@ -5,6 +5,7 @@ import eu.timepit.refined
 import refined.api.{ Refined, Validate }
 import refined.numeric.{ Greater, Less }
 import refined.boolean.{ And, Not }
+import refined.W
 
 import spire.math.{ Fractional, Integral, Rational }
 import spire.implicits._
@@ -107,7 +108,6 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 /**
   */
 object Financial {
-  import refined.W
 
   abstract class Aux[N, ZED, UNO](N: Fractional[N]) extends Financial(N) {
     type LiterallyZero = ZED
@@ -133,10 +133,7 @@ object Financial {
   }
 
   /**
-    * TODO: read up
-    *
-    * # [XBR: Precision, Decimals and Units 1.0]
-    * http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN- 017-01-11.html)
+    * TODO: read up on[[XBR: Precision, Decimals and Units 1.0 http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-017-01-11.html]]
     *
     * > 6.3
     * ..Another related issue is the desire to express the exact value of certain ratios that

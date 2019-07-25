@@ -1,7 +1,8 @@
 package io.deftrade
 
-import cats.{ Eq, Order, Show }
 import cats.implicits._
+import cats.{ Eq, Order, Show }
+import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.api.{ Min, Refined, Validate }
@@ -47,13 +48,15 @@ package object keyval {
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
 
-  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
-  implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] =
-    Order by (_.value)
+  /** n.b. `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
+  implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
 
-  /** n.b. `Order` is inferred for _all_ `OpaqueKey`[K: Order, V] (unquallified for V) */
-  implicit def showOpaqueKey[K: Show: Integral, V]: Show[OpaqueKey[K, V]] =
-    Show show (key => s"key=${key.value.show}")
+  /** n.b. `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
+  implicit def showOpaqueKey[K: Show, V]: Show[OpaqueKey[K, V]] =
+    Show show (k => s"${k.value.show}")
+
+  // FIXME: hash seems broken for even the simplest cases... doing someghing wrong? ;)
+  // implicit def hashOpaqueKey[K, V]: Hash[OpaqueKey[K, V]] = cats.derived.semi.hash
 
   /**
     * The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
@@ -74,7 +77,7 @@ package keyval {
 
   object OpaqueKey {
 
-    private[keyval] def apply[K: Order, V](k: K): OpaqueKey[K, V] = (Refined unsafeApply k)
+    private[keyval] def apply[K: Order, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
 
     def unsafe[K: Order, V](k: K): OpaqueKey[K, V] = apply(k)
 
@@ -90,10 +93,8 @@ package keyval {
   }
 
   /**
-    * Intance which defines how to create a fresh '''globally unique''' key which
+    * Defines how to create a fresh '''globally unique''' key which
     * is suitable to be persisted.
-    *
-    * TODO: consider using a Ref.
     */
   final case class Fresh[K](init: K, next: K => K)
 
@@ -101,7 +102,11 @@ package keyval {
 
     def apply[K: Fresh] = implicitly[Fresh[K]]
 
-    /** FIXME use lifted functions from K to Refined[K, Value] */
+    /**
+      * Equivalent to `autoincrement` or `serial` from SQL.
+      *
+      * TODO: PRNG version.
+      */
     def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
 
       val K = Integral[K]
@@ -115,8 +120,7 @@ package keyval {
   }
 
   /**
-    * Companion object base class for "value types".
-    * (Value types in the DDD sense, not the scala sense.)
+    * Companion object base class
     */
   private[keyval] abstract class WithKeyBase[V] {
 
