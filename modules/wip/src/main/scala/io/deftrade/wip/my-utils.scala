@@ -130,7 +130,7 @@ trait MuhMonad[F[_]] extends Functor[F] {
 }
 object MuhMonadInstances {
   implicit val id = new MuhMonad[Key] {
-    override def pure[A](a: A): Key[A]                                 = a
+    override def pure[A](a: A): Key[A]                                   = a
     override def flatMap[A, B](value: Key[A])(func: A => Key[B]): Key[B] = value |> func
 
     /**

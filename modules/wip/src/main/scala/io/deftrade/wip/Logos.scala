@@ -33,9 +33,9 @@ trait Logos {
 
   type Point = Complex[Real]
 
-  def point(p: Point): String  = s"${real(p)},${imag(p)}"
-  def real(p: Point): String   = s"${p.real}"
-  def imag(p: Point): String              = s"${p.imag}"
+  def point(p: Point): String = s"${real(p)},${imag(p)}"
+  def real(p: Point): String  = s"${p.real}"
+  def imag(p: Point): String  = s"${p.imag}"
 
   sealed trait Graphic { self =>
     final val TissueThin = 0.05

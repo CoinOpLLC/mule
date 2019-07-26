@@ -18,7 +18,7 @@ import spire.syntax.field._
 
 import scala.collection.immutable.SortedMap
 
-private[deftrade] trait PartitionLike[K, V] extends Any { self =>
+private[deftrade] trait PartitionLike[K, V] {
 
   def kvs: NonEmptyMap[K, V]
 
@@ -31,10 +31,10 @@ private[deftrade] trait PartitionLike[K, V] extends Any { self =>
 
 }
 
-final case class Partition[K, V] private (
+/** Modelling the total equity stake, and the stakeholders thereof. */
+sealed abstract case class Partition[K, V] private (
     val kvs: NonEmptyMap[K, V]
-) extends AnyVal
-    with PartitionLike[K, V] {
+) extends PartitionLike[K, V] {
 
   final def normalized(implicit K: Order[K], V: Fractional[V]): UnitPartition[K, V] = {
     val _total = total
@@ -56,6 +56,8 @@ final case class Partition[K, V] private (
 }
 
 object Partition {
+
+  private def apply[K: Order, V: Fractional](kvs: NonEmptyMap[K, V]) = new Partition(kvs) {}
 
   /** total shares outstanding computed from the sum of `shares` */
   def fromShares[K: Order, V: Fractional](shares: (K, V)*): Result[Partition[K, V]] =
@@ -85,9 +87,15 @@ object Partition {
 
 }
 
-// TODO use refined to restrict V to be between 0 and 1
-/** Guaranteed untitary and reasonable proportioning among several unique keys. */
-final case class UnitPartition[K, V] private (val kvs: NonEmptyMap[K, V]) extends AnyVal with PartitionLike[K, V] {
+/**
+  * Models the equity of an entity as a single Unit.
+  *
+  * (Not to be confused with Scala Unit.)
+  * TODO use refined to restrict V to be between 0 and 1
+  */
+sealed abstract case class UnitPartition[K, V] private (
+    val kvs: NonEmptyMap[K, V]
+) extends PartitionLike[K, V] {
 
   /** share acquired from each according to their proportion */
   def buyIn(key: K, share: V)(implicit K: Order[K], V: Fractional[V]): Result[UnitPartition[K, V]] =
@@ -160,5 +168,5 @@ object UnitPartition {
   }
 
   private[deftrade] def unsafe[K: Order, V: Fractional](kvs: SortedMap[K, V]): UnitPartition[K, V] =
-    new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity))
+    new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity)) {}
 }
