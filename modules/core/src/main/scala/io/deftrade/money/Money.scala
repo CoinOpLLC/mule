@@ -9,7 +9,9 @@ import cats.implicits._
 import cats.kernel.{ CommutativeGroup, Order }
 
 /**
-  * `Money` is a scala value class, with a phantom currency type.
+  * Models an `amount` of [[Currency]] as scala value class, with a phantom currency type.
+  *
+  * Design rational(ization?):
   *
   * So why can't we just say
   * {{{
@@ -64,17 +66,20 @@ object Money {
     Order by (_.amount)
 
   /**
-    * `toString` is limited due to value class implementation
+    * A Show implementation which uses [[format]].
+    *
+    * `toString` is limited by the decision to use value class for [[Money]].
     * But we can implement Show[Money[N, C]] for all the N and C we care about.
     * The Currency[_] instance is legit necessary for proper formatting.
     */
   implicit def moneyShow[N: Financial, C: Currency]: Show[Money[N, C]] =
     Show show (m => format(m))
 
-  /** Money is a commutative group under addition */
+  /** Money is a commutative group under addition. */
   implicit def moneyCommutativeGroup[N: Financial, C]: CommutativeGroup[Money[N, C]] =
     Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(_ |> fiat[N, C])(_.amount)
 
+  /** Stylized output. */
   def format[N, C](m: Money[N, C])(implicit N: Financial[N], C: Currency[C]): String = {
 
     // decimal-separator, grouping-separators, parens-for-negative
@@ -88,6 +93,22 @@ object Money {
     def sfmt = if (isNegative) fmt else s" $fmt "
 
     s"${C.currencyCode} ${m.amount formatted sfmt}"
+  }
+
+  /** Strictly checked input. */
+  def scan[N, C](x: String)(implicit N: Financial[N], C: Currency[C]): Result[Money[N, C]] = {
+    import spire.syntax.field._
+    import N.fractional.one
+    def ccy  = (x take 3).toUpperCase
+    def sign = if ((x charAt 5) === '(') -one else one
+    for {
+      _ <- if (C.toString === ccy)
+            Result.Ok
+          else
+            Result fail s"expected: ${C.toString} read $ccy"
+      amount = x drop 3 + 1 + 1 dropRight 1 + 1
+      n <- Result { N fromString amount }
+    } yield C(sign * n)
   }
 
   /**
@@ -130,35 +151,5 @@ object Money {
     */
   implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
     Validate alwaysPassed Currency[P]
-
-  /** FIXME move the cormorant stuff somewhere else */
-  import io.chrisdavenport.cormorant._
-  import io.chrisdavenport.cormorant.implicits._
-
-  private def scan[N: Financial, C: Currency](
-      x: String
-  ): Either[Error.DecodeFailure, Money[N, C]] = {
-    import spire.syntax.field._
-    val C      = Currency[C]
-    val one    = Financial[N].fractional.one
-    def sign   = if (x.charAt(5) === '(') -one else one
-    val ccy    = (x take 3) |> CSV.Field.apply
-    val amount = (x drop 3 + 1 + 1 dropRight 1 + 1) |> CSV.Field.apply
-    for {
-      _ <- Get[Currency[C]] get ccy
-      n <- Get[N] get amount
-    } yield C apply sign * n
-  }
-
-  /** cormorant csv Get */
-  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
-
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] = scan(field.x)
-
-  }
-
-  /** cormorant csv Put */
-  implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
-    stringPut contramap format[N, C]
 
 }

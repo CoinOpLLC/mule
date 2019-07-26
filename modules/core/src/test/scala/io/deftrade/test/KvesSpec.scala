@@ -104,7 +104,7 @@ class KvesSpec extends FlatSpec {
 
     implicit lazy val freshFooKey: Fresh[Foo.Key] = Fresh.zeroBasedIncr
 
-    val xs: List[Foo]       = List.fill(3)(Foo mk "yo wtf")
+    val xs: List[Foo]       = List.fill(7)(Foo mk "yo wtf")
     val ks: List[Foo.Key]   = xs map (_ => Fresh[Foo.Key].init)
     val rows: List[Foo.Row] = ks zip xs
 

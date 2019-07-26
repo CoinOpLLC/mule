@@ -4,21 +4,22 @@ package money
 object pricing {
 
   /**
-    * - Two parameter typeclass which takes advantage of the infix syntax; `A QuotedIn B`is
+    * Two parameter typeclass which takes advantage of the infix syntax: `A QuotedIn B` is
     * a human-legible expression in the domain of market quotes.
     *
-    * - can come from a variety of sources including live market
-    * - "Orderly market" invariant: `ask` < `bid`.
-    * - must model disorderly markets: not everything that comes at you down the wire makes sense.
-    * - note: the types parameters `A` and `C` are effectively *phantom types*
-    *   - used summon a pricing instance (e.g. QuotedIn[SomeShadySpeculativeInstrument, CHF]))
-    *   - C is intended (but not required by this base type) to represent a currency, and will
-    * typically have a Currency[C] typeclass instance
+    *   - can come from a variety of sources including live market
+    *   - "Orderly market" invariant: `ask` < `bid`.
+    *   - must model disorderly markets: not everything that comes at you down the wire makes sense.
+    *   - note: the types parameters `A` and `C` are effectively *phantom types*
+    *       - used summon a pricing instance
+    *           - (e.g. `QuotedIn`[`SomeShadySpeculativeInstrument`, [[Currency.CHF]]]))
+    *       - C is intended (but not required by this base type) to represent a currency, and will
+    * typically have a [[Currency]][C] typeclass instance
     *
     * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
     * One or more Market(s) determine this price.
-    * - A design that doesnt' abstract over `QuotedIn`, **including live data**, is useless.
-    * - otoh dead simple immutable for testing / demo also required
+    *     - A design that doesn't abstract over `QuotedIn`, '''including live data''', is useless.
+    *     - otoh dead simple immutable for testing / demo also required
     */
   trait QuotedIn[A, C] extends Any {
 
@@ -49,9 +50,7 @@ object pricing {
     }
   }
 
-// TODO: a case class Quote (immutable value version of `Rate`)
-
-  /** TODO: wtf is this about, really? */
+  /** An exchange rate. */
   final case class Rate[C1, C2]()(implicit
                                   C1: Currency[C1],
                                   C2: Currency[C2],
@@ -99,19 +98,3 @@ object pricing {
     }
 
 }
-/*
-TODO: read up
-
-  # [XBR: Precision, Decimals and Units 1.0](http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html)
-
-  > 6.3
-  ...Another related issue is the desire to express the exact value of certain ratios that cannot be
-exactly represented in a decimal representation. This requirement arises from the Tax domain space.
-Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between
-9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the
-fractionItemType in XBRL (where the numerator and denominator are always exact).
-
-  This suggests a Rational type e.g. from spire
-
-  > 7.4 Representing Exact Currency Amounts
- */

@@ -3,6 +3,7 @@ package io.deftrade
 import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.effect.Sync
+import cats.data.NonEmptyList
 
 import eu.timepit.refined
 import refined.api.{ Min, Refined, Validate }
@@ -15,9 +16,9 @@ import shapeless.labelled._
 import shapeless.syntax.singleton._
 
 import io.chrisdavenport.cormorant._
+import io.chrisdavenport.cormorant.implicits._
 // import io.chrisdavenport.cormorant.generic.semiauto._
 // import io.chrisdavenport.cormorant.parser._
-// import io.chrisdavenport.cormorant.implicits._
 // import io.chrisdavenport.cormorant.refined._
 
 /**
@@ -71,6 +72,28 @@ package object keyval {
     */
   private[keyval] final val key = Symbol("key").witness
 
+  /** CSV stuff ... least bad place to stuff it for now */
+  import money._
+
+  /** cormorant csv Get */
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
+
+    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
+      (Money scan field.x) leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+
+  }
+
+  /** cormorant csv Put */
+  implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
+    stringPut contramap Money.format[N, C]
+
+  implicit def financialGet[N: Financial]: Get[N] = Get tryOrMessage (
+    field => scala.util.Try { Financial[N] fromString field.x },
+    field => s"Failed to parse with ${Financial[N]}: Received $field"
+  )
+
+  implicit def financialPut[N: Financial]: Put[N] = stringPut contramap (Financial[N] toString _)
+
 }
 
 package keyval {
@@ -98,6 +121,7 @@ package keyval {
     */
   final case class Fresh[K](init: K, next: K => K)
 
+  /** */
   object Fresh {
 
     def apply[K: Fresh] = implicitly[Fresh[K]]
@@ -175,6 +199,7 @@ package keyval {
 
     // import io.deftrade.money.Money.{ moneyGet, moneyPut }
 
+    /** FIXME this is wrong wrong wrong */
     implicit final def deriveLabelledGenericRow[HR <: HList, HV <: HList](
         implicit
         lgR: LabelledGeneric.Aux[Row, HR],

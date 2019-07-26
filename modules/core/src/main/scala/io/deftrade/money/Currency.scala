@@ -8,7 +8,11 @@ import enumeratum._
 
 import BigDecimal.RoundingMode._
 
-/**  */
+/**
+  * Unparameterized [[Currency]] base class.
+  *
+  * Implemements the bulk of the functionality, and so, is useful in its own right.
+  */
 sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
 
   /** instance phantom type representing currency */
@@ -41,14 +45,13 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   }
 }
 
-private[money] object CurrencyLike {
+/**  */
+object CurrencyLike {
   import cats.instances.string._
   implicit lazy val order: cats.Order[CurrencyLike] = cats.Order by { _.currencyCode }
-
 }
 
 /**
-  * Per-real-world-instance of ISO 4217 currencies.
   */
 sealed trait Currency[C] extends CurrencyLike { self =>
 
@@ -77,7 +80,10 @@ sealed trait Currency[C] extends CurrencyLike { self =>
   }
 }
 
-object Currency extends Enum[CurrencyLike] { self =>
+/**
+  * Per-real-world-instances of (some) ISO 4217 currencies.
+  */
+object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
 
   import cats.implicits._
 
@@ -155,23 +161,4 @@ object Currency extends Enum[CurrencyLike] { self =>
   // TODO: MOAR...
 
   val values = findValues
-
-  import cats.implicits._
-
-  import io.chrisdavenport.cormorant._
-  // import io.chrisdavenport.cormorant.implicits._
-
-  implicit def enumGet[C: Currency]: Get[Currency[C]] = new Get[Currency[C]] {
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Currency[C]] =
-      CsvEnum.enumGet[CurrencyLike](self) get field match {
-        case Right(ccy) if ccy === Currency[C] =>
-          Currency[C].asRight
-        case _ =>
-          (Error.DecodeFailure
-            single
-              s"Failed to decode: ${Currency[C]}: Received $field").asLeft
-      }
-  }
-  implicit def put[C: Currency]: Put[Currency[C]] = CsvEnum.enumPut
-
 }

@@ -10,6 +10,8 @@ object Result {
 
   def fail[T](msg: String): Result[T] = Fail(msg).asLeft
 
+  val Ok: Result[Unit] = Result(())
+
   def apply[T](unsafe: => T): Result[T] =
     (Try apply unsafe).toEither.left map throw2fail
 
@@ -26,7 +28,7 @@ object Result {
   }
 }
 
-sealed abstract class Fail extends Product with Serializable
+sealed abstract class Fail extends Serializable
 object Fail {
   private final case class Impl(msg: String, cause: Option[Throwable]) extends Fail
   def apply(msg: String): Fail                   = Impl(msg, None)

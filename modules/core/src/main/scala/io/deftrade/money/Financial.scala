@@ -26,6 +26,19 @@ import cats.implicits._
   * (At least, not true enough for this domain model architect.)
   *
   * TODO: facilities for representing / displaying percentages.
+  *
+  *  TODO: read up
+  *
+  *   [["XBR: Precision, Decimals and Units 1.0" http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html]]
+  *
+  *    > 6.3
+  *    > Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).
+  *
+  *    This suggests a `Rational` type e.g. from `spire`.
+  *
+  * TODO: see also:
+  *    > 7.4 Representing Exact Currency Amounts
+  *
   */
 abstract class Financial[N] private (val fractional: Fractional[N]) {
 
@@ -70,6 +83,7 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
   final def to[R: Financial](n: N): R   = n |> fractional.toType[R]
 
   final def toString(n: N): String = fractional toString n
+
   def fromString(s: String): N
 
   object WholeIs {
