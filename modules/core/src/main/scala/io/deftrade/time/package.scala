@@ -4,6 +4,9 @@ import java.time._, chrono.{ Chronology, IsoChronology }
 import java.time.{ temporal => jtt }
 import jtt._
 
+/**
+  * Single-import package providing minimal scala-ideomatic bindings for java.time.
+  */
 package object time extends time.Api {
 
   implicit class SweetClock(val base: Clock) extends AnyVal {

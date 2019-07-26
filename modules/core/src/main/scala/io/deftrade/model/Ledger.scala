@@ -64,10 +64,12 @@ abstract class Ledger[Q: Financial] { self =>
     *
     * n.b. the `C` type parameter is purely phantom
     */
-  sealed abstract case class Wallet[C] private (val folio: Folio)
+  sealed abstract case class Wallet[C] private (folio: Folio)
 
   /**
-    * Wallet folios are guarranteed non-empty. (TODO: is this worth a new type?)
+    * Wallet folios are guarranteed non-empty, in that there is at least one Position.
+    *
+    * (TODO: is this worth a new type?)
     * Also, when creating `Wallet`s, the `C` type parameter is checked for `Currency` status.
     */
   object Wallet extends WithOpaqueKey[Long, Folio] {

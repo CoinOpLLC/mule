@@ -7,9 +7,6 @@ import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
-/**
-  * Single-import package providing minimal scala-ideomatic bindings for java.time.
-  */
 trait Api {
 
   // Clock

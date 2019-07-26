@@ -1,6 +1,5 @@
 package io.deftrade
 package time
-package market
 
 import io.deftrade.time.work._
 
@@ -11,7 +10,15 @@ import enumeratum._
 
 import java.{ time => jt }, jt.{ temporal => jtt }
 
-trait Api {
+package object market {
+  implicit class MarketLocalDate(val ld: LocalDate) extends AnyVal {
+    def +(pp: market.ProxiedPeriod): LocalDate = ld plus pp.period
+    def -(pp: market.ProxiedPeriod): LocalDate = ld minus pp.period
+  }
+}
+
+/** Day count conventions, [[Tenor]]s and [[Frequency]]s, etc. */
+package market {
 
   // issue: can I just go ahead and make these ValueEnum[Duration]? I don't see *why*.
 
@@ -42,7 +49,7 @@ trait Api {
 
   // maybe we should have `exactly` one ChronoUnit per Frequency
 
-  trait ProxiedPeriod extends EnumEntry {
+  private[market] trait ProxiedPeriod extends EnumEntry {
     import ProxiedPeriod._
 
     def pspec: String
@@ -59,7 +66,8 @@ trait Api {
 
     override def toString: String = 'T' +: (pspec drop 1)
   }
-  object ProxiedPeriod {
+
+  private[market] object ProxiedPeriod {
 
     import jtt.ChronoUnit._
 
@@ -194,4 +202,5 @@ trait Api {
 
   // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
   // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
+
 }
