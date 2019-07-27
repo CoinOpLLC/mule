@@ -79,8 +79,14 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 
   final def fromLong(l: Long): N = fractional.fromLong(l)
 
-  final def from[T: Financial](t: T): N = t |> fractional.fromType[T]
-  final def to[R: Financial](n: N): R   = n |> fractional.toType[R]
+  final def from[T: Financial](t: T): N = {
+    implicit val fractionalT: Fractional[T] = Financial[T].fractional
+    t |> fractional.fromType[T]
+  }
+  final def to[R: Financial](n: N): R = {
+    implicit def fractionalR = Financial[R].fractional
+    fractional.toType[R](n)
+  }
 
   final def toString(n: N): String = fractional toString n
 

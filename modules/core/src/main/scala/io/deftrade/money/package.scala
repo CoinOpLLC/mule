@@ -49,7 +49,4 @@ package object money {
   implicit def financialCommutativeGroup[MA: Financial]: CommutativeGroup[MA] =
     Financial[MA].commutativeGroup
 
-  implicit def financialFractional[MA: Financial]: Fractional[MA] =
-    Financial[MA].fractional
-
 }

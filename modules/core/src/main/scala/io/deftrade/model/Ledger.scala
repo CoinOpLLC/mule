@@ -167,6 +167,8 @@ abstract class Ledger[Q: Financial] { self =>
   /** creation patterns for teams */
   object Roster {
 
+    implicit val qf = Quantity.fractional
+
     private def unsafe(
         principals: UnitPartition[LegalEntity.Key, Quantity],
         nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]

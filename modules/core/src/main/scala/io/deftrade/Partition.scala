@@ -125,7 +125,7 @@ object UnitPartition {
     unsafe(slices)
   }
 
-  /** total shares outstanding computed from the sum of `shares` */
+  /** Total shares outstanding computed from the sum of `shares`. */
   def fromShares[K: Order, V: Fractional](shares: (K, V)*): Result[UnitPartition[K, V]] =
     Partition.fromShares(shares: _*) map (_.normalized)
 

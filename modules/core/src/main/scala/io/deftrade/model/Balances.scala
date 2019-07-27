@@ -44,8 +44,8 @@ import scala.language.higherKinds
 abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   /** Domain specific tools for dealing with `MonetaryAmount`s */
-  type MonetaryAmount = MA
-  val MonetaryAmount = Financial[MonetaryAmount]
+  final type MonetaryAmount = MA
+  final val MonetaryAmount = Financial[MonetaryAmount]
 
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
 
@@ -109,7 +109,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   implicit class SweetAccountMap[A <: AccountingKey, C](am: AccountMap[A, C]) {
 
     def total(implicit C: Currency[C]): Money[MA, C] =
-      C(NonEmptyList(Fractional[MA].zero, am.values.toList.map(_.amount)).reduce)
+      C(NonEmptyList(MonetaryAmount.fractional.zero, am.values.toList.map(_.amount)).reduce)
 
   }
 

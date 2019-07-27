@@ -7,18 +7,16 @@ object Version {
   val Scala = "2.12.8"
   val Xml   = "1.1.0"
 
-  val Refined   = "0.9.8"
-  val Shapeless = "2.3.3"
-  val Spire     = "0.16.1"
-  val Cats      = "2.0.0-M4"
-  // val Kittens   = "1.2.1"
-  val Kittens = "2.0.0-M1"
+  val Enumeratum = "1.5.13"
+  val Shapeless  = "2.3.3"
+  val Refined    = "0.9.8"
+  val Cats       = "2.0.0-M4"
+  val Spire      = "0.16.1"
 
+  val Kittens    = "2.0.0-M1"
   val CatsEffect = "1.3.0"
   val Fs2        = "1.0.5"
-  val Zio        = "1.0.0-RC8-12"
-
-  val Enumeratum = "1.5.13"
+  // val Zio        = "1.0.0-RC8-12"
 
   val TypesafeConfig = "1.3.3"
   val PureConfig     = "0.9.2"
@@ -30,10 +28,6 @@ object Version {
   val Akka        = "2.5.12"
   val AkkaHttp    = "10.1.5"
   val HttpSession = "0.5.5"
-  // val Quill       = "2.3.1"
-
-  // random shit
-  val Ammonite = "1.6.8"
 
   val Fansi = "0.2.7"
 
@@ -143,10 +137,10 @@ object Deps {
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
 
-  val zios = List(
-    "zio",
-    "zio-streams",
-  ) map (s => "dev.zio" %% s % Zio)
+  // val zios = List(
+  //   "zio",
+  //   "zio-streams",
+  // ) map (s => "dev.zio" %% s % Zio)
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
@@ -259,11 +253,11 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  lazy val initialCommands = """"""
-  // """import io.deftrade._, time._
-  //   |import cats._, implicits._
-  //   |
-  //   |""".stripMargin
+  lazy val initialCommands =
+    """|import io.deftrade._
+       |""".stripMargin
+  // |import time._, money._, keyval._, model._, reference._
+  // |import cats.implicits._
 }
 
 object License {

@@ -8,6 +8,8 @@ import cats._
 import cats.implicits._
 import cats.kernel.{ CommutativeGroup, Order }
 
+import spire.math.Fractional
+
 /**
   * Models an `amount` of [[Currency]] as scala value class, with a phantom currency type.
   *
@@ -31,6 +33,8 @@ final class Money[N, C] private (val amount: N) extends AnyVal with Serializable
   import spire.implicits._
   import Money.fiat
 
+  implicit def financialFractional(implicit N: Financial[N]): Fractional[N] = N.fractional
+
   def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> fiat
 
   def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount - rhs.amount |> fiat
@@ -50,6 +54,9 @@ final class Money[N, C] private (val amount: N) extends AnyVal with Serializable
   * `Money[?, C]: Order: Show: CommutativeGroup`
   */
 object Money {
+
+  private implicit def financialFractional[N](implicit N: Financial[N]): Fractional[N] =
+    N.fractional
 
   /** `fiat` is the new `unsafe` ;) */
   private def fiat[N, C](n: N): Money[N, C] = new Money(n)

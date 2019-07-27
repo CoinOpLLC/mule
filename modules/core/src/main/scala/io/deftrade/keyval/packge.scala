@@ -4,6 +4,7 @@ import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.effect.Sync
 import cats.data.NonEmptyList
+import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
 import refined.api.{ Min, Refined, Validate }
@@ -144,7 +145,7 @@ package keyval {
   }
 
   /**
-    * Companion object base class
+    * Companion object base class.
     */
   private[keyval] abstract class WithKeyBase[V] {
 
@@ -158,8 +159,8 @@ package keyval {
       */
     final type Value = V
 
-    /** FIXME: use kittens? extend to show and hash? */
-    implicit lazy val eqP: Eq[Value] = Eq.fromUniversalEquals[Value]
+    /** */
+    implicit lazy val eqValue: Eq[Value] = Eq.fromUniversalEquals[Value]
 
     /** An permanent identifier (e.g. auto-increment in a db col)*/
     final type Id = OpaqueKey[Long, Value]
