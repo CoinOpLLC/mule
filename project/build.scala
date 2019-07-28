@@ -9,7 +9,7 @@ object Version {
 
   val Enumeratum = "1.5.13"
   val Shapeless  = "2.3.3"
-  val Refined    = "0.9.8"
+  val Refined    = "0.9.9"
   val Cats       = "2.0.0-M4"
   val Spire      = "0.16.1"
 
@@ -21,7 +21,7 @@ object Version {
   val TypesafeConfig = "1.3.3"
   val PureConfig     = "0.9.2"
 
-  val Cormorant = "0.2.0-M3"
+  val Cormorant = "0.2.0"
   val Fuiid     = "0.1.2"
   val Circe     = "0.8.0"
 
@@ -253,11 +253,7 @@ object Args {
     "-Ywarn-unused:privates" // Warn if a private member is unused.
   )
 
-  lazy val initialCommands =
-    """|import io.deftrade._
-       |""".stripMargin
-  // |import time._, money._, keyval._, model._, reference._
-  // |import cats.implicits._
+  lazy val initialCommands = """"""
 }
 
 object License {

@@ -55,7 +55,7 @@ package object keyval {
 
   /** n.b. `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
   implicit def showOpaqueKey[K: Show, V]: Show[OpaqueKey[K, V]] =
-    Show show (k => s"${k.value.show}")
+    Show show (k => s"k=${k.value.show}")
 
   // FIXME: hash seems broken for even the simplest cases... doing someghing wrong? ;)
   // implicit def hashOpaqueKey[K, V]: Hash[OpaqueKey[K, V]] = cats.derived.semi.hash
