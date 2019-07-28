@@ -139,7 +139,16 @@ abstract class Ledger[Q: Financial] { self =>
   object AllOrNone {}
 
   /**
-    * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners and their crew.
+    * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
+    * and their crew.
+    *
+    * Although the signature guarrantees a measure of safety, construction is private to the
+    * class.
+    *
+    * @param principals Each has specified their share of the (capital) [[Account]].
+    * @param nonPrincipals N.b. the signature and what it implies:
+    *   - a total function returning a `NonEmptySet`
+    *   => All non-Princple [[Role]]s must be filled with at least one [[Entity]].
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[LegalEntity.Key, Quantity],
@@ -169,6 +178,8 @@ abstract class Ledger[Q: Financial] { self =>
 
     implicit private val qf = Quantity.fractional
 
+    /**
+      */
     private def unsafe(
         principals: UnitPartition[LegalEntity.Key, Quantity],
         nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
