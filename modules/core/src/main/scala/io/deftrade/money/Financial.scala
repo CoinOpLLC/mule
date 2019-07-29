@@ -29,7 +29,7 @@ import cats.kernel.CommutativeGroup
   *
   *  TODO: read up
   *
-  *   [["XBR: Precision, Decimals and Units 1.0" http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html]]
+  *   [[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html XBR: Precision, Decimals and Units 1.0]]
   *
   *    > 6.3
   *    > Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).

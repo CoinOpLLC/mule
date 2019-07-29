@@ -16,26 +16,16 @@
 
 package io
 
+import cats.implicits._
 import cats._
 import cats.kernel.CommutativeGroup
-import cats.data.{ NonEmptyChain, Validated }
-import cats.implicits._
 
 import spire.math.Fractional
 
 import scala.language.higherKinds
 
 /** House rules. */
-package object deftrade {
-
-  /**
-    * `Result` types
-    */
-  type Result[T]     = Either[Fail, T]
-  type ResultV[T]    = Validated[Fail, T]
-  type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
-
-  def fail[T](msg: String): Result[T] = Fail(msg).asLeft
+package object deftrade extends deftrade.results {
 
   /** generic groupBy in F[_] where F is Applicative, Foldable, and SemigroupKinded */
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](

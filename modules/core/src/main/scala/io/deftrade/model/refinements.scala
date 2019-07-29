@@ -1,8 +1,6 @@
 package io.deftrade
 package model
 
-import money._
-
 import cats.implicits._
 
 import eu.timepit.refined

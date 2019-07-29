@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._, refinements._
+import time._, keyval._, refinements._
 
 import enumeratum._
 

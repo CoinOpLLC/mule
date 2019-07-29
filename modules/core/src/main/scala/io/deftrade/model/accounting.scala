@@ -2,11 +2,11 @@ package io.deftrade
 package model
 
 /**
-  * IRS Form 1065 Schedule L ontology
+  * IRS Form 1065 Schedule L ontology.
+  *
+  * Note: "partnershiptaxaccounting" would be a more accurate name for this package. :|
   */
 package accounting
-
-import money._
 
 import cats.data.NonEmptySet
 

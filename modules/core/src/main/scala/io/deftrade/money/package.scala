@@ -17,8 +17,6 @@ package io.deftrade
 
 import cats.kernel.CommutativeGroup
 
-import spire.math.Fractional
-
 /**
   *   requirements for currency / money:
   *   - scalazzi-9000-complient™, cats-friendly™

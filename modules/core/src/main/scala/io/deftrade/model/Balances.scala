@@ -15,7 +15,6 @@ import eu.timepit.refined
 import refined.auto._
 
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
-import spire.math.{ Fractional }
 import spire.syntax.field._
 
 import scala.language.higherKinds

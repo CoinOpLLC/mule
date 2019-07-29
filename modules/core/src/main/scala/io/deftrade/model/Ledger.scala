@@ -136,6 +136,8 @@ abstract class Ledger[Q: Financial] { self =>
 
   /** Support for multiple contingent deal legs */
   sealed abstract case class AllOrNone(xs: List[Transaction])
+
+  /** */
   object AllOrNone {}
 
   /**
@@ -147,8 +149,10 @@ abstract class Ledger[Q: Financial] { self =>
     *
     * @param principals Each has specified their share of the (capital) [[Account]].
     * @param nonPrincipals N.b. the signature and what it implies:
+    *
     *   - a total function returning a `NonEmptySet`
-    *   => All non-Princple [[Role]]s must be filled with at least one [[Entity]].
+    *   - implies that all non-Princple [[Role]]s must be filled with at least one [[Entity]].
+    *
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[LegalEntity.Key, Quantity],
