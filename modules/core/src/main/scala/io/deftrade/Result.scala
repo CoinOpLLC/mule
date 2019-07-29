@@ -19,23 +19,34 @@ trait results {
   def fail[T](message: String): Result[T] = Fail(message).asLeft
 }
 
-/** Impedence matching utilities. */
+/** Impedence matching utilities, basically. */
 object Result {
 
+  /** */
   def apply[T](unsafe: => T): Result[T] = apply(Try(unsafe))
 
-  def apply[R](t: Try[R]): Result[R] =
-    t.toEither leftMap throw2fail
+  /** */
+  def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
 
-  def apply[R](o: Option[R]): Result[R] =
-    o.fold(fail[R]("not found"))(_.asRight)
+  /** */
+  def apply[R](o: Option[R]): Result[R] = o.fold(fail[R]("not found"))(_.asRight)
 
+  /** */
   def fail[T](message: String): Result[T] = Fail(message).asLeft
 
+  /** Possible because `Fail <:< Throwable`. */
+  def toTry[T](result: Result[T]): Try[T] = result.toTry
+
+  /** Thought to be of general utility. */
+  lazy val throw2fail: Throwable => Fail = x => Fail(s"${x.getClass}: ${x.getMessage}", x)
+
+  /** */
   val Ok: Result[Unit] = Result(())
 
+  /** */
   val Nope: Result[Nothing] = fail[Nothing]("Nope.")
 
+  /** */
   object implicits {
 
     implicit class OptionResult[R](val o: Option[R]) extends AnyVal {
@@ -46,13 +57,6 @@ object Result {
       def asResult: Result[R] = t.toEither leftMap throw2fail
     }
   }
-
-  /** Possible because `Fail <:< Throwable`. */
-  def toTry[T](result: Result[T]): Try[T] = result.toTry
-
-  /** Thought to be of general utility. */
-  lazy val throw2fail: Throwable => Fail =
-    x => Fail(s"${x.getClass}: ${x.getMessage}", x)
 }
 
 /** */
@@ -74,6 +78,9 @@ object ResultV {
   *
   * Subclassing `Throwable` for the `Fail` type is "handy"; e.g. conversion to [[scala.util.Try]]
   * becommes trivial.
+  *
+  * About the name: current usage is consistent with both ''noun'' and ''verb'' for this word.
+  * This results in unusual semantic flexibility; convex, mostly.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Null")) // trustMeIKnowWhatImDoing.gif
 sealed abstract case class Fail private (
