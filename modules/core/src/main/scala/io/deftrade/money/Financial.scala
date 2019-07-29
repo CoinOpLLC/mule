@@ -7,11 +7,11 @@ import refined.numeric.{ Greater, Less }
 import refined.boolean.{ And, Not }
 import refined.W
 
-import spire.math.{ Fractional, Integral, Rational }
 import spire.implicits._
+import spire.math.{ Fractional, Integral, Rational }
 
-import cats.kernel.CommutativeGroup
 import cats.implicits._
+import cats.kernel.CommutativeGroup
 
 /**
   * A typeclass for number types suitable for financial calculations.
@@ -38,6 +38,8 @@ import cats.implicits._
   *
   * TODO: see also:
   *    > 7.4 Representing Exact Currency Amounts
+  *
+  * TODO: would it simplify things if fractional were implicit?
   *
   */
 abstract class Financial[N] private (val fractional: Fractional[N]) {
@@ -90,9 +92,9 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 
   final def toString(n: N): String = fractional toString n
 
-  def fromString(s: String): N
+  def scan(s: String): Result[N]
 
-  object WholeIs {
+  object IsWhole {
     implicit def N: Fractional[N] = fractional
 
     /**
@@ -117,7 +119,7 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 
     implicit def wholeValidate[I: Integral]: Validate.Plain[N, Whole[I]] = {
       val pred: N => Boolean = {
-        case WholeIs(_) => true
+        case IsWhole(_) => true
         case _          => false
       }
       Validate.fromPredicate(pred, t => s"$t isn't Whole", new Whole[I]() {})
@@ -129,34 +131,36 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
   */
 object Financial {
 
+  /**  */
   abstract class Aux[N, ZED, UNO](N: Fractional[N]) extends Financial(N) {
     type LiterallyZero = ZED
     type LiterallyOne  = UNO
   }
 
-  /** FIXME: check the `shapeless` examples here - this probably doesn't work */
-  def apply[N: Financial]: Financial[N] = implicitly
+  /**  */
+  def apply[N](implicit N: Financial[N]): Financial[N] = N
 
-  implicit lazy val DoubleIsFinancial = new Financial.Aux[
+  /**  */
+  implicit lazy final val DoubleIsFinancial = new Financial.Aux[
     Double,
     W.`0.0`.T,
     W.`1.0`.T
   ](Fractional[Double]) {
-    def fromString(s: String): Double = java.lang.Double parseDouble s
+    def scan(s: String) = Result { java.lang.Double parseDouble s }
   }
 
   /** FIXME: test the Aux pattern thing; also: use BigDecimal(1.0).witness ?! */
-  implicit lazy val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
+  implicit lazy final val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def fromString(s: String): BigDecimal = BigDecimal apply s
+    def scan(s: String) = Result { BigDecimal apply s }
   }
 
   /**
-    * TODO: read up on[[XBR: Precision, Decimals and Units 1.0 http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-017-01-11.html]]
+    * TODO: read up on[[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-017-01-11.html XBR: Precision, Decimals and Units 1.0]]
     *
-    * > 6.3
-    * ..Another related issue is the desire to express the exact value of certain ratios that
+    * === 6.3 ===
+    * .Another related issue is the desire to express the exact value of certain ratios that
     * cannot be exactly represented in a decimal representation. This requirement arises from
     * the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal
     * relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of
@@ -166,9 +170,14 @@ object Financial {
     * Also:
     * > 7.4 Representing Exact Currency Amounts
     */
-  implicit lazy val RationalIsFinancial = new Financial(Fractional[Rational]) {
+  implicit lazy final val RationalIsFinancial = new Financial(Fractional[Rational]) {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def fromString(s: String): Rational = Rational apply s
+    def scan(s: String) = Result { Rational apply s }
   }
+}
+
+trait FinancialEntailsFractional {
+  protected final implicit def financialEntailsFractional[V: Financial]: Fractional[V] =
+    Financial[V].fractional
 }

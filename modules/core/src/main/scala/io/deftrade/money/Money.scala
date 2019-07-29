@@ -114,7 +114,7 @@ object Money {
           else
             Result fail s"expected: ${C.toString} read $ccy"
       amount = x drop 3 + 1 + 1 dropRight 1 + 1
-      n <- Result { N fromString amount }
+      n <- N scan amount
     } yield C(sign * n)
   }
 

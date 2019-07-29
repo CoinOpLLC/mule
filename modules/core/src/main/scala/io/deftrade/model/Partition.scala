@@ -9,22 +9,7 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 import spire.math.Fractional
 import spire.syntax.field._
 
-// import eu.timepit.refined
-// import refined.api.Refined
-// import refined.numeric.Positive
-// import refined.auto._
-
-// n.b. the intentionally narrow import!
-// point being: this is how `spire.math.Fractional` and `cats.Order` can co-exist
-// (before grand unification)
-// FIXME: revisit this FIXME am revisiting this
-
 import scala.collection.immutable.SortedMap
-
-trait FinancialEntailsFractional {
-  protected final implicit def financialEntailsFractional[V: Financial]: Fractional[V] =
-    Financial[V].fractional
-}
 
 private[deftrade] trait PartitionLike[K, V] extends FinancialEntailsFractional {
 

@@ -80,21 +80,19 @@ package object keyval {
   implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
 
     def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
-      (Money scan field.x) leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
-
+      Money scan field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
   }
 
   /** cormorant csv Put */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
     stringPut contramap Money.format[N, C]
 
-  implicit def financialGet[N: Financial]: Get[N] = Get tryOrMessage (
-    field => scala.util.Try { Financial[N] fromString field.x },
-    field => s"Failed to parse with ${Financial[N]}: Received $field"
-  )
+  implicit def financialGet[N](implicit N: Financial[N]): Get[N] = new Get[N] {
+    def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
+      N scan field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+  }
 
   implicit def financialPut[N: Financial]: Put[N] = stringPut contramap (Financial[N] toString _)
-
 }
 
 package keyval {
@@ -281,5 +279,4 @@ package keyval {
     implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
 
   }
-
 }
