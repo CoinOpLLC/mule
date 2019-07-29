@@ -5,7 +5,7 @@ import Keys._
 object Version {
 
   val Scala = "2.12.8"
-  val Xml   = "1.1.0"
+  val Xml   = "1.2.0"
 
   val Enumeratum = "1.5.13"
   val Shapeless  = "2.3.3"
