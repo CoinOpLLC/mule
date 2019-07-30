@@ -60,8 +60,8 @@ object pricing {
     @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2]  = convert(m1, bid)
     @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
 
-    def quote[N: Financial]: (Money[N, C2], Money[N, C2]) = {
-      val single = C1(Financial[N].fractional.one)
+    def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) = {
+      val single = C1(N.one)
       (buy(single), sell(single))
     }
 

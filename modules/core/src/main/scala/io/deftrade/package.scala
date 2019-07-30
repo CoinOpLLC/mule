@@ -66,7 +66,7 @@ package object deftrade extends deftrade.results {
     def total(
         implicit C: Foldable[C],
         V: Financial[V]
-    ): V = column.foldLeft(V.fractional.zero)(V.fractional.plus)
+    ): V = column.foldLeft(V.zero)(V.plus)
 
     def tally[CCY](
         implicit C: Foldable[C],

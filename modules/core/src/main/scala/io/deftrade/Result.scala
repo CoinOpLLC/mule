@@ -70,13 +70,12 @@ object ResultV {
 
 /**
   * Immutable instance of Throwable used as a container for an error message (`String`)
-  * and, optionally, a [[scala.util.control.NonFatal]] underlying cause
-  * ([[java.lang.Throwable]]) of failure.
+  * and, optionally, a `scala.util.control.NonFatal` underlying cause (`Throwable`) of failure.
   *
   * Immutability is achieved by disabling suppressed `Throwable`s disabling stack traces
   * from being filled in after construction.
   *
-  * Subclassing `Throwable` for the `Fail` type is "handy"; e.g. conversion to [[scala.util.Try]]
+  * Subclassing `Throwable` for the `Fail` type is "handy"; e.g. conversion to `Try`
   * becommes trivial.
   *
   * About the name: current usage is consistent with both ''noun'' and ''verb'' for this word.

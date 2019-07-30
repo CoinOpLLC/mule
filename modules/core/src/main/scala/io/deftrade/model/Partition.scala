@@ -11,11 +11,11 @@ import spire.syntax.field._
 
 import scala.collection.immutable.SortedMap
 
-private[deftrade] trait PartitionLike[K, V] extends FinancialEntailsFractional {
+private[deftrade] trait PartitionLike[K, V] {
 
   def kvs: NonEmptyMap[K, V]
 
-  final def total(implicit V: Financial[V]): V = kvs reduce V.fractional.plus
+  final def total(implicit V: Financial[V]): V = kvs reduce V.plus
   final def keys: NonEmptySet[K]               = kvs.keys
   final def toSortedMap: SortedMap[K, V]       = kvs.toSortedMap
 
@@ -48,7 +48,7 @@ sealed abstract case class Partition[K, V] private (
 
 }
 
-object Partition extends FinancialEntailsFractional {
+object Partition {
 
   private def apply[K: cats.Order, V: Financial](kvs: NonEmptyMap[K, V]) = new Partition(kvs) {}
 
@@ -92,7 +92,7 @@ sealed abstract case class UnitPartition[K, V] private (
 
   /** share acquired from each according to their proportion */
   def buyIn(key: K, share: V)(implicit K: cats.Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
-    if (!(toSortedMap contains key) && share > V.fractional.zero)
+    if (!(toSortedMap contains key) && share > V.zero)
       Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
     else
       fail(s"bad params: key=$key, share=$share, kvs=$kvs")
@@ -104,16 +104,16 @@ sealed abstract case class UnitPartition[K, V] private (
 
 /**
   */
-object UnitPartition extends FinancialEntailsFractional {
+object UnitPartition {
 
   /** Whole pie for me. */
   def single[K: cats.Order, V: Financial](k: K): UnitPartition[K, V] =
-    unsafe(SortedMap(k -> Financial[V].fractional.one))
+    unsafe(SortedMap(k -> Financial[V].one))
 
   /** What every pizza slicer aims for; their's is a fine example. */
   def fair[K: cats.Order, V: Financial](ks: NonEmptySet[K]): UnitPartition[K, V] = {
-    val VF       = Financial[V].fractional; import VF._
-    val oneSlice = one / (VF fromLong ks.size)
+    val V        = Fractional[V]; import V._
+    val oneSlice = one / (V fromLong ks.size)
     val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
     unsafe(slices)
   }
@@ -123,14 +123,17 @@ object UnitPartition extends FinancialEntailsFractional {
     Partition.fromShares(shares: _*) map (_.normalized)
 
   /** `n` shares issued; sum of slices must equal whole pie */
-  def fromTotalShares[K: cats.Order, V: Financial](n: V)(ps: (K, V)*): Result[UnitPartition[K, V]] = {
-    val VF             = Financial[V].fractional; import VF._
+  def fromTotalShares[K: cats.Order, V: Financial](
+      n: V
+  )(
+      ps: (K, V)*
+  ): Result[UnitPartition[K, V]] = {
+    val V = Fractional[V]; import V._
+
     val computedShares = ps.map(_._2).fold(zero)(plus)
-    if (computedShares === n && inRangeForallShares(n, ps)) {
-      fromShares(ps: _*)
-    } else {
-      s"$computedShares != $n" |> fail
-    }
+    if (computedShares === n && inRangeForallShares(n, ps)) fromShares(ps: _*)
+    else fail(s"$computedShares != $n")
+
   }
 
   /** `exact` slices are claimed by the caller; this is checked. */
@@ -157,7 +160,7 @@ object UnitPartition extends FinancialEntailsFractional {
   private type BrokenScalaSeq[A] = scala.collection.Seq[A]
   private def inRangeForallShares[K: cats.Order, V: Financial](n: V, ps: BrokenScalaSeq[(K, V)]) = {
     val V = Financial[V]
-    ps forall { case (_, q) => V.fractional.zero <= q && q <= n * V.fractional.one }
+    ps forall { case (_, q) => V.zero <= q && q <= n * V.one }
   }
 
   private[deftrade] def unsafe[K: cats.Order, V: Financial](kvs: SortedMap[K, V]): UnitPartition[K, V] =

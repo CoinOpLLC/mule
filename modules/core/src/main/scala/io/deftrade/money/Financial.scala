@@ -27,9 +27,7 @@ import cats.kernel.CommutativeGroup
   *
   * TODO: facilities for representing / displaying percentages.
   *
-  *  TODO: read up
-  *
-  *   [[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html XBR: Precision, Decimals and Units 1.0]]
+  * TODO: read up on [[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html XBR: Precision, Decimals and Units 1.0]]
   *
   *    > 6.3
   *    > Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).
@@ -38,11 +36,8 @@ import cats.kernel.CommutativeGroup
   *
   * TODO: see also:
   *    > 7.4 Representing Exact Currency Amounts
-  *
-  * TODO: would it simplify things if fractional were implicit?
-  *
   */
-abstract class Financial[N] private (val fractional: Fractional[N]) {
+trait Financial[N] extends Fractional[N] { self =>
 
   type LiterallyZero
   type LiterallyOne
@@ -73,29 +68,18 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
     n |> toBigDecimal |> round |> fromBigDecimal
   }
 
-  /** section: `spire.math.Fractional` proxies */
-  final def commutativeGroup: CommutativeGroup[N] = fractional.additive
+  /** section: `spire.math.Fractional` aliases */
+  final def commutativeGroup: CommutativeGroup[N] = additive
 
-  final def fromBigDecimal(bd: BigDecimal): N = fractional.fromBigDecimal(bd)
-  final def toBigDecimal(n: N): BigDecimal    = fractional.toBigDecimal(n)
+  final def from[T: Financial](t: T): N = fromType[T](t)(Financial[T])
 
-  final def fromLong(l: Long): N = fractional.fromLong(l)
-
-  final def from[T: Financial](t: T): N = {
-    implicit val fractionalT: Fractional[T] = Financial[T].fractional
-    t |> fractional.fromType[T]
-  }
-  final def to[R: Financial](n: N): R = {
-    implicit def fractionalR = Financial[R].fractional
-    fractional.toType[R](n)
-  }
-
-  final def toString(n: N): String = fractional toString n
+  final def to[R: Financial](n: N): R = toType[R](n)(Financial[R])
 
   def scan(s: String): Result[N]
 
   object IsWhole {
-    implicit def N: Fractional[N] = fractional
+
+    implicit lazy val N: Fractional[N] = self
 
     /**
       * Matches when `isWhole`, and round-trips with equality
@@ -104,8 +88,8 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
       * for the parameter `n`.
       */
     def unapply[I: Integral](n: N): Option[I] =
-      if (n.isWhole) {
-        val i         = N.toType[I](n)
+      if (isWhole(n)) {
+        val i         = toType[I](n)
         val roundTrip = Integral[I].toType[N](i)
         if (n === roundTrip) i.some else none
       } else none
@@ -132,29 +116,27 @@ abstract class Financial[N] private (val fractional: Fractional[N]) {
 object Financial {
 
   /**  */
-  abstract class Aux[N, ZED, UNO](N: Fractional[N]) extends Financial(N) {
-    type LiterallyZero = ZED
-    type LiterallyOne  = UNO
-  }
-
-  /**  */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
   /**  */
-  implicit lazy final val DoubleIsFinancial = new Financial.Aux[
-    Double,
-    W.`0.0`.T,
-    W.`1.0`.T
-  ](Fractional[Double]) {
+  trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
+    type LiterallyZero = W.`0.0`.T
+    type LiterallyOne  = W.`1.0`.T
     def scan(s: String) = Result { java.lang.Double parseDouble s }
   }
 
-  /** FIXME: test the Aux pattern thing; also: use BigDecimal(1.0).witness ?! */
-  implicit lazy final val BigDecimalIsFinancial = new Financial(Fractional[BigDecimal]) {
+  /**  */
+  implicit object DoubleIsFinancial extends DoubleIsFinancial
+
+  /** FIXME: use BigDecimal(1.0).witness ?! */
+  trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
     def scan(s: String) = Result { BigDecimal apply s }
   }
+
+  /**  */
+  implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial
 
   /**
     * TODO: read up on[[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-017-01-11.html XBR: Precision, Decimals and Units 1.0]]
@@ -170,14 +152,16 @@ object Financial {
     * Also:
     * > 7.4 Representing Exact Currency Amounts
     */
-  implicit lazy final val RationalIsFinancial = new Financial(Fractional[Rational]) {
+  trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
     def scan(s: String) = Result { Rational apply s }
   }
-}
 
-trait FinancialEntailsFractional {
-  protected final implicit def financialEntailsFractional[V: Financial]: Fractional[V] =
-    Financial[V].fractional
+  /**  */
+  implicit object RationalIsFinancial extends RationalIsFinancial
 }
+// trait FinancialEntailsFractional {
+//   protected final implicit def financialEntailsFractional[V: Financial]: Fractional[V] =
+//     Financial[V].fractional
+// }

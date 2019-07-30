@@ -108,7 +108,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   implicit class SweetAccountMap[A <: AccountingKey, C](am: AccountMap[A, C]) {
 
     def total(implicit C: Currency[C]): Money[MA, C] =
-      C(NonEmptyList(MonetaryAmount.fractional.zero, am.values.toList.map(_.amount)).reduce)
+      C(NonEmptyList(MonetaryAmount.zero, am.values.toList.map(_.amount)).reduce)
 
   }
 
@@ -381,7 +381,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
   }
 
-  /** FIXME this can move outside of Cake */
+  /**
+    * Depreciation, depletion, and amortization are the reasons some [[Asset]]s are Nettable.
+    *
+    * TODO: Any other vocabularies to examine? Make this (differently) extensible?
+    */
   object Nettable extends Enum[NettableLike] {
 
     import accounting.Asset._

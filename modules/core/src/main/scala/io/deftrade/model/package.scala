@@ -1,6 +1,6 @@
 package io.deftrade
 
 /**
-  * Financial entity archetypes.
+  * Financial business objects and functions.
   */
 package object model extends model.Trading[BigDecimal, Double]

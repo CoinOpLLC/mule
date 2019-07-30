@@ -180,8 +180,6 @@ abstract class Ledger[Q: Financial] { self =>
   /** creation patterns for teams */
   object Roster {
 
-    implicit private val qf = Quantity.fractional
-
     /**
       */
     private def unsafe(

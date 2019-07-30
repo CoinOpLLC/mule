@@ -92,9 +92,9 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
     * over two hundred assigned; several "dead" currencies (not reused)
     * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
     */
-  private type CodePattern = refined.W.`"[A-Z]{3}"`.T
-  type IsCode              = refined.string.MatchesRegex[CodePattern]
-  type Code                = String Refined IsCode
+  type CodePattern = refined.W.`"[A-Z]{3}"`.T
+  type IsCode      = refined.string.MatchesRegex[CodePattern]
+  type Code        = String Refined IsCode
 
   /**
     * Given a currency (phantom) type, get a `Currency` instance.
