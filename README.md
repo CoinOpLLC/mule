@@ -9,16 +9,16 @@
 ### Premise: KAPS architecture
 : Primary components of the `datapath`:
   - `value`s and `compound value`s
-      - self describing (e.g. XML, JSON)
-      - schema'd (e.g. Protobuf, GraphQL)
+      - self describing (eg XML, JSON)
+      - schema'd (eg Protobuf, GraphQL)
       - either way: _isomorphism_ (think `bimap`) between wire/persistence format and memory format
   - `streams` of `values`s
-      - where `stream` is (**at least**) a formal a formal abstraction, e.g. Kafka or Reactive
+      - where `stream` is (**at least**) a formal a formal abstraction, eg Kafka or Reactive
       - moving towards complete encapsulation in an algebra (i.e. Monix, Quill)
 
   - `collections`s of `value`s, where `collection` is both
-      - a formal abstraction e.g. a `RowSet`
-      - and an algebra (e.g. `Monoid`)
+      - a formal abstraction eg a `RowSet`
+      - and an algebra (eg `Monoid`)
 
   - `repos`
       - instances which source and sink `collection`s or `stream`s of `value`s for persistence

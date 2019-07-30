@@ -77,7 +77,7 @@ create index pizzas_name_dk on pizzas(name);
 create index pizzas_meta_index on pizzas using gin (meta);
 create index pizzas_span on pizzas using gist(span);
 
--- want constant id as user evolves (e.g. changes contact info)
+-- want constant id as user evolves (eg changes contact info)
 drop table if exists users cascade;
 create table users (
 
@@ -86,7 +86,7 @@ create table users (
   email varchar(126) not null,            -- how we're all known now; new email -> new user
   signup timestamptz not null,            -- never changes for a given user name
 
-  -- n.b. two ways of defaulting to empty; two different motivations
+  -- nb two ways of defaulting to empty; two different motivations
   default_location jsonb default null,    -- can change for a given email
   meta jsonb default('{}') not null,      -- can change for a given email
 

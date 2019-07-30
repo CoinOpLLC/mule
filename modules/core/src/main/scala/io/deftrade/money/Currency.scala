@@ -110,7 +110,7 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
     * standard major currency order via objectlabkit
     * TODO: can we find a reference other than objectlabkit?
     * This still smells bonkers. If it flies I want to call it the Wall of Types pattern.
-    * n.b. {{{
+    * nb {{{
     *   import io.deftrade.money.Currency.USD
     * }}}
     * will pull the {{{

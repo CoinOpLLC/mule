@@ -17,7 +17,7 @@ import scala.language.higherKinds
   * TODO: There is a single `F[_]` type - `IO` - below.
   * split into an effect type and a container type (IO/Pure vs Stream/Chain)
   *
-  * n.b. doobie can return `Streams`
+  * nb doobie can return `Streams`
   *
   * FIXME: The "toy repository model" becomes:
   * - append-only file of `WithXyxKey.PitRow`s
@@ -79,10 +79,10 @@ trait Api {
     def rows: IO[Rows]           = IO pure kvs.toList
     def get(k: K): IO[Option[V]] = IO pure { kvs get k }
     def update(row: Row): IO[Result[Unit]] = IO pure {
-      Result { kvs += row }
+      Result safe { kvs += row }
     }
     def delete(k: K): IO[Result[Boolean]] = IO pure {
-      Result {
+      Result safe {
         implicit def V_       = self.V
         val oldKvs: Map[K, V] = kvs
         kvs -= k
@@ -97,7 +97,7 @@ trait Api {
     private var k: K = FK.init
 
     def append(v: V): IO[Result[K]] = IO pure {
-      Result {
+      Result safe {
         k = FK next k
         kvs += (k -> v)
         k
@@ -108,7 +108,7 @@ trait Api {
   trait MemImplInsertable[IO[_], K, V] extends MemImpl[IO, K, V] {
     self: RepoImplicits[IO, K, V] with Repository[IO, K, V] with Mutable[IO, K, V] with Insertable[IO, K, V] =>
 
-    def insert(row: Row): IO[Result[Unit]] = IO pure Result { kvs += row }
+    def insert(row: Row): IO[Result[Unit]] = IO pure (Result safe { kvs += row })
   }
 
   class MemAppendableRepository[IO[_]: Monad, K: cats.Order: Fresh, V: Eq]
@@ -205,7 +205,7 @@ trait Api {
         val updated = Interval fromBounds (Closed(localDateTime), Unbound())
         k = FK next k
         pitRows = (k, (updated, v)) :: pitRows
-        Result { k }
+        Result safe { k }
       }
 
     override def update(pit: LocalDateTime)(row: Row): IO[Result[Unit]] = {
@@ -214,7 +214,7 @@ trait Api {
       val (k, v) = row
       IO.map(tableAt(pit)) { table =>
         (table get k).fold(Result.fail[Unit](s"id=$k not found")) { u =>
-          Result {
+          Result safe {
             val (_, sfx)          = pitRows span (_._1 =!= k) // (k, _) is `head` of suffix
             val (kk, (range, uu)) = sfx.headOption getOrElse ??? // tell it like it is
             assert(k === kk)

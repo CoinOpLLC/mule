@@ -10,7 +10,7 @@ import scala.util.Try
 trait results {
 
   /**
-    * `Result` types
+    * `Result` type is invariant.
     */
   type Result[T]     = Either[Fail, T]
   type ResultV[T]    = Validated[Fail, T]
@@ -23,7 +23,7 @@ trait results {
 object Result {
 
   /** */
-  def apply[T](unsafe: => T): Result[T] = apply(Try(unsafe))
+  def safe[T](thunk: => T): Result[T] = apply(Try(thunk))
 
   /** */
   def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
@@ -34,14 +34,14 @@ object Result {
   /** */
   def fail[T](message: String): Result[T] = Fail(message).asLeft
 
-  /** Possible because `Fail <:< Throwable`. */
+  /** Made trivial because `Fail <:< Throwable`. */
   def toTry[T](result: Result[T]): Try[T] = result.toTry
 
-  /** Thought to be of general utility. */
+  /** Formats a general `message` from the argument, and records that argument as the `cause`. */
   lazy val throw2fail: Throwable => Fail = x => Fail(s"${x.getClass}: ${x.getMessage}", x)
 
   /** */
-  val Ok: Result[Unit] = Result(())
+  val Ok: Result[Unit] = safe(())
 
   /** */
   val Nope: Result[Nothing] = fail[Nothing]("Nope.")
@@ -69,17 +69,19 @@ object ResultV {
 }
 
 /**
-  * Immutable instance of Throwable used as a container for an error message (`String`)
-  * and, optionally, a `scala.util.control.NonFatal` underlying cause (`Throwable`) of failure.
+  * Lightweight immutable Throwable used as a container for an error `message`
+  *  (`String`) and, optionally, a `scala.util.control.NonFatal` underlying
+  * `cause` (`Throwable`) of failure.
   *
-  * Immutability is achieved by disabling suppressed `Throwable`s disabling stack traces
-  * from being filled in after construction.
+  * Immutability is achieved by:
+  *   - disabling suppressed `Throwable`s from being set, and by
+  *   - disabling stack traces from being filled in after construction.
   *
-  * Subclassing `Throwable` for the `Fail` type is "handy"; e.g. conversion to `Try`
+  * Subclassing `Throwable` for the `Fail` type is "handy"; eg conversion to `Try`
   * becommes trivial.
   *
-  * About the name: current usage is consistent with both ''noun'' and ''verb'' for this word.
-  * This results in unusual semantic flexibility; convex, mostly.
+  * About the name: current global usage feels consistent with both ''noun'' and ''verb'' for
+  * this word. We exploit the resulting semantic flexibility.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Null")) // trustMeIKnowWhatImDoing.gif
 sealed abstract case class Fail private (
@@ -92,7 +94,7 @@ sealed abstract case class Fail private (
       /* writableStackTrace = */ false //  don't (bother to) fill in stack trace
     )
 
-/** TODO consider Label instead of String. */
+/** */
 object Fail {
   def apply(message: String): Fail                   = new Fail(message, none)       {}
   def apply(message: String, cause: Throwable): Fail = new Fail(message, cause.some) {}

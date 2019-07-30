@@ -76,7 +76,7 @@ object Boundless {
   def apply[A: Boundless]: Boundless[A] = implicitly
 }
 
-// n.b. since I'm not sure what postgres does when lower > upper, don't check yet
+// nb since I'm not sure what postgres does when lower > upper, don't check yet
 class PgRange[A] private (lower: A, upper: A, bound: Bounds) {
   final override def toString = s"${bound.lower}${lower}, ${upper}${bound.upper}"
 }

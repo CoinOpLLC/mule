@@ -153,7 +153,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     final def cs: AccountMap[CreditType, CurrencyType] = _cs
 
     /**
-      * n.b. as it stands, this is useful as a check only, because the algebra is balanced by design
+      * nb as it stands, this is useful as a check only, because the algebra is balanced by design
       */
     final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = cs.total - ds.total
 

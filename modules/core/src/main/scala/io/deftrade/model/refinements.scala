@@ -99,7 +99,7 @@ object refinements {
   type Ssn   = String Refined IsSsn
 
   /**
-    * An `LegalEntity` represents a legal (e.g. corporate, or non-profit) body.
+    * An `LegalEntity` represents a legal (eg corporate, or non-profit) body.
     * TODO: refine (pun intended) the requirements on US EINs.
     * TODO: Internationalize with an ADT.
     */

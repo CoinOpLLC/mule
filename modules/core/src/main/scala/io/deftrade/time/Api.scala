@@ -104,7 +104,7 @@ trait Api {
     * because it is occupied only by a lone java interface in `type` namespace`
     */
   object TemporalQuery {
-    import cats.implicits._ // n.b. this is "just syntax sugar" here but it's _very_ sweet...
+    import cats.implicits._ // nb this is "just syntax sugar" here but it's _very_ sweet...
     import jtt.{ TemporalQueries => TQs }
 
     type TQ[+R] = LocalDate => R

@@ -53,7 +53,7 @@ object Printable {
     */
   def apply[A: Printable]: Printable[A] = implicitly
 
-  // n.b. all this is terrible naming imho
+  // nb all this is terrible naming imho
   def format[A: Printable](a: A): String = Printable[A] format a
   def print[A: Printable](a: A): Unit    = println(format(a))
 

@@ -32,7 +32,7 @@ import cats.kernel.CommutativeGroup
   *    > 6.3
   *    > Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).
   *
-  *    This suggests a `Rational` type e.g. from `spire`.
+  *    This suggests a `Rational` type eg from `spire`.
   *
   * TODO: see also:
   *    > 7.4 Representing Exact Currency Amounts
@@ -122,7 +122,7 @@ object Financial {
   trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result { java.lang.Double parseDouble s }
+    def scan(s: String) = Result safe { java.lang.Double parseDouble s }
   }
 
   /**  */
@@ -132,7 +132,7 @@ object Financial {
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result { BigDecimal apply s }
+    def scan(s: String) = Result safe { BigDecimal apply s }
   }
 
   /**  */
@@ -155,7 +155,7 @@ object Financial {
   trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result { Rational apply s }
+    def scan(s: String) = Result safe { Rational apply s }
   }
 
   /**  */

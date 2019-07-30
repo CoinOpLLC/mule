@@ -24,10 +24,10 @@ import spire.math.Fractional
 
 import scala.language.higherKinds
 
-/** House rules. */
+/** House amenities. */
 package object deftrade extends deftrade.results {
 
-  /** generic groupBy in F[_] where F is Applicative, Foldable, and SemigroupKinded */
+  /**  */
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](
       as: F[A]
   )(
@@ -41,10 +41,10 @@ package object deftrade extends deftrade.results {
       val key = f(a)
       val v   = a.pure[F]
       acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
-    // FIXME: Monoid[Map[K, F[A]]].combine(acc, Map(key -> v))
     }
   }
 
+  /**  */
   def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
       kvs: F[(K, V)]
   ): Map[K, F[V]] =
@@ -52,6 +52,7 @@ package object deftrade extends deftrade.results {
       case (k, kvs) => (k, kvs map (_._2))
     }
 
+  /**  */
   def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
       kvs: F[(K, V)]
   ): Map[K, V] =
@@ -59,7 +60,24 @@ package object deftrade extends deftrade.results {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
 
-  implicit class SweetColumn[C[_], V](val column: C[V]) {
+  /**
+    * Informs wart remover that the value is intentionally discarded.
+    *
+    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
+    */
+  val discardValue: Any => Unit = (_: Any) => ()
+
+  /**
+    * I hear nice things about OCaml.
+    *
+    * So I stole something from it. `|>` pairs nicely with [[discardValue]].
+    */
+  implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
+    def |>[B](f: A => B): B = f(a)
+  }
+
+  /** Add convenience methods to qualifying "column" type constructors. */
+  implicit final class SweetColumn[C[_], V](val column: C[V]) {
 
     import io.deftrade.money._
 
@@ -76,47 +94,19 @@ package object deftrade extends deftrade.results {
       total |> CCY.apply[V]
   }
 
-  /**
-    *
-    */
-  implicit class SweetMap[K, V](val m: Map[K, V]) extends AnyVal {
+  /** Add convenience methods to qualifying `Map`s.*/
+  implicit final class SweetMap[K, V](val m: Map[K, V]) extends AnyVal {
 
     def getWithZero(k: K)(implicit V: Fractional[V]): V = (m get k).fold(V.zero)(identity)
 
     def sumValues(implicit V: Fractional[V]): V = m.map(_._2).fold(V.zero)(V.plus)
-
   }
 
   /**
     * Bind a message to an assertion function.
-    * Handy for development. If you write trading algos, this is basically "forever".
+    *
+    * Handy for development. If you write trading algos, development is basically "forever".
     */
-  def assertOrElse(msg: String): Boolean => Unit = assert(_, msg)
+  def assertOrElse(message: String): Boolean => Unit = assert(_, message)
 
-  /**
-    * Informs wart remover that the value is intentionally discarded.
-    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
-    */
-  val discardValue: Any => Unit = (_: Any) => ()
-
-  /**
-    * I hear nice things about OCaml. So I stole something from it.
-    * The |> operator pairs nicely with `discardValues`.
-    */
-  implicit final class PipeToFunction1[A](val a: A) extends AnyVal {
-    def |>[B](f: A => B): B = f(a)
-  }
-
-  /**
-    * Make `Seq` immutable. See:
-    * - [this post](https://hseeberger.wordpress.com/2013/10/25/attention-seq-is-not-immutable/),
-    * and also
-    * - [these comments](https://disqus.com/home/discussion/heikosblog/attention_seq_is_not_immutable_heikos_blog/).
-    */
-  type Seq[+A] = scala.collection.immutable.Seq[A]
-  val Seq = scala.collection.immutable.Seq
-
-  /** IndexedSeq is also made immutable */
-  type IndexedSeq[+A] = scala.collection.immutable.IndexedSeq[A]
-  val IndexedSeq = scala.collection.immutable.IndexedSeq
 }

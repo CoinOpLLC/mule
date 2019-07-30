@@ -50,10 +50,10 @@ package object keyval {
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
 
-  /** n.b. `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
+  /** nb `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
   implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
 
-  /** n.b. `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
+  /** nb `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
   implicit def showOpaqueKey[K: Show, V]: Show[OpaqueKey[K, V]] =
     Show show (k => s"k=${k.value.show}")
 
@@ -160,7 +160,7 @@ package keyval {
     /** */
     implicit lazy val eqValue: Eq[Value] = Eq.fromUniversalEquals[Value]
 
-    /** An permanent identifier (e.g. auto-increment in a db col)*/
+    /** An permanent identifier (eg auto-increment in a db col)*/
     final type Id = OpaqueKey[Long, Value]
 
     /**
@@ -238,7 +238,7 @@ package keyval {
       * This can either be a trivial tag which encodes the independance of a key from the record
       * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
       *
-      * The assumption is that some kind of tagging (e.g. `Refine` or `@@`) is
+      * The assumption is that some kind of tagging (eg `Refine` or `@@`) is
       * combining `K` and `P` to create the `Key` type.
       */
     final type Tag = P

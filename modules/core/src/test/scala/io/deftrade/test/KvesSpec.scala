@@ -46,7 +46,7 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
   case object Pistaschio extends Nut
   case object Brazil     extends Nut
 
-  lazy val values: IndexedSeq[Nut] = findValues
+  lazy val values = findValues
 
 }
 
@@ -331,12 +331,10 @@ object Repos extends WithOpaqueKey[Long, OMS[Id]] {
   /** */
   object Orders extends SimplePointInTimeRepository[_root_.cats.Id, model.Order.Key, model.Order[USD]]
 
-  /**  n.b. `Exectutions` are recorded as [[Transactions]] this completing the life cycle */
+  /**  nb `Exectutions` are recorded as [[Transactions]] this completing the life cycle */
   type Executions = Executions.Table
 
   /** */
   object Executions extends MemAppendableRepository[_root_.cats.Id, Execution.Key, Execution]
 
 }
-// abstract class Playground[MA: Financial, Q: Financial] extends Fruitcake[MA, Q] { api =>
-// }

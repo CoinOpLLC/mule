@@ -36,7 +36,7 @@ import cats.kernel.CommutativeGroup
   *      - ...and integration with `Refined` via `RefType[F[_,_]]`,
   *      - ...and `Enumeratum` to walk thru implemented currency codes
   *   - use the currency conversion / cross conventions typical of financial market participants.
-  *      - e.g. banks, and long/short credit hedge funds, which aren't much different)
+  *      - eg banks, and long/short credit hedge funds, which aren't much different)
   *
   *   https://en.wikipedia.org/wiki/ISO_4217
   *   TODO: treatment of what's expected to be imported implicitly

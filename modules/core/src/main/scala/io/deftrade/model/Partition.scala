@@ -157,8 +157,7 @@ object UnitPartition {
     }
   }
 
-  private type BrokenScalaSeq[A] = scala.collection.Seq[A]
-  private def inRangeForallShares[K: cats.Order, V: Financial](n: V, ps: BrokenScalaSeq[(K, V)]) = {
+  private def inRangeForallShares[K: cats.Order, V: Financial](n: V, ps: Seq[(K, V)]) = {
     val V = Financial[V]
     ps forall { case (_, q) => V.zero <= q && q <= n * V.one }
   }

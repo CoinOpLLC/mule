@@ -32,7 +32,7 @@ abstract class NonDefaultNamedValues(val start: String, val sep: String, val end
     * for only those field values which are not equal to the default value (if any) specified in the
     * apply() method of the companion.
     *
-    * e.g.
+    * eg
     * {{{
     *   case class Foo(i: Int, s: String = "bar") {
     *     override def toString = NonDefaultNamedValues.nonDefaultNamedValues

@@ -334,7 +334,7 @@ object Logos extends Logos {
             })
         }
 
-    val greeks = "αβγδεζηθικλμνξοπρστυφχψω" // n.b. only one sigma
+    val greeks = "αβγδεζηθικλμνξοπρστυφχψω" // nb only one sigma
 
     val blackDirections: Seq[Char] = "▶▲◀▼"
     val whiteDirections: Seq[Char] = "▷△◁▽"

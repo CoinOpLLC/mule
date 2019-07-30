@@ -22,7 +22,7 @@ abstract class Ledger[Q: Financial] { self =>
 
   import io.deftrade.keyval.Fresh
 
-  /** n.b. this is where fresh key policy is decided for the ledger */
+  /** nb this is where fresh key policy is decided for the ledger */
   implicit def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
 
   /** Domain specific tools for dealing with `Quantity`s */
@@ -62,7 +62,7 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * Models ready cash per currency.
     *
-    * n.b. the `C` type parameter is purely phantom
+    * nb the `C` type parameter is purely phantom
     */
   sealed abstract case class Wallet[C] private (folio: Folio)
 
@@ -87,9 +87,9 @@ abstract class Ledger[Q: Financial] { self =>
     *  the transaction is provisional until dated, returned as a receipt.
     *
     * The exact semantics will depend on the higher level context
-    *  (e.g. booking a trade vs receiving notice of settlement).
+    *  (eg booking a trade vs receiving notice of settlement).
     *
-    * n.b.: there is no currency field; cash payments are reified in currency-as-instrument.
+    * nb: there is no currency field; cash payments are reified in currency-as-instrument.
     * Store the _cryptographic hash_ of whatever metadata there is.
     */
   sealed abstract case class Transaction(

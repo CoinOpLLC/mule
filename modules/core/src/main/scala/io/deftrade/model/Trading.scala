@@ -103,7 +103,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       * Their [[Ledger]] [[Account]] is
       * assumed to be "real" (not a contra account) although it can assume those characteristics
       * when the `Counterparty` is sourcing `Instruments` from private flows.
-      *   - (e.g. exempt Securities for accredited individuals or qualified institutions)
+      *   - (eg exempt Securities for accredited individuals or qualified institutions)
       */
     sealed abstract case class Counterparty(val key: LegalEntity.Key) extends Market
     object Counterparty {}

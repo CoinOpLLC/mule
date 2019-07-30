@@ -12,7 +12,7 @@ object pricing {
     *   - must model disorderly markets: not everything that comes at you down the wire makes sense.
     *   - note: the types parameters `A` and `C` are effectively *phantom types*
     *       - used summon a pricing instance
-    *           - (e.g. `QuotedIn`[`SomeShadySpeculativeInstrument`, [[Currency.CHF]]]))
+    *           - (eg `QuotedIn`[`SomeShadySpeculativeInstrument`, [[Currency.CHF]]]))
     *       - C is intended (but not required by this base type) to represent a currency, and will
     * typically have a [[Currency]][C] typeclass instance
     *

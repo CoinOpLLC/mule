@@ -148,15 +148,15 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
       *
       * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
-      * be suited e.g. to a Risk Manager, operating in the context of a hedge fund.
+      * be suited eg to a Risk Manager, operating in the context of a hedge fund.
       */
     case object Auditor extends Role
 
     /** The `findValues` macro collects all `value`s in the order written. */
-    lazy val values: IndexedSeq[Role] = findValues
+    lazy val values = findValues
 
     /** */
-    lazy val nonPrincipals: IndexedSeq[Role] = values collect { case NonPrincipal(np) => np }
+    lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
   }
 
 }

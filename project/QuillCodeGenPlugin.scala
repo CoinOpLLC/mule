@@ -92,7 +92,7 @@
 //           val tag = streams.value.cacheDirectory / "gen-quill-code"
 //           val cache: FileSetCombinator =
 //             FileFunction.cached(tag, lastModified, exists)
-//           val cachedQcg: FileSetXform = cache { _ => // n.b. we use inSet only to trigger
+//           val cachedQcg: FileSetXform = cache { _ => // nb we use inSet only to trigger
 //             doTheThing
 //           }
 //
