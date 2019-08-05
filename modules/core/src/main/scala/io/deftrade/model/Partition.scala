@@ -55,7 +55,7 @@ object Partition {
   /** total shares outstanding computed from the sum of `shares` */
   def fromShares[K: cats.Order, V: Financial](shares: (K, V)*): Result[Partition[K, V]] =
     if (shares.toList.nonEmpty) unsafe(shares |> SortedMap.apply[K, V]).asRight
-    else fail("must be non-empty")
+    else Result fail "must be non-empty"
 
   /**
     * Creates an allocation function (`V => Partition`) from a set of tranches,
@@ -90,14 +90,14 @@ sealed abstract case class UnitPartition[K, V] private (
     val kvs: NonEmptyMap[K, V]
 ) extends PartitionLike[K, V] {
 
-  /** share acquired from each according to their proportion */
+  /** Share acquired from each, according to their proportion. */
   def buyIn(key: K, share: V)(implicit K: cats.Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
     if (!(toSortedMap contains key) && share > V.zero)
       Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
     else
-      fail(s"bad params: key=$key, share=$share, kvs=$kvs")
+      Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
 
-  /** share returned to each according to their proportion */
+  /** Share returned to each according to their proportion. */
   def sellOut(key: K)(implicit K: cats.Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
     UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
@@ -132,7 +132,7 @@ object UnitPartition {
 
     val computedShares = ps.map(_._2).fold(zero)(plus)
     if (computedShares === n && inRangeForallShares(n, ps)) fromShares(ps: _*)
-    else fail(s"$computedShares != $n")
+    else Result fail s"$computedShares != $n"
 
   }
 
@@ -143,7 +143,7 @@ object UnitPartition {
     if (isUnitary && inRangeForallShares(one, shares))
       unsafe(SortedMap(shares: _*)).asRight
     else
-      fail(s"UnitPartition: invalid creation parms: $shares")
+      Result fail s"UnitPartition: invalid creation parms: $shares"
   }
 
   object Single {

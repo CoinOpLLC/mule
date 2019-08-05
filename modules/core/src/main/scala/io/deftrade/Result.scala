@@ -9,21 +9,25 @@ import scala.util.Try
 
 trait results {
 
+  /** Fast-fail, invariant. */
+  type Result[T] = Either[Fail, T]
+
+  /** Applicative variant. */
+  type ResultV[T] = Validated[Fail, T]
+
   /**
-    * `Result` type is invariant.
+    * Choosing [[https://typelevel.org/cats/datatypes/chain.html Chain]] for our
+    * monoidal [[Fail]] accumulator.
     */
-  type Result[T]     = Either[Fail, T]
-  type ResultV[T]    = Validated[Fail, T]
   type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
 
-  def fail[T](message: String): Result[T] = Fail(message).asLeft
+  /** Formats a general `message` from the argument, and records that argument as the `cause`. */
+  private[deftrade] lazy val throw2fail: Throwable => Fail =
+    x => Fail(s"${x.getClass}: ${x.getMessage}", x)
 }
 
 /** Impedence matching utilities, basically. */
 object Result {
-
-  /** */
-  def safe[T](thunk: => T): Result[T] = apply(Try(thunk))
 
   /** */
   def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
@@ -31,20 +35,23 @@ object Result {
   /** */
   def apply[R](o: Option[R]): Result[R] = o.fold(fail[R]("not found"))(_.asRight)
 
-  /** */
+  /** And by safe we mean "will not `throw`" . */
+  def safe[T](thunk: => T): Result[T] = Result(Try(thunk))
+
+  /** A failure message, stylized at the type level. */
   def fail[T](message: String): Result[T] = Fail(message).asLeft
-
-  /** Made trivial because `Fail <:< Throwable`. */
-  def toTry[T](result: Result[T]): Try[T] = result.toTry
-
-  /** Formats a general `message` from the argument, and records that argument as the `cause`. */
-  lazy val throw2fail: Throwable => Fail = x => Fail(s"${x.getClass}: ${x.getMessage}", x)
 
   /** */
   val Ok: Result[Unit] = safe(())
 
   /** */
   val Nope: Result[Nothing] = fail[Nothing]("Nope.")
+
+  /** Made trivial because `Fail <:< Throwable`. */
+  def toTry[T](result: Result[T]): Try[T] = result.toTry
+
+  /** Trivial; for completeness. */
+  def toOption[T](result: Result[T]): Option[T] = result.toOption
 
   /** */
   object implicits {
@@ -61,8 +68,6 @@ object Result {
 
 /** */
 object ResultV {
-
-  import Result.throw2fail
 
   def apply[T](unsafe: => T): ResultV[T] =
     Validated catchNonFatal unsafe leftMap throw2fail
