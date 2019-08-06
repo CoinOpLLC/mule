@@ -18,29 +18,34 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /**
-  *   requirements for currency / money:
-  *   - scalazzi-9000-complient™, cats-friendly™
-  *   - take some _inspiration_ from `squants.market` (emphasis _mine_)
-  *   - comprehend the best of other FOSS offerings (esp the moribund ones!)
-  *      -  these chaps https://github.com/Appendium/objectlabkit
-  *      -  but lose the whole "is market convention" thing - yagni
+  * =Intent:=
+  * Model the monetary and currency conversion use cases typical of financial market participants:
+  *   - banks
+  *   - hedge funds
+  *   - corporate treasurers
+  *   - ...etc
   *
-  *   implementation
-  *   - minimal to no overheOad (value classes on [N: Financial])
+  *   ==Requirements:==
+  *   - scalazzi compliant
+  *   - plays well with cats
+  *   - exploit java Currency support for [[https://en.wikipedia.org/wiki/ISO_4217 ISO 4217]]
+  *   - take some ''inspiration'' from `squants.market`
+  *   - comprehend the facilities provided by other FOSS packages
+  *       - [[https://www.joda.org/joda-money/ Joda Money]] of course
+  *       - [[https://github.com/Appendium/objectlabkit ObjectLabKit]]
+  *
+  *   ==Implementation:==
+  *   - [[Money]] is a value class type constructor on `[N: Financial]`
   *   - distinct types for each currency
-  *   - summon implicit Currency[C] typeclass instance given a currency type C
-  *   - exploit java Currency support
+  *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
   *   - abstract over currencies for single implicit `cats.CommutativeGroup` function
-  *   - Currency enum as factory pattern - use to "print legit money"
   *   - no dependencies other than `typelevel algebra` (which includes `spire`)
-  *      - ...and integration with `Refined` via `RefType[F[_,_]]`,
-  *      - ...and `Enumeratum` to walk thru implemented currency codes
-  *   - use the currency conversion / cross conventions typical of financial market participants.
-  *      - eg banks, and long/short credit hedge funds, which aren't much different)
+  *       - ...and integration with `Refined` via `RefType[F[_,_]]`
+  *       - ...and `Enumeratum` to walk thru implemented currency codes
   *
-  *   https://en.wikipedia.org/wiki/ISO_4217
-  *   TODO: treatment of what's expected to be imported implicitly
-  *   https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies
+  *   TODO: track evolving
+  * [[https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies crypto support]]
+  *
   */
 package object money {
 

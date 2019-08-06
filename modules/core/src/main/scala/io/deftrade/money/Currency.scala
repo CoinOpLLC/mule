@@ -81,7 +81,7 @@ sealed trait Currency[C] extends CurrencyLike { self =>
 }
 
 /**
-  * Per-real-world-instances of (some) ISO 4217 currencies.
+  * Some of the more common ISO 4217 currencies.
   */
 object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
 

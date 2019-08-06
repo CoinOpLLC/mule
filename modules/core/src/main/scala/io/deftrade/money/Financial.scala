@@ -14,28 +14,33 @@ import cats.implicits._
 import cats.kernel.CommutativeGroup
 
 /**
-  * A typeclass for number types suitable for financial calculations.
-  *
-  * The essential affordances:
-  * - a `Currency` dependend `round`ing method.
-  * - some handy `Refined` types
-  *
-  * Beyond that, essentially a wrapper around `spire.math.Fractional`.
+  * A typeclass for number types suitable for financial calculations,
+  * based on `spire.math.Fractional`.
   *
   * While all `Financial`s are `Fractional`, the reverse is not true.
   * (At least, not true enough for this domain model architect.)
+  *
+  * The additional affordances:
+  * - a `Currency` dependend `round`ing method.
+  * - some handy `Refined` types
   *
   * TODO: facilities for representing / displaying percentages.
   *
   * TODO: read up on [[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html XBR: Precision, Decimals and Units 1.0]]
   *
-  *    > 6.3
-  *    > Another related issue is the desire to express the exact value of certain ratios that cannot be exactly represented in a decimal representation. This requirement arises from the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and denominator are always exact).
+  * > 6.3
+  * Another related issue is the desire to express the exact value of certain ratios that
+  * cannot be exactly represented in a decimal representation. This requirement arises from
+  * the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal
+  * relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of
+  * 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and
+  * denominator are always exact).
+
+  * Also:
+  * > 7.4 Representing Exact Currency Amounts
   *
-  *    This suggests a `Rational` type eg from `spire`.
-  *
-  * TODO: see also:
-  *    > 7.4 Representing Exact Currency Amounts
+  *    This motivates inclusion of the `Rational` type from `spire` among the specializations
+  * provided by `Financial` implicit instances.
   */
 trait Financial[N] extends Fractional[N] { self =>
 
@@ -128,7 +133,7 @@ object Financial {
   /**  */
   implicit object DoubleIsFinancial extends DoubleIsFinancial
 
-  /** FIXME: use BigDecimal(1.0).witness ?! */
+  /** FIXME: use BigDecimal(1.0).witness ?! Or what? */
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
@@ -138,20 +143,7 @@ object Financial {
   /**  */
   implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial
 
-  /**
-    * TODO: read up on[[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-017-01-11.html XBR: Precision, Decimals and Units 1.0]]
-    *
-    * === 6.3 ===
-    * .Another related issue is the desire to express the exact value of certain ratios that
-    * cannot be exactly represented in a decimal representation. This requirement arises from
-    * the Tax domain space. Specific examples from the UK Inland Revenue (now HMRC) are marginal
-    * relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of
-    * 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and
-    * denominator are always exact).
-
-    * Also:
-    * > 7.4 Representing Exact Currency Amounts
-    */
+  /** */
   trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
