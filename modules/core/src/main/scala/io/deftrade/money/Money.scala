@@ -96,7 +96,7 @@ object Money {
   }
 
   /** Strictly checked input. */
-  def scan[N, C](x: String)(implicit N: Financial[N], C: Currency[C]): Result[Money[N, C]] = {
+  def parse[N, C](x: String)(implicit N: Financial[N], C: Currency[C]): Result[Money[N, C]] = {
     import spire.syntax.field._
     import N.one
     def ccy  = (x take 3).toUpperCase
@@ -107,7 +107,7 @@ object Money {
           else
             Result fail s"expected: ${C.toString} read $ccy"
       amount = x drop 3 + 1 + 1 dropRight 1 + 1
-      n <- N scan amount
+      n <- N parse amount
     } yield C(sign * n)
   }
 

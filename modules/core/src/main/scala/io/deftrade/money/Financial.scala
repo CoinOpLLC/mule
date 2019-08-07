@@ -80,7 +80,7 @@ trait Financial[N] extends Fractional[N] { self =>
 
   final def to[R: Financial](n: N): R = toType[R](n)(Financial[R])
 
-  def scan(s: String): Result[N]
+  def parse(s: String): Result[N]
 
   object IsWhole {
 
@@ -127,7 +127,7 @@ object Financial {
   trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result safe { java.lang.Double parseDouble s }
+    def parse(s: String) = Result safe { java.lang.Double parseDouble s }
   }
 
   /**  */
@@ -137,7 +137,7 @@ object Financial {
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result safe { BigDecimal apply s }
+    def parse(s: String) = Result safe { BigDecimal apply s }
   }
 
   /**  */
@@ -147,7 +147,7 @@ object Financial {
   trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
     type LiterallyZero = W.`0.0`.T
     type LiterallyOne  = W.`1.0`.T
-    def scan(s: String) = Result safe { Rational apply s }
+    def parse(s: String) = Result safe { Rational apply s }
   }
 
   /**  */

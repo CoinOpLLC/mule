@@ -7,12 +7,13 @@ import cats.data.{ NonEmptyChain, Validated }
 
 import scala.util.Try
 
+/** Package mixin. */
 trait results {
 
   /** Fast-fail, invariant. */
   type Result[T] = Either[Fail, T]
 
-  /** Applicative variant. */
+  /** Applicative flavor. */
   type ResultV[T] = Validated[Fail, T]
 
   /**
@@ -30,10 +31,10 @@ trait results {
 object Result {
 
   /** */
-  def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
+  def apply[R](o: Option[R]): Result[R] = o.fold(fail[R]("not found"))(_.asRight)
 
   /** */
-  def apply[R](o: Option[R]): Result[R] = o.fold(fail[R]("not found"))(_.asRight)
+  def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
 
   /** And by safe we mean "will not `throw`" . */
   def safe[T](thunk: => T): Result[T] = Result(Try(thunk))
@@ -47,11 +48,11 @@ object Result {
   /** */
   val Nope: Result[Nothing] = fail[Nothing]("Nope.")
 
-  /** Made trivial because `Fail <:< Throwable`. */
-  def toTry[T](result: Result[T]): Try[T] = result.toTry
-
   /** Trivial; for completeness. */
   def toOption[T](result: Result[T]): Option[T] = result.toOption
+
+  /** Made trivial because `Fail <:< Throwable`. */
+  def toTry[T](result: Result[T]): Try[T] = result.toTry
 
   /** */
   object implicits {
@@ -85,6 +86,8 @@ object ResultV {
   * Subclassing `Throwable` for the `Fail` type is "handy"; eg conversion to `Try`
   * becommes trivial.
   *
+  * Interoperability with `scala.Option` and `scala.util.Try` is provided.
+  *
   * About the name: current global usage feels consistent with both ''noun'' and ''verb'' for
   * this word. We exploit the resulting semantic flexibility.
   */
@@ -101,6 +104,13 @@ sealed abstract case class Fail private (
 
 /** */
 object Fail {
-  def apply(message: String): Fail                   = new Fail(message, none)       {}
+
+  /** */
+  def apply(message: String): Fail = new Fail(message, none) {}
+
+  /** */
   def apply(message: String, cause: Throwable): Fail = new Fail(message, cause.some) {}
+
+  /** */
+  def unapply(fail: Fail): Option[(String, Option[Throwable])] = (fail.message, fail.cause).some
 }

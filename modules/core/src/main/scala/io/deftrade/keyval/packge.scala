@@ -80,7 +80,7 @@ package object keyval {
   implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
 
     def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
-      Money scan field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+      Money parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
   }
 
   /** cormorant csv Put */
@@ -89,7 +89,7 @@ package object keyval {
 
   implicit def financialGet[N](implicit N: Financial[N]): Get[N] = new Get[N] {
     def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
-      N scan field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+      N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
   }
 
   implicit def financialPut[N: Financial]: Put[N] = stringPut contramap (Financial[N] toString _)
