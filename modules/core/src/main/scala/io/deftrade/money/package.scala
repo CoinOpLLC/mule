@@ -18,12 +18,10 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /**
-  * =Intent:=
-  * Model the monetary and currency conversion use cases typical of financial market participants:
-  *   - banks
-  *   - hedge funds
-  *   - corporate treasurers
-  *   - ...etc
+  *   ==Mandate:==
+  *   Model the monetary and currency conversion use cases typical of
+  *   '''financial market participants''': banks, certainly, but also hedge funds,
+  *   private equity funds, insurance companies, mortgage companies, etc.
   *
   *   ==Requirements:==
   *   - scalazzi compliant
@@ -39,9 +37,10 @@ import cats.kernel.CommutativeGroup
   *   - distinct types for each currency
   *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
   *   - abstract over currencies for single implicit `cats.CommutativeGroup` function
-  *   - no dependencies other than `typelevel algebra` (which includes `spire`)
-  *       - ...and integration with `Refined` via `RefType[F[_,_]]`
-  *       - ...and `Enumeratum` to walk thru implemented currency codes
+  *   - few dependencies:
+  *       - `typelevel algebra` (which includes `spire`)
+  *       - `Enumeratum` to walk thru implemented currency codes
+  *       - integration with `Refined` via `RefType[F[_,_]]`
   *
   *   TODO: track evolving
   * [[https://en.wikipedia.org/wiki/ISO_4217#Cryptocurrencies crypto support]]

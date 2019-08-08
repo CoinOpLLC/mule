@@ -1,6 +1,8 @@
 package io.deftrade
 package money
 
+import io.deftrade.keyval.CsvEnum
+
 import eu.timepit.refined
 import refined.api.Refined
 
