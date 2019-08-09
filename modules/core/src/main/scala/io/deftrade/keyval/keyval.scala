@@ -16,17 +16,30 @@ import shapeless.labelled._
 
 import _root_.io.chrisdavenport.cormorant._
 
+/** */
 object OpaqueKey {
 
+  /** */
   private[keyval] def apply[K: Order, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
 
+  /** */
   def unsafe[K: Order, V](k: K): OpaqueKey[K, V] = apply(k)
-
 }
 
-/** Key type companion mez class. */
-abstract class OpaqueKeyCompanion[K: Order, P] {
+/** Key type companion base class. */
+abstract class KeyCompanion[K] {
 
+  /** */
+  implicit def order: Order[K]
+}
+
+/** Key type companion mez class for [[OpaqueKey]] types. */
+abstract class OpaqueKeyCompanion[K: Order, P] extends KeyCompanion[OpaqueKey[K, P]] {
+
+  /** */
+  implicit def order = Order[OpaqueKey[K, P]]
+
+  /** */
   def apply(k: K) = OpaqueKey[K, P](k)
 
   /** Where the key type is integral, we will reserve the min value. */
@@ -61,8 +74,8 @@ object Fresh {
   }
 }
 
-/** */
-trait WithRepo[V] {
+/** @contentDiagram */
+trait WithValue[V] {
 
   /**
     * The type of the underlying record being indexed.
@@ -105,14 +118,13 @@ trait WithRepo[V] {
   /** Will be assigned either Id or Key. */
   type Index
 
+  /** */
   final type T[k, v] = Map[k, v]
 
+  /** */
   final type R[x] = List[x]
 
-  /**
-    * Basic in-memory table structures.
-    * (Be kind, naming is hard.)
-    */
+  /** Basic in-memory table structure */
   final type Table = T[Index, Value]
 
   /** */
@@ -121,41 +133,41 @@ trait WithRepo[V] {
   /** */
   final type PermaRows = R[PermaRow]
 
+  /** The full type of the [[Id]] column. */
+  final type IdField = FieldType[id.T, Id]
+
 }
 
 /**
   * Companion object base class.
   */
-abstract class WithId[V] extends WithRepo[V] {
+abstract class WithId[V] extends WithValue[V] {
 
-  final type Row = (Id, Value)
+  final type Row = Value
 
   final type Index = Id
-
-  /** The full type of the [[Id]] column. */
-  final type IdField = FieldType[id.T, Id]
 
   implicit final def deriveLabelledWriteRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlw: Lazy[LabelledWrite[IdField :: HV]]
-  ): LabelledWrite[Row] =
-    new LabelledWrite[Row] {
+  ): LabelledWrite[PermaRow] =
+    new LabelledWrite[PermaRow] {
 
       val writeHKV: LabelledWrite[IdField :: HV] = hlw.value
 
-      def headers: CSV.Headers   = writeHKV.headers
-      def write(r: Row): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
+      def headers: CSV.Headers        = writeHKV.headers
+      def write(r: PermaRow): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
     }
 
   implicit final def deriveLabelledReadRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlr: Lazy[LabelledRead[IdField :: HV]]
-  ): LabelledRead[Row] =
-    new LabelledRead[Row] {
+  ): LabelledRead[PermaRow] =
+    new LabelledRead[PermaRow] {
       val readHKV: LabelledRead[IdField :: HV] = hlr.value
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermaRow] =
         readHKV.read(row, headers) map { h =>
           (h.head, genV from h.tail)
         }
@@ -165,12 +177,15 @@ abstract class WithId[V] extends WithRepo[V] {
 /**
   * Companion object base class.
   */
-private[deftrade] abstract class WithKeyBase[V] extends WithRepo[V] {
+abstract class WithKey[V] extends WithValue[V] {
 
   /**
     * So `Foo`s are indexed with `Foo.Key`s
     */
   type Key
+
+  /** Known accomplices. */
+  val Key: KeyCompanion[Key]
 
   /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
   final type Row = (Key, Value)
@@ -206,24 +221,24 @@ private[deftrade] abstract class WithKeyBase[V] extends WithRepo[V] {
 }
 
 /** When you absolutely, positively wanna (well behaved) case class as a `Key`. */
-abstract class WithAdtKey[K: Order, V] extends WithKeyBase[V] {
+abstract class WithAdtKey[K: Order, V] extends WithKey[V] {
 
   /** */
   sealed abstract case class Key private (val k: K)
 
   /** */
-  object Key {
+  object Key extends KeyCompanion[Key] {
 
     /** */
     def apply(k: K): Key = new Key(k) {}
 
     /** */
-    implicit def orderKey: Order[Key] = Order by (_.k)
+    override implicit def order: Order[Key] = Order by (_.k)
   }
 }
 
 /** */
-private[keyval] abstract class WithRefinedKeyBase[K: Order, P, V] extends WithKeyBase[V] {
+abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
 
   /**
     * Phantom type used to tag the key, which has type K as its underlying representation.
@@ -242,7 +257,6 @@ private[keyval] abstract class WithRefinedKeyBase[K: Order, P, V] extends WithKe
 
   /** */
   object Key extends OpaqueKeyCompanion[K, P]
-
 }
 
 /**
@@ -250,7 +264,7 @@ private[keyval] abstract class WithRefinedKeyBase[K: Order, P, V] extends WithKe
   *
   * For example, the `Key` might be of {{{ type Label = String Refined (NonEmpty And Trimmed) }}}.
   */
-abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V]
+abstract class WithPredicateKey[K: Order, P, V] extends WithRefinedKey[K, P, V]
 
 /**
   * '''By convention''', this companion tag keys with the value type of the
@@ -258,9 +272,7 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithRefinedKeyBase[K, P, V
   *
   * This phantom type for the `Refined` Key type is [[[Value]]]).
   */
-abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKeyBase[K, V, V] {
+abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
 
-  /** No constraint on validation. */
-  // implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())
-
-}
+/** No constraint on validation. */
+// implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())

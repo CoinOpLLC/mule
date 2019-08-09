@@ -213,7 +213,7 @@ abstract class Ledger[Q: Financial] { self =>
   sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 
   /** */
-  object Account extends WithRefinedKey[Long, AccountNo, Account] {
+  object Account extends WithPredicateKey[Long, AccountNo, Account] {
 
     def unsafe(roster: Roster, folioKey: Folio.Key) = new Account(roster, folioKey) {}
 
