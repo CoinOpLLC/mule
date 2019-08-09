@@ -74,7 +74,7 @@ object Fresh {
   }
 }
 
-/** @contentDiagram */
+/**  @inheritanceDiagram */
 trait WithValue[V] {
 
   /**

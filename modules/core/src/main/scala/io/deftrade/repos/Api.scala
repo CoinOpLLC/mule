@@ -14,15 +14,6 @@ import spire.math.interval._
 import scala.language.higherKinds
 
 /**
-  * TODO: There is a single `F[_]` type - `F` - below.
-  * split into an effect type and a container type (F/Pure vs Stream/Chain)
-  *
-  * nb doobie can return `Streams`
-  *
-  * FIXME: The "toy repository model" becomes:
-  * - append-only file of `WithXyxKey.PitRow`s
-  * - in memory `WithXyxKey.Table`
-  *
   */
 trait Api {
 
@@ -133,8 +124,6 @@ trait Api {
     /** FIXME effectively unplmenented */
     def get(id: Id): F[Option[Row]] = F pure { none }
 
-    private var id = fresh.init
-
     /** */
     def update(row: Row): F[Result[Unit]] = F delay {
       Result safe { kvs += row }
@@ -152,6 +141,11 @@ trait Api {
     /** */
     def insert(row: Row): F[Result[Unit]] = F delay (Result safe { kvs += row })
 
+  }
+
+  final class MemFileValueRepository[F[_]: Sync, V: Eq](V: WithId[V]) extends ValueOnlyRepository[F, V](V) with MemFileImplV[F, V] {
+    def fresh: Fresh[OpaqueKey[Long, V]]            = ???
+    def permaRows: F[List[(OpaqueKey[Long, V], V)]] = ???
   }
 }
 
