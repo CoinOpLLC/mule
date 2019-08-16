@@ -36,7 +36,7 @@ import shapeless.syntax.singleton._
   *
   * *,, it's just a scheme because calling it a "schema" is too grand,,
   */
-package object keyval extends csv {
+package object keyval extends repos with csv {
 
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
