@@ -15,7 +15,9 @@ import scala.language.higherKinds
   */
 trait repos {
 
-  /** */
+  /**
+    * `V` is a type carrier, basically.
+    */
   abstract class ValueRepository[F[_], W[?] <: WithValue[?], V](
       val V: W[V]
   )(
@@ -55,13 +57,13 @@ trait repos {
 
   /**  */
   abstract class KeyValueRepository[F[_]: Sync, V: Eq](
-      val KV: WithKey[V]
-  ) extends ValueRepository(KV) {
+      override val V: WithKey[V]
+  ) extends ValueRepository(V) {
 
-    import KV._
+    import V._
 
     /** TODO: review the fact that this overloads `get()` `*/
-    def get(k: KV.Key): Stream[F, KV.Value]
+    def get(k: V.Key): Stream[F, V.Value]
 
     /** */
     def insert(row: Row): F[Result[Unit]]
@@ -77,7 +79,7 @@ trait repos {
     def update(row: Row): F[Result[Unit]]
 
     /** */
-    def delete(k: Key): F[Result[Boolean]]
+    def delete(k: V.Key): F[Result[Boolean]]
   }
 
   /** */
@@ -111,9 +113,7 @@ trait repos {
   trait MemFileImplKV[F[_], V] /* extends MemFileImplV[F, V] */ {
     self: KeyValueRepository[F, V] =>
 
-    import KV._
-
-    final val WV: WithValue[V] = KV
+    import V._
 
     /** */
     protected final var kvs: Table = Map.empty
@@ -125,7 +125,7 @@ trait repos {
     def get(id: Id): Stream[F, Row] = ??? /// Stream emit something something
     // def get(id: Id): F[Option[Row]] = F pure { none }
 
-    def get(k: KV.Key): Stream[F, KV.Value] = ???
+    def get(k: Key): Stream[F, Value] = ???
 
     /** */
     def update(row: Row): F[Result[Unit]] = F delay {
@@ -157,7 +157,12 @@ trait repos {
 
   }
 
-  // final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](KV: WithKey[V]) extends KeyValueRepository(KV) with MemFileImplKV[F, V]
+  final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](final override val V: WithKey[V])
+      extends KeyValueRepository(V)
+      with MemFileImplKV[F, V] {
+    def append(v: V.Row): F[Result[V.Id]] = ???
+    def permRows: Stream[F, V.PermRow]    = ???
+  }
 }
 
 object repos extends repos
