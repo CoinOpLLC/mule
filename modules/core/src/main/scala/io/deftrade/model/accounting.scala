@@ -8,6 +8,7 @@ package model
   */
 package accounting
 
+import cats.implicits._
 import cats.data.NonEmptySet
 
 import enumeratum._
@@ -19,7 +20,12 @@ import enumeratum._
   }}}
   */
 sealed trait AccountingKey extends EnumEntry with Serializable
-object AccountingKey
+object AccountingKey {
+
+  /** this is just a hack to use `SortedSet`s etc */
+  implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
+
+}
 
 sealed trait Debit extends AccountingKey
 object Debit {
@@ -102,40 +108,36 @@ object Income extends Enum[Income] with CatsEnum[Income] {
   lazy val values = findValues
 }
 
-/** Single amount principle: one leg is singular */
-sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] private[accounting] (
-    entry: X,
-    contras: DoubleEntryKey.KeySet[Y]
-) extends EnumEntry
-    with Product
-    with Serializable
-
 object DoubleEntryKey {
   type KeySet[AT <: AccountingKey] = NonEmptySet[AT]
+  final val KeySet = NonEmptySet
 }
-
 import DoubleEntryKey.KeySet
+
+/** Single amount principle: one leg is singular */
+sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] private[accounting] (
+    entries: KeySet[X],
+    contras: KeySet[Y]
+) extends EnumEntry
+    with Serializable
 
 sealed abstract class DebitKey private (
     val debit: Debit,
     val credits: KeySet[Credit]
-) extends DoubleEntryKey(entry = debit, contras = credits)
+) extends DoubleEntryKey[Debit, Credit](entries = KeySet one debit, contras = credits)
 
 sealed abstract class CreditKey private (
     val debits: KeySet[Debit],
     val credit: Credit
-) extends DoubleEntryKey[Credit, Debit](entry = credit, contras = debits)
+) extends DoubleEntryKey[Debit, Credit](entries = debits, contras = KeySet one credit)
 
 /** Keys that grow or shrink the balance. */
 object DebitKey extends Enum[DebitKey] {
 
   import cats.instances.string._
 
-  /** this is just a hack to use `SortedSet`s etc */
-  private implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
-
   /** bill payment */
-  case object PayBills extends DebitKey(Asset.Cash, NonEmptySet one Liability.AccountsPayable)
+  case object PayBills extends DebitKey(Asset.Cash, KeySet one Liability.AccountsPayable)
 
   // etc.
   lazy val values = findValues
@@ -148,15 +150,17 @@ object DebitKey extends Enum[DebitKey] {
   * within the same "column" of the `Balance`.
   */
 sealed abstract class SwapKey[T <: AccountingKey] private[accounting] (
-    val from: T,
+    val from: KeySet[T],
     val to: KeySet[T]
 ) extends DoubleEntryKey(from, to)
+
+/** */
 object SwapKey
 
 private[accounting] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
     extends SwapKey[Asset](
-      from = from,
-      to = NonEmptySet one to
+      from = KeySet one from,
+      to = KeySet one to
     )
 
 object AssetSwapKey extends Enum[AssetSwapKey] {
@@ -166,14 +170,15 @@ object AssetSwapKey extends Enum[AssetSwapKey] {
   case object ShipProduct        extends AssetSwapKey(Inventories, AccountsReceivable)
   case object PurchaseInstrument extends AssetSwapKey(OtherInvestments, Cash)
 
-  def unapply(ask: AssetSwapKey): Option[(Asset, KeySet[Asset])] = Some(ask.from -> ask.to)
-  lazy val values                                                = findValues
+  def unapply(ask: AssetSwapKey): Option[(Asset, Asset)] = Some(ask.from.head -> ask.to.head)
+
+  lazy val values = findValues
 }
 
 sealed abstract class LiabilitySwapKey(
     from: Liability,
     to: KeySet[Liability]
-) extends SwapKey[Liability](from, to)
+) extends SwapKey[Liability](KeySet one from, to)
 object LiabilitySwapKey extends Enum[LiabilitySwapKey] {
 
   import Liability._
