@@ -222,3 +222,13 @@ abstract class Ledger[Q: Financial] { self =>
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
 }
+// Trade Blotter - includes canceled trades
+// Client name
+// Trade name
+// Settlement Date
+// Buy/Sell
+// CUSIP	Security Symbol
+// Security Desc.
+// Quantity
+// Unit Price
+// Principal/Proceeds

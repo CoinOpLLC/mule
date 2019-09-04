@@ -104,7 +104,7 @@ object Expense extends Enum[Expense] with CatsEnum[Expense] {
 
 sealed trait Income extends Debit
 object Income extends Enum[Income] with CatsEnum[Income] {
-  case object Income extends Income // SAY IT AGAIN
+  case object Income extends Income
   lazy val values = findValues
 }
 
@@ -124,12 +124,12 @@ sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] pri
 sealed abstract class DebitKey private (
     val debit: Debit,
     val credits: KeySet[Credit]
-) extends DoubleEntryKey[Debit, Credit](entries = KeySet one debit, contras = credits)
+) extends DoubleEntryKey(entries = KeySet one debit, contras = credits)
 
 sealed abstract class CreditKey private (
     val debits: KeySet[Debit],
     val credit: Credit
-) extends DoubleEntryKey[Debit, Credit](entries = debits, contras = KeySet one credit)
+) extends DoubleEntryKey(entries = debits, contras = KeySet one credit)
 
 /** Keys that grow or shrink the balance. */
 object DebitKey extends Enum[DebitKey] {
