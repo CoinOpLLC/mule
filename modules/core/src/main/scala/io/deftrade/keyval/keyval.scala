@@ -118,21 +118,6 @@ trait WithValue[V] {
   /** Will be assigned either Id or Key. */
   type Index
 
-  /** */
-  final type T[k, v] = Map[k, v]
-
-  /** */
-  final type R[x] = List[x]
-
-  /** Basic in-memory table structure */
-  final type Table = T[Index, Value]
-
-  /** */
-  final type Rows = R[Row]
-
-  /** */
-  final type PermRows = R[PermRow]
-
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
 

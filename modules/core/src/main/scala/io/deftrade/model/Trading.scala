@@ -240,7 +240,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     * Can we break this down into two methods: anonymous, and not?
     */
   def recorded[F[_]: Foldable: Monad: SemigroupK](
-      fs: Folio.Table,
-      accounts: Account.Table
-  ): Execution => F[Folio.Table] = ???
+      fs: Map[Folio.Key, Folio.Value],
+      accounts: Map[Account.Key, Account.Value]
+  ): Execution => F[Map[Folio.Key, Folio.Value]] = ???
 }
