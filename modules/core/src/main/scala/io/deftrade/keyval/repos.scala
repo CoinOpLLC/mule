@@ -121,8 +121,18 @@ trait repos {
         id
       }
     }
+
+    /** */
+    override def fresh: Fresh[Id] = Fresh.zeroBasedIncr
+
+    /** */
+    override def permRows: PermRows = Stream emit [F, PermRow] {
+      ???
+    }
+
   }
 
+  /** */
   trait MemFileImplKV[F[_], V] /* extends MemFileImplV[F, V] */ {
     self: KeyValueRepository[F, V] =>
 
@@ -157,25 +167,21 @@ trait repos {
     /** */
     def insert(row: Row): F[Result[Unit]] = F delay (Result safe { kvs += row })
 
+    /** */
+    def append(v: V.Row): F[Result[V.Id]] = ???
+
+    /** */
+    def permRows: Stream[F, V.PermRow] = ???
+
   }
 
   final class MemFileValueRepository[F[_]: Sync, V: Eq](final override val V: WithId[V])
       extends ValueOnlyRepository(V)
-      with MemFileImplV[F, V] {
-
-    import V._
-
-    override def fresh: Fresh[OpaqueKey[Long, Value]] = ???
-    override def permRows: Stream[F, PermRow]         = ???
-
-  }
+      with MemFileImplV[F, V]
 
   final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](final override val V: WithKey[V])
       extends KeyValueRepository(V)
-      with MemFileImplKV[F, V] {
-    def append(v: V.Row): F[Result[V.Id]] = ???
-    def permRows: Stream[F, V.PermRow]    = ???
-  }
+      with MemFileImplKV[F, V]
 }
 
 object repos extends repos

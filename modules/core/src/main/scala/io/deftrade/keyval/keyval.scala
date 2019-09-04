@@ -252,8 +252,8 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
 abstract class WithPredicateKey[K: Order, P, V] extends WithRefinedKey[K, P, V]
 
 /**
-  * '''By convention''', this companion tag keys with the value type of the
-  * record table we are indexing.
+  * '''By convention''', this companion defines a key as a [[eu.timepit.refined.api.Refined]]
+  * type, parameterized with the value type we are indexing.
   *
   * This phantom type for the `Refined` Key type is [[[Value]]]).
   */

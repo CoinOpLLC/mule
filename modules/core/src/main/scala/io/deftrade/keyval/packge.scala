@@ -32,7 +32,7 @@ import shapeless.syntax.singleton._
   * Further, the package supports the instantiaton of the scheme by
   *   - providing a `Row` type (`Key` -> `Value`)
   *   - providing a `Table` type (Map[Key, Value])
-  *   - providing implicit derivations for CSV file readers and writers of `Row`s and `Tables`s.
+  *   - providing implicit derivations for CSV file readers and writers of `Row`s and `Table`s.
   *
   * *,, it's just a scheme because calling it a "schema" is too grand,,
   */
