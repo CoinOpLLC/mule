@@ -1,8 +1,6 @@
 package io.deftrade
 package keyval
 
-import cats.implicits._
-
 import cats.{ Eq }
 import cats.effect.Sync
 
@@ -29,19 +27,34 @@ trait repos {
     import V._
 
     /** */
-    def rows: Stream[F, Row]
+    final type T[k, v] = Map[k, v]
+
+    /** Basic in-memory table structure */
+    final type Table = T[Index, Value]
 
     /** */
-    def permRows: Stream[F, PermRow]
+    final type R[x] = Stream[F, x]
+
+    /** */
+    final type Rows = R[Row]
+
+    /** */
+    final type PermRows = R[PermRow]
+
+    /** */
+    def rows: Rows
+
+    /** */
+    def permRows: PermRows
 
     /**  @return a `Stream` of length zero or one. */
-    def get(id: Id): Stream[F, Row]
+    def get(id: Id): Rows
 
     /**  */
     final type Pred = Row => Boolean
 
     /**  */
-    final def filter(pred: Pred): Stream[F, Row] = rows filter pred
+    final def filter(pred: Pred): Rows = rows filter pred
 
     /** */
     def fresh: Fresh[Id] = Fresh.zeroBasedIncr
@@ -63,7 +76,7 @@ trait repos {
     import V._
 
     /** TODO: review the fact that this overloads `get()` `*/
-    def get(k: V.Key): Stream[F, V.Value]
+    def get(k: V.Key): R[V.Value]
 
     /** */
     def insert(row: Row): F[Result[Unit]]
@@ -93,10 +106,10 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** */
-    override def rows: Stream[F, Row] = ???
+    override def rows: Rows = ???
 
     /** */
-    def get(id: Id): Stream[F, Row] = ??? /// Stream emit something something
+    def get(id: Id): Rows = ??? /// Stream emit something something
     // F pure { kvs get id }
 
     /** keep this streamless for now */
@@ -108,8 +121,18 @@ trait repos {
         id
       }
     }
+
+    /** */
+    override def fresh: Fresh[Id] = Fresh.zeroBasedIncr
+
+    /** */
+    override def permRows: PermRows = Stream emit [F, PermRow] {
+      ???
+    }
+
   }
 
+  /** */
   trait MemFileImplKV[F[_], V] /* extends MemFileImplV[F, V] */ {
     self: KeyValueRepository[F, V] =>
 
@@ -119,13 +142,13 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** */
-    override def rows: Stream[F, Row] = ???
+    override def rows: Rows = ???
 
     /** Results in re-reading file.  */
-    def get(id: Id): Stream[F, Row] = ??? /// Stream emit something something
+    def get(id: Id): Rows = ??? /// Stream emit something something
     // def get(id: Id): F[Option[Row]] = F pure { none }
 
-    def get(k: Key): Stream[F, Value] = ???
+    def get(k: Key): R[Value] = ???
 
     /** */
     def update(row: Row): F[Result[Unit]] = F delay {
@@ -144,25 +167,21 @@ trait repos {
     /** */
     def insert(row: Row): F[Result[Unit]] = F delay (Result safe { kvs += row })
 
+    /** */
+    def append(v: V.Row): F[Result[V.Id]] = ???
+
+    /** */
+    def permRows: Stream[F, V.PermRow] = ???
+
   }
 
   final class MemFileValueRepository[F[_]: Sync, V: Eq](final override val V: WithId[V])
       extends ValueOnlyRepository(V)
-      with MemFileImplV[F, V] {
-
-    import V._
-
-    override def fresh: Fresh[OpaqueKey[Long, Value]] = ???
-    override def permRows: Stream[F, PermRow]         = ???
-
-  }
+      with MemFileImplV[F, V]
 
   final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](final override val V: WithKey[V])
       extends KeyValueRepository(V)
-      with MemFileImplKV[F, V] {
-    def append(v: V.Row): F[Result[V.Id]] = ???
-    def permRows: Stream[F, V.PermRow]    = ???
-  }
+      with MemFileImplKV[F, V]
 }
 
 object repos extends repos

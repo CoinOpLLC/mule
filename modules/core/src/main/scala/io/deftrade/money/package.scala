@@ -33,7 +33,7 @@ import cats.kernel.CommutativeGroup
   *       - [[https://github.com/Appendium/objectlabkit ObjectLabKit]]
   *
   *   ==Implementation:==
-  *   - [[Money]] is a value class type constructor on `[N: Financial]`
+  *   - [[Money]] is a value class type constructor for type parameter `[N: Financial]`
   *   - distinct types for each currency
   *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
   *   - abstract over currencies for single implicit `cats.CommutativeGroup` function
