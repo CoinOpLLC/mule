@@ -1,6 +1,8 @@
 package io.deftrade
 package money
 
+import io.deftrade.implicits._
+
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
 import refined.numeric.{ Greater, Less }

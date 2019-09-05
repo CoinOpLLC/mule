@@ -311,29 +311,54 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       }
   }
 
-  sealed trait CoversPeriod {
+  sealed trait BookSet[C] {
     def date: LocalDate
     def period: Period
     final def startDate = date - period
+    def cs: CashFlowStatement[C]
+    def bs: BalanceSheet[C]
+    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): BookSet[C]
   }
 
-  sealed abstract case class CashBookSet[C: Currency](
+  sealed abstract case class CashBookSet[C](
       date: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C]
-  ) extends CoversPeriod {
+  ) extends BookSet[C] {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
-  sealed abstract case class AccrualBookSet[C: Currency](
+  object CashBookSet {
+    def apply[C: Currency](
+        date: LocalDate,
+        period: Period,
+        cs: CashFlowStatement[C],
+        bs: BalanceSheet[C]
+    ): CashBookSet[C] = new CashBookSet(date, period, cs, bs) {}
+  }
+
+  /** */
+  sealed abstract case class AccrualBookSet[C](
       date: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
       bs: BalanceSheet[C]
-  ) extends CoversPeriod {
+  ) extends BookSet[C] {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+  }
+
+  /** */
+  object AccrualBookSet {
+    def apply[C: Currency](
+        date: LocalDate,
+        period: Period,
+        cs: CashFlowStatement[C],
+        is: IncomeStatement[C],
+        bs: BalanceSheet[C]
+    ): AccrualBookSet[C] = new AccrualBookSet(date, period, cs, is, bs) {}
+
   }
 
   def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](

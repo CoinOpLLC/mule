@@ -1,7 +1,7 @@
 package io.deftrade
 package time
 
-import io.deftrade.time.work._
+import implicits._, time.work._
 
 import scala.collection.immutable.SortedSet
 import cats.implicits._

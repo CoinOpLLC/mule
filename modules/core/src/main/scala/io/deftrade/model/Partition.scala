@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._
+import implicits._, money._
 
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }

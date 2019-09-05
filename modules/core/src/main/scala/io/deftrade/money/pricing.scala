@@ -1,6 +1,8 @@
 package io.deftrade
 package money
 
+import io.deftrade.implicits._
+
 object pricing {
 
   /**

@@ -2,6 +2,8 @@
 package io.deftrade
 package time
 
+import implicits._
+
 import enumeratum._
 
 import cats._
