@@ -24,21 +24,17 @@ import scala.language.higherKinds
   *
   * Recall the fundamental equation of accounting:
   *
-  *  `Debits` === `Credits`
-  *  `Assets` + `Expenses` === `Liabilities` + `Equity` + `Revenues`
+  *   - `Debits === Credits`
+  *   - `Assets + Expenses === Liabilities + Equity + Revenues`
   *
-  *  Balance(Assets, LOQs)
-  *  Balance(XOI, Revenues)
+  * Note the two type parameters: `MA` and `Q`
   *
-  * Both type params are needed to deal with case where MA =!= Q in the cake
-  * enabling the package to create
-  *   Money[MA, C] <=> (MI, Q)
-  * codecs via MonetaryInstruments table.
+  * Both type params are needed to deal with case where `MonetaryAmount and `Quantity`
+  * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
-  * TODO: this design is provisional
+  * The package can now create {{{Money[MA, C] <=> (MI, Q)}}} codecs via MonetaryInstruments table.
   *
-  * Note the explicit binding to `Ledger` with `Folio.Key` dependence.
-  * FIXME: really only depends on `Ledger` - could merge but would need 2 type params
+  * @note This design is (very) provisional.
   */
 abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
@@ -46,9 +42,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   final type MonetaryAmount = MA
   final val MonetaryAmount = Financial[MonetaryAmount]
 
+  /** */
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
 
+  /** */
   object PricedTrade {
+
+    /** */
     def apply[C: Currency: Wallet](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
 
     /**
@@ -60,16 +60,23 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** type alias */
   type ValuedFolio[C] = PricedTrade[C]
 
+  /** */
   lazy val ValuedFolio = PricedTrade
 
-  type Pricer[C] = Trade => PricedTrade[C]
-  sealed abstract case class TransactionMarker[C](
-      mark: Pricer[C]
+  /** TODO: I smell a Reader monad in here... */
+  sealed abstract case class TransactionPricer[C](
+      mark: Trade => PricedTrade[C]
   )
-  object TransactionMarker extends WithOpaqueKey[Long, TransactionMarker[Currency.USD]] {
-    def apply[C: Currency](mark: Pricer[C]): TransactionMarker[C] = new TransactionMarker(mark) {}
+
+  /**
+    *
+    */
+  object TransactionPricer extends WithOpaqueKey[Long, TransactionPricer[_]] {
+    def apply[C: Currency](mark: Trade => PricedTrade[C]): TransactionPricer[C] =
+      new TransactionPricer(mark) {}
   }
 
+  /** */
   type AccountingKey = accounting.AccountingKey
 
   type Debit  = accounting.Debit
@@ -87,17 +94,20 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
   final type AccountMap[A <: AccountingKey, C] = Map[A, Money[MA, C]]
 
-  /* */
+  /** */
   object AccountMap {
 
-    def empty[AT <: AccountingKey, C]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
+    /** */
+    def empty[AT <: AccountingKey, C: Currency]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
 
-    def from[AT <: AccountingKey, C](
+    /** */
+    def from[AT <: AccountingKey, C: Currency](
         ks: accounting.SwapKey[AT],
         amount: Money[MA, C]
     ): AccountMap[AT, C] = ???
 
-    def collect[T <: AccountingKey, R <: T: scala.reflect.ClassTag, C](
+    /** */
+    def collect[T <: AccountingKey, R <: T: scala.reflect.ClassTag, C: Currency](
         as: AccountMap[T, C]
     ): AccountMap[R, C] =
       as collect {
@@ -105,8 +115,10 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       }
   }
 
+  /** */
   implicit class SweetAccountMap[A <: AccountingKey, C](am: AccountMap[A, C]) {
 
+    /** */
     def total(implicit C: Currency[C]): Money[MA, C] =
       C(NonEmptyList(MonetaryAmount.zero, am.values.toList.map(_.amount)).reduce)
 
@@ -115,25 +127,49 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** convenience and domain semantics only */
   def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = AccountMap.empty
 
-  final type Debits[C]      = AccountMap[Debit, C]
-  final type Credits[C]     = AccountMap[Credit, C]
-  final type Revenues[C]    = AccountMap[Revenue, C]
-  final type Assets[C]      = AccountMap[Asset, C]
-  final type Expenses[C]    = AccountMap[Expense, C]
+  /** */
+  final type Debits[C] = AccountMap[Debit, C]
+
+  /** */
+  final type Credits[C] = AccountMap[Credit, C]
+
+  /** [[BalanceSheet]] assets */
+  final type Assets[C] = AccountMap[Asset, C]
+
+  /** [[BalanceSheet]] liabilities */
   final type Liabilities[C] = AccountMap[Liability, C]
-  final type Incomes[C]     = AccountMap[Income, C]
-  final type Equities[C]    = AccountMap[Equity, C]
+
+  /** Assets net of Liabilities */
+  final type Equities[C] = AccountMap[Equity, C]
+
+  /** "Top line" */
+  final type Revenues[C] = AccountMap[Revenue, C]
+
+  /** */
+  final type Expenses[C] = AccountMap[Expense, C]
+
+  /** Revenues net of Expenses */
+  final type Incomes[C] = AccountMap[Income, C]
 
   /** pure trait for the enum base */
   private[model] sealed trait BalanceLike extends Product with Serializable {
 
+    /** */
     type CurrencyType
+
+    /** */
     def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
 
+    /** */
     type DebitType <: Debit
+
+    /** */
     def ds: AccountMap[DebitType, CurrencyType]
 
+    /** */
     type CreditType <: Credit
+
+    /** */
     def cs: AccountMap[CreditType, CurrencyType]
 
   }
@@ -144,41 +180,51 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       _cs: AccountMap[C, CCY]
   ) extends BalanceLike {
 
-    final type DebitType  = D
+    /** */
+    final type DebitType = D
+
+    /** */
     final type CreditType = C
 
+    /** */
     final type CurrencyType = CCY
 
-    final def ds: AccountMap[DebitType, CurrencyType]  = _ds
+    /** */
+    final def ds: AccountMap[DebitType, CurrencyType] = _ds
+
+    /** */
     final def cs: AccountMap[CreditType, CurrencyType] = _cs
 
     /**
       * nb as it stands, this is useful as a check only, because the algebra is balanced by design
       */
     final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = cs.total - ds.total
-
   }
 
   /** */
   object Balance {
 
+    /** Decompose into separate `Debit` and `Credit` maps. */
     def unapply[D <: Debit, C <: Credit, CCY: Currency](
         b: Balance[D, C, CCY]
     ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.ds, b.cs).some
   }
 
-  /** */
+  /** Most general / least safe... */
   sealed abstract case class TrialBalance[C] private (
       debits: Debits[C],
       credits: Credits[C]
   ) extends Balance[Debit, Credit, C](debits, credits) {
 
-    // FIXME import AccountMap.collect
+    /** */
+    def updated(key: DebitKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
-    def updated(key: DebitKey, amount: Money[MA, C]): TrialBalance[C]  = ???
+    /** */
     def updated(key: CreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
+    // FIXME import AccountMap.collect
     // implicit def CG[AT <: AccountingKey] = CommutativeGroup[AccountMap[AT, C]]
+    /** */
     def swapped[T <: AccountingKey](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
       sk match {
         // FIXME: make syntax work
@@ -187,6 +233,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
         // case ks @ LiabilitySwapKey(_, _)   => ???
       }
 
+    /** */
     def partition: (IncomeStatement[C], BalanceSheet[C]) = ???
     // FIXME `Any` problems
     // (
@@ -198,17 +245,20 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** */
   object TrialBalance {
 
+    /** */
     private[model] def apply[C: Currency](
         debits: Debits[C],
         credits: Credits[C]
     ): TrialBalance[C] = new TrialBalance(debits, credits) {}
 
+    /** */
     def empty[C: Currency]: TrialBalance[C] =
       apply(
         debits = emptyAccount[Debit, C],
         credits = emptyAccount[Credit, C]
       )
 
+    /** */
     implicit def trialBalanceCommutativeGroup[C: Currency]: CommutativeGroup[TrialBalance[C]] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -216,8 +266,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
         unapply(_).fold(???)(identity)
       }
 
+    /** */
     def from[CC[_]: Foldable, C: Currency](
-        marker: TransactionMarker[C]
+        marker: TransactionPricer[C]
     )(
         xs: CC[Transaction]
     ): TrialBalance[C] = ??? // xs.sum // FIXME this is all I should have to say!
@@ -270,11 +321,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /**  */
   object CashFlowStatement {
 
+    /** */
     private[model] def apply[C: Currency](
         outflows: Expenses[C],
         inflows: Revenues[C]
     ): CashFlowStatement[C] = new CashFlowStatement(outflows, inflows) {}
 
+    /** */
     implicit def cashflowStatementCommutativeGroup[C: Currency]: CommutativeGroup[CashFlowStatement[C]] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[C], Revenues[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -372,6 +425,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   ): (CashFlowStatement[C], EquityStatement[C]) =
     ???
 
+  /**  */
   type DeltaCashBooks[C]    = (CashFlowStatement[C], BalanceSheet[C])
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 

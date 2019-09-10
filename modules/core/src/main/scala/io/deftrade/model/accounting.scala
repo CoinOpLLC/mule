@@ -25,6 +25,10 @@ object AccountingKey {
   /** this is just a hack to use `SortedSet`s etc */
   implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def extract[AK <: AccountingKey](values: IndexedSeq[AK], key: AccountingKey): Option[AK] =
+    if (values contains key) key.asInstanceOf[AK].some else none
+
 }
 
 sealed trait Debit extends AccountingKey
@@ -35,11 +39,16 @@ object Debit {
 sealed trait Credit extends AccountingKey
 object Credit {
   lazy val values = Liability.values ++ Equity.values ++ Revenue.values
+  def unapply(ak: AccountingKey): Option[Credit] =
+    AccountingKey.extract(values, ak)
 }
 
 sealed trait Asset extends Debit
 object Asset extends Enum[Asset] with CatsEnum[Asset] {
-  lazy val values = findValues
+
+  def unapply(key: AccountingKey): Option[Asset] = AccountingKey.extract(values, key)
+  lazy val values                                = findValues
+
   case object Cash                               extends Asset
   case object AccountsReceivable                 extends Asset
   case object LessBadDebtAllowance               extends Asset
@@ -62,7 +71,7 @@ object Asset extends Enum[Asset] with CatsEnum[Asset] {
 
 sealed trait Liability extends Credit
 object Liability extends Enum[Liability] with CatsEnum[Liability] {
-  lazy val values = findValues
+
   case object AccountsPayable         extends Liability
   case object CurrentMortgateNotes    extends Liability
   case object OtherCurrentLiabilities extends Liability
@@ -70,12 +79,20 @@ object Liability extends Enum[Liability] with CatsEnum[Liability] {
   case object LoansFromPartners       extends Liability
   case object MortgageNotes           extends Liability
   case object OtherLiabilities        extends Liability
+
+  def unapply(key: AccountingKey): Option[Liability] = AccountingKey.extract(values, key)
+
+  lazy val values = findValues
 }
 
 sealed trait Equity extends Liability
 object Equity extends Enum[Equity] with CatsEnum[Equity] {
+
   case object PartnersCapital  extends Equity
   case object RetainedEarnings extends Equity
+
+  def unapply(key: AccountingKey): Option[Equity] = AccountingKey.extract(values, key)
+
   lazy val values = findValues
 }
 

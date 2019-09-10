@@ -11,28 +11,38 @@ import spire.syntax.field._
 
 import scala.collection.immutable.SortedMap
 
-private[deftrade] trait PartitionLike[K, V] {
+/** */
+sealed trait PartitionLike[K, V] { self =>
 
+  /** */
   def kvs: NonEmptyMap[K, V]
 
+  /** */
   final def total(implicit V: Financial[V]): V = kvs reduce V.plus
-  final def keys: NonEmptySet[K]               = kvs.keys
-  final def toSortedMap: SortedMap[K, V]       = kvs.toSortedMap
 
+  /** */
+  final def keys: NonEmptySet[K] = kvs.keys
+
+  /** */
+  final def toSortedMap: SortedMap[K, V] = kvs.toSortedMap
+
+  /** */
   final def scaled(n: V)(implicit K: cats.Order[K], V: Financial[V]): Partition[K, V] =
     Partition unsafe (toSortedMap mapValues (_ * n))
+
+  /** Creates a [[UnitPartition]] from this one. */
+  final def normalized(implicit K: cats.Order[K], V: Financial[V]): UnitPartition[K, V] =
+    self match {
+      case Partition(_)          => UnitPartition unsafe [K, V] (toSortedMap mapValues (_ / total))
+      case up @ UnitPartition(_) => up
+    }
 
 }
 
 /** Modelling the total equity stake, and the stakeholders thereof. */
 sealed abstract case class Partition[K, V] private (
-    val kvs: NonEmptyMap[K, V]
+    kvs: NonEmptyMap[K, V]
 ) extends PartitionLike[K, V] {
-
-  final def normalized(implicit K: cats.Order[K], V: Financial[V]): UnitPartition[K, V] = {
-    val _total = total
-    UnitPartition unsafe [K, V] (toSortedMap mapValues (_ / _total))
-  }
 
   /** Creates a `Partition` of total `n`, proportional to self. */
   def proRated(n: V)(implicit K: cats.Order[K], V: Financial[V]): Partition[K, V] =
@@ -48,8 +58,10 @@ sealed abstract case class Partition[K, V] private (
 
 }
 
+/** */
 object Partition {
 
+  /** */
   private def apply[K: cats.Order, V: Financial](kvs: NonEmptyMap[K, V]) = new Partition(kvs) {}
 
   /** total shares outstanding computed from the sum of `shares` */
@@ -87,7 +99,7 @@ object Partition {
   * TODO use refined to restrict V to be between 0 and 1
   */
 sealed abstract case class UnitPartition[K, V] private (
-    val kvs: NonEmptyMap[K, V]
+    kvs: NonEmptyMap[K, V]
 ) extends PartitionLike[K, V] {
 
   /** Share acquired from each, according to their proportion. */
@@ -102,8 +114,7 @@ sealed abstract case class UnitPartition[K, V] private (
     UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
 
-/**
-  */
+/** Conventional creation patterns. */
 object UnitPartition {
 
   /** Whole pie for me. */
@@ -146,8 +157,10 @@ object UnitPartition {
       Result fail s"UnitPartition: invalid creation parms: $shares"
   }
 
+  /** For the extractor. */
   object Single {
 
+    /** Extracts a single key, if that's what's there. */
     def unapply[K: cats.Order, V: Financial](p: UnitPartition[K, V]): Option[K] = {
       val VF = Fractional[V]; import VF._
       p.kvs.toNel.toList match {

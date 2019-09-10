@@ -20,14 +20,14 @@ import scala.language.higherKinds
   */
 abstract class Ledger[Q: Financial] { self =>
 
-  import io.deftrade.keyval.Fresh
-
-  /** nb this is where fresh key policy is decided for the ledger */
-  implicit def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
+  /** */
+  final type Quantity = Q
 
   /** Domain specific tools for dealing with `Quantity`s */
-  type Quantity = Q
-  val Quantity = Financial[Quantity]
+  final val Quantity = Financial[Quantity]
+
+  /** nb this is where fresh key policy is decided for the ledger */
+  final def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
 
   /**
     * How much of a given [[capital.Instrument]] is held.
@@ -35,10 +35,14 @@ abstract class Ledger[Q: Financial] { self =>
     * Can also be thought of as a [[Leg]] at rest.
     */
   type Position = (Instrument.Key, Quantity)
+
+  /** */
   object Position
 
   /** A [[Position]] in motion */
   type Leg = Position
+
+  /** */
   lazy val Leg = Position
 
   /**
@@ -62,7 +66,11 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * Models ready cash per currency.
     *
-    * nb the `C` type parameter is purely phantom
+    * In this way, implicit values of `Wallet` can be used to inject maps ("pricers") between
+    * (certain) [[Folio]]s and (certain) [[Currency]]s into the implicit context.
+    *
+    * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
+    * values are '''not''' carried by instances of this class.
     */
   sealed abstract case class Wallet[C] private (folio: Folio)
 
@@ -74,8 +82,10 @@ abstract class Ledger[Q: Financial] { self =>
     */
   object Wallet extends WithOpaqueKey[Long, Folio] {
 
+    /** */
     private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
 
+    /** */
     def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
       new Wallet[C](Folio(p +: ps: _*)) {}
   }

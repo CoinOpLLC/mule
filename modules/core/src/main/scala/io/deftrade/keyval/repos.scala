@@ -100,6 +100,7 @@ trait repos {
 
     import V._
 
+    /** FIXME this needs to be atomic swap. Think about it. :| */
     private var id: Id = fresh.init
 
     /** */
@@ -121,9 +122,6 @@ trait repos {
         id
       }
     }
-
-    /** */
-    override def fresh: Fresh[Id] = Fresh.zeroBasedIncr
 
     /** */
     override def permRows: PermRows = Stream emit [F, PermRow] {

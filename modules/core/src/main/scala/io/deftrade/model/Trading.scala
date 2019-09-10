@@ -107,9 +107,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       */
     sealed abstract case class Counterparty(val key: LegalEntity.Key) extends Market
     object Counterparty {}
-
-    implicit def freshMarketKey: Fresh[Key] = Fresh.zeroBasedIncr
-
   }
 
   /**
@@ -142,9 +139,6 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     /** `Limit` orders */
     def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
     def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
-
-    implicit def freshOrderKey: Fresh[Key] = Fresh.zeroBasedIncr
-
   }
 
   /**
@@ -158,9 +152,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   )
 
   /** */
-  object Execution extends WithOpaqueKey[Long, Execution] {
-    implicit def freshExecutionKey: Fresh[Key] = Fresh.zeroBasedIncr
-  }
+  object Execution extends WithOpaqueKey[Long, Execution] {}
 
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.

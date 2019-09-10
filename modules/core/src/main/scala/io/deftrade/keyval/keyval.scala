@@ -99,7 +99,10 @@ trait WithValue[V] {
     implicit lazy val freshId: Fresh[Id] = Fresh.zeroBasedIncr
   }
 
-  /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
+  /**
+    * Think spreadsheet or relational table,
+    * keeping in mind that [[Value]]s are can be, and often are, compound.
+    */
   type Row
 
   /** */
@@ -128,10 +131,13 @@ trait WithValue[V] {
   */
 abstract class WithId[V] extends WithValue[V] {
 
+  /** */
   final type Row = Value
 
+  /** */
   final type Index = Id
 
+  /** */
   implicit final def deriveLabelledWriteRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
@@ -145,6 +151,7 @@ abstract class WithId[V] extends WithValue[V] {
       def write(r: PermRow): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
     }
 
+  /** */
   implicit final def deriveLabelledReadRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
@@ -175,11 +182,13 @@ abstract class WithKey[V] extends WithValue[V] {
   /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
   final type Row = (Key, Value)
 
+  /** */
   final type Index = Key
 
   /** The full type of the [[Key]] column. */
   final type KeyField = FieldType[key.T, Key]
 
+  /** */
   implicit final def deriveLabelledWriteRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
@@ -191,6 +200,7 @@ abstract class WithKey[V] extends WithValue[V] {
       def write(r: Row): CSV.Row                  = writeHKV write field[key.T](r._1) :: (genV to r._2)
     }
 
+  /** */
   implicit final def deriveLabelledReadRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
