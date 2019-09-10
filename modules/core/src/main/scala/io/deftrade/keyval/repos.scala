@@ -159,7 +159,7 @@ trait repos {
       Result safe {
         val oldKvs: Table = kvs
         kvs -= k
-        oldKvs == /* WHAAAT? = */ kvs
+        oldKvs == /* FIXME WHAAAT? = */ kvs
       }
     }
 
@@ -174,11 +174,11 @@ trait repos {
 
   }
 
-  final class MemFileValueRepository[F[_]: Sync, V: Eq](final override val V: WithId[V])
-      extends ValueOnlyRepository(V)
-      with MemFileImplV[F, V]
+  /** */
+  final class MemFileValueRepository[F[_]: Sync, V: Eq](override val V: WithId[V]) extends ValueOnlyRepository(V) with MemFileImplV[F, V]
 
-  final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](final override val V: WithKey[V])
+  /** */
+  final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](override val V: WithKey[V])
       extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 }

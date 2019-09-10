@@ -3,7 +3,7 @@ package model
 
 import money._, time._, keyval._
 
-import accounting.{ AssetSwapKey, CreditKey, DebitKey, SwapKey }
+import accounting.{ CreditKey, DebitKey, SingleAssetSwapKey, SwapKey }
 
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.data.NonEmptyList
@@ -228,7 +228,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     def swapped[T <: AccountingKey](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
       sk match {
         // FIXME: make syntax work
-        case AssetSwapKey(_, _) =>
+        case SingleAssetSwapKey(_, _) =>
           ???
         // case ks @ LiabilitySwapKey(_, _)   => ???
       }

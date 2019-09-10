@@ -6,7 +6,7 @@ import money._
 import cats.implicits._
 import cats.data.NonEmptyList
 
-import enumeratum.EnumEntry
+import enumeratum.{ CatsEnum, Enum, EnumEntry }
 
 import io.chrisdavenport.cormorant._
 import io.chrisdavenport.cormorant.implicits._
@@ -64,3 +64,14 @@ object CsvEnum {
   )
   def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
 }
+
+/** Fully stacc'd enum type. */
+trait DtEnum[EE <: EnumEntry] extends Enum[EE] with CatsEnum[EE] with CsvEnum[EE] {
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def unapply(key: EnumEntry): Option[EE] =
+    if (values contains key) key.asInstanceOf[EE].some else none
+}
+
+/** */

@@ -8,6 +8,8 @@ package model
   */
 package accounting
 
+import keyval.DtEnum
+
 import cats.implicits._
 import cats.data.NonEmptySet
 
@@ -22,32 +24,39 @@ import enumeratum._
 sealed trait AccountingKey extends EnumEntry with Serializable
 object AccountingKey {
 
-  /** this is just a hack to use `SortedSet`s etc */
+  /** this is just a hack to use `SortedSet`s  */
   implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
-
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def extract[AK <: AccountingKey](values: IndexedSeq[AK], key: AccountingKey): Option[AK] =
-    if (values contains key) key.asInstanceOf[AK].some else none
 
 }
 
+/** */
 sealed trait Debit extends AccountingKey
+
+/** */
 object Debit {
+
+  /** */
   lazy val values = Asset.values ++ Expense.values ++ Income.values
 }
 
+/** */
 sealed trait Credit extends AccountingKey
-object Credit {
+
+/** */
+object Credit extends DtEnum[Credit] {
+
+  /** */
   lazy val values = Liability.values ++ Equity.values ++ Revenue.values
-  def unapply(ak: AccountingKey): Option[Credit] =
-    AccountingKey.extract(values, ak)
 }
 
+/** */
 sealed trait Asset extends Debit
-object Asset extends Enum[Asset] with CatsEnum[Asset] {
 
-  def unapply(key: AccountingKey): Option[Asset] = AccountingKey.extract(values, key)
-  lazy val values                                = findValues
+/** */
+object Asset extends DtEnum[Asset] {
+
+  /** */
+  lazy val values = findValues
 
   case object Cash                               extends Asset
   case object AccountsReceivable                 extends Asset
@@ -69,8 +78,11 @@ object Asset extends Enum[Asset] with CatsEnum[Asset] {
   case object OtherAssets                        extends Asset
 }
 
+/** */
 sealed trait Liability extends Credit
-object Liability extends Enum[Liability] with CatsEnum[Liability] {
+
+/** */
+object Liability extends DtEnum[Liability] {
 
   case object AccountsPayable         extends Liability
   case object CurrentMortgateNotes    extends Liability
@@ -80,53 +92,77 @@ object Liability extends Enum[Liability] with CatsEnum[Liability] {
   case object MortgageNotes           extends Liability
   case object OtherLiabilities        extends Liability
 
-  def unapply(key: AccountingKey): Option[Liability] = AccountingKey.extract(values, key)
-
+  /** */
   lazy val values = findValues
 }
 
+/** */
 sealed trait Equity extends Liability
-object Equity extends Enum[Equity] with CatsEnum[Equity] {
+
+/** */
+object Equity extends DtEnum[Equity] {
 
   case object PartnersCapital  extends Equity
   case object RetainedEarnings extends Equity
 
-  def unapply(key: AccountingKey): Option[Equity] = AccountingKey.extract(values, key)
-
+  /** */
   lazy val values = findValues
 }
 
+/** */
 sealed trait Revenue extends Credit
-object Revenue extends Enum[Revenue] with CatsEnum[Revenue] {
+
+/** */
+object Revenue extends DtEnum[Revenue] {
   case object Finance        extends Revenue
   case object Investment     extends Revenue
   case object Receipts       extends Revenue
   case object OrdinaryIncome extends Revenue
 
+  /** */
   lazy val values = findValues
 }
 
+/** */
 sealed trait Expense extends Debit
-sealed trait OpEx    extends Expense
-sealed trait CapEx   extends Expense
-object Expense extends Enum[Expense] with CatsEnum[Expense] {
+
+/** */
+sealed trait OpEx extends Expense
+
+/** */
+sealed trait CapEx extends Expense
+
+/** */
+object Expense extends DtEnum[Expense] {
   case object Investment            extends CapEx
   case object Finance               extends CapEx // FIXME check this
   case object COGS                  extends OpEx
   case object RepairsAndMaintenance extends OpEx
   case object Salaries              extends OpEx
   case object Rent                  extends OpEx
+
+  /** */
   lazy val values = findValues
 }
 
+/** */
 sealed trait Income extends Debit
-object Income extends Enum[Income] with CatsEnum[Income] {
+
+/** */
+object Income extends DtEnum[Income] {
   case object Income extends Income
+
+  /** */
   lazy val values = findValues
 }
 
+/** */
 object DoubleEntryKey {
+
+  /** */
   type KeySet[AT <: AccountingKey] = NonEmptySet[AT]
+
+  /** */
   final val KeySet = NonEmptySet
 }
 import DoubleEntryKey.KeySet
@@ -136,24 +172,27 @@ sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] pri
     entries: KeySet[X],
     contras: KeySet[Y]
 ) extends EnumEntry
-    with Serializable
+    with Serializable {
+  final type EntryType  = X
+  final type ContraType = Y
+}
 
+/** */
 sealed abstract class DebitKey private (
     val debit: Debit,
     val credits: KeySet[Credit]
 ) extends DoubleEntryKey(entries = KeySet one debit, contras = credits)
 
+/** */
 sealed abstract class CreditKey private (
     val debits: KeySet[Debit],
     val credit: Credit
 ) extends DoubleEntryKey(entries = debits, contras = KeySet one credit)
 
 /** Keys that grow or shrink the balance. */
-object DebitKey extends Enum[DebitKey] {
+object DebitKey extends DtEnum[DebitKey] {
 
-  import cats.instances.string._
-
-  /** bill payment */
+  /** */
   case object PayBills extends DebitKey(Asset.Cash, KeySet one Liability.AccountsPayable)
 
   // etc.
@@ -172,37 +211,62 @@ sealed abstract class SwapKey[T <: AccountingKey] private[accounting] (
 ) extends DoubleEntryKey(from, to)
 
 /** */
-object SwapKey
+object SwapKey {
 
-private[accounting] sealed abstract class AssetSwapKey(from: Asset, to: Asset)
+  /** */
+  def unapply[EE <: AccountingKey](sk: SwapKey[EE]): Option[(KeySet[EE], KeySet[EE])] =
+    (sk.from, sk.to).some
+}
+
+/** */
+sealed abstract class AssetSwapKey(from: KeySet[Asset], to: KeySet[Asset]) extends SwapKey(from, to)
+
+/** */
+object AssetSwapKey extends DtEnum[AssetSwapKey] {
+  lazy val values = findValues
+}
+
+/** */
+sealed abstract class SingleAssetSwapKey(from: Asset, to: Asset)
     extends SwapKey[Asset](
       from = KeySet one from,
       to = KeySet one to
     )
 
-object AssetSwapKey extends Enum[AssetSwapKey] {
+/** */
+object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {
 
   import Asset._
 
-  case object ShipProduct        extends AssetSwapKey(Inventories, AccountsReceivable)
-  case object PurchaseInstrument extends AssetSwapKey(OtherInvestments, Cash)
+  /** */
+  case object ShipProduct extends SingleAssetSwapKey(Inventories, AccountsReceivable)
 
-  def unapply(ask: AssetSwapKey): Option[(Asset, Asset)] = Some(ask.from.head -> ask.to.head)
+  /** */
+  case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
 
+  def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
+    (sk.from.toSortedSet.toList, sk.to.toSortedSet.toList) match {
+      case (List(f), List(t)) => (f, t).some
+    }
+
+  /** */
   lazy val values = findValues
 }
 
+/** */
 sealed abstract class LiabilitySwapKey(
-    from: Liability,
+    from: KeySet[Liability],
     to: KeySet[Liability]
-) extends SwapKey[Liability](KeySet one from, to)
-object LiabilitySwapKey extends Enum[LiabilitySwapKey] {
+) extends SwapKey[Liability](from, to)
+
+/** */
+object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
 
   import Liability._
 
   case object LongTermToCurrentLiability
       extends LiabilitySwapKey(
-        OtherLiabilities,
+        NonEmptySet one OtherLiabilities,
         NonEmptySet one OtherCurrentLiabilities
       )
 
