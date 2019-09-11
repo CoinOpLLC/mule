@@ -1,9 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._
-
-import accounting.{ CreditKey, DebitKey, SingleAssetSwapKey, SwapKey }
+import money._, time._, keyval._, accounting._, implicits._
 
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.data.NonEmptyList
@@ -40,7 +38,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   final type MonetaryAmount = MA
+
+  /** member [[money.Financial]] instance for convenience */
   final val MonetaryAmount = Financial[MonetaryAmount]
+
+  /** instantiate double entry key module with appropriate monetary amount type */
+  object doubleEntryKeys extends DoubleEntryKeys[MonetaryAmount]
+  import doubleEntryKeys._
 
   /** */
   type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
@@ -102,17 +106,10 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
     /** */
     def from[AT <: AccountingKey, C: Currency](
-        ks: accounting.SwapKey[AT],
+        ks: SwapKey[AT],
         amount: Money[MA, C]
     ): AccountMap[AT, C] = ???
 
-    /** */
-    def collect[T <: AccountingKey, R <: T: scala.reflect.ClassTag, C: Currency](
-        as: AccountMap[T, C]
-    ): AccountMap[R, C] =
-      as collect {
-        case (k: R, v) => (k, v)
-      }
   }
 
   /** */
@@ -122,6 +119,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     def total(implicit C: Currency[C]): Money[MA, C] =
       C(NonEmptyList(MonetaryAmount.zero, am.values.toList.map(_.amount)).reduce)
 
+    /** */
+    def restricted[R <: A: scala.reflect.ClassTag]: AccountMap[R, C] =
+      am collect {
+        case (k: R, v) => (k, v)
+      }
   }
 
   /** convenience and domain semantics only */
@@ -217,20 +219,18 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   ) extends Balance[Debit, Credit, C](debits, credits) {
 
     /** */
-    def updated(key: DebitKey, amount: Money[MA, C]): TrialBalance[C] = ???
+    def updated(key: SingleDebitKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
     /** */
-    def updated(key: CreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
+    def updated(key: SingleCreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
 
     // FIXME import AccountMap.collect
     // implicit def CG[AT <: AccountingKey] = CommutativeGroup[AccountMap[AT, C]]
     /** */
     def swapped[T <: AccountingKey](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
       sk match {
-        // FIXME: make syntax work
-        case SingleAssetSwapKey(_, _) =>
-          ???
-        // case ks @ LiabilitySwapKey(_, _)   => ???
+        case SingleAssetSwapKey(_, _)    => ???
+        case ks @ LiabilitySwapKey(_, _) => ks |> discardValue; ???
       }
 
     /** */
@@ -285,6 +285,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       val revenues: Revenues[C]
   ) extends Balance(expenses, revenues) {
 
+    /** */
     def partition(implicit ci: Wallet[C]): (IncomeStatement[C], CashFlowStatement[C]) =
       ???
   }
@@ -336,7 +337,10 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       }
   }
 
+  /** */
   sealed abstract case class EquityStatement[C] private (wut: Null)
+
+  /** */
   object EquityStatement
 
   /**
@@ -351,11 +355,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** tax free implicits */
   object BalanceSheet {
 
+    /** */
     private[model] def apply[C: Currency](
         assets: Assets[C],
         liabilities: Liabilities[C]
     ): BalanceSheet[C] = new BalanceSheet(assets, liabilities) {}
 
+    /** */
     implicit def balanceCommutativeGroup[C: Currency]: CommutativeGroup[BalanceSheet[C]] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets[C], Liabilities[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -364,6 +370,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
       }
   }
 
+  /** */
   sealed trait BookSet[C] {
     def date: LocalDate
     def period: Period
@@ -373,6 +380,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): BookSet[C]
   }
 
+  /** */
   sealed abstract case class CashBookSet[C](
       date: LocalDate,
       period: Period,
@@ -382,6 +390,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
+  /** */
   object CashBookSet {
     def apply[C: Currency](
         date: LocalDate,
@@ -441,19 +450,23 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   import enumeratum._
 
+  /** */
   sealed trait NettableLike extends EnumEntry with Serializable {
     type AssetType <: Debit
     def gross: AssetType
     def less: AssetType
   }
 
+  /** */
   abstract class Nettable[D <: Asset](
       val gross: D,
       val less: D
   ) extends NettableLike {
 
+    /** */
     final type AssetType = D
 
+    /** */
     final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MA, CCY] = b match {
       case Balance(ds, _) => ds(gross) - ds(less)
     }
@@ -465,7 +478,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     *
     * TODO: Any other vocabularies to examine? Make this (differently) extensible?
     */
-  object Nettable extends Enum[NettableLike] {
+  object Nettable extends DtEnum[NettableLike] {
 
     import accounting.Asset._
 
@@ -480,6 +493,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
           DepletableAssets,
           LessAccumulatedDepletion
         )
+
     case object Amortizable
         extends Nettable(
           IntangibleAssets,

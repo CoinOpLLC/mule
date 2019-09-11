@@ -76,16 +76,13 @@ abstract class Ledger[Q: Financial] { self =>
 
   /**
     * Wallet folios are guarranteed non-empty, in that there is at least one Position.
-    *
-    * (TODO: is this worth a new type?)
-    * Also, when creating `Wallet`s, the `C` type parameter is checked for `Currency` status.
     */
   object Wallet extends WithOpaqueKey[Long, Folio] {
 
-    /** */
+    /** type parameter is checked for `Currency` status */
     private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
 
-    /** */
+    /** type parameter is checked for `Currency` status */
     def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
       new Wallet[C](Folio(p +: ps: _*)) {}
   }
@@ -93,22 +90,28 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * For [[Ledger]] updates, the `Transaction` is the concrete record of record, so to speak.
     *
-    * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`:
-    *  the transaction is provisional until dated, returned as a receipt.
-    *
     * The exact semantics will depend on the higher level context
     *  (eg booking a trade vs receiving notice of settlement).
     *
-    * nb: there is no currency field; cash payments are reified in currency-as-instrument.
+    * Note: there is no currency field; cash payments are reified in currency-as-instrument.
     * Store the _cryptographic hash_ of whatever metadata there is.
     */
-  sealed abstract case class Transaction(
+  sealed abstract case class Transaction private (
       recordedAt: Option[Instant],
       debitFrom: Folio.Key,
       creditTo: Folio.Key,
       trade: Trade,
       metaSha: Array[Byte]
-  )
+  ) {
+
+    /**
+      *
+      * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`:
+      *  the transaction is provisional until dated, returned as a receipt.
+      */
+    final def recordedAt(timestamp: Instant): Transaction =
+      new Transaction(timestamp.some, debitFrom, creditTo, trade, metaSha) {}
+  }
 
   /**
     * Do we mean in the business sense or the computer science sense?
@@ -120,7 +123,10 @@ abstract class Ledger[Q: Financial] { self =>
     /** */
     type Meta = io.circe.Json // f'rinstance
 
-    def apply(
+    /**
+      * TODO: define and implement `metaSha` field
+      */
+    def simple(
         debitFrom: Folio.Key,
         creditTo: Folio.Key,
         instrument: Instrument.Key,
@@ -132,7 +138,7 @@ abstract class Ledger[Q: Financial] { self =>
         debitFrom,
         creditTo,
         Trade(instrument -> amount),
-        Array.empty[Byte] // FIXME, and notice that typesafety is no help here - need moar shapeless
+        Array.empty[Byte] // notice that typesafety is no help here - need moar shapeless
       ) {}
 
     /**
@@ -140,7 +146,10 @@ abstract class Ledger[Q: Financial] { self =>
       */
     def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
 
-    implicit def order: Eq[Transaction]  = Eq.fromUniversalEquals[Transaction]
+    /** */
+    implicit def order: Eq[Transaction] = Eq.fromUniversalEquals[Transaction]
+
+    /** */
     implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }
 

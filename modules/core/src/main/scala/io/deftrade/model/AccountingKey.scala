@@ -1,39 +1,36 @@
 package io.deftrade
 package model
-
-/**
-  * IRS Form 1065 Schedule L ontology.
-  *
-  * Note: "partnershiptaxaccounting" would be a more accurate name for this package. :|
-  */
 package accounting
 
 import keyval.DtEnum
 
 import cats.implicits._
-import cats.data.NonEmptySet
 
 import enumeratum._
 
-/** IRS Form 1065 Schedule L ontology: partnerships and `LLC`s taxed as partnerships.
+/**
+  * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
+  * Note: "partnershiptaxaccounting" would be a more accurate name for this package. :|
+  *
   {{{
-   Assets + eXpenses = eQuity + Liabilities + Income
-   A + X = Q + L + I.
+   Assets + Expenses = Liabilities + Equity + Income
   }}}
+  *
   */
 sealed trait AccountingKey extends EnumEntry with Serializable
+
+/** */
 object AccountingKey {
 
   /** this is just a hack to use `SortedSet`s  */
   implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
-
 }
 
 /** */
 sealed trait Debit extends AccountingKey
 
 /** */
-object Debit {
+object Debit extends DtEnum[Debit] {
 
   /** */
   lazy val values = Asset.values ++ Expense.values ++ Income.values
@@ -148,128 +145,12 @@ object Expense extends DtEnum[Expense] {
 /** */
 sealed trait Income extends Debit
 
-/** */
+/** FIXME: this needs work */
 object Income extends DtEnum[Income] {
-  case object Income extends Income
+
+  case object OperatingIncome  extends Income
+  case object InvestmentIncome extends Income
 
   /** */
-  lazy val values = findValues
-}
-
-/** */
-object DoubleEntryKey {
-
-  /** */
-  type KeySet[AT <: AccountingKey] = NonEmptySet[AT]
-
-  /** */
-  final val KeySet = NonEmptySet
-}
-import DoubleEntryKey.KeySet
-
-/** Single amount principle: one leg is singular */
-sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] private[accounting] (
-    entries: KeySet[X],
-    contras: KeySet[Y]
-) extends EnumEntry
-    with Serializable {
-  final type EntryType  = X
-  final type ContraType = Y
-}
-
-/** */
-sealed abstract class DebitKey private (
-    val debit: Debit,
-    val credits: KeySet[Credit]
-) extends DoubleEntryKey(entries = KeySet one debit, contras = credits)
-
-/** */
-sealed abstract class CreditKey private (
-    val debits: KeySet[Debit],
-    val credit: Credit
-) extends DoubleEntryKey(entries = debits, contras = KeySet one credit)
-
-/** Keys that grow or shrink the balance. */
-object DebitKey extends DtEnum[DebitKey] {
-
-  /** */
-  case object PayBills extends DebitKey(Asset.Cash, KeySet one Liability.AccountsPayable)
-
-  // etc.
-  lazy val values = findValues
-}
-
-/**
-  * Keys that preserve the balance.
-  *
-  * `SwapKey`'s type parameter restricts the swap to occur
-  * within the same "column" of the `Balance`.
-  */
-sealed abstract class SwapKey[T <: AccountingKey] private[accounting] (
-    val from: KeySet[T],
-    val to: KeySet[T]
-) extends DoubleEntryKey(from, to)
-
-/** */
-object SwapKey {
-
-  /** */
-  def unapply[EE <: AccountingKey](sk: SwapKey[EE]): Option[(KeySet[EE], KeySet[EE])] =
-    (sk.from, sk.to).some
-}
-
-/** */
-sealed abstract class AssetSwapKey(from: KeySet[Asset], to: KeySet[Asset]) extends SwapKey(from, to)
-
-/** */
-object AssetSwapKey extends DtEnum[AssetSwapKey] {
-  lazy val values = findValues
-}
-
-/** */
-sealed abstract class SingleAssetSwapKey(from: Asset, to: Asset)
-    extends SwapKey[Asset](
-      from = KeySet one from,
-      to = KeySet one to
-    )
-
-/** */
-object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {
-
-  import Asset._
-
-  /** */
-  case object ShipProduct extends SingleAssetSwapKey(Inventories, AccountsReceivable)
-
-  /** */
-  case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
-
-  def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
-    (sk.from.toSortedSet.toList, sk.to.toSortedSet.toList) match {
-      case (List(f), List(t)) => (f, t).some
-    }
-
-  /** */
-  lazy val values = findValues
-}
-
-/** */
-sealed abstract class LiabilitySwapKey(
-    from: KeySet[Liability],
-    to: KeySet[Liability]
-) extends SwapKey[Liability](from, to)
-
-/** */
-object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
-
-  import Liability._
-
-  case object LongTermToCurrentLiability
-      extends LiabilitySwapKey(
-        NonEmptySet one OtherLiabilities,
-        NonEmptySet one OtherCurrentLiabilities
-      )
-
-  // def unapply(lsk: LOQSwapKey): Option[(LOQ, LOQ)] = Some(lsk.from -> lsk.to)
   lazy val values = findValues
 }
