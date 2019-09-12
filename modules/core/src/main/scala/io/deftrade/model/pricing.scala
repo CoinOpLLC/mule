@@ -1,9 +1,15 @@
 package io.deftrade
-package money
+package model
 
-import io.deftrade.implicits._
+import money._, keyval.DtEnum
 
+import enumeratum.EnumEntry
+
+/**
+  *
+  */
 object pricing {
+  import io.deftrade.implicits._
 
   /**
     * Two parameter typeclass which takes advantage of the infix syntax: `A QuotedIn B` is
@@ -25,8 +31,14 @@ object pricing {
     */
   trait QuotedIn[A, C] extends Any {
 
-    def ask: BigDecimal
-    def bid: BigDecimal
+    /** */
+    final def ask: BigDecimal = quote match { case (_, ask) => ask }
+
+    /** */
+    final def bid: BigDecimal = quote match { case (_, bid) => bid }
+
+    /** */
+    def quote: (BigDecimal, BigDecimal)
 
     def tick(implicit C: Currency[C]): BigDecimal
 
@@ -38,17 +50,35 @@ object pricing {
     @inline final def spread = ask - bid
     @inline final def mid    = bid + spread / 2
   }
+
+  /** */
   object QuotedIn {
+
+    /** */
     def apply = ???
 
-    // FIXME: get rid of implicit case class param
-    final case class Spread[A, C2](val ask: BigDecimal, val bid: BigDecimal) extends QuotedIn[A, C2] {
+    /** Subtle name. TODO: reconsider */
+    sealed abstract case class QuoteIn[A, C2] private (
+        final val quote: (BigDecimal, BigDecimal)
+    ) extends QuotedIn[A, C2] {
+
+      /** */
       def tick(implicit C2: Currency[C2]): BigDecimal = C2.pip //  / 10 // this is a thing now
     }
-    final case class TradeQuote[A, C2: Currency](val trade: BigDecimal) extends /* AnyVal with */ QuotedIn[A, C2] {
-      def bid: BigDecimal                             = trade
-      def ask: BigDecimal                             = trade
-      def tick(implicit C2: Currency[C2]): BigDecimal = C2.pip //  / 10 // this is a thing now
+
+    /** */
+    object QuoteIn {
+
+      /** */
+      def apply[A, C2: Currency](
+          bid: BigDecimal,
+          ask: BigDecimal
+      ): QuoteIn[A, C2] = new QuoteIn[A, C2]((bid, ask)) {}
+
+      /** */
+      def asTraded[A, C2: Currency](
+          trade: BigDecimal
+      ): QuoteIn[A, C2] = apply(trade, trade)
     }
   }
 
@@ -58,45 +88,100 @@ object pricing {
                                   C2: Currency[C2],
                                   Q: C1 QuotedIn C2) {
     import Q._
-    @inline def buy[N: Financial](m1: Money[N, C1]): Money[N, C2]   = convert(m1, ask)
-    @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2]  = convert(m1, bid)
+
+    /** */
+    @inline def buy[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, ask)
+
+    /** */
+    @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, bid)
+
+    /** */
     @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
 
+    /** */
     def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) = {
       val single = C1(N.one)
       (buy(single), sell(single))
     }
 
+    /** */
     def description: String = s"""
         |Quoter buys  ${C1} and sells ${C2} at ${bid}
         |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
 
+    /** */
     private def convert[N: Financial](m1: Money[N, C1], rate: BigDecimal): Money[N, C2] = {
       val N = Financial[N]
       C2(m1.amount |> N.toBigDecimal |> (_ * rate) |> N.fromBigDecimal)
     }
   }
+
+  /** */
   implicit def inverseQuote[C1: Currency, C2: Currency](
       implicit Q: C1 QuotedIn C2
   ): C2 QuotedIn C1 =
     new QuotedIn[C2, C1] {
-      def bid                             = 1 / Q.ask
-      def ask                             = 1 / Q.bid
+
+      /** */
+      def quote = (1 / Q.bid, 1 / Q.ask)
+
+      /** */
       def tick(implicit C1: Currency[C1]) = Q.tick * mid
-      override def isDerived              = true
+
+      /** */
+      override def isDerived = true
     }
 
+  /** */
   implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
       Q1X: C1 QuotedIn CX,
       QX2: CX QuotedIn C2
   ): C1 QuotedIn C2 =
     new QuotedIn[C1, C2] {
-      def bid                             = Q1X.bid * QX2.bid
-      def ask                             = Q1X.ask * QX2.ask
+
+      /** */
+      def quote = (Q1X.bid * QX2.bid, Q1X.ask * QX2.ask)
+
+      /** */
       def tick(implicit C2: Currency[C2]) = QX2.tick(C2) * mid
-      override def isDerived              = true
+
+      /** */
+      override def isDerived = true
+
+      /** */
       type CrossType = Currency[CX]
+
+      /** */
       override def cross: Option[CrossType] = Some(Currency[CX])
     }
 
+  /** */
+  sealed trait Tick extends EnumEntry with Serializable
+
+  /** */
+  object Tick extends DtEnum[Tick] {
+
+    case object Bid   extends Tick
+    case object Ask   extends Tick
+    case object Trade extends Tick
+
+    /** */
+    lazy val values = findValues
+  }
+
+  sealed abstract case class TickData(tick: Tick, price: BigDecimal, size: Long)
+
+  object TickData {
+
+    private def mk(tick: Tick, price: BigDecimal, size: Long) = new TickData(tick, price, size) {}
+
+    /** */
+    def bid(price: BigDecimal, size: Long): TickData = mk(Tick.Bid, price, size)
+
+    /** */
+    def ask(price: BigDecimal, size: Long): TickData = mk(Tick.Ask, price, size)
+
+    /** */
+    def trade(price: BigDecimal, size: Long): TickData = mk(Tick.Trade, price, size)
+  }
 }

@@ -18,19 +18,26 @@ import spire.syntax.field._
 import scala.language.higherKinds
 
 /**
-  * Double entry `Balance` calculation from a sequence of `Transaction`s.
+  * Double entry [[Balance]] calculation from a sequence of [[Transaction]]s.
   *
-  * Recall the fundamental equation of accounting:
+  * Recall the fundamental equation of double entry bookkeeping:
   *
-  *   - `Debits === Credits`
-  *   - `Assets + Expenses === Liabilities + Equity + Revenues`
+  *   - {{{Debits === Credits}}}
   *
-  * Note the two type parameters: `MA` and `Q`
+  * Expanding:
   *
-  * Both type params are needed to deal with case where `MonetaryAmount and `Quantity`
+  *   - {{{Assets + Expenses === Liabilities + Equity + Revenues}}}
+  *
+  * When summing Transactions, this "modular cake slice" implements the algebra which
+  * maintains the above equality.
+  *
+  * @note Both type params `MA` and `Q` are needed to deal with case
+  * where [[MonetaryAmount]] and [[Quantity]]
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
-  * The package can now create {{{Money[MA, C] <=> (MI, Q)}}} codecs via MonetaryInstruments table.
+  * The package can thus create {{{Money[MA, C] <=> (MI, Q)}}} codecs via a table of
+  * [[Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
+  * a money market fund instrument.)
   *
   * @note This design is (very) provisional.
   */
@@ -68,16 +75,16 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   lazy val ValuedFolio = PricedTrade
 
   /** TODO: I smell a Reader monad in here... */
-  sealed abstract case class TransactionPricer[C](
+  sealed abstract case class TradePricer[C](
       mark: Trade => PricedTrade[C]
   )
 
   /**
     *
     */
-  object TransactionPricer extends WithOpaqueKey[Long, TransactionPricer[_]] {
-    def apply[C: Currency](mark: Trade => PricedTrade[C]): TransactionPricer[C] =
-      new TransactionPricer(mark) {}
+  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+    def apply[C: Currency](mark: Trade => PricedTrade[C]): TradePricer[C] =
+      new TradePricer(mark) {}
   }
 
   /** */
@@ -95,7 +102,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
   type Income = accounting.Income
   type Equity = accounting.Equity
 
-  /** A tally sheet, basically. Partially specialized `Map` with special tricks. */
+  /** Mapping accounting keys to [[money.Money]]. */
   final type AccountMap[A <: AccountingKey, C] = Map[A, Money[MA, C]]
 
   /** */
@@ -268,7 +275,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
     /** */
     def from[CC[_]: Foldable, C: Currency](
-        marker: TransactionPricer[C]
+        marker: TradePricer[C]
     )(
         xs: CC[Transaction]
     ): TrialBalance[C] = ??? // xs.sum // FIXME this is all I should have to say!
@@ -423,10 +430,12 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   }
 
+  /** */
   def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](
       ts: F[Transaction]
   ): TrialBalance[C] = ???
 
+  /** */
   def breakdown[C: Currency: Wallet](
       prior: BalanceSheet[C],
       delta: BalanceSheet[C], // delta and raw come from TrialBalance
@@ -435,7 +444,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
     ???
 
   /**  */
-  type DeltaCashBooks[C]    = (CashFlowStatement[C], BalanceSheet[C])
+  type DeltaCashBooks[C] = (CashFlowStatement[C], BalanceSheet[C])
+
+  /** */
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
   /**

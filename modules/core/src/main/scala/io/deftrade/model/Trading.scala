@@ -166,8 +166,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     * Reference:
     * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
     *
-    * FIXME: Maybe make this a full MTL thing because SemigroupK for Kleisli is restrictive.
+    * TODO: Revisit design; SemigroupK for Kleisli is restrictive.
     * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
+    *
     */
   sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
       entity: LegalEntity.Key,

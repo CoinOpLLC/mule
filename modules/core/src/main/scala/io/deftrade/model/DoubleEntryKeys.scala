@@ -16,7 +16,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
 
   /**
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
-    * following usage common in the accounting field.
+    * following terminology common in the accounting field.
     */
   type Treatment[AK <: AccountingKey] = UnitPartition[AK, MA]
 

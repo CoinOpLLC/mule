@@ -1,14 +1,16 @@
 package io.deftrade
 package money
 
-import io.deftrade.keyval.CsvEnum
+import keyval.CsvEnum, model.pricing.{ QuotedIn, Rate }
+
+import cats.instances.string._
 
 import eu.timepit.refined
 import refined.api.Refined
 
-import enumeratum._
+import enumeratum.{ Enum, EnumEntry }
 
-import BigDecimal.RoundingMode._
+import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
 
 /**
   * Unparameterized [[Currency]] base class.
@@ -20,14 +22,22 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   /** instance phantom type representing currency */
   type Type
 
+  /** */
   def apply[N: Financial](n: N): Money[N, Type]
 
-  final private lazy val jc = java.util.Currency getInstance self.entryName
-
+  /** */
   final def currencyCode: String = jc.getCurrencyCode
-  final def numericCode: Int     = jc.getNumericCode
-  final def displayName: String  = jc.getDisplayName
-  final def symbol: String       = jc.getSymbol
+
+  /** */
+  final def numericCode: Int = jc.getNumericCode
+
+  /** */
+  final def displayName: String = jc.getDisplayName
+
+  /** */
+  final def symbol: String = jc.getSymbol
+
+  /** */
   final def defaultFractionDigits: Int = jc.getDefaultFractionDigits match {
     case -1 => 4 // typical use case is unit-of-account: no real std, just need a decent default
     case fd => fd
@@ -36,20 +46,30 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   /**
     * pip: percentage in point https://en.wikipedia.org/wiki/Percentage_in_point
     */
-  final def pipScale: Int = defaultFractionDigits + 2
-
   final def pip: BigDecimal = BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
 
+  /**
+    * Typically, two digits more than typical for a given currency but CHECK THE SOURCE k thx.
+    */
+  final def pipScale: Int = defaultFractionDigits + 2
+
+  /** */
   def fractionDigits: Int = defaultFractionDigits
+
+  /** */
   def rounding: RoundingMode = self.entryName match {
     case "JPY" => DOWN
     case _     => HALF_UP
   }
+
+  /** */
+  final private lazy val jc = java.util.Currency getInstance self.entryName
 }
 
 /**  */
 object CurrencyLike {
-  import cats.instances.string._
+
+  /** */
   implicit lazy val order: cats.Order[CurrencyLike] = cats.Order by { _.currencyCode }
 }
 
@@ -57,6 +77,7 @@ object CurrencyLike {
   */
 sealed trait Currency[C] extends CurrencyLike { self =>
 
+  /** */
   final type Type = C
 
   /**
@@ -70,8 +91,6 @@ sealed trait Currency[C] extends CurrencyLike { self =>
     * _fiat bux_
     */
   def apply[N: Financial](n: N) = Money[N, C](n)
-
-  import pricing._
 
   /**
     * Exchange `Rate` factory. Implicit context provides pricing.
@@ -95,8 +114,12 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
     * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
     */
   type CodePattern = refined.W.`"[A-Z]{3}"`.T
-  type IsCode      = refined.string.MatchesRegex[CodePattern]
-  type Code        = String Refined IsCode
+
+  /** */
+  type IsCode = refined.string.MatchesRegex[CodePattern]
+
+  /** */
+  type Code = String Refined IsCode
 
   /**
     * Given a currency (phantom) type, get a `Currency` instance.
@@ -104,6 +127,7 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
     */
   def apply[C: Currency]: Currency[C] = implicitly
 
+  /** */
   def unapply[N: Financial, C: Currency](money: Money[N, C]): Option[(N, Currency[C])] =
     ((money.amount, Currency[C])).some
 
@@ -162,5 +186,6 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
 
   // TODO: MOAR...
 
+  /** */
   val values = findValues
 }

@@ -54,13 +54,21 @@ abstract class Ledger[Q: Financial] { self =>
     * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
     */
   type Folio = Map[Instrument.Key, Quantity]
+
+  /** */
   object Folio extends WithOpaqueKey[Long, Folio] {
-    def empty: Folio                = Map.empty
+
+    /** */
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
+
+    /** */
+    def empty: Folio = Map.empty
   }
 
   /** A [[Folio]] in motion. */
   type Trade = Folio
+
+  /** */
   lazy val Trade = Folio
 
   /**
@@ -79,12 +87,15 @@ abstract class Ledger[Q: Financial] { self =>
     */
   object Wallet extends WithOpaqueKey[Long, Folio] {
 
-    /** type parameter is checked for `Currency` status */
-    private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
-
-    /** type parameter is checked for `Currency` status */
+    /**
+      * type parameter is checked for `Currency` status
+      * TODO: additional validation?
+      */
     def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
       new Wallet[C](Folio(p +: ps: _*)) {}
+
+    /** type parameter is checked for `Currency` status */
+    private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
   }
 
   /**
@@ -241,13 +252,3 @@ abstract class Ledger[Q: Financial] { self =>
     implicit def eq = Eq.fromUniversalEquals[Account]
   }
 }
-// Trade Blotter - includes canceled trades
-// Client name
-// Trade name
-// Settlement Date
-// Buy/Sell
-// CUSIP	Security Symbol
-// Security Desc.
-// Quantity
-// Unit Price
-// Principal/Proceeds
