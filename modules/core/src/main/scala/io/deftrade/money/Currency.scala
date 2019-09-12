@@ -1,7 +1,7 @@
 package io.deftrade
 package money
 
-import keyval.CsvEnum, model.pricing.{ QuotedIn, Rate }
+import keyval.CsvEnum
 
 import cats.instances.string._
 
@@ -90,15 +90,8 @@ sealed trait Currency[C] extends CurrencyLike { self =>
   /**
     * _fiat bux_
     */
-  def apply[N: Financial](n: N) = Money[N, C](n)
+  final def apply[N: Financial](n: N) = Money[N, C](n)
 
-  /**
-    * Exchange `Rate` factory. Implicit context provides pricing.
-    */
-  def /[C2](cb: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
-    implicit val C2 = cb
-    Rate[C, C2]
-  }
 }
 
 /**

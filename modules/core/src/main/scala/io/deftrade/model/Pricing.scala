@@ -1,17 +1,64 @@
 package io.deftrade
 package model
 
-import money._, keyval.DtEnum, implicits._
+import money._, keyval._
+
+import cats.implicits._
+
+import spire.syntax.field._
 
 import enumeratum.EnumEntry
 
 /**
-  * Something of a dumping ground for now
+  * Price all the things.
+  *
+  * Something of a dumping ground for now.
   */
-object pricing extends pricing
+abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
 
-/** */
-trait pricing {
+  /** Domain specific tools for dealing with `MonetaryAmount`s */
+  final type MonetaryAmount = MA
+
+  /** member [[money.Financial]] instance for convenience */
+  final val MonetaryAmount = Financial[MonetaryAmount]
+
+  /** */
+  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
+
+  /** */
+  object PricedTrade {
+
+    /** */
+    def apply[C: Currency: Wallet](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+
+    /**
+      * Used to convert to the currency as `Instrument` convention.
+      */
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+  }
+
+  /** type alias */
+  type ValuedFolio[C] = PricedTrade[C]
+
+  /** */
+  lazy val ValuedFolio = PricedTrade
+
+  /**
+    * TODO: I smell a Reader monad in here. Why? The pricing function is a kind of config...
+    */
+  sealed abstract case class TradePricer[C](
+      mark: Trade => PricedTrade[C]
+  )
+
+  /**
+    *
+    */
+  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+
+    /** */
+    def apply[C: Currency](mark: Trade => PricedTrade[C]): TradePricer[C] =
+      new TradePricer(mark) {}
+  }
 
   /**
     * Two parameter typeclass which takes advantage of the infix syntax: `A QuotedIn B` is
@@ -34,19 +81,19 @@ trait pricing {
   trait QuotedIn[A, C] extends Any {
 
     /** */
-    final def ask: BigDecimal = quote match { case (_, ask) => ask }
+    final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
 
     /** */
-    final def bid: BigDecimal = quote match { case (_, bid) => bid }
+    final def bid: MonetaryAmount = quote match { case (_, bid) => bid }
 
     /**
       * Implementations which query live markets, but do not require live data,
       * should strongly consider caching.
       */
-    def quote: (BigDecimal, BigDecimal)
+    def quote: (MonetaryAmount, MonetaryAmount)
 
     /** */
-    def tick(implicit C: Currency[C]): BigDecimal
+    def tick(implicit C: Currency[C]): MonetaryAmount
 
     /** */
     def isDerived: Boolean = false
@@ -73,11 +120,12 @@ trait pricing {
 
   /** Subtle name. TODO: reconsider */
   sealed abstract case class QuoteIn[A, C2] private (
-      final val quote: (BigDecimal, BigDecimal)
+      final val quote: (MonetaryAmount, MonetaryAmount)
   ) extends QuotedIn[A, C2] {
 
     /** */
-    def tick(implicit C2: Currency[C2]): BigDecimal = C2.pip //  / 10 // this is a thing now
+    def tick(implicit C2: Currency[C2]): MonetaryAmount =
+      MonetaryAmount from [BigDecimal] C2.pip //  / 10 // this is a thing now
   }
 
   /** */
@@ -85,13 +133,13 @@ trait pricing {
 
     /** */
     def apply[A, C2: Currency](
-        bid: BigDecimal,
-        ask: BigDecimal
+        bid: MonetaryAmount,
+        ask: MonetaryAmount
     ): QuoteIn[A, C2] = new QuoteIn[A, C2]((bid, ask)) {}
 
     /** */
     def asTraded[A, C2: Currency](
-        trade: BigDecimal
+        trade: MonetaryAmount
     ): QuoteIn[A, C2] = apply(trade, trade)
   }
 
@@ -103,17 +151,15 @@ trait pricing {
     import Q._
 
     /** */
-    @inline def buy[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, ask)
+    /** */
+    /** */
+    @inline def buy(m1: Money[MA, C1]): Money[MA, C2]   = convert(m1, ask)
+    @inline def sell(m1: Money[MA, C1]): Money[MA, C2]  = convert(m1, bid)
+    @inline def apply(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, mid)
 
     /** */
-    @inline def sell[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, bid)
-
-    /** */
-    @inline def apply[N: Financial](m1: Money[N, C1]): Money[N, C2] = convert(m1, mid)
-
-    /** */
-    def quote[N](implicit N: Financial[N]): (Money[N, C2], Money[N, C2]) = {
-      val single = C1(N.one)
+    def quote: (Money[MA, C2], Money[MA, C2]) = {
+      val single = C1(MonetaryAmount.one)
       (buy(single), sell(single))
     }
 
@@ -123,10 +169,7 @@ trait pricing {
         |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
 
     /** */
-    private def convert[N: Financial](m1: Money[N, C1], rate: BigDecimal): Money[N, C2] = {
-      val N = Financial[N]
-      C2(m1.amount |> N.toBigDecimal |> (_ * rate) |> N.fromBigDecimal)
-    }
+    private def convert(m1: Money[MA, C1], rate: MA): Money[MA, C2] = C2(m1.amount * rate)
   }
 
   /** */
@@ -190,19 +233,34 @@ trait pricing {
     lazy val values = findValues
   }
 
-  sealed abstract case class TickData(tick: Tick, price: BigDecimal, size: Long)
+  sealed abstract case class TickData(tick: Tick, price: MonetaryAmount, size: Long)
 
   object TickData {
 
-    private def mk(tick: Tick, price: BigDecimal, size: Long) = new TickData(tick, price, size) {}
+    /** */
+    def apply(tick: Tick, price: MonetaryAmount, size: Long): TickData =
+      new TickData(tick, price, size) {}
 
     /** */
-    def bid(price: BigDecimal, size: Long): TickData = mk(Tick.Bid, price, size)
+    def bid(price: MonetaryAmount, size: Long) = TickData(Tick.Bid, price, size)
 
     /** */
-    def ask(price: BigDecimal, size: Long): TickData = mk(Tick.Ask, price, size)
+    def ask(price: MonetaryAmount, size: Long) = TickData(Tick.Ask, price, size)
 
     /** */
-    def trade(price: BigDecimal, size: Long): TickData = mk(Tick.Trade, price, size)
+    def trade(price: MonetaryAmount, size: Long) = TickData(Tick.Trade, price, size)
+  }
+
+  /** */
+  implicit class SweetCurrency[C: Currency](C: C) {
+
+    /**
+      * Exchange `Rate` factory. Implicit context provides pricing.
+      */
+    def /[C2](cb: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+      implicit val C2 = cb
+      Rate[C, C2]
+    }
+
   }
 }

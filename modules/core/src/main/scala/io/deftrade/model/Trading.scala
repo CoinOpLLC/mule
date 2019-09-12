@@ -17,7 +17,7 @@
 package io.deftrade
 package model
 
-import keyval._, time._, money._, pricing._
+import keyval._, time._, money._
 import capital.Instrument, refinements.Mic, Currency.USD
 
 import cats._

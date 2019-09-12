@@ -3,11 +3,11 @@ package model
 
 import money._, time._, keyval._, accounting._, implicits._
 
+import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
-import cats.implicits._
 
 import eu.timepit.refined
 import refined.auto._
@@ -41,51 +41,11 @@ import scala.language.higherKinds
   *
   * @note This design is (very) provisional.
   */
-abstract class Balances[MA: Financial, Q: Financial] extends Ledger[Q] {
-
-  /** Domain specific tools for dealing with `MonetaryAmount`s */
-  final type MonetaryAmount = MA
-
-  /** member [[money.Financial]] instance for convenience */
-  final val MonetaryAmount = Financial[MonetaryAmount]
+abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
   /** instantiate double entry key module with appropriate monetary amount type */
   object doubleEntryKeys extends DoubleEntryKeys[MonetaryAmount]
   import doubleEntryKeys._
-
-  /** */
-  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
-
-  /** */
-  object PricedTrade {
-
-    /** */
-    def apply[C: Currency: Wallet](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
-
-    /**
-      * Used to convert to the currency as `Instrument` convention.
-      */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
-  }
-
-  /** type alias */
-  type ValuedFolio[C] = PricedTrade[C]
-
-  /** */
-  lazy val ValuedFolio = PricedTrade
-
-  /** TODO: I smell a Reader monad in here... */
-  sealed abstract case class TradePricer[C](
-      mark: Trade => PricedTrade[C]
-  )
-
-  /**
-    *
-    */
-  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
-    def apply[C: Currency](mark: Trade => PricedTrade[C]): TradePricer[C] =
-      new TradePricer(mark) {}
-  }
 
   /** */
   type AccountingKey = accounting.AccountingKey
