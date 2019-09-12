@@ -87,9 +87,9 @@ object Partition {
       amount: V
   ) = compute(keys)(amount) |> apply[K, V]
 
+  //
   private[deftrade] def unsafe[K: cats.Order, V: Financial](sm: SortedMap[K, V]): Partition[K, V] =
     Partition(NonEmptyMap fromMapUnsafe sm)
-
 }
 
 /**

@@ -1,15 +1,17 @@
 package io.deftrade
 package model
 
-import money._, keyval.DtEnum
+import money._, keyval.DtEnum, implicits._
 
 import enumeratum.EnumEntry
 
 /**
-  *
+  * Something of a dumping ground for now
   */
-object pricing {
-  import io.deftrade.implicits._
+object pricing extends pricing
+
+/** */
+trait pricing {
 
   /**
     * Two parameter typeclass which takes advantage of the infix syntax: `A QuotedIn B` is
@@ -37,56 +39,67 @@ object pricing {
     /** */
     final def bid: BigDecimal = quote match { case (_, bid) => bid }
 
-    /** */
+    /**
+      * Implementations which query live markets, but do not require live data,
+      * should strongly consider caching.
+      */
     def quote: (BigDecimal, BigDecimal)
 
+    /** */
     def tick(implicit C: Currency[C]): BigDecimal
 
+    /** */
     def isDerived: Boolean = false
 
+    /** */
     type CrossType
+
+    /** */
     def cross: Option[CrossType] = None
 
+    /** */
     @inline final def spread = ask - bid
-    @inline final def mid    = bid + spread / 2
+
+    /** */
+    @inline final def mid = bid + spread / 2
   }
 
   /** */
   object QuotedIn {
 
-    /** */
-    def apply = ???
+    /** FIXME: Not sure this can be generally implemented. */
+    def apply[A, C: Currency]: QuotedIn[A, C] = ???
+  }
 
-    /** Subtle name. TODO: reconsider */
-    sealed abstract case class QuoteIn[A, C2] private (
-        final val quote: (BigDecimal, BigDecimal)
-    ) extends QuotedIn[A, C2] {
-
-      /** */
-      def tick(implicit C2: Currency[C2]): BigDecimal = C2.pip //  / 10 // this is a thing now
-    }
+  /** Subtle name. TODO: reconsider */
+  sealed abstract case class QuoteIn[A, C2] private (
+      final val quote: (BigDecimal, BigDecimal)
+  ) extends QuotedIn[A, C2] {
 
     /** */
-    object QuoteIn {
+    def tick(implicit C2: Currency[C2]): BigDecimal = C2.pip //  / 10 // this is a thing now
+  }
 
-      /** */
-      def apply[A, C2: Currency](
-          bid: BigDecimal,
-          ask: BigDecimal
-      ): QuoteIn[A, C2] = new QuoteIn[A, C2]((bid, ask)) {}
+  /** */
+  object QuoteIn {
 
-      /** */
-      def asTraded[A, C2: Currency](
-          trade: BigDecimal
-      ): QuoteIn[A, C2] = apply(trade, trade)
-    }
+    /** */
+    def apply[A, C2: Currency](
+        bid: BigDecimal,
+        ask: BigDecimal
+    ): QuoteIn[A, C2] = new QuoteIn[A, C2]((bid, ask)) {}
+
+    /** */
+    def asTraded[A, C2: Currency](
+        trade: BigDecimal
+    ): QuoteIn[A, C2] = apply(trade, trade)
   }
 
   /** An exchange rate. */
-  final case class Rate[C1, C2]()(implicit
-                                  C1: Currency[C1],
-                                  C2: Currency[C2],
-                                  Q: C1 QuotedIn C2) {
+  sealed abstract case class Rate[C1, C2]()(implicit
+                                            C1: Currency[C1],
+                                            C2: Currency[C2],
+                                            Q: C1 QuotedIn C2) {
     import Q._
 
     /** */
@@ -114,6 +127,14 @@ object pricing {
       val N = Financial[N]
       C2(m1.amount |> N.toBigDecimal |> (_ * rate) |> N.fromBigDecimal)
     }
+  }
+
+  /** */
+  object Rate {
+
+    /** */
+    def apply[C1: Currency, C2: Currency](implicit Q: C1 QuotedIn C2): Rate[C1, C2] =
+      new Rate[C1, C2] {}
   }
 
   /** */
