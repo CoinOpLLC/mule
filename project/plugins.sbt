@@ -78,19 +78,13 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.0")
 // addSbtPlugin("com.frugalmechanic" % "fm-sbt-s3-resolver" % "0.12.0")
 
 /**
-  * [scaladoc: other API resolution](https://github.com/ThoughtWorksInc/sbt-api-mappings)
-  */
-// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "1.1.0") // for SBT 0.13_
-// addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "2.0.0")
-
-/**
   * [TUT](https://github.com/tpolecat/tut)
   */
 // addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.5.5") // for SBT 0.13_
 addSbtPlugin("org.tpolecat" % "tut-plugin" % "0.6.2")
 
 /**
-  * [tag list (TODO and friends)](https://github.com/johanandren/sbt-taglist)
+  * tag list (TODO and friends)](https://github.com/johanandren/sbt-taglist)
   */
 addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
 
@@ -103,6 +97,12 @@ addSbtPlugin("com.markatta" % "sbt-taglist" % "1.4.0")
   * [Pretty class diagrams; needs graphviz](https://github.com/xuwei-k/sbt-class-diagram)
   */
 addSbtPlugin("com.github.xuwei-k" % "sbt-class-diagram" % "0.2.1")
+
+/**
+  * Gets links for all the `api`s. And by all we mean most.
+  * https://github.com/ThoughtWorksInc/sbt-api-mappings
+  */
+addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "3.0.0")
 
 /**
   * [link](url)

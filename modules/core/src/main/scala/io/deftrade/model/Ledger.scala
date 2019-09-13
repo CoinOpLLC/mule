@@ -75,7 +75,7 @@ abstract class Ledger[Q: Financial] { self =>
     * Models ready cash per currency.
     *
     * In this way, implicit values of `Wallet` can be used to inject maps ("pricers") between
-    * (certain) [[Folio]]s and (certain) [[Currency]]s into the implicit context.
+    * (certain) [[Folio]]s and (certain) [[money.Currency]]s into the implicit context.
     *
     * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
     * values are '''not''' carried by instances of this class.

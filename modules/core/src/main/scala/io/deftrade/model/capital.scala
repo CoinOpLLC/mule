@@ -2,20 +2,20 @@ package io.deftrade
 package model
 package capital
 
-import scala.language.higherKinds
-
-import keyval._
-import money.{ CurrencyLike, Financial }
 import time.ZonedDateTime
-import model.refinements.{ Isin, Mic, Usin, VarChar }
+import money.{ CurrencyLike, Financial }
+import keyval._
+import refinements.{ Label }
+import model.reference.{ Isin, Mic, Usin }
 
-// import cats.{ Eq, Hash, Order, Show }
 import cats.Id
 import cats.instances.string._
 
 // import shapeless.syntax.singleton._
 
 import io.circe.Json
+
+import scala.language.higherKinds
 
 /**
   * Models a tradeable thing.
@@ -25,29 +25,35 @@ import io.circe.Json
   *   - see implementations in `Refine` library
   */
 final case class Instrument(
-    symbol: VarChar,
+    symbol: Label,
     issuer: LegalEntity.Key,
     meta: Json
 )
 
+/** */
 object Instrument extends WithAdtKey[Usin, Instrument]
 
+/** */
 trait PrimaryCapital {
 
+  /** */
   case class CommonStock(
       mic: Mic,
       c: CurrencyLike,
-      tclass: Option[VarChar]
+      tclass: Option[Label]
   )
 
+  /** */
   object CommonStock extends WithAdtKey[Usin, CommonStock]
 
+  /** */
   case class PreferredStock(
       mic: Mic,
       c: CurrencyLike,
-      series: VarChar,
+      series: Label,
   )
 
+  /** */
   object PreferredStock extends WithAdtKey[Usin, PreferredStock]
 
   /** */
@@ -56,127 +62,190 @@ trait PrimaryCapital {
   /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
   object Bond extends WithAdtKey[Isin, Bond]
 
+  /** */
   case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
 }
 
+/** */
 trait VanillaDerivatives {
 
+  /** */
   case class Index(underlyer: List[Instrument.Key]) extends Derivative[List] {
     def components: List[Instrument.Key] = underlyer
   }
+
+  /** */
   object Index extends WithAdtKey[Isin, Index]
 
+  /** Exchange Traded Derivative - Future (ETD) */
   case class EtdFuture(underlyer: Instrument.Key) extends Derivative[Id]
 
-  // Exchange Traded Derivative - Option (ETD)
-  case class EtdOption()
+  /**Exchange Traded Derivative - Option (ETD)  */
+  case class EtdOption(underlyer: Instrument.Key) extends Derivative[Id]
 
-  // I mean, right?
+  /** I mean, right? */
   case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative[Id]
 
+  /** */
   case class IndexOption(underlyer: Instrument.Key) extends Derivative[Id]
 
+  /** */
   case class StockOption(underlyer: Instrument.Key) extends Derivative[Id]
 
-  case class BondFuture()
-  // A BondFutureOption.
+  /** */
+  case class BondFuture(underlyer: Instrument.Key) extends Derivative[Id]
+
+  /** */
   case class BondFutureOption(index: Index.Key) extends Derivative[Id] {
 
     /** FIXME need to be able to derive this */
     def underlyer: Instrument.Key = ??? // index
   }
-  // Exchange Traded Derivative - Future (ETD)
 }
 
+/** WIP */
 trait Exotics {
-  // A product only used for calibration.
+
+  /** A product only used for calibration. FIXME WTF */
   case class Calibration()
-  // Credit Default Swap (CDS)
+
+  /** Credit Default Swap */
   case class Cds()
-  // CDS index
+
+  /** */
   case class CdsIndex()
-  // Constant Maturity Swap (CMS)
+
+  /** Constant Maturity Swap */
   case class Cms()
-  // A Deliverable Swap Forward
-  // https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf
+
+  /**
+    * [[https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf Deliverable Swap Forward]]
+    */
   case class Dsf()
-  // Forward Rate Agreement
+
+  /** Forward Rate Agreement */
   case class Fra()
-  // // A representation based on sensitivities.
+
+  /** A representation based on sensitivities. FIXME WTF */
   case class Sensitivities()
-  // A Swap.
+
+  /** */
   case class Swap()
-  // A Swaption.
+
+  /** */
   case class Swaption()
 }
 
+/** WIP */
 trait Fx {
-  // FX Non-Deliverable Forward
+
+  /** FX Non-Deliverable Forward */
   case class FxNdf()
-  // A FxSingle.
+
+  /** */
   case class FxSingle()
-  // A FxSingleBarrierOption.
+
+  /** */
   case class FxSingleBarrierOption()
-  // A FxSwap.
+
+  /** */
   case class FxSwap()
-  // A FxVanillaOption.
+
+  /** */
   case class FxVanillaOption()
 }
 
+/** */
 trait Ibor {
-  // A IborCapFloor.
+
+  /** */
   case class IborCapFloor()
-  // A IborFuture.
+
+  /** */
   case class IborFuture()
-  // A IborFutureOption.
+
+  /** */
   case class IborFutureOption()
 }
 
+/**
+  * Bespoke lending products.
+  */
 trait Lending {
-  // A BulletPayment.
+
+  /** */
   case class BulletPayment()
-  // A TermDeposit.
+
+  /** */
   case class TermDeposit()
 
+  /** */
   case class AmortizingLoan()
 
+  /** */
   case class ConvertibleNote()
 }
 
 /** FIXME: "Index" anything should reference the index - need a Table of Indexes */
 sealed trait Derivative[F[_]] {
+
+  /** */
   def underlyer: F[Instrument.Key]
 }
 
+/** */
 sealed trait Index {
+
+  /** */
   def underlyer: Instrument
 }
 
+/** */
 sealed trait Maturity {
+
+  /** */
   def matures: ZonedDateTime
 }
 
+/** */
 sealed trait Expiry {
+
+  /** */
   def expires: ZonedDateTime
 }
 
+/** */
 sealed trait Strike[N] {
+
+  /** */
   def strike: N
 }
 
+/** */
 object Strike {
 
+  /** */
   sealed abstract case class SimpleStrike[N] private (strike: N) extends Strike[N]
+
+  /** */
   object SimpleStrike {
     def apply[N: Financial](strike: N): SimpleStrike[N] = new SimpleStrike(strike) {}
   }
 
+  /** */
   sealed abstract case class LogMoneynessStrike[N] private (strike: N) extends Strike[N]
+
+  /** */
   object LogMoneynessStrike {
+
+    /** */
     def apply[N: Financial](strike: N): LogMoneynessStrike[N] = new LogMoneynessStrike(strike) {}
+
+    /** */
     def apply[N: Financial](strike: N, forward: N): LogMoneynessStrike[N] =
       ??? // apply(ln(strike / forward)) TODO abstract ln over Financial[N] ?!
   }
 }
 
+/** */
 object Instruments extends PrimaryCapital with VanillaDerivatives with Exotics with Fx with Ibor with Lending

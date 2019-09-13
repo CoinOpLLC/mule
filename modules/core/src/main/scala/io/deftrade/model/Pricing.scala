@@ -61,19 +61,20 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   }
 
   /**
-    * Two parameter typeclass which takes advantage of the infix syntax: `A QuotedIn B` is
+    * Represents a price quote (in currency `C`) for instruments of type `A`.
+    *
+    * The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is
     * a human-legible expression in the domain of market quotes.
     *
-    *   - can come from a variety of sources including live market
+    *   Instances can come from a variety of sources including live market
     *   - "Orderly market" invariant: `ask` < `bid`.
     *   - must model disorderly markets: not everything that comes at you down the wire makes sense.
-    *   - note: the types parameters `A` and `C` are effectively *phantom types*
-    *       - used summon a pricing instance
-    *           - (eg `QuotedIn`[`SomeShadySpeculativeInstrument`, [[Currency.CHF]]]))
+    *   - used summon a pricing instance, e.g.
+    *{{{val q = QuotedIn[SomeShadySpeculativeInstrument, Currency.CHF] }}}
     *       - C is intended (but not required by this base type) to represent a currency, and will
-    * typically have a [[Currency]][C] typeclass instance
+    * typically have a [[money.Currency]][C] typeclass instance
     *
-    * Domain consideration: `Currency` _exchange depends on _pricing_ of some kind.
+    * Domain consideration: `Currency`_exchange depends on '''pricing''' of some kind.
     * One or more Market(s) determine this price.
     *     - A design that doesn't abstract over `QuotedIn`, '''including live data''', is useless.
     *     - otoh dead simple immutable for testing / demo also required
@@ -87,8 +88,16 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
     final def bid: MonetaryAmount = quote match { case (_, bid) => bid }
 
     /**
+      *
+      * Return both a `bid` and an `ask` for the given instrument.
+      *
       * Implementations which query live markets, but do not require live data,
       * should strongly consider caching.
+      *
+      * Domain modelling note: `quote` does not signal intent. For example, the client may ignore
+      * the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
+      * cannot not predjudice their responses when asked for a quote, as the client reveals nothing
+      * about their intent.
       */
     def quote: (MonetaryAmount, MonetaryAmount)
 

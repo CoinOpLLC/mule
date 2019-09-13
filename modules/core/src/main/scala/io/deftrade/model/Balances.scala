@@ -36,7 +36,7 @@ import scala.language.higherKinds
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
   * The package can thus create {{{Money[MA, C] <=> (MI, Q)}}} codecs via a table of
-  * [[Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
+  * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
   *
   * @note This design is (very) provisional.

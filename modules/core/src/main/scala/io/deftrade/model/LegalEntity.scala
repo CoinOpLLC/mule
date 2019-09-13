@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import time._, keyval._, refinements._
+import time._, keyval._, refinements.Label, reference._
 
 import enumeratum._
 
@@ -22,7 +22,7 @@ import io.circe.Json
   * See Also: `model.Role`s.
   */
 sealed trait LegalEntity extends Serializable {
-  def name: VarChar
+  def name: Label
   def taxId: LegalEntity.TaxId
   def meta: Json
 }
@@ -41,7 +41,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
     *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
     */
   final case class NaturalPerson(
-      name: VarChar,
+      name: Label,
       ssn: Ssn,
       dob: LocalDate,
       meta: Json
@@ -52,7 +52,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
   /**
     * `Corporation`s are `LegalEntity`s too!
     */
-  final case class Corporation(name: VarChar, ein: Ein, meta: Json) extends LegalEntity {
+  final case class Corporation(name: Label, ein: Ein, meta: Json) extends LegalEntity {
     def taxId = ein
   }
 

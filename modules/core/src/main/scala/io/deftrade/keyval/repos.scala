@@ -124,10 +124,7 @@ trait repos {
     }
 
     /** */
-    override def permRows: PermRows = Stream emit [F, PermRow] {
-      def f = ???
-      f
-    }
+    override def permRows: PermRows = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
 
   }
 

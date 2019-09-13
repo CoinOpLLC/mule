@@ -18,7 +18,7 @@ package io.deftrade
 package model
 
 import keyval._, time._, money._
-import capital.Instrument, refinements.Mic, Currency.USD
+import capital.Instrument, reference.Mic, Currency.USD
 
 import cats._
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
