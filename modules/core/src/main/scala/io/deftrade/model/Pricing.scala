@@ -19,20 +19,47 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** Domain specific tools for dealing with `MonetaryAmount`s */
   final type MonetaryAmount = MA
 
+  final type Mny[C] = Money[MonetaryAmount, C]
+
   /** member [[money.Financial]] instance for convenience */
   final val MonetaryAmount = Financial[MonetaryAmount]
 
   /** */
-  type PricedTrade[C] = (Trade, Money[MonetaryAmount, C])
+  sealed abstract case class TradePricer[C](mark: Trade => Result[Mny[C]])
+
+  /**
+    * FIXME: this is where the implicit pricers need to be instantiated...
+    * ... um, how, exactly?
+    */
+  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+
+    /** */
+    def apply[C: Currency: TradePricer]: TradePricer[C] = implicitly
+
+    /** */
+    def apply[C: Currency](mark: Trade => Result[Mny[C]]): TradePricer[C] =
+      new TradePricer(mark) {}
+  }
+
+  /** */
+  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
 
   /** */
   object PricedTrade {
 
-    /** */
-    def apply[C: Currency: Wallet](pt: PricedTrade[C]): Trade = PricedTrade.normalize(pt)
+    /**
+      * TODO: Realizing now this entails implicit per-currency pricers. :|
+      */
+    def apply[C: Currency: TradePricer](trade: Trade): Result[PricedTrade[C]] =
+      for {
+        amount <- TradePricer[C] mark trade
+      } yield new PricedTrade[C](trade, amount) {}
 
     /**
-      * Used to convert to the currency as `Instrument` convention.
+      * Reduct to "currency as `Instrument`" convention, according to the contents
+      * of a certain (implicit) [[Wallet]].
+      *
+      * Creates what could be called a `FairTrade`...
       */
     def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
   }
@@ -42,23 +69,6 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
 
   /** */
   lazy val ValuedFolio = PricedTrade
-
-  /**
-    * TODO: I smell a Reader monad in here. Why? The pricing function is a kind of config...
-    */
-  sealed abstract case class TradePricer[C](
-      mark: Trade => PricedTrade[C]
-  )
-
-  /**
-    *
-    */
-  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
-
-    /** */
-    def apply[C: Currency](mark: Trade => PricedTrade[C]): TradePricer[C] =
-      new TradePricer(mark) {}
-  }
 
   /**
     * Represents a price quote (in currency `C`) for instruments of type `A`.
@@ -82,10 +92,10 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   trait QuotedIn[A, C] extends Any {
 
     /** */
-    final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
+    final def bid: MonetaryAmount = quote match { case (bid, _) => bid }
 
     /** */
-    final def bid: MonetaryAmount = quote match { case (_, bid) => bid }
+    final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
 
     /**
       *
@@ -123,18 +133,68 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   /** */
   object QuotedIn {
 
-    /** FIXME: Not sure this can be generally implemented. */
-    def apply[A, C: Currency]: QuotedIn[A, C] = ???
-  }
+    /**
+      * Securities of any kind.
+      */
+    def apply[C: Currency]: QuotedIn[reference.Usin, C] = ???
 
-  /** Subtle name. TODO: reconsider */
-  sealed abstract case class QuoteIn[A, C2] private (
-      final val quote: (MonetaryAmount, MonetaryAmount)
-  ) extends QuotedIn[A, C2] {
+    /**
+      * Forex.
+      */
+    def apply[C1: Currency, C2: Currency]: QuotedIn[C1, C2] = ???
 
     /** */
-    def tick(implicit C2: Currency[C2]): MonetaryAmount =
-      MonetaryAmount from [BigDecimal] C2.pip //  / 10 // this is a thing now
+    implicit def inverseQuote[C1: Currency, C2: Currency](
+        implicit Q: C1 QuotedIn C2
+    ): C2 QuotedIn C1 =
+      new QuotedIn[C2, C1] {
+
+        /** */
+        def quote = (1 / Q.bid, 1 / Q.ask)
+
+        /** */
+        def tick(implicit C1: Currency[C1]) = Q.tick * mid
+
+        /** */
+        override def isDerived = true
+      }
+
+    /** */
+    implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
+        Q1X: C1 QuotedIn CX,
+        QX2: CX QuotedIn C2
+    ): C1 QuotedIn C2 =
+      new QuotedIn[C1, C2] {
+
+        /** */
+        def quote = (Q1X.bid * QX2.bid, Q1X.ask * QX2.ask)
+
+        /** */
+        def tick(implicit C2: Currency[C2]) = QX2.tick(C2) * mid
+
+        /** */
+        override def isDerived = true
+
+        /** */
+        type CrossType = Currency[CX]
+
+        /** */
+        override def cross: Option[CrossType] = Some(Currency[CX])
+      }
+  }
+
+  /**
+    * Immutable value class representing a quote.
+    *
+    * TODO: reconsider the subtle name.
+    */
+  sealed abstract case class QuoteIn[A, C] private (
+      final val quote: (MonetaryAmount, MonetaryAmount)
+  ) extends QuotedIn[A, C] {
+
+    /** */
+    def tick(implicit C: Currency[C]): MonetaryAmount =
+      MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
   }
 
   /** */
@@ -160,10 +220,12 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
     import Q._
 
     /** */
+    @inline def buy(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, ask)
+
     /** */
+    @inline def sell(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, bid)
+
     /** */
-    @inline def buy(m1: Money[MA, C1]): Money[MA, C2]   = convert(m1, ask)
-    @inline def sell(m1: Money[MA, C1]): Money[MA, C2]  = convert(m1, bid)
     @inline def apply(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, mid)
 
     /** */
@@ -174,8 +236,8 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
 
     /** */
     def description: String = s"""
-        |Quoter buys  ${C1} and sells ${C2} at ${bid}
-        |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
+          |Quoter buys  ${C1} and sells ${C2} at ${bid}
+          |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
 
     /** */
     private def convert(m1: Money[MA, C1], rate: MA): Money[MA, C2] = C2(m1.amount * rate)
@@ -190,43 +252,16 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   }
 
   /** */
-  implicit def inverseQuote[C1: Currency, C2: Currency](
-      implicit Q: C1 QuotedIn C2
-  ): C2 QuotedIn C1 =
-    new QuotedIn[C2, C1] {
+  implicit class SweetCurrency[C: Currency](C: C) {
 
-      /** */
-      def quote = (1 / Q.bid, 1 / Q.ask)
-
-      /** */
-      def tick(implicit C1: Currency[C1]) = Q.tick * mid
-
-      /** */
-      override def isDerived = true
+    /**
+      * Exchange `Rate` factory. Implicit context provides pricing.
+      */
+    def /[C2](cb: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+      implicit val C2 = cb
+      Rate[C, C2]
     }
-
-  /** */
-  implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
-      Q1X: C1 QuotedIn CX,
-      QX2: CX QuotedIn C2
-  ): C1 QuotedIn C2 =
-    new QuotedIn[C1, C2] {
-
-      /** */
-      def quote = (Q1X.bid * QX2.bid, Q1X.ask * QX2.ask)
-
-      /** */
-      def tick(implicit C2: Currency[C2]) = QX2.tick(C2) * mid
-
-      /** */
-      override def isDerived = true
-
-      /** */
-      type CrossType = Currency[CX]
-
-      /** */
-      override def cross: Option[CrossType] = Some(Currency[CX])
-    }
+  }
 
   /** */
   sealed trait Tick extends EnumEntry with Serializable
@@ -258,18 +293,5 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
 
     /** */
     def trade(price: MonetaryAmount, size: Long) = TickData(Tick.Trade, price, size)
-  }
-
-  /** */
-  implicit class SweetCurrency[C: Currency](C: C) {
-
-    /**
-      * Exchange `Rate` factory. Implicit context provides pricing.
-      */
-    def /[C2](cb: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
-      implicit val C2 = cb
-      Rate[C, C2]
-    }
-
   }
 }

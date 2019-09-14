@@ -22,6 +22,7 @@ import scala.language.existentials
   */
 object refinements {
 
+  // power tools on
   import refined.auto._
 
   private def alpha = "[A-Z]"

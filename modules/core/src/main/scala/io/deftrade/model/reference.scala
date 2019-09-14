@@ -171,7 +171,7 @@ object reference {
     }
   }
 
-  /** Psin: Pseudo Isin: matches regex, but uses the 9 digit body for proprietary mappings. */
+  /** Pseudo `Isin` matches `Isin` regex, but uses the 9 digit body for proprietary mappings. */
   sealed abstract case class CheckedPsin()
 
   /** */
@@ -297,6 +297,7 @@ object reference {
     * `ConId`'s
     */
   val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
+
   /** */
   type MatchesRxIbrk = MatchesRegex[MatchesRxIbrk.T]
 
@@ -310,6 +311,7 @@ object reference {
     * `Unreg` identifiers represent unregistered securities, numbered by the firm.
     */
   val MatchesRxUnreg = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
+
   /** */
   type MatchesRxUnreg = MatchesRegex[MatchesRxUnreg.T]
 
