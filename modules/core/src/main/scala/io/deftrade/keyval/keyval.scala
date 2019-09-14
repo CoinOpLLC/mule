@@ -245,9 +245,7 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
     */
   final type Tag = P
 
-  /**
-    * Keys type is auto generated and presents a uniform convention.
-    */
+  /** */
   final type Key = Refined[K, Tag]
 
   /** */
@@ -257,17 +255,12 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
 /**
   * Use case: `Predicate` type is non trival.
   *
-  * For example, the `Key` might be of {{{ type Label = String Refined (NonEmpty And Trimmed) }}}.
+  * For example, the `Key` might be of {{{type Label = String Refined (NonEmpty And Trimmed)}}}
   */
 abstract class WithPredicateKey[K: Order, P, V] extends WithRefinedKey[K, P, V]
 
 /**
   * '''By convention''', this companion defines a key as a `Refined`
   * type, parameterized with the value type we are indexing.
-  *
-  * This phantom type for the `Refined` Key type is [[[Value]]]).
   */
 abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
-
-/** No constraint on validation. */
-// implicit final lazy val keyValidate: Validate[K, Value] = Validate alwaysPassed (())

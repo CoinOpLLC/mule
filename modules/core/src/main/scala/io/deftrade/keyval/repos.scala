@@ -1,6 +1,7 @@
 package io.deftrade
 package keyval
 
+import cats.implicits._
 import cats.{ Eq }
 import cats.effect.Sync
 
@@ -9,19 +10,16 @@ import fs2.Stream
 import scala.language.higherKinds
 
 /**
-  * @note one consequence of this design is that there is only one `Key` type per value object type.
+  * @note One consequence of this design is that there is only one `Key` type per value object type.
+  * TODO revisit this decision and its implication.
   */
 trait repos {
 
-  /**
-    * `V` is a type carrier, basically.
-    */
+  /** */
   abstract class ValueRepository[F[_], W[?] <: WithValue[?], V](
-      val V: W[V]
+      val V: W[V] // empbds Eq[V] instance
   )(
-      implicit
-      final val F: Sync[F],
-      final val eqV: Eq[V]
+      implicit final val F: Sync[F]
   ) {
 
     import V._
@@ -144,6 +142,7 @@ trait repos {
     def get(id: Id): Rows = ??? /// Stream emit something something
     // def get(id: Id): F[Option[Row]] = F pure { none }
 
+    /** */
     def get(k: Key): R[Value] = ???
 
     /** */
@@ -156,7 +155,7 @@ trait repos {
       Result safe {
         val oldKvs: Table = kvs
         kvs -= k
-        oldKvs == /* FIXME WHAAAT? = */ kvs
+        oldKvs === kvs
       }
     }
 
@@ -172,12 +171,24 @@ trait repos {
   }
 
   /** */
-  final class MemFileValueRepository[F[_]: Sync, V: Eq](override val V: WithId[V]) extends ValueOnlyRepository(V) with MemFileImplV[F, V]
+  sealed abstract case class MemFileValueRepository[F[_]: Sync, V: Eq](
+      override val V: WithId[V]
+  ) extends ValueOnlyRepository(V)
+      with MemFileImplV[F, V]
 
   /** */
-  final class MemFileKeyValueRepository[F[_]: Sync, V: Eq](override val V: WithKey[V])
-      extends KeyValueRepository(V)
+  sealed abstract case class MemFileKeyValueRepository[F[_]: Sync, V: Eq](
+      override val V: WithKey[V]
+  ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
+
+  /** */
+  def valueRepository[F[_]: Sync, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
+    new MemFileValueRepository(v) {}
+
+  /** */
+  def keyValueRepository[F[_]: Sync, V: Eq](v: WithKey[V]): KeyValueRepository[F, V] =
+    new MemFileKeyValueRepository(v) {}
 }
 
 object repos extends repos

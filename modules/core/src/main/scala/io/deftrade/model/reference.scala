@@ -293,7 +293,7 @@ object reference {
   type Cusip = String Refined IsCusip
 
   /**
-    * `Ibrk` identifiers represent **Interactive Brokers**
+    * `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
     * `ConId`'s
     */
   val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
@@ -327,6 +327,6 @@ object reference {
   private def luhn(digit: Int, idx: Int): Int =
     if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10
 
-  private def failsafe(predcomp: => Boolean): Boolean = Try(predcomp).fold(_ => false, identity)
+  private def failsafe(thunk: => Boolean): Boolean = Try(thunk).fold(_ => false, identity)
 
 }
