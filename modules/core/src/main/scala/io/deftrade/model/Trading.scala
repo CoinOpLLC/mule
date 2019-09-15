@@ -20,9 +20,9 @@ package model
 import keyval._, time._, money._
 import capital.Instrument, reference.Mic, Currency.USD
 
-import cats._
-import cats.data.{ EitherT, Kleisli, NonEmptySet }
 import cats.implicits._
+import cats.{ Foldable, Monad, SemigroupK }
+import cats.data.{ EitherT, Kleisli, NonEmptySet }
 
 import eu.timepit.refined
 import refined.auto._
@@ -54,59 +54,50 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   /** Namespace placeholder */
   object Allocation
 
+  /** */
+  sealed trait Market { def entity: LegalEntity.Key }
+
+  /** */
+  object Market extends WithOpaqueKey[Long, Market]
+
   /**
-    * Price all the things.
-    * TODO: Revisit the implicit binding between market data (quotes) and `Exchanges`.
-    *   - this isn't how data typically comes, especially cheap data.
-    *   - smart routers (and internalizers!) introduce another layer of conceptual complexity
-    *   - nonetheless, these are the semantics any sane developer needs... if best effort
-    * isn't good enough, don't offer it.
+    * Models a direct deal facing a private party.
+    *
+    * Their [[Ledger]] [[Account]] is
+    * assumed to be "real" (not a contra account) although it can assume those characteristics
+    * when the `Counterparty` is sourcing `Instruments` from private flows.
+    *   - (eg exempt Securities for accredited individuals or qualified institutions)
     */
-  sealed trait Market { def entity: Option[LegalEntity.Key] }
+  sealed abstract case class Counterparty(
+      final val label: Label,
+      final val contra: Account.Key,
+      final val entity: LegalEntity.Key
+  ) extends Market
 
-  object Market extends WithOpaqueKey[Long, Market] {
-    implicit def eq: cats.Eq[Market] = cats.Eq by (_.entity)
+  /** */
+  object Counterparty {}
 
-    def quote[F[_]: Monad, C: Currency](
-        m: Market
-    )(
-        id: Instrument.Key
-    ): F[Money[MonetaryAmount, C]] = ???
-    // Currency[C] apply (Financial[MonetaryAmount] from quotedIn(m)(id).mid)
+  /**
+    * Single effective counterparty: the `Exchange` itself.
+    *   - [[reference.Mic]]s are unique.
+    *   - seller for all buyers and vice versa.
+    *   - activity recorded in a `contra account`
+    */
+  sealed abstract case class Exchange private (
+      final val mic: Mic,
+      final val contra: Account.Key,
+      final val entity: LegalEntity.Key
+  ) extends Market
 
-    def quotedIn[C: Currency](m: Market)(id: Instrument.Key): Instrument.Key QuotedIn C = ???
+  /** */
+  object Exchange {
 
-    /**
-      * Single effective counterparty: the `Exchange` itself.
-      *   - [[reference.Mic]]s are unique.
-      *   - seller for all buyers and vice versa.
-      *   - activity recorded in a `contra account`
-      */
-    sealed abstract case class Exchange private (
-        final val mic: Mic,
-        final val contra: Account.Key,
-        final val entity: Option[LegalEntity.Key]
-    ) extends Market
+    /** */
+    def fromMic(mic: Mic): Exchange = ??? // make new contra account
 
-    /** Fluent constructors. */
-    object Exchange {
-      def fromMic(mic: Mic): Exchange = ??? // make new contra account
-
-      /** */
-      def withEntity(lek: LegalEntity.Key): Exchange => Exchange =
-        x => new Exchange(x.mic, x.contra, lek.some) {}
-    }
-
-    /**
-      * Models a direct deal facing a private party.
-      *
-      * Their [[Ledger]] [[Account]] is
-      * assumed to be "real" (not a contra account) although it can assume those characteristics
-      * when the `Counterparty` is sourcing `Instruments` from private flows.
-      *   - (eg exempt Securities for accredited individuals or qualified institutions)
-      */
-    sealed abstract case class Counterparty(val key: LegalEntity.Key) extends Market
-    object Counterparty {}
+    /** */
+    def withEntity(lek: LegalEntity.Key): Exchange => Exchange =
+      x => new Exchange(x.mic, x.contra, lek) {}
   }
 
   /**
@@ -120,24 +111,49 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       trade: Trade,
       limit: Option[Money[MA, C]]
   ) {
+
+    /** */
     def currency = Currency[C]
+  }
+
+  /**
+    * Price all the things.
+    */
+  sealed abstract case class MarketDataSource(market: Market) {
+
+    /** */
+    def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
+      Monad[F] pure (Currency[C] fiat quotedIn(ik).mid)
+
+    /** FIXME: how do we materialize these? */
+    def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
+  }
+
+  object MarketDataSource extends WithOpaqueKey[Long, MarketDataSource] {
+    def apply(m: Market): MarketDataSource = new MarketDataSource(m) {}
   }
 
   /** */
   object Order extends WithOpaqueKey[Long, Order[USD]] {
 
+    /** */
     def market[C: Currency](market: Market.Key, trade: Trade): Order[C] =
       new Order(market, instant, trade, none) {}
 
+    /** */
     def limit[C: Currency](market: Market.Key, trade: Trade, limit: Money[MA, C]): Order[C] =
       new Order(market, instant, trade, limit.some) {}
 
     /** `Market` orders */
-    def buy[C: Currency]: Order[C]  = ???
+    def buy[C: Currency]: Order[C] = ???
+
+    /** */
     def sell[C: Currency]: Order[C] = ???
 
     /** `Limit` orders */
-    def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C]  = ???
+    def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C] = ???
+
+    /** */
     def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
   }
 
@@ -182,21 +198,26 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     /** */
     type FK[T, R] = Kleisli[FF, T, R]
 
+    /** */
     final def process[C: Currency, A](p: Account.Key, a: Allocation)(
         block: => A
     ): FK[A, Transaction] =
       riskCheck[C, A](p)(block) andThen trade[C](p) andThen allocate[C](a) andThen settle[C](p)
 
+    /** */
     def riskCheck[C: Currency, A](p: Account.Key)(a: A): FK[A, Order[C]] =
       ???
 
+    /** */
     def trade[C](p: Account.Key): FK[Order[C], Execution] = ???
 
+    /** */
     private final def allocate[C: Currency](
         a: Allocation
     ): FK[Execution, Execution] =
       ???
 
+    /** */
     private def settle[C: Currency](p: Account.Key): FK[Execution, Transaction] = ???
   }
 
@@ -215,17 +236,20 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     ): OMS[F] =
       new OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*))) {}
 
-    private def newContraAccount: Account.Key = ???
   }
 
+  /** */
+  private def newContraAccount: Account.Key = ???
+
   /** top level package methods */
-  def quoteLeg[C: Currency](market: Market)(leg: Leg): Money[MonetaryAmount, C] =
+  def quoteLeg[F[_]: Monad, C: Currency](mds: MarketDataSource)(leg: Leg): F[Mny[C]] =
     leg match {
-      case (security, quantity) => Market.quote[cats.Id, C](market)(security) * quantity
+      case (security, quantity) => (mds quote [F, C] security) map (_ * quantity)
     }
 
-  def quote[C: Currency](market: Market)(trade: Trade): Money[MonetaryAmount, C] =
-    trade.toList foldMap quoteLeg[C](market)
+  /** */
+  def quote[F[_]: Monad, C: Currency](mds: MarketDataSource)(trade: Trade): F[Mny[C]] =
+    trade.toList foldMapM quoteLeg[F, C](mds)
 
   /**
     * TODO: Revisit the privacy issues here.

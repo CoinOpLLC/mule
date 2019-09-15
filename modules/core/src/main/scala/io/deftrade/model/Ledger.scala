@@ -32,7 +32,7 @@ abstract class Ledger[Q: Financial] { self =>
   /**
     * How much of a given [[capital.Instrument]] is held.
     *
-    * Can also be thought of as a [[Leg]] at rest.
+    * Can also be thought of as a [[Trade]] [[Leg]] at rest.
     */
   type Position = (Instrument.Key, Quantity)
 

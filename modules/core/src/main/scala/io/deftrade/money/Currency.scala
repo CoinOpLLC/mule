@@ -88,9 +88,12 @@ sealed trait Currency[C] extends CurrencyLike { self =>
   private[this] implicit def C: Currency[C] = self
 
   /**
-    * _fiat bux_
+    * And the Fed said: ''fiat bux''...
     */
-  final def apply[N: Financial](n: N) = Money[N, C](n)
+  final def fiat[N: Financial](n: N) = Money[N, C](n)
+
+  /** */
+  final def apply[N: Financial](n: N) = fiat(n)
 
 }
 

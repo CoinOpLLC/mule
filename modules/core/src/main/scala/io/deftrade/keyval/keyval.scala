@@ -64,8 +64,7 @@ object Fresh {
     */
   def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
 
-    val K = Integral[K]
-    import K._
+    val K = Integral[K]; import K._
 
     Fresh(
       OpaqueKey(zero),
@@ -74,7 +73,9 @@ object Fresh {
   }
 }
 
-/**  @inheritanceDiagram */
+/**
+  * Defines `Id` and other persistence helpers for a given value class `V`.
+  */
 trait WithValue[V] {
 
   /**

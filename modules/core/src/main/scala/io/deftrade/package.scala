@@ -22,8 +22,13 @@ import cats.kernel.CommutativeGroup
 
 import scala.language.higherKinds
 
-/** House amenities. */
+/**
+  * If best effort isn't good enough, don't offer it.
+  */
 package object deftrade extends deftrade.results {
+
+  /** */
+  type Label = refinements.Label
 
   /**  */
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](

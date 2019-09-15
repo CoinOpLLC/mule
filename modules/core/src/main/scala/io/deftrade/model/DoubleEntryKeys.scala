@@ -31,7 +31,11 @@ abstract class DoubleEntryKeys[MA: Financial] {
       contras: Treatment[Y]
   ) extends EnumEntry
       with Serializable {
-    final type EntryType  = X
+
+    /** */
+    final type EntryType = X
+
+    /** */
     final type ContraType = Y
   }
 
@@ -111,6 +115,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
     /** */
     case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
 
+    /** */
     def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
       (sk.from, sk.to) match {
         case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
@@ -131,6 +136,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
 
     import Liability._
 
+    /** */
     case object LongTermToCurrentLiability
         extends LiabilitySwapKey(
           Treatment single OtherLiabilities,
