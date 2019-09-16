@@ -26,7 +26,8 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   def apply[N: Financial](n: N): Money[N, Type]
 
   /** */
-  final def currencyCode: String = jc.getCurrencyCode
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  final def code: Currency.Code = jc.getCurrencyCode.asInstanceOf[Currency.Code]
 
   /** */
   final def numericCode: Int = jc.getNumericCode
@@ -69,8 +70,10 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
 /**  */
 object CurrencyLike {
 
+  import refined.cats._
+
   /** */
-  implicit lazy val order: cats.Order[CurrencyLike] = cats.Order by { _.currencyCode }
+  implicit lazy val order: cats.Order[CurrencyLike] = cats.Order by { _.code }
 }
 
 /**

@@ -44,6 +44,12 @@ object refinements {
   type Alpha3 = String Refined MatchesRegex[Alpha3.T]
 
   /** */
+  val Alpha4 = patRep(alpha)(4)
+
+  /** */
+  type Alpha4 = String Refined MatchesRegex[Alpha4.T]
+
+  /** */
   val Num3 = patRep(num)(3)
 
   /** */

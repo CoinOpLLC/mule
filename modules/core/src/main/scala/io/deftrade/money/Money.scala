@@ -94,7 +94,7 @@ object Money {
 
     def sfmt = if (isNegative) fmt else s" $fmt "
 
-    s"${C.currencyCode} ${m.amount formatted sfmt}"
+    s"${C.code} ${m.amount formatted sfmt}"
   }
 
   /** Strictly checked input. */

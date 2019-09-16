@@ -18,13 +18,14 @@ package io.deftrade
 package model
 
 import keyval._, time._, money._
-import capital.Instrument, reference.Mic, Currency.USD
+import capital.Instrument, reference.Mic
 
 import cats.implicits._
 import cats.{ Foldable, Monad, SemigroupK }
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
 
 import eu.timepit.refined
+//import refined.cats._
 import refined.auto._
 
 import scala.collection.immutable.SortedSet
@@ -101,64 +102,75 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   }
 
   /**
-    * Minimum viable `Order` type. What the client would _like_ to have happen.
-    * TODO: revisit parent/child orders
-    * TODO: Eliminate `C` ?! Normalize the trade. MA and Currency as separate fields.
-    */
-  sealed abstract case class Order[C: Currency](
-      market: Market.Key,
-      ts: Instant,
-      trade: Trade,
-      limit: Option[Money[MA, C]]
-  ) {
-
-    /** */
-    def currency = Currency[C]
-  }
-
-  /**
     * Price all the things.
     */
   sealed abstract case class MarketDataSource(market: Market) {
 
+    /** `Currency`-specific quote factory. */
+    def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
+
     /** */
-    def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
+    final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
       Monad[F] pure (Currency[C] fiat quotedIn(ik).mid)
 
-    /** FIXME: how do we materialize these? */
-    def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
-  }
+    /** */
+    final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Mny[C]] =
+      leg match {
+        case (security, quantity) => quote[F, C](security) map (_ * quantity)
+      }
 
-  object MarketDataSource extends WithOpaqueKey[Long, MarketDataSource] {
-    def apply(m: Market): MarketDataSource = new MarketDataSource(m) {}
+    /**
+      * Simple per-leg pricing. Note, this method is `override`-able.
+      *
+      * TODO: this is so minimal as to be of questionable viablity... but is correct
+      */
+    def quoteTrade[F[_]: Monad, C: Currency](trade: Trade): F[Mny[C]] =
+      trade.toList foldMapM quoteLeg[F, C]
   }
 
   /** */
-  object Order extends WithOpaqueKey[Long, Order[USD]] {
+  object MarketDataSource extends WithOpaqueKey[Long, MarketDataSource] {
 
     /** */
-    def market[C: Currency](market: Market.Key, trade: Trade): Order[C] =
-      new Order(market, instant, trade, none) {}
+    def apply(m: Market): MarketDataSource = new MarketDataSource(m) {
 
-    /** */
-    def limit[C: Currency](market: Market.Key, trade: Trade, limit: Money[MA, C]): Order[C] =
-      new Order(market, instant, trade, limit.some) {}
-
-    /** `Market` orders */
-    def buy[C: Currency]: Order[C] = ???
-
-    /** */
-    def sell[C: Currency]: Order[C] = ???
-
-    /** `Limit` orders */
-    def buy[C: Currency](bid: Money[MonetaryAmount, C]): Order[C] = ???
-
-    /** */
-    def sell[C: Currency](ask: Money[MonetaryAmount, C]): Order[C] = ???
+      /** FIXME: how do we specialize? */
+      def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
+    }
   }
 
   /**
-    * What actually happened.
+    * What the client wants [[Execution]] of.
+    *
+    * Note: [[money.Currency.Code]] specification is always required by the [[Exchange]]s,
+    * in order to fully specify the trade, even if there is no limit amount attached.
+    *
+    * TODO: revisit parent/child orders
+    */
+  sealed abstract case class Order(
+      ts: Instant,
+      market: Market.Key,
+      trade: Trade,
+      currency: Currency.Code,
+      limit: Option[MonetaryAmount]
+  )
+
+  /** */
+  object Order extends WithOpaqueKey[Long, Order] {
+
+    /**
+      * Note that currency is required even for market orders.
+      */
+    def market[C: Currency](market: Market.Key, trade: Trade): Order =
+      new Order(instant, market, trade, Currency[C].code, none) {}
+
+    /** */
+    def limit[C: Currency](market: Market.Key, trade: Trade, limit: Mny[C]): Order =
+      new Order(instant, market, trade, Currency[C].code, limit.amount.some) {}
+  }
+
+  /**
+    * What actually happened to the [[Order]].
     */
   sealed abstract case class Execution(
       ts: Instant,
@@ -182,8 +194,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
     * Reference:
     * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
     *
-    * TODO: Revisit design; SemigroupK for Kleisli is restrictive.
-    * OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
+    * FIXME: this is just a sketch / WIP
+    * - SemigroupK for Kleisli is restrictive.
+    * - OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
     *
     */
   sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
@@ -191,6 +204,14 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       contra: Account.Key,
       markets: NonEmptySet[Market.Key]
   ) {
+
+    /**
+      * `Folios` is a `Map` of `Map`s, which, normalized and written out as a list,
+      * has rows of type: {{{
+      *   (Folio.Key, Instrument.Key, Quantity)
+      * }}}
+      */
+    type FolioTable = Map[Folio.Key, Folio.Value]
 
     /** */
     type FF[R] = EitherT[F, Fail, R]
@@ -200,34 +221,37 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
 
     /** */
     final def process[C: Currency, A](p: Account.Key, a: Allocation)(
+        folios: FolioTable
+    )(
         block: => A
-    ): FK[A, Transaction] =
-      riskCheck[C, A](p)(block) andThen trade[C](p) andThen allocate[C](a) andThen settle[C](p)
+    ): FK[A, FolioTable] =
+      riskCheck[C, A](p)(block) andThen trade(p) andThen allocate(a) andThen settle(folios)(p)
 
     /** */
-    def riskCheck[C: Currency, A](p: Account.Key)(a: A): FK[A, Order[C]] =
+    def riskCheck[C: Currency, A](p: Account.Key)(a: A): FK[A, Order] =
       ???
 
     /** */
-    def trade[C](p: Account.Key): FK[Order[C], Execution] = ???
-
-    /** */
-    private final def allocate[C: Currency](
-        a: Allocation
-    ): FK[Execution, Execution] =
+    def trade(p: Account.Key): FK[Order, Execution] =
       ???
 
     /** */
-    private def settle[C: Currency](p: Account.Key): FK[Execution, Transaction] = ???
+    def allocate(a: Allocation): FK[Execution, Execution] =
+      ???
+
+    /** */
+    final def settle(
+        folios: Map[Folio.Key, Folio.Value]
+    )(
+        p: Account.Key
+    ): FK[Execution, FolioTable] = ???
   }
 
-  /**
-    * Where do Order Management Systems come from? (Here.)
-    */
+  /** */
   object OMS extends WithOpaqueKey[Long, OMS[cats.Id]] {
 
     /**
-      * TODO: augment/evolve creation pattern.
+      * FIXME: augment/evolve creation pattern.
       */
     def apply[F[_]: Monad: SemigroupK: Foldable](
         key: LegalEntity.Key,
@@ -235,29 +259,9 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
         ms: Market.Key*
     ): OMS[F] =
       new OMS[F](key, newContraAccount, NonEmptySet(market, SortedSet(ms: _*))) {}
-
   }
 
   /** */
   private def newContraAccount: Account.Key = ???
 
-  /** top level package methods */
-  def quoteLeg[F[_]: Monad, C: Currency](mds: MarketDataSource)(leg: Leg): F[Mny[C]] =
-    leg match {
-      case (security, quantity) => (mds quote [F, C] security) map (_ * quantity)
-    }
-
-  /** */
-  def quote[F[_]: Monad, C: Currency](mds: MarketDataSource)(trade: Trade): F[Mny[C]] =
-    trade.toList foldMapM quoteLeg[F, C](mds)
-
-  /**
-    * TODO: Revisit the privacy issues here.
-    * Account keys are are needed e.g to verify sigs and allocate partitions
-    * Can we break this down into two methods: anonymous, and not?
-    */
-  def recorded[F[_]: Foldable: Monad: SemigroupK](
-      fs: Map[Folio.Key, Folio.Value],
-      accounts: Map[Account.Key, Account.Value]
-  ): Execution => F[Map[Folio.Key, Folio.Value]] = ???
 }
