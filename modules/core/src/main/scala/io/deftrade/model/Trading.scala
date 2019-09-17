@@ -35,9 +35,9 @@ import scala.language.higherKinds
   * What does "double entry bookkeeping" mean in the context of a shared distributed ledger with
   * multiple OMS gateways to external markets?
   *
-  * It means this:
+  * It means:
   *   - we keep contra accounts per OMS gateway
-  *   - we debit that account when we "buy shares" (creates negative balance)
+  *   - we debit that account when we "buy shares (units)" (creates negative balance)
   *   - we credit that account when settlement happens (zeros out the balance)
   *   - we "reverse polarity" when we enter a short position.
   *   - we can indexAndSum settled positions for reconcilliation
@@ -142,7 +142,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   /**
     * What the client wants [[Execution]] of.
     *
-    * Note: [[money.Currency.Code]] specification is always required by the [[Exchange]]s,
+    * Note: a denominating currency is always required by the [[Exchange]]s,
     * in order to fully specify the trade, even if there is no limit amount attached.
     *
     * TODO: revisit parent/child orders
@@ -151,7 +151,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       ts: Instant,
       market: Market.Key,
       trade: Trade,
-      currency: Currency.Code,
+      currency: CurrencyLike,
       limit: Option[MonetaryAmount]
   )
 
@@ -162,11 +162,11 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
       * Note that currency is required even for market orders.
       */
     def market[C: Currency](market: Market.Key, trade: Trade): Order =
-      new Order(instant, market, trade, Currency[C].code, none) {}
+      new Order(instant, market, trade, Currency[C], none) {}
 
     /** */
     def limit[C: Currency](market: Market.Key, trade: Trade, limit: Mny[C]): Order =
-      new Order(instant, market, trade, Currency[C].code, limit.amount.some) {}
+      new Order(instant, market, trade, Currency[C], limit.amount.some) {}
   }
 
   /**

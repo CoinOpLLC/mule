@@ -73,7 +73,12 @@ trait repos {
 
     import V._
 
-    /** TODO: review the fact that this overloads `get()` `*/
+    /**
+      * Note that the returned value is ''not'' embeded in 'F'; this is a "live" invocation!
+      * FIXME: is this right?
+      * FIXME: val folios: Map[K, Map[K2, V]] is gonna need some work...
+      * TODO: review the fact that `get()` is overloaded here.
+      */
     def get(k: V.Key): R[V.Value]
 
     /** */

@@ -3,7 +3,7 @@ package model
 
 import time._, money._, keyval._, capital._
 
-import cats._
+import cats.{ Eq, Foldable, Hash, Monad, MonoidK }
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
@@ -51,12 +51,18 @@ abstract class Ledger[Q: Financial] { self =>
     * A `Folio` can be thought of as a "flat portfolio", i.e. a portfolio without
     * sub portfolios.
     *
+    * A `Folio` can also be thought of as a "sheet" (as its name suggests) in a spreadsheet.
+    *
     * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
     */
   type Folio = Map[Instrument.Key, Quantity]
 
-  /** */
-  object Folio extends WithOpaqueKey[Long, Folio] {
+  /**
+    * Tricky semantics: the collection of all [[Folio]]s is a [[scala.collection.Map]] of `Map`s.
+    * FIXME: csv won't work as is; needs (K1, (K2, V)) => (K1, K2, V) type function on Row...
+    * ... shapeless?
+    */
+  object Folio extends WithOpaqueKey[Long, Position] { // sicc hacc
 
     /** */
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
@@ -108,21 +114,12 @@ abstract class Ledger[Q: Financial] { self =>
     * Store the _cryptographic hash_ of whatever metadata there is.
     */
   sealed abstract case class Transaction private (
-      recordedAt: Option[Instant],
+      recordedAt: Instant,
       debitFrom: Folio.Key,
       creditTo: Folio.Key,
       trade: Trade,
       metaSha: Array[Byte]
-  ) {
-
-    /**
-      *
-      * A timestamp is required of all `Recorded Transaction`s, assigned by the `Recorder`:
-      *  the transaction is provisional until dated, returned as a receipt.
-      */
-    final def recordedAt(timestamp: Instant): Transaction =
-      new Transaction(timestamp.some, debitFrom, creditTo, trade, metaSha) {}
-  }
+  )
 
   /**
     * Do we mean in the business sense or the computer science sense?
@@ -145,7 +142,7 @@ abstract class Ledger[Q: Financial] { self =>
         meta: Option[Json]
     ): Transaction =
       new Transaction(
-        none,
+        instant,
         debitFrom,
         creditTo,
         Trade(instrument -> amount),
@@ -156,9 +153,6 @@ abstract class Ledger[Q: Financial] { self =>
       * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
       */
     def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
-
-    /** */
-    implicit def order: Eq[Transaction] = Eq.fromUniversalEquals[Transaction]
 
     /** */
     implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]

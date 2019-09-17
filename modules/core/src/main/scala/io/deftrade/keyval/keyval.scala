@@ -89,7 +89,7 @@ trait WithValue[V] {
   /** */
   // implicit lazy val showValue: Show[V] = cats.derived.semi.show
 
-  /** An permanent identifier (eg auto-increment in a db col)*/
+  /** A permanent identifier (eg auto-increment in a db col) */
   final type Id = OpaqueKey[Long, Value]
 
   /**
