@@ -22,6 +22,7 @@ object Version {
   val Fuiid      = "0.3.0-M2"
   val Circe      = "0.12.1"
   val PureConfig = "0.12.0"
+  val Http4s     = "0.21.0-M4"
 
   // Test libs
 
@@ -104,12 +105,16 @@ object Deps {
   val pureConfigs = List(
     "pureconfig",
     "pureconfig-enumeratum",
+    "pureconfig-fs2",
+    "pureconfig-http4s",
+    "pureconfig-cats",
+    "pureconfig-cats-effect",
+    "pureconfig-circe"
   ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
   val testers = Seq(
-    "org.scalatest"  %% "scalatest"  % ScalaTest,
-    "org.scalacheck" %% "scalacheck" % ScalaCheck,
-    /** FIXME version crap with 2.13.0 */
+    "org.scalatest"              %% "scalatest"                 % ScalaTest,
+    "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
     "eu.timepit"                 %% "refined-scalacheck"        % Refined,
     "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
@@ -126,8 +131,8 @@ object Deps {
     "core",
     "generic",
     "parser",
-    "fs2",  // DON'T "FIXME": This is OK because fs2 1.11 is bincompat with 2.0 series... semver l8r
-    // "http4s",
+    "fs2", // DON'T "FIXME": This is OK because fs2 1.11 is bincompat with 2.0 series... semver l8r
+    "http4s",
     "refined"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
 
@@ -166,12 +171,17 @@ object Deps {
   val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
   // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
 
-  lazy val httplibs = List(
-    akkaHttp,
-    akkaActor,
-    akkaStream,
-    httpSession,
-    httpSessionJwt
+  // lazy val httplibs = List(
+  //   akkaHttp,
+  //   akkaActor,
+  //   akkaStream,
+  //   httpSession,
+  //   httpSessionJwt
+  // )
+
+  val http4s = "org.http4s" %% "http4s-core" % Http4s
+  val httplibs = List(
+    http4s
   )
 
   lazy val funlibs =

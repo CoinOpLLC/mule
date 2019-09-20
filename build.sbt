@@ -81,7 +81,7 @@ lazy val demo = module("demo", "something to run")
   .dependsOn(core)
   .settings(common)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ Seq(opengamma) ++ testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ Seq(opengamma) ++ httplibs ++ testers
   )
 
 // wip := work in progress
