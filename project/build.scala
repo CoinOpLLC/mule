@@ -4,45 +4,47 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.12.8"
+  // val Scala = "2.13.1"
+  val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Enumeratum = "1.5.13"
+  val Cats       = "2.0.0"
+  val Spire      = "0.17.0-M1"
   val Shapeless  = "2.3.3"
-  val Refined    = "0.9.9"
-  val Cats       = "2.0.0-M4"
-  val Spire      = "0.16.1"
+  val Refined    = "0.9.10"
+  val Enumeratum = "1.5.13"
 
-  val Kittens    = "2.0.0-M1"
-  val CatsEffect = "1.3.0"
-  val Fs2        = "1.0.5"
-  // val Zio        = "1.0.0-RC8-12"
+  val Kittens    = "2.0.0"
+  val CatsEffect = "2.0.0"
+  val Fs2        = "2.0.0"
 
-  val TypesafeConfig = "1.3.3"
-  val PureConfig     = "0.9.2"
-
-  val Cormorant = "0.2.0"
-  val Fuiid     = "0.1.2"
-  val Circe     = "0.8.0"
-
-  val Akka        = "2.5.12"
-  val AkkaHttp    = "10.1.5"
-  val HttpSession = "0.5.5"
-
-  val Fansi = "0.2.7"
-
-  val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
-  // val PgJdbc = "9.4-1201-jdbc41"
-
-  val OpenGamma = "2.3.2"
+  val Cormorant  = "0.3.0-M1"
+  val Fuiid      = "0.3.0-M2"
+  val Circe      = "0.12.1"
+  val PureConfig = "0.12.0"
 
   // Test libs
 
   val ScalaTest  = "3.0.8"
   val ScalaCheck = "1.14.0"
 
-  val CatsScalaCheck      = "0.1.1"
-  val ShapelessScalaCheck = "1.2.0"
+  val CatsScalaCheck      = "0.2.0"
+  val ShapelessScalaCheck = "1.2.3"
+
+  val OpenGamma = "2.3.2"
+
+  // on the way out
+  val Akka        = "2.5.12"
+  val AkkaHttp    = "10.1.5"
+  val HttpSession = "0.5.5"
+
+  val TypesafeConfig = "1.3.3"
+
+  val Fansi = "0.2.7"
+
+  val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
+  // val PgJdbc = "9.4-1201-jdbc41"
+
 }
 
 object Deps {
@@ -79,9 +81,9 @@ object Deps {
   }
 
   val enumerata = Seq(
-    "com.beachape" %% "enumeratum" % Enumeratum,
-    // "com.beachape" %% "enumeratum-cats"  % Enumeratum,
-    "com.beachape" %% "enumeratum-circe" % Enumeratum,
+    "com.beachape" %% "enumeratum"       % Enumeratum,
+    "com.beachape" %% "enumeratum-cats"  % "1.5.16",
+    "com.beachape" %% "enumeratum-circe" % "1.5.21",
   )
 
   val circeii = Seq(
@@ -102,7 +104,6 @@ object Deps {
   val pureConfigs = List(
     "pureconfig",
     "pureconfig-enumeratum",
-    "pureconfig-squants",
   ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
   val testers = Seq(
@@ -116,17 +117,17 @@ object Deps {
 
   val fuiids = List(
     "fuuid", // core
-    "fuuid-circe", // Circe integration
-    "fuuid-http4s", // Http4s integration
-    "fuuid-doobie" // Doobie integration
-  ) map (x => "io.chrisdavenport" %% x % Fuiid)
+    "fuuid-circe" // Circe integration
+    // "fuuid-http4s", // Http4s integration
+    // "fuuid-doobie" // Doobie integration
+  ) map (x => "io.chrisdavenport" %% s"$x" % Fuiid)
 
   val cormorants = List(
     "core",
     "generic",
     "parser",
-    "fs2",
-    "http4s",
+    "fs2",  // DON'T "FIXME": This is OK because fs2 1.11 is bincompat with 2.0 series... semver l8r
+    // "http4s",
     "refined"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
 
@@ -187,7 +188,6 @@ object Deps {
       reflection,
       scompiler,
       xml, // FIXME: check the state of available alternatives
-      conf,
       fansi // can't help myself
     )
 }

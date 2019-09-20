@@ -60,14 +60,14 @@ lazy val core = module(
   "core",
   """foundational finance VOs and aggregate entity primitives:
     time, money
-    core finance fns
     key -> val entities
+    core finance fns
     """.stripMargin
 )
   // .dependsOn(macros) // or did... no more
   .settings(common)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ misclibs ++ testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
   )
 
 // lazy val api = module("api", "domain entities as aecore/cqrs-es instances")
@@ -81,7 +81,7 @@ lazy val demo = module("demo", "something to run")
   .dependsOn(core)
   .settings(common)
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ misclibs ++ testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ pureConfigs ++ Seq(opengamma) ++ testers
   )
 
 // wip := work in progress
