@@ -62,6 +62,8 @@ object CsvEnum {
     field => scala.util.Try { e withName field.x },
     field => s"Failed to decode Enum: $e: Received $field"
   )
+
+  /** */
   def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
 }
 
@@ -73,7 +75,6 @@ trait DtEnum[EE <: EnumEntry] extends Enum[EE] with CatsEnum[EE] with CsvEnum[EE
   def unapply(key: EnumEntry): Option[EE] =
     if (values contains key) key.asInstanceOf[EE].some else none
 
-  def collect(key: EnumEntry): PartialFunction[EnumEntry, EE] = Function unlift unapply
+  /** */
+  def collect: PartialFunction[EnumEntry, EE] = Function unlift unapply
 }
-
-/** */
