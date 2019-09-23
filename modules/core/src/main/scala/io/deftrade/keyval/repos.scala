@@ -24,11 +24,8 @@ trait repos {
 
     import V._
 
-    /** */
-    final type T[k, v] = Map[k, v]
-
     /** Basic in-memory table structure */
-    final type Table = T[Index, Value]
+    final type Table = Map[Index, Value]
 
     /** */
     final type R[x] = Stream[F, x]

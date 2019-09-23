@@ -72,6 +72,8 @@ trait DtEnum[EE <: EnumEntry] extends Enum[EE] with CatsEnum[EE] with CsvEnum[EE
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def unapply(key: EnumEntry): Option[EE] =
     if (values contains key) key.asInstanceOf[EE].some else none
+
+  def collect(key: EnumEntry): PartialFunction[EnumEntry, EE] = Function unlift unapply
 }
 
 /** */

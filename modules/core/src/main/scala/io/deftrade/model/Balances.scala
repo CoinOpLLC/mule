@@ -86,11 +86,13 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     def total(implicit C: Currency[C]): Money[MA, C] =
       C(NonEmptyList(MonetaryAmount.zero, am.values.toList.map(_.amount)).reduce)
 
-    /** */
-    def restricted[R <: A: scala.reflect.ClassTag]: AccountMap[R, C] =
-      am collect {
-        case (k: R, v) => (k, v)
-      }
+    /**
+      * TODO: This is awkward, but DRY and reflection free... needs to evolve.
+      */
+    def collectKey[B <: A](subKey: A => Option[B]): AccountMap[B, C] = {
+      val of: ((A, Mny[C])) => Option[(B, Mny[C])] = { case (a, v) => subKey(a) map (b => (b, v)) }
+      am collect (Function unlift of)
+    }
   }
 
   /** convenience and domain semantics only */
