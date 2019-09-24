@@ -5,7 +5,6 @@ import money._, time._, keyval._, accounting._, implicits._
 
 import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
-import cats.data.NonEmptyList
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
@@ -63,36 +62,20 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   type Equity = accounting.Equity
 
   /** Mapping accounting keys to [[money.Money]]. */
-  final type AccountMap[A <: AccountingKey, C] = Map[A, Money[MA, C]]
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
 
   /** */
   object AccountMap {
 
     /** */
-    def empty[AT <: AccountingKey, C: Currency]: AccountMap[AT, C] = Map.empty[AT, Money[MA, C]]
+    def empty[AT <: AccountingKey, C: Currency]: AccountMap[AT, C] = Map.empty[AT, Mny[C]]
 
     /** */
     def from[AT <: AccountingKey, C: Currency](
         ks: SwapKey[AT],
-        amount: Money[MA, C]
+        amount: Mny[C]
     ): AccountMap[AT, C] = ???
 
-  }
-
-  /** */
-  implicit class SweetAccountMap[A <: AccountingKey, C](am: AccountMap[A, C]) {
-
-    /** */
-    def total(implicit C: Currency[C]): Money[MA, C] =
-      C(NonEmptyList(MonetaryAmount.zero, am.values.toList.map(_.amount)).reduce)
-
-    /**
-      * TODO: This is awkward, but DRY and reflection free... needs to evolve.
-      */
-    def collectKey[B <: A](subKey: A => Option[B]): AccountMap[B, C] = {
-      val of: ((A, Mny[C])) => Option[(B, Mny[C])] = { case (a, v) => subKey(a) map (b => (b, v)) }
-      am collect (Function unlift of)
-    }
   }
 
   /** convenience and domain semantics only */
@@ -169,7 +152,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     /**
       * nb as it stands, this is useful as a check only, because the algebra is balanced by design
       */
-    final def net(implicit CCY: Currency[CCY]): Money[MA, CCY] = cs.total - ds.total
+    final def net: Money[MA, CCY] = cs.total - ds.total
   }
 
   /** */

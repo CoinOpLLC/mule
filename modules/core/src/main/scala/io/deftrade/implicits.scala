@@ -24,10 +24,13 @@ object implicits {
     *
     * TODO: let's see this evolve if it's useful.
     */
-  implicit final class SweetColumn[C[_], V](val column: C[V]) {
+  implicit final class SweetColumn[C[_], V](val column: C[V]) extends AnyVal {
 
     /** */
     def total(implicit C: Foldable[C], V: Financial[V]): V = column fold V.additive
+
+    /** */
+    def total(implicit C: Foldable[C], V: CommutativeGroup[V]): V = column fold V
   }
 
   /** Add convenience methods to qualifying `Map`s.*/
@@ -40,7 +43,7 @@ object implicits {
     def getWithZero(k: K)(implicit V: CommutativeGroup[V]): V = (m get k).fold(V.empty)(identity)
 
     /** works for any [[money.Financial]] amount or quantity */
-    def total(implicit V: Financial[V]): V = m.map(_._2).fold(V.zero)(V.plus)
+    // def total(implicit V: Financial[V]): V = m.map(_._2).fold(V.zero)(V.plus)
 
     /** works for [[money.Money]] */
     def total(implicit V: CommutativeGroup[V]): V = m.map(_._2).fold(V.empty)(V.combine)
