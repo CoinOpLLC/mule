@@ -8,19 +8,20 @@ object Version {
   val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Cats       = "2.0.0"
-  val Spire      = "0.17.0-M1"
+  val Enumeratum = "1.5.13"
   val Shapeless  = "2.3.3"
   val Refined    = "0.9.10"
-  val Enumeratum = "1.5.13"
 
+  val Cats       = "2.0.0"
   val Kittens    = "2.0.0"
   val CatsEffect = "2.0.0"
+
+  val Spire      = "0.17.0-M1"
+  val Circe      = "0.12.1"
   val Fs2        = "2.0.0"
 
   val Cormorant  = "0.3.0-M1"
   val Fuiid      = "0.3.0-M2"
-  val Circe      = "0.12.1"
   val PureConfig = "0.12.0"
   val Http4s     = "0.21.0-M4"
 

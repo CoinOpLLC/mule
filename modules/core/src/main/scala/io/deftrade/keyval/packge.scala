@@ -3,10 +3,10 @@ package io.deftrade
 import cats.implicits._
 import cats.{ Order, Show }
 
+import shapeless.syntax.singleton._
+
 import eu.timepit.refined
 import refined.api.Refined
-
-import shapeless.syntax.singleton._
 
 // import io.chrisdavenport.cormorant.implicits._
 // import io.chrisdavenport.cormorant.generic.semiauto._
@@ -14,27 +14,33 @@ import shapeless.syntax.singleton._
 // import io.chrisdavenport.cormorant.refined._
 
 /**
-  * Defines a scheme* for enriching domain value types (typically case classes) with additional
+  * Defines a
+  * [[https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration]]
+  * scheme* for enriching domain value types (typically case classes) with additional
   * types and implicit methods useful for persistence and caching.
   *
   *   - `id`s: opaque Long based `id` (with `Order` instances)
-  *   - `key`s: opaque identifiers with `Order`, `Hash` and `Show` typeclass instances
+  *   - `key`s: identifiers (including opaque identifiers)
+  * with `Order`, and `Show` typeclass instances
   *   - `value`s: value class typeclass instances (`Eq`, `Hash` and `Show`).
   *   - etc.
   *
   * This shall be the law: A `type Foo` may not depend upon the type of the `key` for `Foo`s.
+  * Point being: there will be no `id: Id` fields within domain objects; these will be carried
+  * separately (e.g. `key`s in an in-memory [[scala.collection.Map]] and will not depend in any way on the domain
+  * value objects. However, foreign keys which reference other domain value types are permitted.
   *
-  * This package provides `key` and `id` implementations which abide the law.
+  * This package provides `key` and `id` implementations which abide the law given above.
   *   - aliasing `Refined` as an opaque key for a collection of a given type of values
   *   - assinging the `Value` type to be the phantom type parameter for the Refined type constructor
   *   - providing the `Key` types and instances as companion base classes.
   *
   * Further, the package supports the instantiaton of the scheme by
-  *   - providing a `Row` type (`Key` -> `Value`)
-  *   - providing a `Table` type (Map[Key, Value])
-  *   - providing implicit derivations for CSV file readers and writers of `Row`s and `Table`s.
+  *   - providing a `Row` type (`Key -> Value`)
+  *   - providing a `Table` type (`Map[Key, Value]`) (see [[repos]])
+  *   - providing implicit derivations for [[csv]] file readers and writers of `Row`s and `Table`s.
   *
-  * *,, it's just a scheme because calling it a "schema" is too grand,,
+  * *,, it's just a scheme because calling it a "schema" is far too grand,,
   */
 package object keyval extends repos with csv {
 

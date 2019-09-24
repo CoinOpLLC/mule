@@ -261,7 +261,7 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
 abstract class WithPredicateKey[K: Order, P, V] extends WithRefinedKey[K, P, V]
 
 /**
-  * '''By convention''', this companion defines a key as a `Refined`
+  * Companion base class which defines a key as a `Refined`
   * type, parameterized with the value type we are indexing.
   */
 abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]

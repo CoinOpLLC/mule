@@ -90,20 +90,22 @@ object TimeExample {
 /** */
 object Demo extends IOApp {
 
+  final val BUFFER_SIZE = 4096 // * 4096 // nostalgia
+
   type Report = Pipe[IO, Transaction, BookSet]
   val report: Report = ???
 
   val reporter: Stream[IO, Unit] = (Stream resource Blocker[IO]) flatMap { blocker =>
-    io.file.readAll[IO](Paths.get("transactions.csv"), blocker, 4096)
+    io.file.readAll[IO](Paths get "transactions.csv", blocker, BUFFER_SIZE)
       .through(text.utf8Decode)
       .through(text.lines)
       .through(/* csv read => Transaction */)
       .through(report)
       .through(/* BookSet.show */)
       .through(text.utf8Encode)
-      .through(io.file.writeAll(Paths.get("reports/booksets.txt"), blocker))
+      .through(io.file.writeAll(Paths get "reports/booksets.txt", blocker))
   }
 
   def run(args: List[String]): IO[ExitCode] =
-    reporter.compile.drain.as(ExitCode.Success)
+    reporter.compile.drain as ExitCode.Success
 }

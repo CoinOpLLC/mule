@@ -36,28 +36,29 @@ object implicits {
   /** Add convenience methods to qualifying `Map`s.*/
   implicit final class SweetMap[K, V](val m: Map[K, V]) extends AnyVal {
 
-    /** works for any [[money.Financial]] amount or quantity */
-    def getWithZero(k: K)(implicit V: Financial[V]): V = (m get k).fold(V.zero)(identity)
-
-    /** works for [[money.Money]] */
+    /**
+      * Works for any [[money.Financial]] amount or quantity,
+      * or for [[money.Money]] of any [[money.Currency]].
+      */
     def getWithZero(k: K)(implicit V: CommutativeGroup[V]): V = (m get k).fold(V.empty)(identity)
 
-    /** works for any [[money.Financial]] amount or quantity */
-    // def total(implicit V: Financial[V]): V = m.map(_._2).fold(V.zero)(V.plus)
-
-    /** works for [[money.Money]] */
+    /**
+      * Totals values for any [[money.Financial]] amount or quantity,
+      * or for [[money.Money]] of any [[money.Currency]].
+      */
     def total(implicit V: CommutativeGroup[V]): V = m.map(_._2).fold(V.empty)(V.combine)
 
     /**
-      * TODO: This is awkward, but DRY and reflection free... needs to evolve.
+      * Filters a map by narrowing the scope of the keys contained.
+      *
+      * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+      *
+      * @param subKey Easily provided via an extractor.
+      * @return A map containing those entries whose keys match a subclassing pattern.
+      * @see [[keyval.DtEnum]]
+      *
       */
-    def collectKey[L <: K](subKey: K => Option[L]): Map[L, V] = {
-      val of: ((K, V)) => Option[(L, V)] = {
-        case (k, v) => subKey(k) map (l => (l, v))
-      }
-      val pf: PartialFunction[(K, V), (L, V)] = Function unlift of
-      m collect pf
-    }
+    def collectKey[L <: K](subKey: K => Option[L]): Map[L, V] =
+      m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
   }
-
 }
