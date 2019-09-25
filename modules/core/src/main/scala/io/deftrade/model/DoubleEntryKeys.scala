@@ -2,7 +2,7 @@ package io.deftrade
 package model
 package accounting
 
-import money.Financial, keyval.DtEnum
+import money._, keyval.DtEnum
 
 import cats.implicits._
 
@@ -26,40 +26,74 @@ abstract class DoubleEntryKeys[MA: Financial] {
   /**
     * General form of a "double (bookkeeping) entry" key.
     */
-  sealed abstract class DoubleEntryKey[X <: AccountingKey, Y <: AccountingKey] private[accounting] (
-      entries: Treatment[X],
-      contras: Treatment[Y]
-  ) extends EnumEntry
-      with Serializable {
+  sealed trait DoubleEntryKeyLike extends EnumEntry with Serializable {
 
     /** */
-    final type EntryType = X
+    type EntryType <: AccountingKey
 
     /** */
-    final type ContraType = Y
+    type ContraType <: AccountingKey
+
+    /** */
+    def entries: Treatment[EntryType]
+
+    /** */
+    def contras: Treatment[ContraType]
   }
 
-  /** namespace placeholder */
-  object DoubleEntryKey
-
-  /** */
-  sealed abstract class SingleDebitKey private (
-      val debit: Debit,
-      val credits: Treatment[Credit]
-  ) extends DoubleEntryKey(entries = Treatment single debit, contras = credits)
-
-  /** */
-  sealed abstract class SingleCreditKey private (
-      val debits: Treatment[Debit],
-      val credit: Credit
-// ) extends DoubleEntryKey(entries = debits, contras = Treatment single credit)
-  ) extends DoubleEntryKey(entries = Treatment single credit, contras = debits)
-
-  /** Keys that grow or shrink the balance. */
-  object SingleDebitKey extends DtEnum[SingleDebitKey] {
+  sealed abstract class DoubleEntryKey[E <: AccountingKey, C <: AccountingKey](
+      es: Treatment[E],
+      cs: Treatment[C]
+  ) extends DoubleEntryKeyLike {
 
     /** */
-    case object PayBills extends SingleDebitKey(Asset.Cash, Treatment single Liability.AccountsPayable)
+    final type EntryType = E
+
+    /** */
+    final type ContraType = C
+
+    /** */
+    final def entries: Treatment[EntryType] = es
+
+    /** */
+    final def contras: Treatment[ContraType] = cs
+
+  }
+
+  /** */
+  object DoubleEntryKey
+
+  sealed abstract class DebitCreditKey[D <: Debit, C <: Credit](
+      debits: Treatment[D],
+      credits: Treatment[C]
+  ) extends DoubleEntryKey(debits, credits) {
+    final def debits: Treatment[D]  = entries
+    final def credits: Treatment[C] = contras
+  }
+
+  // /** */
+  // sealed abstract class SingleDebitKey private (
+  //     val debit: Debit,
+  //     val credits: Treatment[Credit]
+  // ) extends DebitCreditKey(Treatment single debit, credits)
+  //
+  // /** */
+  // sealed abstract class SingleCreditKey private (
+  //     val debits: Treatment[Debit],
+  //     val credit: Credit
+  // ) extends DebitCreditKey(debits, Treatment single credit)
+
+  /** */
+  sealed abstract class SimpleDebitCreditKey(
+      final val debit: Debit,
+      final val credit: Credit
+  ) extends DebitCreditKey(Treatment single debit, Treatment single credit)
+
+  /** Keys that grow or shrink the balance. */
+  object SimpleDebitCreditKey extends DtEnum[SimpleDebitCreditKey] {
+
+    /** */
+    case object PayBill extends SimpleDebitCreditKey(Asset.Cash, Liability.AccountsPayable)
 
     /** */
     lazy val values = findValues
@@ -99,10 +133,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
 
   /** */
   sealed abstract class SingleAssetSwapKey private (from: Asset, to: Asset)
-      extends SwapKey[Asset](
-        from = Treatment single from,
-        to = Treatment single to
-      )
+      extends SwapKey[Asset](Treatment single from, Treatment single to)
 
   /** */
   object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {

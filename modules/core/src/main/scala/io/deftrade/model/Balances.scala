@@ -68,18 +68,24 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   object AccountMap {
 
     /** */
-    def empty[AT <: AccountingKey, C: Currency]: AccountMap[AT, C] = Map.empty[AT, Mny[C]]
+    def fromSwapKey[A <: AccountingKey, C: Currency](
+        ks: SwapKey[A],
+        amount: Mny[C]
+    ): AccountMap[A, C] = {
+      def debit  = ks.from.toSortedMap mapValues (-amount * _)
+      def credit = ks.to.toSortedMap mapValues (amount * _)
+      debit |+| credit
+    }
 
     /** */
-    def from[AT <: AccountingKey, C: Currency](
-        ks: SwapKey[AT],
-        amount: Mny[C]
-    ): AccountMap[AT, C] = ???
-
+    implicit final class Ops[A <: AccountingKey, N: Financial](m: Map[A, N]) {
+      def denominated[C: Currency]: AccountMap[A, C] =
+        m map { case (k, n) => (k, Currency[C] fiat (Financial[N] to [MonetaryAmount] n)) }
+    }
   }
 
   /** convenience and domain semantics only */
-  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = AccountMap.empty
+  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = Map.empty[A, Mny[C]]
 
   /** */
   final type Debits[C] = AccountMap[Debit, C]
@@ -171,10 +177,15 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   ) extends Balance[Debit, Credit, C](debits, credits) {
 
     /** */
-    def updated(key: SingleDebitKey, amount: Money[MA, C]): TrialBalance[C] = ???
-
-    /** */
-    def updated(key: SingleCreditKey, amount: Money[MA, C]): TrialBalance[C] = ???
+    def updated(
+        dc: DebitCreditKey[Debit, Credit],
+        amount: Money[MA, C]
+    )(
+        implicit C: Currency[C]
+    ): TrialBalance[C] = TrialBalance(
+      debits |+| (dc.debits scaled -amount),
+      credits |+| (dc.credits scaled amount)
+    )
 
     // FIXME import AccountMap.collect
     // implicit def CG[AT <: AccountingKey] = CommutativeGroup[AccountMap[AT, C]]

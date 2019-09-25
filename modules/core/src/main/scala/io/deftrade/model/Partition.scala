@@ -30,6 +30,14 @@ sealed trait PartitionLike[K, V] { self =>
   final def scaled(n: V)(implicit K: cats.Order[K], V: Financial[V]): Partition[K, V] =
     Partition unsafe (toSortedMap mapValues (_ * n))
 
+  /** */
+  final def scaled[N: Financial, C: Currency](
+      amount: Money[N, C]
+  )(
+      implicit V: Financial[V]
+  ): Map[K, Money[N, C]] =
+    toSortedMap mapValues (amount * _)
+
   /** Creates a [[UnitPartition]] from this one. */
   final def normalized(implicit K: cats.Order[K], V: Financial[V]): UnitPartition[K, V] =
     self match {
