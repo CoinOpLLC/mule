@@ -13,7 +13,7 @@ import cats.data.{ NonEmptySet }
 import scala.collection.immutable.SortedSet
 
 import java.time.DayOfWeek
-import java.time.{ temporal => jtt }
+import java.time.temporal.WeekFields.{ ISO => weekFields }
 
 package object work {
 
@@ -23,24 +23,29 @@ package object work {
     * stick with ISO for now
     * TODO: make use of locale?
     */
-  lazy val weekFields = jtt.WeekFields.ISO
-
   type WorkWeek = NonEmptySet[DayOfWeek]
 
-  lazy val WorkWeek: WorkWeek = NonEmptySet(
+  /** */
+  implicit lazy val WorkWeek: WorkWeek = NonEmptySet(
     weekFields.getFirstDayOfWeek,
     SortedSet((1L to 4L) map (weekFields.getFirstDayOfWeek plus _): _*)
   )
 
+  def yesterday = today - 1.day
+  def today     = localDate
+  def tomorrow  = today + 1.day
+
   implicit final class WorkDayOps(val ld: LocalDate) extends AnyVal {
 
-    def workDay(implicit iwd: IsWorkDay): Boolean                 = iwd(ld)
-    def isLastWorkDayOfMonth(implicit iwd: IsWorkDay): Boolean    = ???
-    def next(implicit iwd: IsWorkDay): LocalDate                  = (ld + 1.day).nextOrSame
-    def nextOrSame(implicit iwd: IsWorkDay): LocalDate            = ld plusWorkDays 0
-    def nextSameOrLastInMonth(implicit iwd: IsWorkDay): LocalDate = ???
-    def previous(implicit iwd: IsWorkDay): LocalDate              = ???
-    def previousOrSame(implicit iwd: IsWorkDay): LocalDate        = ???
+    def workDay(implicit iwd: IsWorkDay): Boolean                    = iwd(ld)
+    def workDaysUntil(that: LocalDate)(implicit iwd: IsWorkDay): Int = ???
+    def isLastWorkDayOfMonth(implicit iwd: IsWorkDay): Boolean       = ???
+    def lastWorkDayOfMonth(implicit iwd: IsWorkDay): LocalDate       = ???
+    def next(implicit iwd: IsWorkDay): LocalDate                     = (ld + 1.day).nextOrSame
+    def nextOrSame(implicit iwd: IsWorkDay): LocalDate               = ld plusWorkDays 0
+    def nextSameOrLastInMonth(implicit iwd: IsWorkDay): LocalDate    = ???
+    def previous(implicit iwd: IsWorkDay): LocalDate                 = ???
+    def previousOrSame(implicit iwd: IsWorkDay): LocalDate           = ???
 
     @annotation.tailrec
     def plusWorkDays(nwds: Int)(implicit iwd: IsWorkDay): LocalDate = {
@@ -65,64 +70,84 @@ package object work {
     }
   }
 
-  def workDaysBetween(start: LocalDate, end: LocalDate): Int = ???
-  def lastWorkDayOfMonth(date: LocalDate): LocalDate         = ???
-
-  def yesterday = today - 1.day
-  def today     = localDate
-  def tomorrow  = today + 1.day
+  implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
 
   implicit def fixedHolidays: FixedHolidays = ???
+
+  implicit def sheduledHoliday(implicit fhs: FixedHolidays): IsScheduledHoliday =
+    IsScheduledHoliday(fhs.holidays contains _)
+
+  implicit lazy val unscheduledHolidays: IsUnscheduledHoliday =
+    IsUnscheduledHoliday(Set.empty[LocalDate])
+
+  /** FIXME: this should be implicit but then causes ambig... */
+  def isWorkDay(
+      implicit workWeek: WorkWeek,
+      sheduledHoliday: IsScheduledHoliday,
+      unsheduledHoliday: IsUnscheduledHoliday
+  ): IsWorkDay = IsWorkDay { ld =>
+    (workWeek contains ld.dayOfWeek) && !sheduledHoliday(ld) && !unsheduledHoliday(ld)
+  }
 
 }
 
 package work {
 
   /** */
-  object IsDay {
-    type Pred = LocalDate => Boolean
+  sealed trait IsDay extends Any {
+
+    /** */
+    def is: IsDay.Predicate
+
+    /** */
+    final def apply(ld: LocalDate): Boolean = is(ld)
   }
 
   /** */
-  sealed trait IsDay extends Any {
-    def is: IsDay.Pred
-    final def apply(ld: LocalDate): Boolean = is(ld)
-  }
-  final case class IsScheduledHoliday(val is: IsDay.Pred)   extends AnyVal with IsDay
-  final case class IsUnscheduledHoliday(val is: IsDay.Pred) extends AnyVal with IsDay
-  final case class IsWorkDay(val is: IsDay.Pred)            extends AnyVal with IsDay
+  object IsDay {
 
+    /** */
+    type Predicate = LocalDate => Boolean
+  }
+
+  /** */
+  final case class IsScheduledHoliday(val is: IsDay.Predicate) extends AnyVal with IsDay
+
+  /** */
+  final case class IsUnscheduledHoliday(val is: IsDay.Predicate) extends AnyVal with IsDay
+
+  /** */
+  final case class IsWorkDay(val is: IsDay.Predicate) extends AnyVal with IsDay
+
+  /** */
   sealed abstract class WorkDay private (signum: Int, sameMonth: Boolean) extends EnumEntry {
 
-    import WorkDay._
-
-    // final def adjuster: LocalDate => LocalDate = adjuster(implicitly[IsWorkDay])
-    // final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
-
-    final def adjuster(iwd: IsWorkDay): LocalDate => LocalDate =
+    /** */
+    final def adjuster(implicit iwd: IsWorkDay): LocalDate => LocalDate =
       signum match {
         case 0      => identity
-        case 1 | -1 => adjust(0)(signum, sameMonth)(iwd)
-        case _      => ??? // TODO: just use a trinary type here to be ironclad.
+        case 1 | -1 => adjust(0)(signum, sameMonth)
       }
 
-    private def adjust(n: Int)(signum: Int, sameMonth: Boolean)(isWd: IsWorkDay): LocalDate => LocalDate =
+    private def adjust(n: Int)(signum: Int, sameMonth: Boolean)(
+        implicit iwd: IsWorkDay
+    ): LocalDate => LocalDate =
       ld => {
         val delta = (signum * n).days
         ld + delta match {
-          case wd if isWd(wd) =>
+          case wd if iwd(wd) =>
             wd
           case hd if sameMonth && (hd.month =!= ld.month) =>
-            adjust(0)(-signum, false)(isWd)(ld)
+            ld |> adjust(0)(-signum, false)
           case _ =>
-            adjust(n - signum)(signum, sameMonth)(isWd)(ld)
+            ld |> adjust(n - signum)(signum, sameMonth)
         }
       }
   }
 
-  /** All civilized financial calendars have at least one holiday: domain invariant. */
 // FIXME NonEmptySet impl artifact error; work around it
 /// case class FixedHolidays(val holidays: NonEmptySet[LocalDate]) extends AnyVal
+  /** All civilized financial calendars have at least one holiday: domain invariant. */
   case class FixedHolidays(val holidays: SortedSet[LocalDate]) extends AnyVal
 
   object WorkDay extends Enum[WorkDay] {
@@ -134,26 +159,6 @@ package work {
     // TODO: `Nearest` from Strata
 
     lazy val values = findValues
-
-    implicit def dayOfWeekOrder[T <: DayOfWeek with Comparable[T]]: Order[T] = Order.fromComparable[T]
-
-    implicit lazy val workWeek: WorkWeek =
-      NonEmptySet(DayOfWeek.MONDAY, SortedSet(DayOfWeek.values: _*) - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY)
-
-    implicit def sheduledHoliday(implicit fhs: FixedHolidays): IsScheduledHoliday =
-      IsScheduledHoliday(fhs.holidays contains _)
-
-    implicit lazy val unscheduledHolidays: IsUnscheduledHoliday =
-      IsUnscheduledHoliday(Set.empty[LocalDate])
-
-    def isWorkDay(
-        implicit workWeek: WorkWeek,
-        sheduledHoliday: IsScheduledHoliday,
-        unsheduledHoliday: IsUnscheduledHoliday
-    ): IsWorkDay = IsWorkDay { ld =>
-      (workWeek contains ld.dayOfWeek) && !sheduledHoliday(ld) && !unsheduledHoliday(ld)
-    }
-
   }
 
 // TODO: finish this
