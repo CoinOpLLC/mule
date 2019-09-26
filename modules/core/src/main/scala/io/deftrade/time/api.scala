@@ -9,7 +9,7 @@ import java.time._, chrono.Chronology, format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
-trait Api {
+trait api {
 
   // Clock
 
@@ -212,13 +212,13 @@ trait Api {
     Instant ofEpochSecond (epochSecond, nanoAdjustment)
   def instant(text: CharSequence) = Instant parse text
 
-  implicit class SweetInstant(val i: Instant) extends Ordered[Instant] {
+  implicit class InstantOps(val i: Instant) extends Ordered[Instant] {
 
     def nano: Int         = i.getNano
     def epochSecond: Long = i.getEpochSecond
 
-    def +(amount: TemporalAmount): SweetInstant = i plus amount
-    def -(amount: TemporalAmount): SweetInstant = i minus amount
+    def +(amount: TemporalAmount): InstantOps = i plus amount
+    def -(amount: TemporalAmount): InstantOps = i minus amount
 
     override def compare(that: Instant): Int = i compareTo that
   }
@@ -291,11 +291,7 @@ trait Api {
 
     override def show(x: TA): String = formatter format x
 
-    // TODO: refactor this where it belongs (i.e. will pick up operator)
-    def parse(s: String): Either[Throwable, TA] =
-      scala.util.Try {
-        tq(formatter parse s)
-      }.toEither
+    def parse(s: String): Result[TA] = Result safe tq(formatter parse s)
 
     def hash(x: TA): Int           = x.hashCode
     def compare(x: TA, y: TA): Int = x compareTo y
@@ -330,8 +326,7 @@ trait Api {
       Instant from _
     ) with Hash[Instant] with cats.Order[Instant]
 
-  // TODO: flesh these out with other typeclasses
-
+  /** TODO: expand on these */
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
 
 }

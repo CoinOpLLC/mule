@@ -6,64 +6,74 @@ import implicits._
 
 import enumeratum._
 
-import cats._
 import cats.implicits._
-import cats.data.NonEmptySet
+import cats.{ Order }
+import cats.data.{ NonEmptySet }
 
 import scala.collection.immutable.SortedSet
 
 import java.time.DayOfWeek
+import java.time.{ temporal => jtt }
 
 package object work {
 
   import WorkDay._
 
-  implicit def fixedHolidays: FixedHolidays = ???
+  /**
+    * stick with ISO for now
+    * TODO: make use of locale?
+    */
+  lazy val weekFields = jtt.WeekFields.ISO
 
-  def workDay(ld: LocalDate): Boolean = { val is = implicitly[IsWorkDay]; is(ld) }
-  // def workDaysBetween(start: LocalDate, end: LocalDate): Int
-  // def isLastWorkDayOfMonth(date: LocalDate): Boolean
-  //
-  // def lastWorkDayOfMonth(date: LocalDate): LocalDate
+  type WorkWeek = NonEmptySet[DayOfWeek]
 
-  def next(ld: LocalDate): LocalDate       = nextOrSame(ld + 1.day)
-  def nextOrSame(ld: LocalDate): LocalDate = plusWorkDays(0)(ld)
-  // def nextSameOrLastInMonth(date: LocalDate): LocalDate
-  // def previous(date: LocalDate): LocalDate
-  // def previousOrSame(date: LocalDate): LocalDate
+  lazy val WorkWeek: WorkWeek = NonEmptySet(
+    weekFields.getFirstDayOfWeek,
+    SortedSet((1L to 4L) map (weekFields.getFirstDayOfWeek plus _): _*)
+  )
 
-  // val iso: WeekFields        = WeekFields.ISO
-  // val dow: jtt.TemporalField = iso.dayOfWeek
+  implicit final class WorkDayOps(val ld: LocalDate) extends AnyVal {
+
+    def workDay(implicit iwd: IsWorkDay): Boolean                 = iwd(ld)
+    def isLastWorkDayOfMonth(implicit iwd: IsWorkDay): Boolean    = ???
+    def next(implicit iwd: IsWorkDay): LocalDate                  = (ld + 1.day).nextOrSame
+    def nextOrSame(implicit iwd: IsWorkDay): LocalDate            = ld plusWorkDays 0
+    def nextSameOrLastInMonth(implicit iwd: IsWorkDay): LocalDate = ???
+    def previous(implicit iwd: IsWorkDay): LocalDate              = ???
+    def previousOrSame(implicit iwd: IsWorkDay): LocalDate        = ???
+
+    @annotation.tailrec
+    def plusWorkDays(nwds: Int)(implicit iwd: IsWorkDay): LocalDate = {
+
+      val signum = math.signum(nwds)
+
+      val adjust: LocalDate => LocalDate = {
+        val wd: WorkDay = signum match {
+          case 0 | 1 => Next
+          case -1    => Prev
+        }
+        wd adjuster iwd
+      }
+
+      def movedByOne = ld + signum.days |> adjust
+
+      nwds match {
+        case 0      => adjust(ld)
+        case 1 | -1 => movedByOne
+        case n      => movedByOne plusWorkDays (n - signum)
+      }
+    }
+  }
+
+  def workDaysBetween(start: LocalDate, end: LocalDate): Int = ???
+  def lastWorkDayOfMonth(date: LocalDate): LocalDate         = ???
 
   def yesterday = today - 1.day
   def today     = localDate
   def tomorrow  = today + 1.day
 
-  // stick with ISO and be rigorous about others
-  // TODO: make use of locale?
-  type WorkWeek = NonEmptySet[DayOfWeek]
+  implicit def fixedHolidays: FixedHolidays = ???
 
-  @annotation.tailrec
-  final def plusWorkDays(nwds: Int)(ld: LocalDate)(implicit wd: IsWorkDay): LocalDate = {
-
-    val signum = math.signum(nwds)
-
-    val adjust: LocalDate => LocalDate = {
-      val wd: WorkDay = signum match {
-        case 0 | 1 => Next
-        case -1    => Prev
-      }
-      wd.adjuster
-    }
-
-    def movedByOne = ld + signum.days |> adjust
-
-    nwds match {
-      case 0      => adjust(ld)
-      case 1 | -1 => movedByOne
-      case n      => plusWorkDays(n - signum)(movedByOne)(wd)
-    }
-  }
 }
 
 package work {
@@ -86,16 +96,15 @@ package work {
 
     import WorkDay._
 
-    final def adjuster: LocalDate => LocalDate = adjuster(implicitly)
+    // final def adjuster: LocalDate => LocalDate = adjuster(implicitly[IsWorkDay])
+    // final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
 
-    final def adjuster(isWd: IsWorkDay): LocalDate => LocalDate =
+    final def adjuster(iwd: IsWorkDay): LocalDate => LocalDate =
       signum match {
         case 0      => identity
-        case 1 | -1 => adjust(0)(signum, sameMonth)(isWd)
+        case 1 | -1 => adjust(0)(signum, sameMonth)(iwd)
         case _      => ??? // TODO: just use a trinary type here to be ironclad.
       }
-
-    final def temporalAdjuster: TemporalAdjuster = TemporalAdjuster(adjuster)
 
     private def adjust(n: Int)(signum: Int, sameMonth: Boolean)(isWd: IsWorkDay): LocalDate => LocalDate =
       ld => {
@@ -137,7 +146,7 @@ package work {
     implicit lazy val unscheduledHolidays: IsUnscheduledHoliday =
       IsUnscheduledHoliday(Set.empty[LocalDate])
 
-    implicit def isWorkDay(
+    def isWorkDay(
         implicit workWeek: WorkWeek,
         sheduledHoliday: IsScheduledHoliday,
         unsheduledHoliday: IsUnscheduledHoliday

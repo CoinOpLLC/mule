@@ -252,7 +252,7 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
   }
 
   /** */
-  implicit class SweetCurrency[C: Currency](C: C) {
+  implicit class CurrencyOps[C: Currency](C: C) {
 
     /**
       * Exchange `Rate` factory. Implicit context provides pricing.

@@ -24,7 +24,7 @@ object implicits {
     *
     * TODO: let's see this evolve if it's useful.
     */
-  implicit final class SweetColumn[C[_], V](val column: C[V]) extends AnyVal {
+  implicit final class ColumnOps[C[_], V](val column: C[V]) extends AnyVal {
 
     /** */
     def total(implicit C: Foldable[C], V: Financial[V]): V = column fold V.additive
@@ -34,7 +34,7 @@ object implicits {
   }
 
   /** Add convenience methods to qualifying `Map`s.*/
-  implicit final class SweetMap[K, V](val m: Map[K, V]) extends AnyVal {
+  implicit final class MapOps[K, V](val m: Map[K, V]) extends AnyVal {
 
     /**
       * Works for any [[money.Financial]] amount or quantity,

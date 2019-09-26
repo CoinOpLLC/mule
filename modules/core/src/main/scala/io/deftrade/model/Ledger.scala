@@ -154,15 +154,9 @@ abstract class Ledger[Q: Financial] { self =>
       */
     def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
 
-    /** */
+    /** TODO: investigate kittens for this. */
     implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }
-
-  /** Support for multiple contingent deal legs */
-  sealed abstract case class AllOrNone(xs: List[Transaction])
-
-  /** */
-  object AllOrNone {}
 
   /**
     * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners

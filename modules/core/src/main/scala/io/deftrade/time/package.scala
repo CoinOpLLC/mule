@@ -7,14 +7,15 @@ import jtt._
 /**
   * Single-import package providing minimal scala-ideomatic bindings for java.time.
   */
-package object time extends time.Api {
+package object time extends time.api {
 
-  implicit class SweetClock(val base: Clock) extends AnyVal {
+  implicit class ClockOps(val base: Clock) extends AnyVal {
     def offset(d: Duration) = Clock offset (base, d)
     def tick(d: Duration)   = Clock tick (base, d)
   }
 
-  implicit class J8TimeLong(val n: Long) extends AnyVal {
+  /** */
+  implicit class LongOps(val n: Long) extends AnyVal {
 
     def hour: Duration    = time.hours(n)
     def hours: Duration   = time.hours(n)
@@ -28,7 +29,8 @@ package object time extends time.Api {
     def nanos: Duration   = time.nanos(n)
   }
 
-  implicit class J8TimeInt(val n: Int) extends AnyVal {
+  /** */
+  implicit class IntOps(val n: Int) extends AnyVal {
 
     def day: Period    = time.days(n)
     def days: Period   = time.days(n)
@@ -40,7 +42,8 @@ package object time extends time.Api {
     def years: Period  = time.years(n)
   }
 
-  implicit class SweetLocalDateTime(val ldt: LocalDateTime) extends AnyVal {
+  /** */
+  implicit class LocalDateTimeOps(val ldt: LocalDateTime) extends AnyVal {
 
     def year: Int              = ldt.getYear
     def dayOfMonth: Int        = ldt.getDayOfMonth
@@ -63,7 +66,8 @@ package object time extends time.Api {
 
   }
 
-  implicit class SweetLocalDate(val ld: LocalDate) extends AnyVal {
+  /** */
+  implicit class LocalDateOps(val ld: LocalDate) extends AnyVal {
 
     def year: Int              = ld.getYear
     def dayOfMonth: Int        = ld.getDayOfMonth
@@ -83,7 +87,8 @@ package object time extends time.Api {
     def -(end: LocalDate): Period = ld until end
   }
 
-  implicit class SweetLocalTime(val lt: LocalTime) extends AnyVal {
+  /** */
+  implicit class LocalTimeOps(val lt: LocalTime) extends AnyVal {
 
     def hour: Int   = lt.getHour
     def minute: Int = lt.getMinute
@@ -94,7 +99,8 @@ package object time extends time.Api {
     def -(duration: Duration): LocalTime = lt minus duration
   }
 
-  implicit class SweetZonedDateTime(val zdt: ZonedDateTime) extends AnyVal {
+  /** */
+  implicit class ZonedDateTimeOps(val zdt: ZonedDateTime) extends AnyVal {
     def year: Int            = zdt.getYear
     def dayOfMonth: Int      = zdt.getDayOfMonth
     def month: Month         = zdt.getMonth
@@ -122,7 +128,8 @@ package object time extends time.Api {
     def chronology: Chronology = zdt.getChronology
   }
 
-  implicit class SweetDuration(val d: Duration) extends AnyVal {
+  /** */
+  implicit class DurationOps(val d: Duration) extends AnyVal {
 
     import scala.concurrent.duration.{ FiniteDuration, NANOSECONDS, SECONDS }
 
@@ -147,7 +154,9 @@ package object time extends time.Api {
       }
 
   }
-  implicit class SweetPeriod(val p: Period) extends AnyVal {
+
+  /** */
+  implicit class PeriodOps(val p: Period) extends AnyVal {
 
     def days: Int                 = p.getDays
     def months: Int               = p.getMonths
@@ -159,14 +168,17 @@ package object time extends time.Api {
     def *(scalar: Int): Period           = p multipliedBy scalar
 
   }
-  implicit class SweetYear(val y: Year) extends AnyVal {
+
+  /** */
+  implicit class YearOps(val y: Year) extends AnyVal {
     def year: Int = y get ChronoField.YEAR
 
     def -(amount: Period) = y minus amount
     def +(amount: Period) = y plus amount
   }
 
-  implicit class SweetYearMonth(val ym: YearMonth) extends AnyVal {
+  /** */
+  implicit class YearMonthOps(val ym: YearMonth) extends AnyVal {
 
     def year: Int       = ym.getYear
     def month: Month    = ym.getMonth
@@ -177,6 +189,7 @@ package object time extends time.Api {
 
   }
 
+  /** */
   implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
     def adjusted(ta: TemporalAdjuster) = value `with` ta
   }
