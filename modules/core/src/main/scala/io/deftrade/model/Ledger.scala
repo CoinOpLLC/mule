@@ -1,13 +1,14 @@
 package io.deftrade
 package model
 
-import time._, money._, keyval._, capital._
+import implicits._, time._, money._, keyval._, capital._, refinements.Sha256
 
 import cats.implicits._
-import cats.{ Eq, Foldable, Hash, Monad, MonoidK }
+import cats.{ Eq, Foldable, Hash, Monad, MonoidK, Show }
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
+import refined.api.Refined
 import refined.W
 import refined.numeric.Interval
 
@@ -64,7 +65,14 @@ abstract class Ledger[Q: Financial] { self =>
     */
   object Folio extends WithOpaqueKey[Long, Position] { // sicc hacc
 
-    /** */
+    /**
+      * Conceptually, lifts all the [[Position]]s into `Map`s,
+      * and sums them as the `Map`s form commutative groups.
+      *
+      * Implementation differs, for efficiency.
+      *
+      * TODO: verify implementation against concept.
+      */
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
 
     /** */
@@ -118,39 +126,49 @@ abstract class Ledger[Q: Financial] { self =>
       debitFrom: Folio.Key,
       creditTo: Folio.Key,
       trade: Trade,
-      metaSha: Array[Byte]
+      metaSha: Sha256
   )
 
   /**
     * Do we mean in the business sense or the computer science sense?
     *
-    * Yes: both parties must agree upon the result .
+    * Yes: both parties must agree upon the result.
     */
   object Transaction extends WithOpaqueKey[Long, Transaction] {
 
     /** */
-    type Meta = io.circe.Json // f'rinstance
+    private val hackSha256: Sha256 = Refined unsafeApply (0 until 256 / 8 map (_.toByte)).toArray
+
+    /** */
+    final type MetaSha = Meta => Sha256
 
     /**
-      * TODO: define and implement `metaSha` field
+      * Digester. FIXME: actually implement
       */
-    def simple(
+    def digest: MetaSha = _ => hackSha256
+
+    /** f'rinstance */
+    type Meta = io.circe.Json
+
+    /** */
+    def single(
         debitFrom: Folio.Key,
         creditTo: Folio.Key,
         instrument: Instrument.Key,
         amount: Quantity,
-        meta: Option[Json]
+        meta: Json
     ): Transaction =
       new Transaction(
         instant,
         debitFrom,
         creditTo,
         Trade(instrument -> amount),
-        Array.empty[Byte] // notice that typesafety is no help here - need moar shapeless
+        meta |> digest
       ) {}
 
     /**
-      * ex nihilo, yada yada ... Make sure I can plug in fs2.Stream[cats.effect.IO, ?] etc here
+      * ex nihilo, yada yada ...
+      * TODO: interop with `fs2.Stream[cats.effect.IO, ?]`
       */
     def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
 
@@ -240,11 +258,13 @@ abstract class Ledger[Q: Financial] { self =>
     private def unsafe(
         principals: UnitPartition[Key, Quantity],
         nonPrincipals: Role => NonEmptySet[Key]
-    ) = new Roster(principals, nonPrincipals) {}
+    ): Roster = new Roster(principals, nonPrincipals) {}
   }
 
-  type AccountNo = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
-  implicit def eqHackHackHack: Eq[AccountNo] = Eq.fromUniversalEquals[AccountNo]
+  /**
+    * Predicate defining a very conventional looking account numbering scheme.
+    */
+  type IsAccountNo = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
 
   /**
     * `Account`s consist of:
@@ -254,12 +274,18 @@ abstract class Ledger[Q: Financial] { self =>
   sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 
   /** */
-  object Account extends WithPredicateKey[Long, AccountNo, Account] {
+  object Account extends WithPredicateKey[Long, IsAccountNo, Account] {
 
-    def unsafe(roster: Roster, folioKey: Folio.Key) = new Account(roster, folioKey) {}
+    /** */
+    def apply(roster: Roster, folio: Folio.Key): Account = new Account(roster, folio) {}
 
-    def simple(le: LegalEntity.Key, f: Folio.Key): Account = unsafe(Roster single le, f)
+    /** */
+    def single(entity: LegalEntity.Key, folio: Folio.Key) = Account(Roster single entity, folio)
 
+    /** TODO: use kittens? Why or why not? */
     implicit def eq = Eq.fromUniversalEquals[Account]
+
+    /** TODO: placeholder */
+    implicit def show = Show.fromToString[Account]
   }
 }

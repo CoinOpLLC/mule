@@ -6,7 +6,7 @@ import eu.timepit.refined
 import refined.api.Refined
 import refined.W
 import refined.boolean.And
-import refined.collection.{ MaxSize, NonEmpty }
+import refined.collection.{ MaxSize, NonEmpty, Size }
 import refined.numeric.Positive
 import refined.string.{ MatchesRegex, Trimmed }
 // import refined.api.Validate
@@ -86,4 +86,10 @@ object refinements {
 
   /** */
   type VarChar255 = String Refined IsVarChar255
+
+  /** */
+  type IsSha256 = Size[W.`256`.T]
+
+  /** */
+  type Sha256 = Array[Byte] Refined IsSha256
 }

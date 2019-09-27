@@ -130,7 +130,9 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
     @inline final def mid = bid + spread / 2
   }
 
-  /** */
+  /**
+    * TODO: implement
+    */
   object QuotedIn {
 
     /**
@@ -143,7 +145,9 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
       */
     def apply[C1: Currency, C2: Currency]: QuotedIn[C1, C2] = ???
 
-    /** */
+    /**
+      * Inverse quotes are particular to Forex.
+      */
     implicit def inverseQuote[C1: Currency, C2: Currency](
         implicit Q: C1 QuotedIn C2
     ): C2 QuotedIn C1 =
@@ -159,7 +163,9 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
         override def isDerived = true
       }
 
-    /** */
+    /**
+      * Cross quotes are particular to Forex.
+      */
     implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
         Q1X: C1 QuotedIn CX,
         QX2: CX QuotedIn C2
