@@ -18,8 +18,7 @@ import io.circe.Json
   * Models real world actors under the aegis of, and registered with, real world
   * justistictions.
   *
-  * Privacy by design: [[LegalEntity.TaxId]]'s are not used as keys.
-  * See Also: `model.Role`s.
+  * Small step towards privacy by design: [[LegalEntity.TaxId]]'s are not used as keys.
   */
 sealed trait LegalEntity extends Serializable {
   def name: Label
@@ -28,7 +27,7 @@ sealed trait LegalEntity extends Serializable {
 }
 
 /**
-  * `LegalEntity`s recognized by the system.
+  * Players that are recognized by the system.
   */
 object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
@@ -158,5 +157,4 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
     /** */
     lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
   }
-
 }

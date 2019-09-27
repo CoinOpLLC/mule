@@ -5,7 +5,9 @@ import implicits._
 
 import cats.{ Hash, Order, Show }
 
-import java.time._, chrono.Chronology, format.DateTimeFormatter
+import java.time._ // leave this be
+import java.time.chrono.{ ChronoLocalDate, ChronoLocalDateTime, Chronology }
+import java.time.format.DateTimeFormatter
 import java.time.{ temporal => jtt }
 import jtt.{ ChronoUnit => JCU, _ }, JCU._
 
@@ -297,8 +299,6 @@ trait api {
     def compare(x: TA, y: TA): Int = x compareTo y
 
   }
-
-  import java.time.chrono.{ ChronoLocalDate, ChronoLocalDateTime }
 
   implicit lazy val shoLocalDate =
     new FormatShowHashOrder[ChronoLocalDate, LocalDate](

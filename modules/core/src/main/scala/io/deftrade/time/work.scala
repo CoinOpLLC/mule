@@ -4,25 +4,26 @@ package time
 
 import implicits._
 
-import enumeratum._
-
 import cats.implicits._
 import cats.{ Order }
 import cats.data.{ NonEmptySet }
+
+import enumeratum.{ Enum, EnumEntry }
 
 import scala.collection.immutable.SortedSet
 
 import java.time.DayOfWeek
 import java.time.temporal.WeekFields.{ ISO => weekFields }
 
+/**
+  * Stick with ISO work calendars '''only''' for now.
+  *
+  * TODO: make use of locale?
+  */
 package object work {
 
   import WorkDay._
 
-  /**
-    * stick with ISO for now
-    * TODO: make use of locale?
-    */
   type WorkWeek = NonEmptySet[DayOfWeek]
 
   /** */
@@ -37,7 +38,7 @@ package object work {
 
   implicit final class WorkDayOps(val ld: LocalDate) extends AnyVal {
 
-    def workDay(implicit iwd: IsWorkDay): Boolean                    = iwd(ld)
+    def isWorkDay(implicit iwd: IsWorkDay): Boolean                  = iwd(ld)
     def workDaysUntil(that: LocalDate)(implicit iwd: IsWorkDay): Int = ???
     def isLastWorkDayOfMonth(implicit iwd: IsWorkDay): Boolean       = ???
     def lastWorkDayOfMonth(implicit iwd: IsWorkDay): LocalDate       = ???
@@ -145,33 +146,44 @@ package work {
       }
   }
 
-// FIXME NonEmptySet impl artifact error; work around it
-/// case class FixedHolidays(val holidays: NonEmptySet[LocalDate]) extends AnyVal
   /** All civilized financial calendars have at least one holiday: domain invariant. */
-  case class FixedHolidays(val holidays: SortedSet[LocalDate]) extends AnyVal
+  sealed abstract case class FixedHolidays(holidays: NonEmptySet[LocalDate])
 
+  /** TODO: Initialize from a config file. */
+  object FixedHolidays {
+
+    /** */
+    def apply(holidays: NonEmptySet[LocalDate]): FixedHolidays = new FixedHolidays(holidays) {}
+
+    /** */
+    def apply(first: LocalDate, rest: Seq[LocalDate]): FixedHolidays =
+      apply(NonEmptySet(first, SortedSet(rest: _*)))
+  }
+
+  /** TODO: implement `Nearest` from Strata */
   object WorkDay extends Enum[WorkDay] {
 
     case object Next        extends WorkDay(signum = 1, sameMonth = false)
     case object BoundedNext extends WorkDay(signum = 1, sameMonth = true)
     case object Prev        extends WorkDay(signum = -1, sameMonth = false)
     case object BoundedPrev extends WorkDay(signum = -1, sameMonth = true)
-    // TODO: `Nearest` from Strata
 
     lazy val values = findValues
   }
 
-// TODO: finish this
+  /** TODO: finish this */
   sealed trait WorkMonth extends EnumEntry {
     def adjust(ld: LocalDate): LocalDate = ???
     def isMonthBased: Boolean            = ??? // TODO: when / how does this matter?
   }
 
+  /** TODO: finish this */
   object WorkMonth extends Enum[WorkMonth] {
 
     lazy val values = findValues
 
-    case object LastDay         extends WorkMonth
-    case object LastBusinessDay extends WorkMonth
+    case object FirstBusinessDay extends WorkMonth
+    case object LastBusinessDay  extends WorkMonth
+    case object LastDay          extends WorkMonth
   }
 }

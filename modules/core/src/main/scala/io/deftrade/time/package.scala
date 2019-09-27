@@ -6,6 +6,22 @@ import jtt._
 
 /**
   * Single-import package providing minimal scala-ideomatic bindings for java.time.
+  *
+  * The following `java.time` classes are imported and enhanced:
+  *
+  *   - [[java.time.Clock]]
+  *   - [[java.time.Duration]]
+  *   - [[java.time.Instant]]
+  *   - [[java.time.LocalDate]]
+  *   - [[java.time.LocalDateTime]]
+  *   - [[java.time.LocalTime]]
+  *   - [[java.time.Month]]
+  *   - [[java.time.Period]]
+  *   - [[java.time.Year]]
+  *   - [[java.time.YearMonth]]
+  *   - [[java.time.ZoneId]]
+  *   - [[java.time.ZoneOffset]]
+  *   - [[java.time.ZonedDateTime]]
   */
 package object time extends time.api {
 

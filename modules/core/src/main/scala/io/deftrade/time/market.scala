@@ -20,18 +20,20 @@ package object market {
 /** Day count conventions, [[Tenor]]s and [[Frequency]]s, etc. */
 package market {
 
-  // issue: can I just go ahead and make these ValueEnum[Duration]? I don't see *why*.
+  //
 
-  sealed abstract class CashTenor(override val entryName: String) extends EnumEntry
+  /** TODO: use [[Duration]] instead of [[Period]]? */
+  sealed abstract class CashTenor(
+      override val entryName: String,
+      pspec: String
+  ) extends Tenor(pspec)
+
   object CashTenor extends Enum[CashTenor] {
 
-    case object Spot         extends Tenor("SP") // zero days later
-    case object SpotNext     extends Tenor("SN") // one dat later
-    case object Overnight    extends Tenor("ON") // one day later
-    case object TomorrowNext extends Tenor("TN") // two days later? Sorta...
-    // issue: might need a **pair** of dates as state for the algebra... but do we?
-    // TomorrowNext increments both cursors, in effect... why, exactly?!
-    // type DateCalculatorState = (LocalDate, LocalDate) // maybe?
+    case object Spot         extends CashTenor("SP", "P0D")
+    case object SpotNext     extends CashTenor("SN", "P1D")
+    case object Overnight    extends CashTenor("ON", "P1D")
+    case object TomorrowNext extends CashTenor("TN", "P2D")
 
     lazy val values = findValues
 
@@ -45,11 +47,7 @@ package market {
     case object T_2 extends SpotLag
   }
 
-  // TODO: implicitly enrich LocalDate such that it comprehends the addition of business days
-
-  // maybe we should have `exactly` one ChronoUnit per Frequency
-
-  private[market] trait ProxiedPeriod extends EnumEntry {
+  trait ProxiedPeriod extends EnumEntry {
     import ProxiedPeriod._
 
     def pspec: String
@@ -67,13 +65,13 @@ package market {
     override def toString: String = 'T' +: (pspec drop 1)
   }
 
-  private[market] object ProxiedPeriod {
+  object ProxiedPeriod {
 
     import jtt.ChronoUnit._
 
-    private val ymwd = List(YEARS, MONTHS, WEEKS, DAYS)
-    private val rx =
-      s"\\A${(ymwd map (x => s"(?:(\\d+)${x.toString.head})?")).mkString}\\z".r
+    val ymwd = List(YEARS, MONTHS, WEEKS, DAYS)
+    val rx =
+      s"""\A${(ymwd map (x => s"""(?:(\d+)${x.toString.head})?""")).mkString}\z""".r
 
   }
 
@@ -199,8 +197,5 @@ package market {
   //
   // scala> today get sow
   // res109: Int = 7
-
-  // Note: from the javadocs: would like to compile away the non-ISO blues. Can we?
-  // The input temporal object may be in a calendar system other than ISO. Implementations may choose to document compatibility with other calendar systems, or reject non-ISO temporal objects by querying the chronology.
 
 }

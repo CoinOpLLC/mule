@@ -3,8 +3,8 @@ package model
 
 import time._, money._, keyval._, capital._
 
-import cats.{ Eq, Foldable, Hash, Monad, MonoidK }
 import cats.implicits._
+import cats.{ Eq, Foldable, Hash, Monad, MonoidK }
 import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import eu.timepit.refined
@@ -176,48 +176,71 @@ abstract class Ledger[Q: Financial] { self =>
       principals: UnitPartition[LegalEntity.Key, Quantity],
       nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
   ) {
-    lazy val roles: NonEmptyMap[LegalEntity.Role, NonEmptySet[LegalEntity.Key]] =
+    import LegalEntity.{ Key, Role }
+
+    /** */
+    lazy val roles: NonEmptyMap[Role, NonEmptySet[Key]] =
       NonEmptyMap of (
-        LegalEntity.Role.Principal -> principals.keys,
-        LegalEntity.Role.nonPrincipals.map(np => (np, nonPrincipals(np))): _*
+        Role.Principal -> principals.keys,
+        Role.nonPrincipals.map(np => (np, nonPrincipals(np))): _*
     )
 
-    def withAgent(agent: LegalEntity.Key): Roster =
-      Roster.unsafe(
+    /** */
+    def withAgent(agent: Key): Roster =
+      Roster unsafe (
         principals,
         role =>
           role match {
-            case LegalEntity.Role.Agent => NonEmptySet one agent
-            case np                     => nonPrincipals(np)
+            case Role.Agent => NonEmptySet one agent
+            case np         => nonPrincipals(np)
         }
       )
 
-    def withAuditor(auditor: LegalEntity.Key): Roster = ??? // refactor with above
+    /** */
+    def withAuditor(auditor: LegalEntity.Key): Roster =
+      Roster unsafe (
+        principals,
+        role =>
+          role match {
+            case Role.Auditor => NonEmptySet one auditor
+            case np           => nonPrincipals(np)
+        }
+      )
   }
 
-  /** creation patterns for teams */
+  /**
+    * Creation patterns for account management teams.
+    */
   object Roster {
 
-    /**
-      */
-    private def unsafe(
-        principals: UnitPartition[LegalEntity.Key, Quantity],
-        nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
-    ) = new Roster(principals, nonPrincipals) {}
+    import LegalEntity.{ Key, Role }
 
     /**
-      * Splits partition equally among [[LegalEntity.Role.Principal]]s.
+      * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
+      * regardless of their share of the principle pie
       */
-    def equalSplitFrom(rs: Map[LegalEntity.Role, LegalEntity.Key]): Result[Roster] = ???
+    def forPrinciples(principles: UnitPartition[Key, Quantity]): Roster =
+      unsafe(
+        principles,
+        _ => NonEmptySet(principles.keys.head, principles.keys.tail)
+      )
 
     /**
-      *
+      * Splits partition equally among [[Role.Principal]]s.
       */
-    def single(key: LegalEntity.Key): Roster =
+    def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
+
+    /** */
+    def single(key: Key): Roster =
       unsafe(
         principals = UnitPartition single key,
         nonPrincipals = _ => NonEmptySet one key
       )
+
+    private def unsafe(
+        principals: UnitPartition[Key, Quantity],
+        nonPrincipals: Role => NonEmptySet[Key]
+    ) = new Roster(principals, nonPrincipals) {}
   }
 
   type AccountNo = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
