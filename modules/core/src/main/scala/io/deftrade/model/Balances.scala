@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._, accounting._, implicits._
+import money._, time._, keyval._, accounting._
 
 import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
@@ -61,7 +61,27 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       from |+| to
     }
 
-    implicit final class Ops[K <: AccountingKey, C: Currency](am: AccountMap[K, C]) {}
+    implicit final class Ops[K <: AccountingKey, C: Currency](am: AccountMap[K, C]) {
+
+      /**
+        * Filters a map by narrowing the scope of the keys contained.
+        *
+        * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+        *
+        * @param subKey Easily provided via an extractor.
+        * @return A map containing those entries whose keys match a subclassing pattern.
+        * @see [[keyval.DtEnum]]
+        *
+        */
+      def collectKeys[L <: K](subKey: K => Option[L]): AccountMap[L, C] =
+        am collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+      /** TODO: sketchy... de-sketchify */
+      def widenKeys[J >: K <: AccountingKey]: AccountMap[J, C] =
+        (am map widenKey[K, J, Mny[C]]).toMap
+
+    }
+    private def widenKey[K, J >: K, V]: ((K, V)) => (J, V) = identity
 
     /** */
     implicit final class MapOps[K <: AccountingKey, N: Financial](m: Map[K, N]) {
@@ -74,6 +94,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
         }
     }
   }
+  import AccountMap._
 
   /** convenience and domain semantics only */
   def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = Map.empty[A, Mny[C]]
@@ -146,6 +167,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       cs: AccountMap[C, CCY]
   ) extends BalanceLike {
 
+    import io.deftrade.implicits._ // FIXME: why tf does this have to be here?
+
     /** */
     final type DebitType = D
 
@@ -161,10 +184,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     /** overridable */
     def credits: AccountMap[CreditType, CurrencyType] = cs
 
-    /**
-      * nb as it stands, this is useful as a check only, because the algebra is balanced by design
-      */
-    final def net: Money[MA, CCY] = credits.total - debits.total
+    /** */
+    final def net: Mny[CurrencyType] =
+      credits.total - debits.total
   }
 
   /** */
