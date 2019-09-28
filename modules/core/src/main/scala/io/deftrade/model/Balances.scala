@@ -61,7 +61,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       from |+| to
     }
 
-    implicit final class Ops[K <: AccountingKey, C: Currency](am: AccountMap[K, C]) {
+    /** */
+    implicit final class Ops[K <: AccountingKey, C](am: AccountMap[K, C]) {
 
       /**
         * Filters a map by narrowing the scope of the keys contained.
@@ -84,7 +85,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     private def widenKey[K, J >: K, V]: ((K, V)) => (J, V) = identity
 
     /** */
-    implicit final class MapOps[K <: AccountingKey, N: Financial](m: Map[K, N]) {
+    implicit final class MoarMapOps[K <: AccountingKey, N: Financial](m: Map[K, N]) {
 
       /** */
       def denominated[C: Currency]: AccountMap[K, C] =
@@ -222,12 +223,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       }
 
     /** */
-    def partition: (IncomeStatement[C], BalanceSheet[C]) = ???
-    // FIXME `Any` problems
-    // (
-    //   IncomeStatement(debits |> collect, credits |> collect),
-    //   BalanceSheet(debits    |> collect, credits |> collect)
-    // )
+    def partition(implicit C: Currency[C]): (IncomeStatement[C], BalanceSheet[C]) =
+      (
+        IncomeStatement(debits collectKeys Expense.unapply, credits collectKeys Revenue.unapply),
+        BalanceSheet(debits collectKeys Asset.unapply, credits collectKeys Liability.unapply)
+      )
   }
 
   /** */
