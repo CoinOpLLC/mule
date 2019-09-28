@@ -70,7 +70,11 @@ object CsvEnum {
 /** Fully stacc'd enum type. */
 trait DtEnum[EE <: EnumEntry] extends Enum[EE] with CatsEnum[EE] with CsvEnum[EE] {
 
-  /** */
+  /**
+    * TODO:
+    * Implementation relies on reasoning about set containment and downcast safety.
+    * Warrents extreme vetting.
+    */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def unapply(key: EnumEntry): Option[EE] =
     if (values contains key) key.asInstanceOf[EE].some else none

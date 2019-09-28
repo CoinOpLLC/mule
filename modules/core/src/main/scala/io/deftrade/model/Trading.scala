@@ -185,18 +185,17 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.
     *
-    * Note: The methods on `OMS` return `Kliesli` arrows, which are intended to be chained with
+    * The methods on `OMS` return [[cats.data.Kleisli]] arrows, which are intended to be chained with
     * `andThen`.
     *
-    * If it is possible for the arrows to be sequenced in a semantically incorrect way per the
-    * domain model, use phantom types to ensure proper sequencing.
-    *
     * Reference:
-    * [Functional and Reactive Domain Modelling 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
+    * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270 Functional and Reactive Domain Modelling, section 4.4]]
     *
-    * FIXME: this is just a sketch / WIP
-    * - SemigroupK for Kleisli is restrictive.
-    * - OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
+    * TODO: Flesh this out - currently just a sketch
+    *   - `SemigroupK` for `Kleisli` is restrictive.
+    *   - OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
+    *   - If it is possible for the arrows to be sequenced in a semantically incorrect way per the
+    * domain model, use phantom types to ensure proper sequencing.
     *
     */
   sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
@@ -206,7 +205,7 @@ abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
   ) {
 
     /**
-      * `Folios` is a `Map` of `Map`s, which, normalized and written out as a list,
+      * `Folio` is a `Map` of `Map`s, which, normalized and written out as a list,
       * has rows of type: {{{
       *   (Folio.Key, Instrument.Key, Quantity)
       * }}}

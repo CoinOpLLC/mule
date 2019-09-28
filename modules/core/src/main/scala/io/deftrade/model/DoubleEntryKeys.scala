@@ -18,7 +18,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
     */
-  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MA]
+  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MonetaryAmount]
 
   /** */
   final val Treatment = UnitPartition
@@ -41,16 +41,16 @@ abstract class DoubleEntryKeys[MA: Financial] {
     def contras: Treatment[ContraType]
   }
 
-  sealed abstract class DoubleEntryKey[E <: AccountingKey, C <: AccountingKey](
-      es: Treatment[E],
-      cs: Treatment[C]
+  sealed abstract class DoubleEntryKey[ENTRY <: AccountingKey, CONTRA <: AccountingKey](
+      es: Treatment[ENTRY],
+      cs: Treatment[CONTRA]
   ) extends DoubleEntryKeyLike {
 
     /** */
-    final type EntryType = E
+    final type EntryType = ENTRY
 
     /** */
-    final type ContraType = C
+    final type ContraType = CONTRA
 
     /** */
     final def entries: Treatment[EntryType] = es
@@ -119,24 +119,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
   }
 
   /** */
-  sealed abstract class AssetSwapKey private[accounting] (
-      from: Treatment[Asset],
-      to: Treatment[Asset]
-  ) extends SwapKey(from, to)
-
-  /** */
-  object AssetSwapKey extends DtEnum[AssetSwapKey] {
-
-    /** */
-    lazy val values = findValues
-  }
-
-  /** */
-  sealed abstract class SingleAssetSwapKey private (from: Asset, to: Asset)
-      extends SwapKey[Asset](Treatment single from, Treatment single to)
-
-  /** */
-  object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {
+  object AssetSwapKey extends DtEnum[SwapKey[Asset]] {
 
     import Asset._
 
@@ -147,36 +130,35 @@ abstract class DoubleEntryKeys[MA: Financial] {
     case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
 
     /** */
-    def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
-      (sk.from, sk.to) match {
-        case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
-      }
-
-    /** */
+    // lazy val values: IndexedSeq[SwapKey[Asset]] = findValues ++ SingleAssetSwapKey.values
     lazy val values = findValues
   }
 
   /** */
-  sealed abstract class LiabilitySwapKey private[accounting] (
-      from: Treatment[Liability],
-      to: Treatment[Liability]
-  ) extends SwapKey[Liability](from, to)
+  sealed abstract class SingleAssetSwapKey private[model] (from: Asset, to: Asset)
+      extends SwapKey[Asset](Treatment single from, Treatment single to)
 
   /** */
-  object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
+  object SingleAssetSwapKey {
+
+    /** */
+    def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
+      (sk.from, sk.to) match {
+        case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
+      }
+  }
+
+  /** */
+  object LiabilitySwapKey extends DtEnum[SwapKey[Liability]] {
 
     import Liability._
 
     /** */
     case object LongTermToCurrentLiability
-        extends LiabilitySwapKey(
+        extends SwapKey[Liability](
           Treatment single OtherLiabilities,
           Treatment single OtherCurrentLiabilities
         )
-
-    /** */
-    def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(Treatment[AK], Treatment[AK])] =
-      SwapKey.unapply[AK](sk)
 
     /** */
     lazy val values = findValues

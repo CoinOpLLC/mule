@@ -244,7 +244,7 @@ abstract class Ledger[Q: Financial] { self =>
       )
 
     /**
-      * Splits partition equally among [[Role.Principal]]s.
+      * Splits partition equally among [[LegalEntity.Role.Principal]]s.
       */
     def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
 

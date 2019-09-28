@@ -58,7 +58,14 @@ object implicits {
       * @see [[keyval.DtEnum]]
       *
       */
-    def collectKey[L <: K](subKey: K => Option[L]): Map[L, V] =
+    def collectKeys[L](subKey: K => Option[L]): Map[L, V] =
       m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+    /** TODO: sketchy... de-sketchify */
+    def widenKeys[J >: K]: Map[J, V] = (m map widenKey[K, J, V]).toMap
+
   }
+
+  private def widenKey[K, J >: K, V]: ((K, V)) => (J, V) = identity
+
 }

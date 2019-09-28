@@ -21,30 +21,62 @@ import scala.language.higherKinds
   *
   * Recall the fundamental equation of double entry bookkeeping:
   *
-  *   - {{{Debits === Credits}}}
+  *   - `Debits === Credits`
   *
   * Expanding:
   *
-  *   - {{{Assets + Expenses === Liabilities + Equity + Revenues}}}
+  *   - `Assets + Expenses === Liabilities + Equity + Revenues`
   *
-  * When summing Transactions, this "modular cake slice" implements the algebra which
+  * When summing Transactions, this "cake slice" module implements the algebra which
   * maintains the above equality.
   *
-  * @note Both type params `MA` and `Q` are needed to deal with case
+  * Note both type params `MA` and `Q` are needed to deal with case
   * where [[MonetaryAmount]] and [[Quantity]]
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
-  * The package can thus create {{{Money[MA, C] <=> (MI, Q)}}} codecs via a table of
+  * Modules parameterized like this may create `Money[MA, C] <=> (MI, Q)` codecs via a table of
   * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
   *
-  * @note This design is (very) provisional.
   */
 abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
   /** instantiate double entry key module with appropriate monetary amount type */
   object doubleEntryKeys extends DoubleEntryKeys[MonetaryAmount]
   import doubleEntryKeys._
+
+  /** Mapping accounting keys to [[money.Money]]. */
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
+
+  /** */
+  object AccountMap {
+
+    /** */
+    def fromSwapKey[A <: AccountingKey, C: Currency](
+        ks: SwapKey[A],
+        amount: Mny[C]
+    ): AccountMap[A, C] = {
+      def from = ks.from.toSortedMap mapValues (-amount * _)
+      def to   = ks.to.toSortedMap mapValues (amount * _)
+      from |+| to
+    }
+
+    implicit final class Ops[K <: AccountingKey, C: Currency](am: AccountMap[K, C]) {}
+
+    /** */
+    implicit final class MapOps[K <: AccountingKey, N: Financial](m: Map[K, N]) {
+
+      /** */
+      def denominated[C: Currency]: AccountMap[K, C] =
+        m map {
+          case (k, n) =>
+            (k, Currency[C] fiat (Financial[N] to [MonetaryAmount] n))
+        }
+    }
+  }
+
+  /** convenience and domain semantics only */
+  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = Map.empty[A, Mny[C]]
 
   /** */
   type AccountingKey = accounting.AccountingKey
@@ -60,32 +92,6 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
   type Income = accounting.Income
   type Equity = accounting.Equity
-
-  /** Mapping accounting keys to [[money.Money]]. */
-  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
-
-  /** */
-  object AccountMap {
-
-    /** */
-    def fromSwapKey[A <: AccountingKey, C: Currency](
-        ks: SwapKey[A],
-        amount: Mny[C]
-    ): AccountMap[A, C] = {
-      def debit  = ks.from.toSortedMap mapValues (-amount * _)
-      def credit = ks.to.toSortedMap mapValues (amount * _)
-      debit |+| credit
-    }
-
-    /** */
-    implicit final class Ops[A <: AccountingKey, N: Financial](m: Map[A, N]) {
-      def denominated[C: Currency]: AccountMap[A, C] =
-        m map { case (k, n) => (k, Currency[C] fiat (Financial[N] to [MonetaryAmount] n)) }
-    }
-  }
-
-  /** convenience and domain semantics only */
-  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = Map.empty[A, Mny[C]]
 
   /** */
   final type Debits[C] = AccountMap[Debit, C]
@@ -111,33 +117,33 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   /** Revenues net of Expenses */
   final type Incomes[C] = AccountMap[Income, C]
 
-  /** pure trait for the enum base */
-  private[model] sealed trait BalanceLike extends Product with Serializable {
+  /** */
+  sealed trait BalanceLike extends Product with Serializable {
 
     /** */
     type CurrencyType
 
     /** */
-    def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
+    final def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
 
     /** */
     type DebitType <: Debit
 
     /** */
-    def ds: AccountMap[DebitType, CurrencyType]
+    def debits: AccountMap[DebitType, CurrencyType]
 
     /** */
     type CreditType <: Credit
 
     /** */
-    def cs: AccountMap[CreditType, CurrencyType]
+    def credits: AccountMap[CreditType, CurrencyType]
 
   }
 
   /** specify key types */
   sealed abstract class Balance[D <: Debit, C <: Credit, CCY] private[Balances] (
-      _ds: AccountMap[D, CCY],
-      _cs: AccountMap[C, CCY]
+      ds: AccountMap[D, CCY],
+      cs: AccountMap[C, CCY]
   ) extends BalanceLike {
 
     /** */
@@ -149,16 +155,16 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     /** */
     final type CurrencyType = CCY
 
-    /** */
-    final def ds: AccountMap[DebitType, CurrencyType] = _ds
+    /** overridable */
+    def debits: AccountMap[DebitType, CurrencyType] = ds
 
-    /** */
-    final def cs: AccountMap[CreditType, CurrencyType] = _cs
+    /** overridable */
+    def credits: AccountMap[CreditType, CurrencyType] = cs
 
     /**
       * nb as it stands, this is useful as a check only, because the algebra is balanced by design
       */
-    final def net: Money[MA, CCY] = cs.total - ds.total
+    final def net: Money[MA, CCY] = credits.total - debits.total
   }
 
   /** */
@@ -167,33 +173,30 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     /** Decompose into separate `Debit` and `Credit` maps. */
     def unapply[D <: Debit, C <: Credit, CCY: Currency](
         b: Balance[D, C, CCY]
-    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.ds, b.cs).some
+    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.debits, b.credits).some
   }
 
   /** Most general / least safe... */
   sealed abstract case class TrialBalance[C] private (
-      debits: Debits[C],
-      credits: Credits[C]
-  ) extends Balance[Debit, Credit, C](debits, credits) {
+      override val debits: Debits[C],
+      override val credits: Credits[C]
+  ) extends Balance(debits, credits) {
 
     /** */
-    def updated(
-        dc: DebitCreditKey[Debit, Credit],
-        amount: Money[MA, C]
-    )(
+    def updated(dc: DebitCreditKey[Debit, Credit], amount: Mny[C])(
         implicit C: Currency[C]
-    ): TrialBalance[C] = TrialBalance(
-      debits |+| (dc.debits scaled -amount),
-      credits |+| (dc.credits scaled amount)
-    )
+    ): TrialBalance[C] =
+      TrialBalance(debits |+| (dc.debits scaled -amount), credits |+| (dc.credits scaled amount))
 
-    // FIXME import AccountMap.collect
-    // implicit def CG[AT <: AccountingKey] = CommutativeGroup[AccountMap[AT, C]]
     /** */
-    def swapped[T <: AccountingKey](sk: SwapKey[T], amt: Money[MA, C]): TrialBalance[C] =
+    def swapped[T <: AccountingKey](sk: SwapKey[T], amount: Mny[C])(
+        implicit C: Currency[C]
+    ): TrialBalance[C] =
       sk match {
-        case SingleAssetSwapKey(_, _)    => ???
-        case ks @ LiabilitySwapKey(_, _) => ks |> discardValue; ???
+        case AssetSwapKey(ask) =>
+          TrialBalance(debits |+| AccountMap.fromSwapKey(ask, amount).widenKeys, credits)
+        case LiabilitySwapKey(lsk) =>
+          TrialBalance(debits, credits |+| AccountMap.fromSwapKey(lsk, amount).widenKeys)
       }
 
     /** */
@@ -223,7 +226,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
     /** */
     implicit def trialBalanceCommutativeGroup[C: Currency]: CommutativeGroup[TrialBalance[C]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[C], Credits[C])]) {
+      (Invariant[CommutativeGroup] imap CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -273,9 +276,11 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   }
 
   /**
-    * - `CashFlowStatement` is a Balance(debit, credit) like the IncomeStatement.
-    * - Follow the `Money`. Operations, Investment, Financing
-    * - TODO: cash accounting should get their own flavors; for now reuse `Revenue` and `Expense`.
+    * Follow the `Money`.
+    * - Operations
+    * - Investment
+    * - Financing
+    * - TODO: should cash accounting get their own flavors? for now reuse `Revenue` and `Expense`.
     */
   sealed abstract case class CashFlowStatement[C] private (
       val outflows: Expenses[C],
@@ -315,7 +320,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       val liabilities: Liabilities[C]
   ) extends Balance(assets, liabilities)
 
-  /** tax free implicits */
+  /** */
   object BalanceSheet {
 
     /** */
