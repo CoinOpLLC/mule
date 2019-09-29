@@ -290,7 +290,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
     /** */
     implicit def incomeStatementCommutativeGroup[C: Currency]: CommutativeGroup[IncomeStatement[C]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[C], Revenues[C])]) {
+      (Invariant[CommutativeGroup] imap CommutativeGroup[(Expenses[C], Revenues[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
@@ -362,37 +362,63 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
 
   /** */
   sealed trait BookSet[C] {
-    def date: LocalDate
+
+    /** */
+    def asOf: LocalDate
+
+    /** */
     def period: Period
-    final def startDate = date - period
+
+    /** */
+    final def beginning: LocalDate = asOf - period
+
+    /** */
     def cs: CashFlowStatement[C]
+
+    /** */
     def bs: BalanceSheet[C]
+
+    /** FIXME this must evole */
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): BookSet[C]
   }
 
   /** */
   sealed abstract case class CashBookSet[C](
-      date: LocalDate,
+      asOf: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C]
   ) extends BookSet[C] {
+
+    /** FIXME: sketchy; comprehend streams? */
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+
+    /**
+      * Cratchit needs to look at the current state of the books
+      * in order to properly allocate balance sheet items (in the most general case)
+      *
+      * FIXME: Need to make polymorphic (some how).
+      */
+    def deltaFrom: (
+        PricedTrade[C],
+        DoubleEntryKey[AccountingKey, AccountingKey],
+        Transaction.Meta
+    ) => DeltaCashBooks[C] = ???
   }
 
   /** */
   object CashBookSet {
     def apply[C: Currency](
-        date: LocalDate,
+        asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
         bs: BalanceSheet[C]
-    ): CashBookSet[C] = new CashBookSet(date, period, cs, bs) {}
+    ): CashBookSet[C] = new CashBookSet(asOf, period, cs, bs) {}
   }
 
   /** */
   sealed abstract case class AccrualBookSet[C](
-      date: LocalDate,
+      asOf: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
@@ -404,21 +430,26 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   /** */
   object AccrualBookSet {
     def apply[C: Currency](
-        date: LocalDate,
+        asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
         is: IncomeStatement[C],
         bs: BalanceSheet[C]
-    ): AccrualBookSet[C] = new AccrualBookSet(date, period, cs, is, bs) {}
+    ): AccrualBookSet[C] = new AccrualBookSet(asOf, period, cs, is, bs) {}
 
   }
 
   /** */
   def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](
       ts: F[Transaction]
-  ): TrialBalance[C] = ???
+  ): TrialBalance[C] =
+    // price the transaction
+    // create a DoubleEntryKey for it
+    // create a TrialBalance from the price and de keys
+    // fold that TrialBalance into the running sum
+    ???
 
-  /** */
+  /** FIXME: not sure this signature makes sense as it stands */
   def breakdown[C: Currency: Wallet](
       prior: BalanceSheet[C],
       delta: BalanceSheet[C], // delta and raw come from TrialBalance
@@ -432,16 +463,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
   /** */
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
-  /**
-    * Cratchit needs to look at the current state of the books
-    * in order to properly allocate balance sheet items (in the most general case)
-    */
-  def deltaCashBooksFrom[C: Currency](cbs: CashBookSet[C]): (
-      PricedTrade[C],
-      UnitPartition[AccountingKey, MonetaryAmount],
-      Transaction.Meta
-  ) => DeltaCashBooks[C] = ???
-
+  ///////////////////// Netable.scala ///////////////
   import enumeratum._
 
   /** */
@@ -464,7 +486,6 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MA, CCY] = b match {
       case Balance(ds, _) => ds(gross) - ds(less)
     }
-    // b.ds(gross) - b.ds(less) // TODO: this is typesafe, but not fool-proof.
   }
 
   /**
@@ -495,6 +516,5 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
         )
 
     val values = findValues
-
   }
 }
