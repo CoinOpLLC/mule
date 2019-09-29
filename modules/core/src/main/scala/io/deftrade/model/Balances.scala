@@ -61,44 +61,40 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
       from |+| to
     }
 
-    /** */
-    implicit final class Ops[K <: AccountingKey, C](am: AccountMap[K, C]) {
-
-      /**
-        * Filters a map by narrowing the scope of the keys contained.
-        *
-        * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
-        *
-        * @param subKey Easily provided via an extractor.
-        * @return A map containing those entries whose keys match a subclassing pattern.
-        * @see [[keyval.DtEnum]]
-        *
-        */
-      def collectKeys[L <: K](subKey: K => Option[L]): AccountMap[L, C] =
-        am collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
-
-      /** TODO: sketchy... de-sketchify */
-      def widenKeys[J >: K <: AccountingKey]: AccountMap[J, C] =
-        (am map widenKey[K, J, Mny[C]]).toMap
-
-    }
-    private def widenKey[K, J >: K, V]: ((K, V)) => (J, V) = identity
+    def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
 
     /** */
-    implicit final class MoarMapOps[K <: AccountingKey, N: Financial](m: Map[K, N]) {
+    object implicits {
 
       /** */
-      def denominated[C: Currency]: AccountMap[K, C] =
-        m map {
-          case (k, n) =>
-            (k, Currency[C] fiat (Financial[N] to [MonetaryAmount] n))
-        }
+      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+
+        /**
+          * Filters a map by narrowing the scope of the keys contained.
+          *
+          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+          *
+          * @param subKey Easily provided via an extractor.
+          * @return A map containing those entries whose keys match a subclassing pattern.
+          * @see [[keyval.DtEnum]]
+          *
+          */
+        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
+          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+        /** */
+        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
+
+        /** */
+        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
+          m map {
+            case (k, n) =>
+              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
+          }
+      }
     }
   }
-  import AccountMap._
-
-  /** convenience and domain semantics only */
-  def emptyAccount[A <: AccountingKey, C: Currency]: AccountMap[A, C] = Map.empty[A, Mny[C]]
+  import AccountMap.implicits._
 
   /** */
   type AccountingKey = accounting.AccountingKey
@@ -242,8 +238,8 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     /** */
     def empty[C: Currency]: TrialBalance[C] =
       apply(
-        debits = emptyAccount[Debit, C],
-        credits = emptyAccount[Credit, C]
+        debits = AccountMap.empty[Debit, C],
+        credits = AccountMap.empty[Credit, C],
       )
 
     /** */

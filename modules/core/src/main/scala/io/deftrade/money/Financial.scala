@@ -118,7 +118,7 @@ trait Financial[N] extends Fractional[N] { self =>
   }
 }
 
-/**
+/** FIXME: LiterallyZero -> how is this polymorphic?
   */
 object Financial {
 
@@ -127,8 +127,8 @@ object Financial {
 
   /**  */
   trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
-    type LiterallyZero = W.`0.0`.T
-    type LiterallyOne  = W.`1.0`.T
+    final type LiterallyZero = W.`0.0`.T
+    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { java.lang.Double parseDouble s }
   }
 
@@ -137,8 +137,8 @@ object Financial {
 
   /** FIXME: use BigDecimal(1.0).witness ?! Or what? */
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
-    type LiterallyZero = W.`0.0`.T
-    type LiterallyOne  = W.`1.0`.T
+    final type LiterallyZero = W.`0.0`.T
+    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { BigDecimal apply s }
   }
 
@@ -147,8 +147,8 @@ object Financial {
 
   /** */
   trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
-    type LiterallyZero = W.`0.0`.T
-    type LiterallyOne  = W.`1.0`.T
+    final type LiterallyZero = W.`0.0`.T
+    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { Rational apply s }
   }
 
