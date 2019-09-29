@@ -1,11 +1,8 @@
 package io.deftrade
 
-import cats.implicits._
-import cats.{ Foldable }
 import cats.kernel.CommutativeGroup
 
-import scala.language.higherKinds
-
+/** Bowing to convention. */
 object implicits {
 
   /**

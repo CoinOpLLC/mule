@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._, accounting._
+import money._, time._, keyval._
 
 import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
@@ -39,101 +39,9 @@ import scala.language.higherKinds
   * a money market fund instrument.)
   *
   */
-abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
+abstract class Balances[MA: Financial, Q: Financial] extends DoubleEntryKeys[MA, Q] {
 
-  /** instantiate double entry key module with appropriate monetary amount type */
-  object doubleEntryKeys extends DoubleEntryKeys[MonetaryAmount]
-  import doubleEntryKeys._
-
-  /** Mapping accounting keys to [[money.Money]]. */
-  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
-
-  /** */
-  object AccountMap {
-
-    /** */
-    def fromSwapKey[A <: AccountingKey, C: Currency](
-        ks: SwapKey[A],
-        amount: Mny[C]
-    ): AccountMap[A, C] = {
-      def from = ks.from.toSortedMap mapValues (-amount * _)
-      def to   = ks.to.toSortedMap mapValues (amount * _)
-      from |+| to
-    }
-
-    def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
-
-    /** */
-    object implicits {
-
-      /** */
-      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
-
-        /**
-          * Filters a map by narrowing the scope of the keys contained.
-          *
-          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
-          *
-          * @param subKey Easily provided via an extractor.
-          * @return A map containing those entries whose keys match a subclassing pattern.
-          * @see [[keyval.DtEnum]]
-          *
-          */
-        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
-          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
-
-        /** */
-        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
-
-        /** */
-        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
-          m map {
-            case (k, n) =>
-              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
-          }
-      }
-    }
-  }
   import AccountMap.implicits._
-
-  /** */
-  type AccountingKey = accounting.AccountingKey
-
-  type Debit  = accounting.Debit
-  type Credit = accounting.Credit
-
-  type Expense = accounting.Expense
-  type Revenue = accounting.Revenue
-
-  type Asset     = accounting.Asset
-  type Liability = accounting.Liability
-
-  type Income = accounting.Income
-  type Equity = accounting.Equity
-
-  /** */
-  final type Debits[C] = AccountMap[Debit, C]
-
-  /** */
-  final type Credits[C] = AccountMap[Credit, C]
-
-  /** [[BalanceSheet]] assets */
-  final type Assets[C] = AccountMap[Asset, C]
-
-  /** [[BalanceSheet]] liabilities */
-  final type Liabilities[C] = AccountMap[Liability, C]
-
-  /** Assets net of Liabilities */
-  final type Equities[C] = AccountMap[Equity, C]
-
-  /** "Top line" */
-  final type Revenues[C] = AccountMap[Revenue, C]
-
-  /** */
-  final type Expenses[C] = AccountMap[Expense, C]
-
-  /** Revenues net of Expenses */
-  final type Incomes[C] = AccountMap[Income, C]
 
   /** */
   sealed trait BalanceLike extends Product with Serializable {
@@ -490,7 +398,7 @@ abstract class Balances[MA: Financial, Q: Financial] extends Pricing[MA, Q] {
     */
   object Nettable extends DtEnum[NettableLike] {
 
-    import accounting.Asset._
+    import Asset._
 
     case object Depreciable
         extends Nettable(

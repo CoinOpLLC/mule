@@ -1,6 +1,5 @@
 package io.deftrade
 package model
-package accounting
 
 import money._, keyval.DtEnum
 
@@ -10,15 +9,16 @@ import enumeratum._
 
 /**
   * Modular cake layer which abstracts over [[money.Financial]] types.
-  * FIXME: total WIP.
+  *
+  * FIXME: breaking this into potentially polymorphic pieces is proving ponderous.
   */
-abstract class DoubleEntryKeys[MA: Financial] {
+abstract class DoubleEntryKeys[MA: Financial, Q: Financial] extends Pricing[MA, Q] with IRS1065 {
 
   /**
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
     */
-  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MonetaryAmount]
+  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MA]
 
   /** */
   final val Treatment = UnitPartition
@@ -70,6 +70,12 @@ abstract class DoubleEntryKeys[MA: Financial] {
     final def debits: Treatment[D]  = entries
     final def credits: Treatment[C] = contras
   }
+// }
+// ///////////// would be separate sources, but for `sealed` /////////////
+//
+// abstract class DeksIRS1065Generic[MA: Financial] extends DoubleEntryKeys[MA] {
+
+///// would be separate classes but dependent type issues tho... :(
 
   // /** */
   // sealed abstract class SingleDebitKey private (
@@ -105,7 +111,7 @@ abstract class DoubleEntryKeys[MA: Financial] {
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.
     */
-  sealed abstract class SwapKey[T <: AccountingKey] private[accounting] (
+  sealed abstract class SwapKey[T <: AccountingKey] private[model] (
       val from: Treatment[T],
       val to: Treatment[T]
   ) extends DoubleEntryKey(from, to)
@@ -163,4 +169,82 @@ abstract class DoubleEntryKeys[MA: Financial] {
     /** */
     lazy val values = findValues
   }
+
+  ///////////////// AccountMap.scala ///////////////////////
+
+  /** instantiate double entry key module with appropriate monetary amount type */
+  /** Mapping accounting keys to [[money.Money]]. */
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
+
+  /** */
+  object AccountMap {
+
+    /** */
+    def fromSwapKey[A <: AccountingKey, C: Currency](
+        ks: SwapKey[A],
+        amount: Mny[C]
+    ): AccountMap[A, C] = {
+      def from = ks.from.toSortedMap mapValues (-amount * _)
+      def to   = ks.to.toSortedMap mapValues (amount * _)
+      from |+| to
+    }
+
+    def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
+
+    /** */
+    object implicits {
+
+      /** */
+      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+
+        /**
+          * Filters a map by narrowing the scope of the keys contained.
+          *
+          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+          *
+          * @param subKey Easily provided via an extractor.
+          * @return A map containing those entries whose keys match a subclassing pattern.
+          * @see [[keyval.DtEnum]]
+          *
+          */
+        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
+          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+        /** */
+        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
+
+        /** */
+        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
+          m map {
+            case (k, n) =>
+              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
+          }
+      }
+    }
+  }
+
+  /** */
+  final type Debits[C] = AccountMap[Debit, C]
+
+  /** */
+  final type Credits[C] = AccountMap[Credit, C]
+
+  /** [[BalanceSheet]] assets */
+  final type Assets[C] = AccountMap[Asset, C]
+
+  /** [[BalanceSheet]] liabilities */
+  final type Liabilities[C] = AccountMap[Liability, C]
+
+  /** Assets net of Liabilities */
+  final type Equities[C] = AccountMap[Equity, C]
+
+  /** "Top line" */
+  final type Revenues[C] = AccountMap[Revenue, C]
+
+  /** */
+  final type Expenses[C] = AccountMap[Expense, C]
+
+  /** Revenues net of Expenses */
+  final type Incomes[C] = AccountMap[Income, C]
+
 }
