@@ -27,7 +27,7 @@ sealed trait LegalEntity extends Serializable {
 }
 
 /**
-  * Players that are recognized by the system.
+  * Players that are recognized by the system (ours).
   */
 object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 

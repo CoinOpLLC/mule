@@ -8,7 +8,7 @@ import cats.implicits._
 /**
   * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
   */
-trait AccountingIRS1065 extends Accounting { self: ModuleTypeTraits =>
+trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
 
   /** */
   sealed trait Asset1065 extends Asset

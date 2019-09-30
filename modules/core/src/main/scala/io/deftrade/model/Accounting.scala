@@ -15,7 +15,7 @@ import enumeratum._
   * TODO: abstracting across ontologies isn't going to be easy with this scheme,
   * because of the reliance on `sealed` hierarchies of enumerated values.
   */
-trait Accounting { self: ModuleTypeTraits =>
+trait Accounting { self: ModuleTypes =>
 
   /** */
   sealed trait AccountingKey extends EnumEntry with Product with Serializable

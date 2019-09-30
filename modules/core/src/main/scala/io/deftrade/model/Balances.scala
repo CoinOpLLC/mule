@@ -30,17 +30,9 @@ import scala.language.higherKinds
   * When summing Transactions, this "cake slice" module implements the algebra which
   * maintains the above equality.
   *
-  * Note both type params `MA` and `Q` are needed to deal with case
-  * where [[MonetaryAmount]] and [[Quantity]]
-  * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
-  *
-  * Modules parameterized like this may create `Money[MA, C] <=> (MI, Q)` codecs via a table of
-  * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
-  * a money market fund instrument.)
-  *
   */
 trait Balances extends {
-  self: Pricing with Accounting with ModuleTypeTraits =>
+  self: Ledger with Accounting with ModuleTypes =>
 
   import AccountMap.implicits._
 

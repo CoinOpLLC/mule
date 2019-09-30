@@ -14,7 +14,7 @@ import enumeratum.EnumEntry
   *
   * Something of a dumping ground for now.
   */
-trait Pricing { self: Ledger with ModuleTypeTraits =>
+trait Pricing { self: Ledger with ModuleTypes =>
 
   /** */
   sealed abstract case class TradePricer[C](mark: Trade => Result[Mny[C]])

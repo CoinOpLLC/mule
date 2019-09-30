@@ -48,7 +48,7 @@ import scala.language.higherKinds
   * risk controls, margin calcs depend on them.
   */
 trait Trading {
-  self: Balances with Accounting with Pricing with Ledger with ModuleTypeTraits =>
+  self: Balances with Accounting with Pricing with Ledger with ModuleTypes =>
 
   /** All things financial begin with an allocation. */
   type Allocation = UnitPartition[Account.Key, Quantity]
@@ -63,12 +63,10 @@ trait Trading {
   object Market extends WithOpaqueKey[Long, Market]
 
   /**
-    * Models a direct deal facing a private party.
+    * Models a private party whose [[Ledger]]s we run [[Transaction]]s against.
     *
-    * Their [[Ledger]] [[Account]] is
-    * assumed to be "real" (not a contra account) although it can assume those characteristics
-    * when the `Counterparty` is sourcing `Instruments` from private flows.
-    *   - (eg exempt Securities for accredited individuals or qualified institutions)
+    * Their [[Ledger]] [[Account]] is assumed to be "real", i.e.
+    * not a virtual contra account which is used for reconcilliation.
     */
   sealed abstract case class Counterparty(
       final val label: Label,

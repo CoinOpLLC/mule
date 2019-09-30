@@ -17,46 +17,9 @@ import io.circe.Json
 import scala.language.higherKinds
 
 /**
-  * Module level abstract quantities and monetary amounts, which may be distinct types.
-  */
-trait ModuleTypeTraits {
-
-  /** */
-  type Quantity
-
-  /** */
-  implicit val Quantity: Financial[Quantity]
-
-  /** */
-  type MonetaryAmount
-
-  /**  */
-  implicit val MonetaryAmount: Financial[MonetaryAmount]
-
-  /** */
-  final type Mny[C] = Money[MonetaryAmount, C]
-}
-
-/** Base class for module instantiations. */
-abstract class ModuleTypes[MA, Q](ma: Financial[MA], q: Financial[Q]) extends ModuleTypeTraits {
-
-  /** */
-  final type MonetaryAmount = MA
-
-  /**  */
-  implicit final lazy val MonetaryAmount = ma
-
-  /** */
-  final type Quantity = Q
-
-  /**  */
-  implicit final lazy val Quantity = q
-}
-
-/**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
   */
-trait Ledger { self: ModuleTypeTraits =>
+trait Ledger { self: ModuleTypes =>
 
   /** nb this is where fresh key policy is decided for the ledger */
   final def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
