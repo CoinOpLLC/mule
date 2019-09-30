@@ -40,7 +40,7 @@ import scala.language.higherKinds
   *
   */
 trait Balances extends {
-  self: DoubleEntryKeys with Pricing with Ledger with Accounting with ModuleTypeTraits =>
+  self: Pricing with Accounting with ModuleTypeTraits =>
 
   import AccountMap.implicits._
 
@@ -64,7 +64,6 @@ trait Balances extends {
 
     /** */
     def credits: AccountMap[CreditType, CurrencyType]
-
   }
 
   /** specify key types */
@@ -119,13 +118,13 @@ trait Balances extends {
     /** */
     def swapped[T <: AccountingKey](sk: SwapKey[T], amount: Mny[C])(
         implicit C: Currency[C]
-    ): TrialBalance[C] =
-      sk match {
-        case AssetSwapKey(ask) =>
-          TrialBalance(debits |+| SwapKey.accountMap(ask, amount).widenKeys, credits)
-        case LiabilitySwapKey(lsk) =>
-          TrialBalance(debits, credits |+| SwapKey.accountMap(lsk, amount).widenKeys)
-      }
+    ): TrialBalance[C] = {
+      val am: AccountMap[AccountingKey, C] = (SwapKey accountMap (sk, amount)).widenKeys
+      TrialBalance(
+        debits |+| (am collectKeys Debit.unapply),
+        credits |+| (am collectKeys Credit.unapply)
+      )
+    }
 
     /** */
     def partition(implicit C: Currency[C]): (IncomeStatement[C], BalanceSheet[C]) =

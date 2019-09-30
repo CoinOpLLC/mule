@@ -37,7 +37,6 @@ trait Accounting { self: ModuleTypeTraits =>
 
   /** */
   sealed trait Credit extends AccountingKey
-
   object Credit extends DtEnum[Credit] {
 
     /** */
@@ -45,28 +44,28 @@ trait Accounting { self: ModuleTypeTraits =>
   }
 
   /** */
-  sealed trait Expense extends Debit
-  val Expense: DtEnum[Expense]
+  trait Expense extends Debit
+  val Expense: DtEnum[_ <: Expense]
 
   /** */
-  sealed trait Revenue extends Credit
-  val Revenue: DtEnum[Revenue]
+  trait Revenue extends Credit
+  val Revenue: DtEnum[_ <: Revenue]
 
   /** */
-  sealed trait Asset extends Debit
-  val Asset: DtEnum[Asset]
+  trait Asset extends Debit
+  val Asset: DtEnum[_ <: Asset]
 
   /** */
-  sealed trait Liability extends Credit
-  val Liability: DtEnum[Liability]
+  trait Liability extends Credit
+  val Liability: DtEnum[_ <: Liability]
 
   /** */
-  sealed trait Income extends Debit
-  val Income: DtEnum[Income]
+  trait Income extends Debit
+  val Income: DtEnum[_ <: Income]
 
   /** */
-  sealed trait Equity extends Liability
-  val Equity: DtEnum[Equity]
+  trait Equity extends Liability
+  val Equity: DtEnum[_ <: Equity]
 
   /** instantiate double entry key module with appropriate monetary amount type */
   /** Mapping accounting keys to [[money.Money]]. */
@@ -75,6 +74,7 @@ trait Accounting { self: ModuleTypeTraits =>
   /** */
   object AccountMap {
 
+    /** */
     def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
 
     /** */
@@ -148,145 +148,109 @@ trait Accounting { self: ModuleTypeTraits =>
     /** */
     final def net[C: Currency](assets: Assets[C]): Mny[C] =
       assets(gross) - assets(less)
-
   }
 
   /** */
-  abstract class Nettable[D <: Asset](
-      val gross: D,
-      val less: D
-  ) extends NettableLike { final type AssetType = D }
-
-}
-
-///////////// would be separate sources, but for `sealed` /////////////
-
-/**
-  * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
-  */
-trait IRS1065 extends Accounting { self: ModuleTypeTraits =>
-
-  /** */
-  object Asset extends DtEnum[Asset] {
-
-    /** */
-    lazy val values = findValues
-
-    case object Cash                               extends Asset
-    case object AccountsReceivable                 extends Asset
-    case object LessBadDebtAllowance               extends Asset
-    case object Inventories                        extends Asset
-    case object USObligations                      extends Asset
-    case object TaxExemptSec                       extends Asset
-    case object OtherCurrent                       extends Asset
-    case object LoansToPartners                    extends Asset
-    case object MortgageAndRealEstateLoans         extends Asset
-    case object OtherInvestments                   extends Asset
-    case object BuildingsAndOtherDepreciableAssets extends Asset
-    case object LessAccumulatedDepreciation        extends Asset
-    case object DepletableAssets                   extends Asset
-    case object LessAccumulatedDepletion           extends Asset
-    case object Land                               extends Asset
-    case object IntangibleAssets                   extends Asset
-    case object LessAccumulatedAmortization        extends Asset
-    case object OtherAssets                        extends Asset
-  }
-
-  /** */
-  object Liability extends DtEnum[Liability] {
-
-    case object AccountsPayable         extends Liability
-    case object CurrentMortgateNotes    extends Liability
-    case object OtherCurrentLiabilities extends Liability
-    case object NonrecourseLoans        extends Liability
-    case object LoansFromPartners       extends Liability
-    case object MortgageNotes           extends Liability
-    case object OtherLiabilities        extends Liability
-
-    /** */
-    lazy val values = findValues
-  }
-
-  /** */
-  object Equity extends DtEnum[Equity] {
-
-    case object PartnersCapital  extends Equity
-    case object RetainedEarnings extends Equity
-
-    /** */
-    lazy val values = findValues
-  }
-
-  /** */
-  object Revenue extends DtEnum[Revenue] {
-    case object Finance        extends Revenue
-    case object Investment     extends Revenue
-    case object Receipts       extends Revenue
-    case object OrdinaryIncome extends Revenue
-
-    /** */
-    lazy val values = findValues
-  }
-
-  /** */
-  sealed trait OpEx extends Expense
-
-  /** */
-  sealed trait CapEx extends Expense
-
-  /** */
-  object Expense extends DtEnum[Expense] {
-    case object Investment            extends CapEx
-    case object Finance               extends CapEx // FIXME check this
-    case object COGS                  extends OpEx
-    case object RepairsAndMaintenance extends OpEx
-    case object Salaries              extends OpEx
-    case object Rent                  extends OpEx
-
-    /** */
-    lazy val values = findValues
-  }
-
-  /** FIXME: this needs work */
-  object Income extends DtEnum[Income] {
-
-    case object OperatingIncome  extends Income
-    case object InvestmentIncome extends Income
-
-    /** */
-    lazy val values = findValues
+  abstract class Nettable[D <: Asset](val gross: D, val less: D) extends NettableLike {
+    final type AssetType = D
   }
 
   /**
-    * Depreciation, depletion, and amortization are the reasons some [[Asset]]s are Nettable.
-    *
-    * TODO:
-    *   - Any other vocabularies to examine? Make this (differently) extensible?
-    *   - Annoyance: why doesn't type inference work for Nettable?
+    * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
+    * following terminology common in the accounting field.
     */
-  object Nettable extends DtEnum[NettableLike] {
+  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MonetaryAmount]
 
-    import Asset._
+  /** */
+  final val Treatment = UnitPartition
 
-    case object Depreciable
-        extends Nettable[Asset](
-          BuildingsAndOtherDepreciableAssets,
-          LessAccumulatedDepreciation
-        )
+  /**
+    * General form of a "double (bookkeeping) entry" key.
+    */
+  sealed trait DoubleEntryKeyLike extends EnumEntry with Product with Serializable {
 
-    case object Depletable
-        extends Nettable[Asset](
-          DepletableAssets,
-          LessAccumulatedDepletion
-        )
+    /** */
+    type EntryType <: AccountingKey
 
-    case object Amortizable
-        extends Nettable[Asset](
-          IntangibleAssets,
-          LessAccumulatedAmortization
-        )
+    /** */
+    type ContraType <: AccountingKey
 
-    val values = findValues
+    /** */
+    def entries: Treatment[EntryType]
+
+    /** */
+    def contras: Treatment[ContraType]
   }
 
+  /** */
+  sealed abstract class DoubleEntryKey[ENTRY <: AccountingKey, CONTRA <: AccountingKey](
+      es: Treatment[ENTRY],
+      cs: Treatment[CONTRA]
+  ) extends DoubleEntryKeyLike {
+
+    /** */
+    final type EntryType = ENTRY
+
+    /** */
+    final type ContraType = CONTRA
+
+    /** */
+    final def entries: Treatment[EntryType] = es
+
+    /** */
+    final def contras: Treatment[ContraType] = cs
+  }
+
+  /** placeholder */
+  object DoubleEntryKey
+
+  /** not sealed - extension point */
+  abstract class DebitCreditKey[D <: Debit, C <: Credit](
+      debits: Treatment[D],
+      credits: Treatment[C]
+  ) extends DoubleEntryKey(debits, credits) {
+    final def debits: Treatment[D]  = entries
+    final def credits: Treatment[C] = contras
+  }
+
+  /** placeholder */
+  object DebitCreditKey
+
+  /**
+    * Keys that preserve the balance of a [[BalanceSheet]].
+    *
+    * `SwapKey`'s type parameter restricts the swap to occur
+    * within the same "column" of the `Balance`.
+    */
+  abstract class SwapKey[T <: AccountingKey] private[model] (
+      val from: Treatment[T],
+      val to: Treatment[T]
+  ) extends DoubleEntryKey(from, to)
+
+  /** */
+  object SwapKey {
+
+    /** */
+    def accountMap[A <: AccountingKey, C: Currency](
+        ks: SwapKey[A],
+        amount: Mny[C]
+    ): AccountMap[A, C] = {
+      def from = ks.from.toSortedMap mapValues (-amount * _)
+      def to   = ks.to.toSortedMap mapValues (amount * _)
+      from |+| to
+    }
+
+    def unapply[EE <: AccountingKey](sk: SwapKey[EE]): Option[(Treatment[EE], Treatment[EE])] =
+      (sk.from, sk.to).some
+
+  }
+
+  /** */
+  abstract class SimpleDebitCreditKey(
+      final val debit: Debit,
+      final val credit: Credit
+  ) extends DebitCreditKey(Treatment single debit, Treatment single credit)
+
+  /** */
+  val SimpleDebitCreditKey: DtEnum[_ <: SimpleDebitCreditKey]
 }

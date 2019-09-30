@@ -48,7 +48,7 @@ import scala.language.higherKinds
   * risk controls, margin calcs depend on them.
   */
 trait Trading {
-  self: Balances with DoubleEntryKeys with Pricing with Ledger with ModuleTypeTraits =>
+  self: Balances with Accounting with Pricing with Ledger with ModuleTypeTraits =>
 
   /** All things financial begin with an allocation. */
   type Allocation = UnitPartition[Account.Key, Quantity]
