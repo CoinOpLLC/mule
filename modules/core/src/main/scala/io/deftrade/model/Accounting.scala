@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import keyval.DtEnum
+import money.{ Currency, Financial }, keyval.DtEnum
 
 import cats.implicits._
 
@@ -15,10 +15,10 @@ import enumeratum._
   * TODO: abstracting across ontologies isn't going to be easy with this scheme,
   * because of the reliance on `sealed` hierarchies of enumerated values.
   */
-trait Accounting {
+trait Accounting { self: ModuleTypeTraits =>
 
   /** */
-  sealed trait AccountingKey extends EnumEntry with Serializable
+  sealed trait AccountingKey extends EnumEntry with Product with Serializable
 
   /** */
   object AccountingKey {
@@ -29,8 +29,6 @@ trait Accounting {
 
   /** */
   sealed trait Debit extends AccountingKey
-
-  /** */
   object Debit extends DtEnum[Debit] {
 
     /** */
@@ -40,30 +38,124 @@ trait Accounting {
   /** */
   sealed trait Credit extends AccountingKey
 
-  /** */
   object Credit extends DtEnum[Credit] {
 
     /** */
     lazy val values = Liability.values ++ Equity.values ++ Revenue.values
   }
 
-  type Expense <: Debit
+  /** */
+  sealed trait Expense extends Debit
   val Expense: DtEnum[Expense]
 
-  type Revenue <: Credit
+  /** */
+  sealed trait Revenue extends Credit
   val Revenue: DtEnum[Revenue]
 
-  type Asset <: Debit
+  /** */
+  sealed trait Asset extends Debit
   val Asset: DtEnum[Asset]
 
-  type Liability <: Credit
+  /** */
+  sealed trait Liability extends Credit
   val Liability: DtEnum[Liability]
 
-  type Income <: Debit
+  /** */
+  sealed trait Income extends Debit
   val Income: DtEnum[Income]
 
-  type Equity <: Credit
+  /** */
+  sealed trait Equity extends Liability
   val Equity: DtEnum[Equity]
+
+  /** instantiate double entry key module with appropriate monetary amount type */
+  /** Mapping accounting keys to [[money.Money]]. */
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
+
+  /** */
+  object AccountMap {
+
+    def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
+
+    /** */
+    object implicits {
+
+      /** */
+      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+
+        /**
+          * Filters a map by narrowing the scope of the keys contained.
+          *
+          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+          *
+          * @param subKey Easily provided via an extractor.
+          * @return A map containing those entries whose keys match a subclassing pattern.
+          * @see [[keyval.DtEnum]]
+          *
+          */
+        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
+          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+        /** */
+        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
+
+        /** */
+        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
+          m map {
+            case (k, n) =>
+              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
+          }
+      }
+    }
+  }
+
+  /** */
+  final type Debits[C] = AccountMap[Debit, C]
+
+  /** */
+  final type Credits[C] = AccountMap[Credit, C]
+
+  /** [[BalanceSheet]] assets */
+  final type Assets[C] = AccountMap[Asset, C]
+
+  /** [[BalanceSheet]] liabilities */
+  final type Liabilities[C] = AccountMap[Liability, C]
+
+  /** Assets net of Liabilities */
+  final type Equities[C] = AccountMap[Equity, C]
+
+  /** "Top line" */
+  final type Revenues[C] = AccountMap[Revenue, C]
+
+  /** */
+  final type Expenses[C] = AccountMap[Expense, C]
+
+  /** Revenues net of Expenses */
+  final type Incomes[C] = AccountMap[Income, C]
+
+  /** */
+  sealed trait NettableLike extends EnumEntry with Serializable {
+
+    /** */
+    type AssetType <: Asset
+
+    /** */
+    def gross: AssetType
+
+    /** */
+    def less: AssetType
+
+    /** */
+    final def net[C: Currency](assets: Assets[C]): Mny[C] =
+      assets(gross) - assets(less)
+
+  }
+
+  /** */
+  abstract class Nettable[D <: Asset](
+      val gross: D,
+      val less: D
+  ) extends NettableLike { final type AssetType = D }
 
 }
 
@@ -72,10 +164,7 @@ trait Accounting {
 /**
   * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
   */
-trait IRS1065 extends Accounting {
-
-  /** */
-  sealed trait Asset extends Debit
+trait IRS1065 extends Accounting { self: ModuleTypeTraits =>
 
   /** */
   object Asset extends DtEnum[Asset] {
@@ -104,9 +193,6 @@ trait IRS1065 extends Accounting {
   }
 
   /** */
-  sealed trait Liability extends Credit
-
-  /** */
   object Liability extends DtEnum[Liability] {
 
     case object AccountsPayable         extends Liability
@@ -122,9 +208,6 @@ trait IRS1065 extends Accounting {
   }
 
   /** */
-  sealed trait Equity extends Liability
-
-  /** */
   object Equity extends DtEnum[Equity] {
 
     case object PartnersCapital  extends Equity
@@ -133,9 +216,6 @@ trait IRS1065 extends Accounting {
     /** */
     lazy val values = findValues
   }
-
-  /** */
-  sealed trait Revenue extends Credit
 
   /** */
   object Revenue extends DtEnum[Revenue] {
@@ -147,9 +227,6 @@ trait IRS1065 extends Accounting {
     /** */
     lazy val values = findValues
   }
-
-  /** */
-  sealed trait Expense extends Debit
 
   /** */
   sealed trait OpEx extends Expense
@@ -170,9 +247,6 @@ trait IRS1065 extends Accounting {
     lazy val values = findValues
   }
 
-  /** */
-  sealed trait Income extends Debit
-
   /** FIXME: this needs work */
   object Income extends DtEnum[Income] {
 
@@ -182,4 +256,37 @@ trait IRS1065 extends Accounting {
     /** */
     lazy val values = findValues
   }
+
+  /**
+    * Depreciation, depletion, and amortization are the reasons some [[Asset]]s are Nettable.
+    *
+    * TODO:
+    *   - Any other vocabularies to examine? Make this (differently) extensible?
+    *   - Annoyance: why doesn't type inference work for Nettable?
+    */
+  object Nettable extends DtEnum[NettableLike] {
+
+    import Asset._
+
+    case object Depreciable
+        extends Nettable[Asset](
+          BuildingsAndOtherDepreciableAssets,
+          LessAccumulatedDepreciation
+        )
+
+    case object Depletable
+        extends Nettable[Asset](
+          DepletableAssets,
+          LessAccumulatedDepletion
+        )
+
+    case object Amortizable
+        extends Nettable[Asset](
+          IntangibleAssets,
+          LessAccumulatedAmortization
+        )
+
+    val values = findValues
+  }
+
 }

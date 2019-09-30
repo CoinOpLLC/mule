@@ -17,15 +17,46 @@ import io.circe.Json
 import scala.language.higherKinds
 
 /**
-  * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
+  * Module level abstract quantities and monetary amounts, which may be distinct types.
   */
-abstract class Ledger[Q: Financial] { self =>
+trait ModuleTypeTraits {
+
+  /** */
+  type Quantity
+
+  /** */
+  implicit val Quantity: Financial[Quantity]
+
+  /** */
+  type MonetaryAmount
+
+  /**  */
+  implicit val MonetaryAmount: Financial[MonetaryAmount]
+
+  /** */
+  final type Mny[C] = Money[MonetaryAmount, C]
+}
+
+/** Base class for module instantiations. */
+abstract class ModuleTypes[MA, Q](ma: Financial[MA], q: Financial[Q]) extends ModuleTypeTraits {
+
+  /** */
+  final type MonetaryAmount = MA
+
+  /**  */
+  implicit final lazy val MonetaryAmount = ma
 
   /** */
   final type Quantity = Q
 
-  /** Domain specific tools for dealing with `Quantity`s */
-  final val Quantity = Financial[Quantity]
+  /**  */
+  implicit final lazy val Quantity = q
+}
+
+/**
+  * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
+  */
+trait Ledger { self: ModuleTypeTraits =>
 
   /** nb this is where fresh key policy is decided for the ledger */
   final def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
@@ -148,7 +179,7 @@ abstract class Ledger[Q: Financial] { self =>
     def digest: MetaSha = _ => hackSha256
 
     /** f'rinstance */
-    type Meta = io.circe.Json
+    type Meta = Json
 
     /** */
     def single(

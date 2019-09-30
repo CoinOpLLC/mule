@@ -47,7 +47,8 @@ import scala.language.higherKinds
   * to trade blind with respect to account sums:
   * risk controls, margin calcs depend on them.
   */
-abstract class Trading[MA: Financial, Q: Financial] extends Balances[MA, Q] {
+trait Trading {
+  self: Balances with DoubleEntryKeys with Pricing with Ledger with ModuleTypeTraits =>
 
   /** All things financial begin with an allocation. */
   type Allocation = UnitPartition[Account.Key, Quantity]

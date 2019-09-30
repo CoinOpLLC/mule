@@ -14,15 +14,7 @@ import enumeratum.EnumEntry
   *
   * Something of a dumping ground for now.
   */
-abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
-
-  /** Domain specific tools for dealing with `MonetaryAmount`s */
-  final type MonetaryAmount = MA
-
-  final type Mny[C] = Money[MonetaryAmount, C]
-
-  /** member [[money.Financial]] instance for convenience */
-  final val MonetaryAmount = Financial[MonetaryAmount]
+trait Pricing { self: Ledger with ModuleTypeTraits =>
 
   /** */
   sealed abstract case class TradePricer[C](mark: Trade => Result[Mny[C]])
@@ -226,16 +218,16 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
     import Q._
 
     /** */
-    @inline def buy(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, ask)
+    @inline def buy(m1: Mny[C1]): Mny[C2] = convert(m1, ask)
 
     /** */
-    @inline def sell(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, bid)
+    @inline def sell(m1: Mny[C1]): Mny[C2] = convert(m1, bid)
 
     /** */
-    @inline def apply(m1: Money[MA, C1]): Money[MA, C2] = convert(m1, mid)
+    @inline def apply(m1: Mny[C1]): Mny[C2] = convert(m1, mid)
 
     /** */
-    def quote: (Money[MA, C2], Money[MA, C2]) = {
+    def quote: (Mny[C2], Mny[C2]) = {
       val single = C1(MonetaryAmount.one)
       (buy(single), sell(single))
     }
@@ -246,7 +238,7 @@ abstract class Pricing[MA: Financial, Q: Financial] extends Ledger[Q] {
           |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
 
     /** */
-    private def convert(m1: Money[MA, C1], rate: MA): Money[MA, C2] = C2(m1.amount * rate)
+    private def convert(m1: Mny[C1], rate: MonetaryAmount): Mny[C2] = C2(m1.amount * rate)
   }
 
   /** */

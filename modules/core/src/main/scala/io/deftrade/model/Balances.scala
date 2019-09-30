@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import money._, time._, keyval._
+import money._, time._
 
 import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
@@ -39,7 +39,8 @@ import scala.language.higherKinds
   * a money market fund instrument.)
   *
   */
-abstract class Balances[MA: Financial, Q: Financial] extends DoubleEntryKeys[MA, Q] {
+trait Balances extends {
+  self: DoubleEntryKeys with Pricing with Ledger with Accounting with ModuleTypeTraits =>
 
   import AccountMap.implicits._
 
@@ -121,9 +122,9 @@ abstract class Balances[MA: Financial, Q: Financial] extends DoubleEntryKeys[MA,
     ): TrialBalance[C] =
       sk match {
         case AssetSwapKey(ask) =>
-          TrialBalance(debits |+| AccountMap.fromSwapKey(ask, amount).widenKeys, credits)
+          TrialBalance(debits |+| SwapKey.accountMap(ask, amount).widenKeys, credits)
         case LiabilitySwapKey(lsk) =>
-          TrialBalance(debits, credits |+| AccountMap.fromSwapKey(lsk, amount).widenKeys)
+          TrialBalance(debits, credits |+| SwapKey.accountMap(lsk, amount).widenKeys)
       }
 
     /** */
@@ -366,58 +367,4 @@ abstract class Balances[MA: Financial, Q: Financial] extends DoubleEntryKeys[MA,
   /** */
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
-  ///////////////////// Netable.scala ///////////////
-  import enumeratum._
-
-  /** */
-  sealed trait NettableLike extends EnumEntry with Serializable {
-    type AssetType <: Debit
-    def gross: AssetType
-    def less: AssetType
-  }
-
-  /** */
-  abstract class Nettable[D <: Asset](
-      val gross: D,
-      val less: D
-  ) extends NettableLike {
-
-    /** */
-    final type AssetType = D
-
-    /** */
-    final def net[C <: Credit, CCY: Currency](b: Balance[D, C, CCY]): Money[MA, CCY] = b match {
-      case Balance(ds, _) => ds(gross) - ds(less)
-    }
-  }
-
-  /**
-    * Depreciation, depletion, and amortization are the reasons some [[Asset]]s are Nettable.
-    *
-    * TODO: Any other vocabularies to examine? Make this (differently) extensible?
-    */
-  object Nettable extends DtEnum[NettableLike] {
-
-    import Asset._
-
-    case object Depreciable
-        extends Nettable(
-          BuildingsAndOtherDepreciableAssets,
-          LessAccumulatedDepreciation
-        )
-
-    case object Depletable
-        extends Nettable(
-          DepletableAssets,
-          LessAccumulatedDepletion
-        )
-
-    case object Amortizable
-        extends Nettable(
-          IntangibleAssets,
-          LessAccumulatedAmortization
-        )
-
-    val values = findValues
-  }
 }
