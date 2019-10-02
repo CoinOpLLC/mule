@@ -148,6 +148,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
 
   ///////////////////////////// Double Entry Key stuff /////////////////////////////
 
+  /** */
   sealed abstract class SDCK1065(d: Debit, c: Credit) extends SimpleDebitCreditKey(d, c)
 
   /** Keys that grow or shrink the balance. */
@@ -196,6 +197,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     lazy val values = findValues
   }
 
+  /** */
   sealed abstract class LiabilitySwapKey private[model] (
       f: Treatment[Liability],
       t: Treatment[Liability]
@@ -216,5 +218,4 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     /** */
     lazy val values = findValues
   }
-
 }

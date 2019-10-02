@@ -43,7 +43,7 @@ trait csv {
 object csv extends csv
 
 /** Mixin csv read and write capabilities per `Enum`[EE] */
-trait CsvEnum[EE <: EnumEntry] { self: enumeratum.Enum[EE] =>
+trait CsvEnum[EE <: EnumEntry] { self: Enum[EE] =>
 
   import CsvEnum._
 

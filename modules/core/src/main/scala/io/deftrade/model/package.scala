@@ -1,7 +1,7 @@
 package io.deftrade
 
 /**
-  * Financial business objects and functions.
+  * Financial types and methods.
   *
   * This package object is where the policy decision to use [[scala.math.BigDecimal]]
   * for [[money.Money]], and [[scala.Double]] for other [[ModuleTypes.Quantity]]s, is made.

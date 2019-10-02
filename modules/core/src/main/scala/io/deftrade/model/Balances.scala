@@ -31,7 +31,7 @@ import scala.language.higherKinds
   * maintains the above equality.
   *
   */
-trait Balances extends {
+trait Balances {
   self: Ledger with Accounting with ModuleTypes =>
 
   import AccountMap.implicits._
@@ -297,7 +297,7 @@ trait Balances extends {
       */
     def deltaFrom(
         pt: PricedTrade[C],
-        dek: DoubleEntryKey[AccountingKey, AccountingKey],
+        dek: DoubleEntryKey,
         meta: Transaction.Meta
     ): DeltaCashBooks[C] = ???
   }

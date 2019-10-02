@@ -1,7 +1,10 @@
 package io.deftrade
 package money
 
-import io.deftrade.implicits._
+import implicits._
+
+import cats.implicits._
+import cats.kernel.CommutativeGroup
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
@@ -12,21 +15,18 @@ import refined.W
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
 
-import cats.implicits._
-import cats.kernel.CommutativeGroup
-
 /**
-  * A typeclass for number types suitable for financial calculations,
-  * based on `spire.math.Fractional`.
+  * Witnesses that `N` is a numerical type suitable for financial calculations, and provides
+  * an abstract interface based on [[spire.math.Fractional]].
+  *
+  * Additional affordances:
+  *   - a `Currency` dependend `round`ing method.
+  *   - some handy `Refined` types
   *
   * While all `Financial`s are `Fractional`, the reverse is not true.
   * (At least, not true enough for this domain model architect.)
   *
-  * The additional affordances:
-  * - a `Currency` dependend `round`ing method.
-  * - some handy `Refined` types
-  *
-  * TODO: facilities for representing / displaying percentages.
+  * TODO: facilities for representing / displaying percentages a la hp12c.
   *
   * TODO: read up on [[http://www.xbrl.org/WGN/precision-decimals-units/WGN-2017-01-11/precision-decimals-units-WGN-2017-01-11.html XBR: Precision, Decimals and Units 1.0]]
   *
@@ -78,14 +78,25 @@ trait Financial[N] extends Fractional[N] { self =>
   /** section: `spire.math.Fractional` aliases */
   final def commutativeGroup: CommutativeGroup[N] = additive
 
+  /**  */
   final def from[T: Financial](t: T): N = fromType[T](t)(Financial[T])
 
+  /**  */
   final def to[R: Financial](n: N): R = toType[R](n)(Financial[R])
 
+  /**  */
   def parse(s: String): Result[N]
 
+  /**  FIXME test */
+  final type WholeInt = N Refined IsWhole[Int]
+
+  /** Phantom type for `Validate` predicate indicating a whole number (fractional part is zero). */
+  sealed abstract class IsWhole[I] private ()
+
+  /**  */
   object IsWhole {
 
+    /**  */
     implicit lazy val N: Fractional[N] = self
 
     /**
@@ -100,25 +111,21 @@ trait Financial[N] extends Fractional[N] { self =>
         val roundTrip = Integral[I].toType[N](i)
         if (n === roundTrip) i.some else none
       } else none
-  }
 
-  /** Phantom type for `Validate` predicate indicating a whole number (fractional part is zero). */
-  sealed abstract case class Whole[I]()
+    /**  */
+    private def apply[I]: IsWhole[I] = new IsWhole[I]() {}
 
-  /** Extractor for whole numbers. */
-  object Whole {
-
-    implicit def wholeValidate[I: Integral]: Validate.Plain[N, Whole[I]] = {
-      val pred: N => Boolean = {
-        case IsWhole(_) => true
-        case _          => false
-      }
-      Validate.fromPredicate(pred, t => s"$t isn't Whole", new Whole[I]() {})
+    /**  */
+    implicit def wholeValidate[I: Integral]: Validate.Plain[N, IsWhole[I]] = {
+      val p: N => Boolean = n => IsWhole.unapply[I](n).fold(false)(_ => true)
+      Validate fromPredicate (p, t => s"$t isn't a whole number", IsWhole[I])
     }
   }
 }
 
-/** FIXME: LiterallyZero -> how is this polymorphic?
+/**
+  * FIXME: `LiterallyZero` and `LiterallyOne` -> how are these polymorphic?
+  * use BigDecimal(1.0).witness ?! Or what?
   */
 object Financial {
 
@@ -129,13 +136,13 @@ object Financial {
   trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
     final type LiterallyZero = W.`0.0`.T
     final type LiterallyOne  = W.`1.0`.T
-    def parse(s: String) = Result safe { java.lang.Double parseDouble s }
+    def parse(s: String) = Result safe [Double] { java.lang.Double parseDouble s }
   }
 
   /**  */
   implicit object DoubleIsFinancial extends DoubleIsFinancial
 
-  /** FIXME: use BigDecimal(1.0).witness ?! Or what? */
+  /**  */
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
     final type LiterallyZero = W.`0.0`.T
     final type LiterallyOne  = W.`1.0`.T

@@ -4,16 +4,19 @@ package model
 import money.{ Currency, Financial }, keyval.DtEnum
 
 import cats.implicits._
+import cats.{ Order => Oardur }
 
 import enumeratum._
 
 /**
   * Core accounting vocabulary.
   *
-  * {{{Assets + Expenses = Liabilities + Equity + Income}}}
-  *
-  * TODO: abstracting across ontologies isn't going to be easy with this scheme,
-  * because of the reliance on `sealed` hierarchies of enumerated values.
+  * {{{
+  *     Assets === Liabilities
+  *     Assets + Expenses === Liabilities + Revenue
+  *     Income := Net(Revenue, Expenses)
+  *     Equity := Net(Liabilities, Debt)
+  * }}}
   */
 trait Accounting { self: ModuleTypes =>
 
@@ -23,8 +26,8 @@ trait Accounting { self: ModuleTypes =>
   /** */
   object AccountingKey {
 
-    /** this is just a hack to use `SortedSet`s  */
-    implicit def orderKeys[AT <: AccountingKey]: cats.Order[AT] = cats.Order by (_.entryName)
+    /** FIXME whither cats enum?  */
+    implicit def orderKeys[K <: AccountingKey]: Oardur[K] = Oardur by (_.entryName)
   }
 
   /** */
@@ -167,7 +170,7 @@ trait Accounting { self: ModuleTypes =>
   /**
     * General form of a "double (bookkeeping) entry" key.
     */
-  sealed trait DoubleEntryKeyLike extends EnumEntry with Product with Serializable {
+  sealed trait DoubleEntryKey extends EnumEntry with Product with Serializable {
 
     /** */
     type EntryType <: AccountingKey
@@ -182,33 +185,34 @@ trait Accounting { self: ModuleTypes =>
     def contras: Treatment[ContraType]
   }
 
-  /** */
-  sealed abstract class DoubleEntryKey[ENTRY <: AccountingKey, CONTRA <: AccountingKey](
-      es: Treatment[ENTRY],
-      cs: Treatment[CONTRA]
-  ) extends DoubleEntryKeyLike {
-
-    /** */
-    final type EntryType = ENTRY
-
-    /** */
-    final type ContraType = CONTRA
-
-    /** */
-    final def entries: Treatment[EntryType] = es
-
-    /** */
-    final def contras: Treatment[ContraType] = cs
-  }
-
   /** placeholder */
-  object DoubleEntryKey
+  object DoubleEntryKey {
+
+    /** */
+    sealed abstract class Aux[ENTRY <: AccountingKey, CONTRA <: AccountingKey](
+        es: Treatment[ENTRY],
+        cs: Treatment[CONTRA]
+    ) extends DoubleEntryKey {
+
+      /** */
+      final type EntryType = ENTRY
+
+      /** */
+      final type ContraType = CONTRA
+
+      /** */
+      final def entries: Treatment[EntryType] = es
+
+      /** */
+      final def contras: Treatment[ContraType] = cs
+    }
+  }
 
   /** not sealed - extension point */
   abstract class DebitCreditKey[D <: Debit, C <: Credit](
       debits: Treatment[D],
       credits: Treatment[C]
-  ) extends DoubleEntryKey(debits, credits) {
+  ) extends DoubleEntryKey.Aux(debits, credits) {
     final def debits: Treatment[D]  = entries
     final def credits: Treatment[C] = contras
   }
@@ -225,7 +229,7 @@ trait Accounting { self: ModuleTypes =>
   abstract class SwapKey[T <: AccountingKey] private[model] (
       val from: Treatment[T],
       val to: Treatment[T]
-  ) extends DoubleEntryKey(from, to)
+  ) extends DoubleEntryKey.Aux(from, to)
 
   /** */
   object SwapKey {
