@@ -11,7 +11,7 @@ import enumeratum.{ CatsEnum, Enum, EnumEntry }
 import io.chrisdavenport.cormorant._
 import io.chrisdavenport.cormorant.implicits._
 
-/** package mixin */
+/** module mixin */
 trait csv {
 
   /** cormorant csv `Get` */
@@ -37,48 +37,51 @@ trait csv {
   /** cormorant csv `Put` */
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
+
+  /** Mixin csv read and write capabilities per `Enum`[E] */
+  trait CsvEnum[E <: EnumEntry] { self: Enum[E] =>
+
+    import CsvEnum._
+
+    /** */
+    implicit lazy val get: Get[E] = enumGet(self)
+
+    /** */
+    implicit lazy val put: Put[E] = enumPut
+  }
+
+  /**  Integrates Enumeratum with Cormorant (CSV) */
+  object CsvEnum {
+
+    /** Use these methods to create implicits per Enum. */
+    def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] = Get tryOrMessage (
+      field => scala.util.Try { e withName field.x },
+      field => s"Failed to decode Enum: $e: Received $field"
+    )
+
+    /** */
+    def enumPut[E <: EnumEntry]: Put[E] = stringPut contramap (_.toString)
+  }
+
+  /** Fully stacc'd enum type. */
+  trait DtEnum[E <: EnumEntry] extends Enum[E] with CatsEnum[E] with CsvEnum[E] {
+
+    /**
+      * TODO:
+      * Implementation relies on reasoning about set containment and downcast safety.
+      * Warrents extreme vetting.
+      */
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def unapply(key: EnumEntry): Option[E] =
+      if (values contains key) key.asInstanceOf[E].some else none
+
+    /** */
+    def collect: PartialFunction[EnumEntry, E] = Function unlift unapply
+  }
+
+  /** namespace placeholder */
+  object DtEnum
 }
 
 /** Standalone modulette. */
 object csv extends csv
-
-/** Mixin csv read and write capabilities per `Enum`[EE] */
-trait CsvEnum[EE <: EnumEntry] { self: Enum[EE] =>
-
-  import CsvEnum._
-
-  /** */
-  implicit lazy val get: Get[EE] = enumGet(self)
-
-  /** */
-  implicit lazy val put: Put[EE] = enumPut
-}
-
-/**  Integrates Enumeratum with Cormorant (CSV) */
-object CsvEnum {
-
-  /** Use these methods to create implicits per Enum. */
-  def enumGet[EE <: EnumEntry](e: enumeratum.Enum[EE]): Get[EE] = Get tryOrMessage (
-    field => scala.util.Try { e withName field.x },
-    field => s"Failed to decode Enum: $e: Received $field"
-  )
-
-  /** */
-  def enumPut[EE <: EnumEntry]: Put[EE] = stringPut contramap (_.toString)
-}
-
-/** Fully stacc'd enum type. */
-trait DtEnum[EE <: EnumEntry] extends Enum[EE] with CatsEnum[EE] with CsvEnum[EE] {
-
-  /**
-    * TODO:
-    * Implementation relies on reasoning about set containment and downcast safety.
-    * Warrents extreme vetting.
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def unapply(key: EnumEntry): Option[EE] =
-    if (values contains key) key.asInstanceOf[EE].some else none
-
-  /** */
-  def collect: PartialFunction[EnumEntry, EE] = Function unlift unapply
-}

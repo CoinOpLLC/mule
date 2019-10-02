@@ -9,15 +9,15 @@ package rdb
 
 import enumeratum.{ Enum, EnumEntry }
 
-trait CatsOrder[EE <: EnumEntry] { _: Enum[EE] =>
+trait CatsOrder[E <: EnumEntry] { _: Enum[E] =>
   import cats.Order
   import cats.instances.int._
-  implicit lazy val catsOrder: Order[EE] = Order by indexOf
+  implicit lazy val catsOrder: Order[E] = Order by indexOf
 }
 
-trait StdOrdering[EE <: EnumEntry] { _: Enum[EE] =>
+trait StdOrdering[E <: EnumEntry] { _: Enum[E] =>
   import scala.math.Ordering
-  implicit lazy val stdOrdering: Ordering[EE] = Ordering by indexOf
+  implicit lazy val stdOrdering: Ordering[E] = Ordering by indexOf
 }
 
 sealed trait Bounds {

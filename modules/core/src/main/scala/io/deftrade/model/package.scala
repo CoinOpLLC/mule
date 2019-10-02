@@ -1,4 +1,5 @@
 package io.deftrade
+package model
 
 /**
   * Financial types and methods.
@@ -10,10 +11,10 @@ package io.deftrade
   *
   * Different objects, package or otherwise, could make different policy decisions.
   */
-package object model
-    extends ModuleTypes.Aux[BigDecimal, Double] // implicit resolution does the rest
+package object example
+    extends ModuleTypes.Aux[BigDecimal, Double]
     with AccountingIRS1065
     with Ledger
-    with Pricing
     with Balances
-    with Trading
+    with MarketData
+    with OrderManagement

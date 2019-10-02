@@ -1,66 +1,40 @@
+/*
+ * Copyright 2017 CoinOp LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.deftrade
 package model
 
 import money._, keyval._
+import capital.Instrument, reference.Mic
 
 import cats.implicits._
-
-import spire.syntax.field._
+import cats.Monad
 
 import enumeratum.EnumEntry
 
-/**
-  * Price all the things.
-  *
-  * Something of a dumping ground for now.
-  */
-trait Pricing { self: Ledger with ModuleTypes =>
+import spire.syntax.field._
 
-  /** */
-  sealed abstract case class TradePricer[C](mark: Trade => Result[Mny[C]])
+import eu.timepit.refined
+import refined.auto._
 
-  /**
-    * FIXME: this is where the implicit pricers need to be instantiated...
-    * ... um, how, exactly?
-    */
-  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+import scala.language.higherKinds
 
-    /** */
-    def apply[C: Currency: TradePricer]: TradePricer[C] = implicitly
-
-    /** */
-    def apply[C: Currency](mark: Trade => Result[Mny[C]]): TradePricer[C] =
-      new TradePricer(mark) {}
-  }
-
-  /** */
-  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
-
-  /** */
-  object PricedTrade {
-
-    /**
-      * TODO: Realizing now this entails implicit per-currency pricers. :|
-      */
-    def apply[C: Currency: TradePricer](trade: Trade): Result[PricedTrade[C]] =
-      for {
-        amount <- TradePricer[C] mark trade
-      } yield new PricedTrade[C](trade, amount) {}
-
-    /**
-      * Reduct to "currency as `Instrument`" convention, according to the contents
-      * of a certain (implicit) [[Wallet]].
-      *
-      * Creates what could be called a `FairTrade`...
-      */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
-  }
-
-  /** type alias */
-  type ValuedFolio[C] = PricedTrade[C]
-
-  /** */
-  lazy val ValuedFolio = PricedTrade
+/** */
+trait MarketData {
+  self: Ledger with ModuleTypes =>
 
   /**
     * Represents a price quote (in currency `C`) for instruments of type `A`.
@@ -79,7 +53,7 @@ trait Pricing { self: Ledger with ModuleTypes =>
     * Domain consideration: `Currency`_exchange depends on '''pricing''' of some kind.
     * One or more Market(s) determine this price.
     *     - A design that doesn't abstract over `QuotedIn`, '''including live data''', is useless.
-    *     - otoh dead simple immutable for testing / demo also required
+    *     - OTOH, dead simple immutable for testing / demo also required
     */
   trait QuotedIn[A, C] extends Any {
 
@@ -291,5 +265,100 @@ trait Pricing { self: Ledger with ModuleTypes =>
 
     /** */
     def trade(price: MonetaryAmount, size: Long) = TickData(Tick.Trade, price, size)
+  }
+
+  /**
+    * Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
+    *
+    * Note: "double entry bookkeeping" in the context of a shared [[Ledger]] with
+    * multiple [[OrderManagement.OMS]] entails the following:
+    *
+    *   - keep contra accounts per OMS gateway
+    *   - debit contra account when we "buy shares (units)" (creates negative balance)
+    *   - credit that account when settlement happens (zeros out the balance)
+    *   - "reverse polarity" when we enter a short position.
+    *   - indexAndSum settled positions for reconcilliation
+    */
+  sealed trait Market {
+    def entity: LegalEntity.Key
+    def contra: Account.Key
+  }
+
+  /** */
+  object Market extends WithOpaqueKey[Long, Market]
+
+  /**
+    * Models a private party whose [[Ledger.Folio]]s we run [[Ledger.Transaction]]s against.
+    *
+    * The `Counterparty` is assumed to have an [[Ledger.Account]] on the [[Ledger]].
+    */
+  sealed abstract case class Counterparty(
+      final val label: Label,
+      final val contra: Account.Key,
+      final val entity: LegalEntity.Key
+  ) extends Market
+
+  /** */
+  object Counterparty {}
+
+  /**
+    * Single effective counterparty: the `Exchange` itself.
+    *   - [[reference.Mic]]s are unique.
+    *   - seller for all buyers and vice versa.
+    *   - activity recorded in a `contra account`
+    */
+  sealed abstract case class Exchange private (
+      final val mic: Mic,
+      final val contra: Account.Key,
+      final val entity: LegalEntity.Key
+  ) extends Market
+
+  /** */
+  object Exchange {
+
+    /** */
+    def fromMic(mic: Mic): Exchange = ??? // make new contra account
+
+    /** */
+    def withEntity(entity: LegalEntity.Key): Exchange => Exchange =
+      x => new Exchange(x.mic, x.contra, entity) {}
+  }
+
+  /**
+    * MDS := Market Data Source.
+    */
+  sealed abstract case class MDS(market: Market) {
+
+    /** `Currency`-specific quote factory. */
+    def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
+
+    /** */
+    final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
+      Monad[F] pure (Currency[C] fiat quotedIn(ik).mid)
+
+    /** */
+    final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Mny[C]] =
+      leg match {
+        case (security, quantity) => quote[F, C](security) map (_ * quantity)
+      }
+
+    /**
+      * Simple per-leg pricing. Note, this method is `override`-able.
+      *
+      * TODO: this is so minimal as to be of questionable viablity... but is correct
+      */
+    def quoteTrade[F[_]: Monad, C: Currency](trade: Trade): F[Mny[C]] =
+      trade.toList foldMapM quoteLeg[F, C]
+  }
+
+  /** */
+  object MDS extends WithOpaqueKey[Long, MDS] {
+
+    /** */
+    def apply(m: Market): MDS = new MDS(m) {
+
+      /** FIXME: how do we specialize? */
+      def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
+    }
   }
 }

@@ -63,9 +63,9 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
   /**
     * There are a finite enumeration of roles which [[LegalEntity]]s may take on with respect to
-    * [[Account]]s.
+    * [[Ledger.Account]]s.
     *
-    * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]].
+    * Every `Role` is mapped to a [[LegalEntity]] via a [[Ledger.Roster]].
     */
   sealed trait Role extends EnumEntry
 
@@ -93,7 +93,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * There is _always_ a distinguished [[Role]], the `Principal`.
       *
       * The [[LegalEntity]] which is the market participant
-      * responsible for establishing the [[Account]].
+      * responsible for establishing the [[Ledger.Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
       * - beneficial owner for an asset
@@ -135,7 +135,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * `Auditor`s are first class participants, with a package of rights and responsibilities.
       *
       * There are a finite enumeration of [[Role]]s.
-      * Every `Role` is mapped to a [[LegalEntity]] via a [[Roster]]
+      * Every `Role` is mapped to a [[LegalEntity]] via a [[Ledger.Roster]]
       * which is situation and juristiction specific.
       *
       * Practically, what this means is that `Auditor`s will have a (possibly limited) view

@@ -34,7 +34,7 @@ trait Ledger { self: ModuleTypes =>
   /** */
   object Position
 
-  /** A [[Position]] in motion */
+  /** A [[Position]] in motion. */
   type Leg = Position
 
   /** */
@@ -78,6 +78,47 @@ trait Ledger { self: ModuleTypes =>
 
   /** */
   lazy val Trade = Folio
+
+  /** TODO: Revisit decision to make these part of the implicit context. */
+  sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
+
+  /**    */
+  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+
+    /** Summon a pricer for a given currency. */
+    def apply[C: Currency: TradePricer]: TradePricer[C] = implicitly
+
+    /** Create a pricer from a pricing function. */
+    def apply[C: Currency](price: Trade => Result[Mny[C]]): TradePricer[C] =
+      new TradePricer(price) {}
+  }
+
+  /** */
+  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
+
+  /** */
+  object PricedTrade {
+
+    /**      */
+    def apply[C: Currency: TradePricer](trade: Trade): Result[PricedTrade[C]] =
+      for {
+        amount <- TradePricer[C] price trade
+      } yield new PricedTrade[C](trade, amount) {}
+
+    /**
+      * Reduct to "currency as `Instrument`" convention, according to the contents
+      * of a certain (implicit) [[Wallet]].
+      *
+      * Creates what could be called a `FairTrade`...
+      */
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+  }
+
+  /** type alias */
+  type ValuedFolio[C] = PricedTrade[C]
+
+  /** */
+  lazy val ValuedFolio = PricedTrade
 
   /**
     * Models ready cash per currency.

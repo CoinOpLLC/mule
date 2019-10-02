@@ -118,10 +118,10 @@ trait Accounting { self: ModuleTypes =>
   /** */
   final type Credits[C] = AccountMap[Credit, C]
 
-  /** [[BalanceSheet]] assets */
+  /** [[Balances.BalanceSheet]] assets */
   final type Assets[C] = AccountMap[Asset, C]
 
-  /** [[BalanceSheet]] liabilities */
+  /** [[Balances.BalanceSheet]] liabilities */
   final type Liabilities[C] = AccountMap[Liability, C]
 
   /** Assets net of Liabilities */
@@ -162,7 +162,7 @@ trait Accounting { self: ModuleTypes =>
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
     */
-  type Treatment[AK <: AccountingKey] = UnitPartition[AK, MonetaryAmount]
+  type Treatment[K <: AccountingKey] = UnitPartition[K, MonetaryAmount]
 
   /** */
   final val Treatment = UnitPartition
@@ -221,7 +221,7 @@ trait Accounting { self: ModuleTypes =>
   object DebitCreditKey
 
   /**
-    * Keys that preserve the balance of a [[BalanceSheet]].
+    * Keys that preserve the balance of a [[Balances.BalanceSheet]].
     *
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.
@@ -244,7 +244,7 @@ trait Accounting { self: ModuleTypes =>
       from |+| to
     }
 
-    def unapply[EE <: AccountingKey](sk: SwapKey[EE]): Option[(Treatment[EE], Treatment[EE])] =
+    def unapply[E <: AccountingKey](sk: SwapKey[E]): Option[(Treatment[E], Treatment[E])] =
       (sk.from, sk.to).some
 
   }

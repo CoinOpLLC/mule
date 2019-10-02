@@ -175,7 +175,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
   object SingleAssetSwapKey {
 
     /** */
-    def unapply[AK <: AccountingKey](sk: SwapKey[AK]): Option[(AK, AK)] =
+    def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(K, K)] =
       (sk.from, sk.to) match {
         case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
       }

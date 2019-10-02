@@ -17,7 +17,7 @@ import spire.syntax.field._
 import scala.language.higherKinds
 
 /**
-  * Double entry [[Balance]] calculation from a sequence of [[Transaction]]s.
+  * Double entry [[Balance]] calculation from a sequence of [[Ledger.Transaction]]s.
   *
   * Recall the fundamental equation of double entry bookkeeping:
   *
