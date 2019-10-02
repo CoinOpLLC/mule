@@ -1,5 +1,6 @@
 package io.deftrade
 package model
+package layers
 
 import keyval._, time._, money._
 

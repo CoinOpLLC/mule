@@ -1,7 +1,7 @@
 package io.deftrade
 package model
 
-import keyval.DtEnum
+import keyval.DtEnum, layers.{ Accounting, ModuleTypes }
 
 import cats.implicits._
 

@@ -1,5 +1,6 @@
 package io.deftrade
 package model
+package layers
 
 import money.{ Currency, Financial }, keyval.DtEnum
 
@@ -118,10 +119,10 @@ trait Accounting { self: ModuleTypes =>
   /** */
   final type Credits[C] = AccountMap[Credit, C]
 
-  /** [[Balances.BalanceSheet]] assets */
+  /** [[BalanceSheet]] assets */
   final type Assets[C] = AccountMap[Asset, C]
 
-  /** [[Balances.BalanceSheet]] liabilities */
+  /** [[BalanceSheet]] liabilities */
   final type Liabilities[C] = AccountMap[Liability, C]
 
   /** Assets net of Liabilities */

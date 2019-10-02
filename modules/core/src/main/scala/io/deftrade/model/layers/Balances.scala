@@ -1,5 +1,6 @@
 package io.deftrade
 package model
+package layers
 
 import money._, time._
 

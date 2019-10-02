@@ -1,5 +1,6 @@
 package io.deftrade
 package model
+package layers
 
 import implicits._, time._, money._, keyval._, capital._, refinements.Sha256
 

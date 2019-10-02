@@ -16,6 +16,7 @@
 
 package io.deftrade
 package model
+package layers
 
 import money._, keyval._
 import capital.Instrument, reference.Mic

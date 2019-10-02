@@ -3,10 +3,10 @@ package model
 
 import time._, keyval._, refinements.Label, reference._
 
-import enumeratum._
+import enumeratum.{ CatsEnum, Enum, EnumEntry }
 
-import cats._
 import cats.implicits._
+import cats.{ Eq, Show }
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -31,8 +31,11 @@ sealed trait LegalEntity extends Serializable {
   */
 object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
+  /** */
   type IsTaxId = IsSsn Or IsEin
-  type TaxId   = String Refined IsTaxId
+
+  /** */
+  type TaxId = String Refined IsTaxId
 
   import refined.auto._
 
@@ -63,9 +66,9 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
   /**
     * There are a finite enumeration of roles which [[LegalEntity]]s may take on with respect to
-    * [[Ledger.Account]]s.
+    * [[layers.Ledger.Account]]s.
     *
-    * Every `Role` is mapped to a [[LegalEntity]] via a [[Ledger.Roster]].
+    * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Ledger.Roster]].
     */
   sealed trait Role extends EnumEntry
 
@@ -93,7 +96,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * There is _always_ a distinguished [[Role]], the `Principal`.
       *
       * The [[LegalEntity]] which is the market participant
-      * responsible for establishing the [[Ledger.Account]].
+      * responsible for establishing the [[layers.Ledger.Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
       * - beneficial owner for an asset
@@ -135,7 +138,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * `Auditor`s are first class participants, with a package of rights and responsibilities.
       *
       * There are a finite enumeration of [[Role]]s.
-      * Every `Role` is mapped to a [[LegalEntity]] via a [[Ledger.Roster]]
+      * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Ledger.Roster]]
       * which is situation and juristiction specific.
       *
       * Practically, what this means is that `Auditor`s will have a (possibly limited) view
