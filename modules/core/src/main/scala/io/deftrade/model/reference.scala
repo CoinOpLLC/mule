@@ -362,7 +362,7 @@ package reference {
         val sc: String => Seq[Char]    = splitCaps(osc)(_)
         (sc andThen bh)(name).mkString
       }
-      
+
       protected def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
           .foldLeft(Seq.empty[Char]) { (b, a) =>

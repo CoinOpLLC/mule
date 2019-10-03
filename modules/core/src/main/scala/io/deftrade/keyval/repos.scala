@@ -10,14 +10,15 @@ import fs2.Stream
 import scala.language.higherKinds
 
 /**
-  * @note One consequence of this design is that there is only one `Key` type per value object type.
+  * Note: consequence of this design is that there is only one `Key` type per value object type.
+  *
   * TODO revisit this decision and its implication.
   */
 trait repos {
 
   /** */
-  abstract class ValueRepository[F[_], W[?] <: WithValue[?], V](
-      val V: W[V] // empbds Eq[V] instance
+  abstract class ValueRepository[F[_], W[?] <: WithValue.Aux[?], V](
+      val V: W[V]
   )(
       implicit final val F: Sync[F]
   ) {
@@ -31,25 +32,19 @@ trait repos {
     final type R[x] = Stream[F, x]
 
     /** */
-    final type Rows = R[Row]
+    def rows: R[Row]
 
     /** */
-    final type PermRows = R[PermRow]
-
-    /** */
-    def rows: Rows
-
-    /** */
-    def permRows: PermRows
+    def permRows: R[PermRow]
 
     /**  @return a `Stream` of length zero or one. */
-    def get(id: Id): Rows
+    def get(id: Id): R[Row]
 
     /**  */
     final type Pred = Row => Boolean
 
     /**  */
-    final def filter(pred: Pred): Rows = rows filter pred
+    final def filter(pred: Pred): R[Row] = rows filter pred
 
     /** */
     def fresh: Fresh[Id] = Fresh.zeroBasedIncr
@@ -65,16 +60,13 @@ trait repos {
 
   /**  */
   abstract class KeyValueRepository[F[_]: Sync, V: Eq](
-      override val V: WithKey[V]
+      override val V: WithKey.AuxK[V]
   ) extends ValueRepository(V) {
 
     import V._
 
     /**
-      * Note that the returned value is ''not'' embeded in 'F'; this is a "live" invocation!
-      * FIXME: is this right?
-      * FIXME: val folios: Map[K, Map[K2, V]] is gonna need some work...
-      * TODO: review the fact that `get()` is overloaded here.
+      * Note that `get()` is overloaded (not overridden) here.
       */
     def get(k: V.Key): R[V.Value]
 
@@ -107,10 +99,10 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** */
-    override def rows: Rows = ???
+    override def rows: R[Row] = ???
 
     /** */
-    def get(id: Id): Rows = ??? /// Stream emit something something
+    def get(id: Id): R[Row] = ??? /// Stream emit something something
     // F pure { kvs get id }
 
     /** keep this streamless for now */
@@ -124,7 +116,7 @@ trait repos {
     }
 
     /** */
-    override def permRows: PermRows = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
+    override def permRows: R[PermRow] = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
 
   }
 
@@ -138,10 +130,10 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** */
-    override def rows: Rows = ???
+    override def rows: R[Row] = ???
 
     /** Results in re-reading file.  */
-    def get(id: Id): Rows = ??? /// Stream emit something something
+    def get(id: Id): R[Row] = ??? /// Stream emit something something
     // def get(id: Id): F[Option[Row]] = F pure { none }
 
     /** */
@@ -169,7 +161,6 @@ trait repos {
 
     /** */
     def permRows: Stream[F, V.PermRow] = ???
-
   }
 
   /** */
@@ -180,7 +171,7 @@ trait repos {
 
   /** */
   sealed abstract case class MemFileKeyValueRepository[F[_]: Sync, V: Eq](
-      override val V: WithKey[V]
+      override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 
@@ -189,7 +180,7 @@ trait repos {
     new MemFileValueRepository(v) {}
 
   /** */
-  def keyValueRepository[F[_]: Sync, V: Eq](v: WithKey[V]): KeyValueRepository[F, V] =
+  def keyValueRepository[F[_]: Sync, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
     new MemFileKeyValueRepository(v) {}
 }
 

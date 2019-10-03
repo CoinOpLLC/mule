@@ -47,6 +47,11 @@ package object keyval extends repos with csv {
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
 
+  /**
+    * Use case: `Predicate` type is non trival.
+    */
+  type WithPredicateKey[K, P, V] = WithRefinedKey[K, P, V]
+
   /** nb `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
   implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
 

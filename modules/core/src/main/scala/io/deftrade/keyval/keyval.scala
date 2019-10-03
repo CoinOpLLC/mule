@@ -76,12 +76,10 @@ object Fresh {
 /**
   * Defines `Id` and other persistence helpers for a given value class `V`.
   */
-trait WithValue[V] {
+sealed trait WithValue {
 
-  /**
-    * The type of the underlying record being indexed.
-    */
-  final type Value = V
+  /** */
+  type Value
 
   /** */
   implicit lazy val eqValue: Eq[Value] = Eq.fromUniversalEquals[Value]
@@ -124,13 +122,21 @@ trait WithValue[V] {
 
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
+}
+
+object WithValue {
+
+  /**
+    * The type of the underlying record being indexed.
+    */
+  trait Aux[V] extends WithValue { final type Value = V }
 
 }
 
 /**
   * Companion object base class.
   */
-abstract class WithId[V] extends WithValue[V] {
+abstract class WithId[V] extends WithValue.Aux[V] {
 
   /** */
   final type Row = Value
@@ -170,7 +176,7 @@ abstract class WithId[V] extends WithValue[V] {
 /**
   * Companion object base class.
   */
-abstract class WithKey[V] extends WithValue[V] {
+abstract class WithKey extends WithValue {
 
   /**
     * So `Foo`s are indexed with `Foo.Key`s
@@ -216,49 +222,48 @@ abstract class WithKey[V] extends WithValue[V] {
     }
 }
 
+/** */
+object WithKey {
+
+  /** The `Key` type is carried as a member. */
+  abstract class AuxK[V] extends WithKey with WithValue.Aux[V]
+
+  /** */
+  abstract class Aux[K, V] extends AuxK[V] { final type Key = K }
+}
+
+/** */
+sealed abstract case class Key[K] private (k: K)
+
+/** */
+object Key {
+
+  /** */
+  def apply[K](k: K): Key[K] = new Key(k) {}
+
+}
+
 /** When you absolutely, positively wanna (well behaved) case class as a `Key`. */
-abstract class WithAdtKey[K: Order, V] extends WithKey[V] {
-
-  /** */
-  sealed abstract case class Key private (val k: K)
-
-  /** */
+abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
   object Key extends KeyCompanion[Key] {
-
-    /** */
-    def apply(k: K): Key = new Key(k) {}
 
     /** */
     override implicit def order: Order[Key] = Order by (_.k)
   }
 }
 
-/** */
-abstract class WithRefinedKey[K: Order, P, V] extends WithKey[V] {
-
-  /**
-    * Phantom type used to tag the key, which has type K as its underlying representation.
-    * This can either be a trivial tag which encodes the independance of a key from the record
-    * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
-    *
-    * The assumption is that some kind of tagging (eg `Refine` or `@@`) is
-    * combining `K` and `P` to create the `Key` type.
-    */
-  final type Tag = P
-
-  /** */
-  final type Key = Refined[K, Tag]
+/**
+  * Phantom type used to tag the key, which has type K as its underlying representation.
+  * This can either be a trivial tag which encodes the independance of a key from the record
+  * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
+  *
+  * Use case: `Predicate` type is non trival.
+  */
+abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
   object Key extends OpaqueKeyCompanion[K, P]
 }
-
-/**
-  * Use case: `Predicate` type is non trival.
-  *
-  * For example, the `Key` might be of {{{type Label = String Refined (NonEmpty And Trimmed)}}}
-  */
-abstract class WithPredicateKey[K: Order, P, V] extends WithRefinedKey[K, P, V]
 
 /**
   * Companion base class which defines a key as a `Refined`
