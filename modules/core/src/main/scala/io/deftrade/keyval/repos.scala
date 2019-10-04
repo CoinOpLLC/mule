@@ -15,22 +15,44 @@ import java.nio.file.{ Path, Paths }
   */
 trait repos {
 
-  type PH[F[_]] = Sync[F] with ContextShift[F]
+  trait ValueModuleTypes {
+
+    type ValueCompanionType[x] <: WithValue.Aux[x]
+
+    type EffectType[_]
+
+    /** */
+    final type R[x] = Stream[EffectType, x]
+  }
+
+  object ValueModuleTypes {
+    abstract class Aux[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+        val V: W[V]
+    ) extends ValueModuleTypes {
+      final type EffectType[x]         = F[x]
+      final type ValueCompanionType[x] = W[x]
+      import V.{ Index, Value }
+
+      /** Basic in-memory table structure */
+      final type Table = Map[Index, Value]
+    }
+  }
 
   /** */
-  abstract class ValueRepository[F[_], W[?] <: WithValue.Aux[?], V](
-      val V: W[V]
-  )(
-      implicit final val F: PH[F]
-  ) {
+  abstract class ValueRepository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+      v: W[V]
+  ) extends ValueModuleTypes.Aux[F, W, V](v) {
 
     import V._
 
-    /** Basic in-memory table structure */
-    final type Table = Map[Index, Value]
+    /**  */
+    final type Pred = Row => Boolean
+
+    /**  */
+    final def filter(pred: Pred): R[Row] = rows filter pred
 
     /** */
-    final type R[x] = Stream[F, x]
+    final def fresh: Fresh[Id] = Fresh.zeroBasedIncr
 
     /** */
     def rows: R[Row]
@@ -41,26 +63,17 @@ trait repos {
     /**  @return a `Stream` of length zero or one. */
     def get(id: Id): R[Row]
 
-    /**  */
-    final type Pred = Row => Boolean
-
-    /**  */
-    final def filter(pred: Pred): R[Row] = rows filter pred
-
-    /** */
-    def fresh: Fresh[Id] = Fresh.zeroBasedIncr
-
     /** */
     def append(v: Row): F[Result[Id]]
   }
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
-  abstract class ValueOnlyRepository[F[_]: PH, V: Eq](
+  abstract class ValueOnlyRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithId[V]
   ) extends ValueRepository(V)
 
   /**  */
-  abstract class KeyValueRepository[F[_]: PH, V: Eq](
+  abstract class KeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends ValueRepository(V) {
 
@@ -101,17 +114,19 @@ trait repos {
     /** */
     protected final var kvs: Table = Map.empty
 
-    /** */
-    override def rows: R[Row] =
-      // val bs: R[Byte] = for {
-      //   blocker <- Stream resource Blocker[R]
-      //   b       <- io.file.readAll[F](path, blocker, 4096)
-      // } yield b
+    /** FIXME: */
+    override def rows: R[Row] = {
+      def rsrc: Resource[EffectType, Blocker] = Blocker[EffectType]
+      val blockerz: R[Blocker]                = Stream resource rsrc
+      val foo: Blocker => R[Byte] =
+        blocker => io.file.readAll[EffectType](path, blocker, 4096)
+      def bs: R[Byte]                            = ??? // blockerz flatMap foo
+      def csv2row: Pipe[EffectType, String, Row] = ???
       //
-      // def csv2row: Pipe[R, String, Row] = ???
-      //
-      // val x: Stream[R, String] = bs through text.utf8Decode // through text.lines // through csv2row
+      // def x: R[String] = bs through text.utf8Decode // through text.lines // through csv2row
       ???
+    }
+    //
 
     /** */
     def get(id: Id): R[Row] = ??? /// Stream emit something something
@@ -152,7 +167,7 @@ trait repos {
     def get(k: Key): R[Value] = ???
 
     /** */
-    def update(row: Row): F[Result[Unit]] = F delay {
+    def update(row: Row): EffectType[Result[Unit]] = Sync[EffectType] delay {
       Result safe { kvs += row }
     }
 
@@ -176,23 +191,23 @@ trait repos {
   }
 
   /** */
-  sealed abstract case class MemFileValueRepository[F[_]: PH, V: Eq](
+  sealed abstract case class MemFileValueRepository[F[_]: PHI, V: Eq](
       override val V: WithId[V]
   ) extends ValueOnlyRepository(V)
       with MemFileImplV[F, V]
 
   /** */
-  sealed abstract case class MemFileKeyValueRepository[F[_]: PH, V: Eq](
+  sealed abstract case class MemFileKeyValueRepository[F[_]: PHI, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 
   /** */
-  def valueRepository[F[_]: PH, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
+  def valueRepository[F[_]: PHI, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
     new MemFileValueRepository(v) {}
 
   /** */
-  def keyValueRepository[F[_]: PH, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
+  def keyValueRepository[F[_]: PHI, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
     new MemFileKeyValueRepository(v) {}
 }
 

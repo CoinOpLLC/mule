@@ -18,7 +18,7 @@ object Version {
 
   val Spire = "0.17.0-M1"
   val Circe = "0.12.1"
-  val Fs2   = "2.0.0"
+  val Fs2   = "2.0.1"
 
   val Cormorant  = "0.3.0-M1"
   val Fuiid      = "0.3.0-M2"
