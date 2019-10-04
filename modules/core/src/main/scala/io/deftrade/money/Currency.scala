@@ -4,6 +4,7 @@ package money
 import keyval.CsvEnum
 
 import cats.instances.string._
+import cats.Order
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -22,8 +23,20 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   /** instance phantom type representing currency */
   type Type
 
+  /**
+    * Grant of exclusive license to create `Money[N, C]` instances
+    * is hearby made to the implicit instance of `Currency[C]`.
+    * (This feels regrettably clever.)
+    */
+  protected[this] implicit def C: Currency[Type]
+
+  /**
+    * And the Fed said: ''fiat bux''...
+    */
+  final def fiat[N: Financial](n: N) = Money[N, Type](n)
+
   /** */
-  def apply[N: Financial](n: N): Money[N, Type]
+  final def apply[N: Financial](n: N) = fiat(n)
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -73,7 +86,7 @@ object CurrencyLike {
   import refined.cats._
 
   /** */
-  implicit lazy val order: cats.Order[CurrencyLike] = cats.Order by { _.code }
+  implicit lazy val order: Order[CurrencyLike] = Order by { _.code }
 }
 
 /**
@@ -83,21 +96,7 @@ sealed trait Currency[C] extends CurrencyLike { self =>
   /** */
   final type Type = C
 
-  /**
-    * Grant of exclusive license to create `Money[N, C]` instances
-    * is hearby made to the implicit instance of `Currency[C]`.
-    * (This feels regrettably clever.)
-    */
-  private[this] implicit def C: Currency[C] = self
-
-  /**
-    * And the Fed said: ''fiat bux''...
-    */
-  final def fiat[N: Financial](n: N) = Money[N, C](n)
-
-  /** */
-  final def apply[N: Financial](n: N) = fiat(n)
-
+  override protected[this] implicit def C: Currency[Type] = self
 }
 
 /**

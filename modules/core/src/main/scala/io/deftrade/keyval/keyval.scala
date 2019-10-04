@@ -105,17 +105,7 @@ sealed trait WithValue {
   type Row
 
   /** */
-  object Row {
-    type T = Row
-  }
-
-  /** */
   final type PermRow = (Id, Row)
-
-  /** */
-  object PermRow {
-    final type T = PermRow
-  }
 
   /** Will be assigned either Id or Key. */
   type Index
@@ -124,17 +114,21 @@ sealed trait WithValue {
   final type IdField = FieldType[id.T, Id]
 }
 
+/** */
 object WithValue {
 
   /**
     * The type of the underlying record being indexed.
     */
   trait Aux[V] extends WithValue { final type Value = V }
-
 }
 
 /**
   * Companion object base class.
+  *
+  * Note: consequence of this design is that there is only one `Key` type per value object type.
+  *
+  * TODO revisit this decision and its implication.
   */
 abstract class WithId[V] extends WithValue.Aux[V] {
 

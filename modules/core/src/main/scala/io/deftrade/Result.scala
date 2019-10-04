@@ -1,9 +1,8 @@
 package io.deftrade
 
 import cats.implicits._
-import cats.data.Validated
 
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{ EitherT, NonEmptyChain, Validated }
 
 import scala.util.Try
 
@@ -15,6 +14,9 @@ trait results {
 
   /** Applicative flavor. */
   type ResultV[T] = Validated[Fail, T]
+
+  /** Monad transformer flavor. */
+  type ResultT[F[_], T] = EitherT[F, Fail, T]
 
   /**
     * Choosing [[https://typelevel.org/cats/datatypes/chain.html Chain]] for our

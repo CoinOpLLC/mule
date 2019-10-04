@@ -3,24 +3,25 @@ package keyval
 
 import cats.implicits._
 import cats.{ Eq }
-import cats.effect.Sync
+import cats.effect.{ Blocker, ContextShift, ExitCode, IO, IOApp, Resource, Sync }
 
-import fs2.Stream
+import fs2._
 
 import scala.language.higherKinds
 
+import java.nio.file.{ Path, Paths }
+
 /**
-  * Note: consequence of this design is that there is only one `Key` type per value object type.
-  *
-  * TODO revisit this decision and its implication.
   */
 trait repos {
+
+  type PH[F[_]] = Sync[F] with ContextShift[F]
 
   /** */
   abstract class ValueRepository[F[_], W[?] <: WithValue.Aux[?], V](
       val V: W[V]
   )(
-      implicit final val F: Sync[F]
+      implicit final val F: PH[F]
   ) {
 
     import V._
@@ -54,12 +55,12 @@ trait repos {
   }
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
-  abstract class ValueOnlyRepository[F[_]: Sync, V: Eq](
+  abstract class ValueOnlyRepository[F[_]: PH, V: Eq](
       override val V: WithId[V]
   ) extends ValueRepository(V)
 
   /**  */
-  abstract class KeyValueRepository[F[_]: Sync, V: Eq](
+  abstract class KeyValueRepository[F[_]: PH, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends ValueRepository(V) {
 
@@ -92,6 +93,8 @@ trait repos {
 
     import V._
 
+    def path: Path = Paths get "target/foo.txt"
+
     /** FIXME this needs to be atomic swap. Think about it. :| */
     private var id: Id = fresh.init
 
@@ -99,7 +102,16 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** */
-    override def rows: R[Row] = ???
+    override def rows: R[Row] =
+      // val bs: R[Byte] = for {
+      //   blocker <- Stream resource Blocker[R]
+      //   b       <- io.file.readAll[F](path, blocker, 4096)
+      // } yield b
+      //
+      // def csv2row: Pipe[R, String, Row] = ???
+      //
+      // val x: Stream[R, String] = bs through text.utf8Decode // through text.lines // through csv2row
+      ???
 
     /** */
     def get(id: Id): R[Row] = ??? /// Stream emit something something
@@ -164,23 +176,23 @@ trait repos {
   }
 
   /** */
-  sealed abstract case class MemFileValueRepository[F[_]: Sync, V: Eq](
+  sealed abstract case class MemFileValueRepository[F[_]: PH, V: Eq](
       override val V: WithId[V]
   ) extends ValueOnlyRepository(V)
       with MemFileImplV[F, V]
 
   /** */
-  sealed abstract case class MemFileKeyValueRepository[F[_]: Sync, V: Eq](
+  sealed abstract case class MemFileKeyValueRepository[F[_]: PH, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 
   /** */
-  def valueRepository[F[_]: Sync, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
+  def valueRepository[F[_]: PH, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
     new MemFileValueRepository(v) {}
 
   /** */
-  def keyValueRepository[F[_]: Sync, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
+  def keyValueRepository[F[_]: PH, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
     new MemFileKeyValueRepository(v) {}
 }
 
