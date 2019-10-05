@@ -112,25 +112,10 @@ sealed trait WithValue {
 
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
+
 }
 
-/** */
-object WithValue {
-
-  /**
-    * The type of the underlying record being indexed.
-    */
-  trait Aux[V] extends WithValue { final type Value = V }
-}
-
-/**
-  * Companion object base class.
-  *
-  * Note: consequence of this design is that there is only one `Key` type per value object type.
-  *
-  * TODO revisit this decision and its implication.
-  */
-abstract class WithId[V] extends WithValue.Aux[V] {
+trait WithId extends WithValue {
 
   /** */
   final type Row = Value
@@ -139,21 +124,19 @@ abstract class WithId[V] extends WithValue.Aux[V] {
   final type Index = Id
 
   /** */
-  implicit final def deriveLabelledWriteRow[HV <: HList](
+  implicit final def writePermRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlw: Lazy[LabelledWrite[IdField :: HV]]
   ): LabelledWrite[PermRow] =
     new LabelledWrite[PermRow] {
-
       val writeHKV: LabelledWrite[IdField :: HV] = hlw.value
-
-      def headers: CSV.Headers       = writeHKV.headers
-      def write(r: PermRow): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
+      def headers: CSV.Headers                   = writeHKV.headers
+      def write(r: PermRow): CSV.Row             = writeHKV write field[id.T](r._1) :: (genV to r._2)
     }
 
   /** */
-  implicit final def deriveLabelledReadRow[HV <: HList](
+  implicit final def readPermRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlr: Lazy[LabelledRead[IdField :: HV]]
@@ -167,10 +150,32 @@ abstract class WithId[V] extends WithValue.Aux[V] {
     }
 }
 
+/** */
+object WithValue {
+
+  /**
+    * The type of the underlying record being indexed.
+    */
+  trait Aux[V] extends WithValue { final type Value = V }
+}
+
+object WithId {
+
+  /**
+    * Companion object base class.
+    *
+    * Note: consequence of this design is that there is only one `Key` type per value object type.
+    *
+    * TODO revisit this decision and its implication.
+    */
+  trait Aux[V] extends WithValue.Aux[V]
+
+}
+
 /**
   * Companion object base class.
   */
-abstract class WithKey extends WithValue {
+trait WithKey extends WithValue {
 
   /**
     * So `Foo`s are indexed with `Foo.Key`s
@@ -190,30 +195,34 @@ abstract class WithKey extends WithValue {
   final type KeyField = FieldType[key.T, Key]
 
   /** */
-  implicit final def deriveLabelledWriteRow[HV <: HList](
+  implicit final def writePermRow[HV <: HList](
       implicit
-      genV: LabelledGeneric.Aux[Value, HV],
-      hlw: Lazy[LabelledWrite[KeyField :: HV]]
-  ): LabelledWrite[Row] =
-    new LabelledWrite[Row] {
-      val writeHKV: LabelledWrite[KeyField :: HV] = hlw.value
-      def headers: CSV.Headers                    = writeHKV.headers
-      def write(r: Row): CSV.Row                  = writeHKV write field[key.T](r._1) :: (genV to r._2)
+      lgv: LabelledGeneric.Aux[Value, HV],
+      llw: Lazy[LabelledWrite[IdField :: KeyField :: HV]]
+  ): LabelledWrite[PermRow] =
+    new LabelledWrite[PermRow] {
+      val lwHikv: LabelledWrite[IdField :: KeyField :: HV] = llw.value
+      def headers: CSV.Headers                             = lwHikv.headers
+      def write(pr: PermRow): CSV.Row = pr match {
+        case (i, (k, v)) =>
+          lwHikv write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+      }
     }
 
   /** */
-  implicit final def deriveLabelledReadRow[HV <: HList](
+  implicit final def readPermRow[HV <: HList](
       implicit
-      genV: LabelledGeneric.Aux[Value, HV],
-      hlr: Lazy[LabelledRead[KeyField :: HV]]
-  ): LabelledRead[Row] =
-    new LabelledRead[Row] {
-      val readHKV: LabelledRead[KeyField :: HV] = hlr.value
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Row] =
-        readHKV.read(row, headers) map { h =>
-          (h.head, genV from h.tail)
+      lgv: LabelledGeneric.Aux[Value, HV],
+      llr: Lazy[LabelledRead[IdField :: KeyField :: HV]]
+  ): LabelledRead[PermRow] =
+    new LabelledRead[PermRow] {
+      val lrHikv: LabelledRead[IdField :: KeyField :: HV] = llr.value
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+        lrHikv.read(row, headers) map { h =>
+          (h.head, (h.tail.head, lgv from h.tail.tail))
         }
     }
+
 }
 
 /** */

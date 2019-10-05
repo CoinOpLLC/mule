@@ -9,6 +9,8 @@ import fs2._
 
 import scala.language.higherKinds
 
+import scala.concurrent.ExecutionContext
+
 import java.nio.file.{ Path, Paths }
 
 /**
@@ -76,7 +78,7 @@ trait repos {
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
   abstract class ValueOnlyRepository[F[_]: Sync: ContextShift, V: Eq](
-      override val V: WithId[V]
+      override val V: WithId.Aux[V]
   ) extends ValueRepository(V)
 
   /**  */
@@ -113,7 +115,7 @@ trait repos {
 
     import V._
 
-    def path: Path = Paths get "target/foo.txt"
+    def path: Path
 
     /** FIXME this needs to be atomic swap. Think about it. :| */
     private var id: Id = fresh.init
@@ -123,11 +125,7 @@ trait repos {
 
     /** FIXME: */
     override def rows: R[Row] = {
-      def rsrc: Resource[EffectType, Blocker] = Blocker[EffectType]
-      val blockerz: R[Blocker]                = Stream resource rsrc
-      val foo: Blocker => R[Byte] =
-        blocker => io.file.readAll[EffectType](path, blocker, 4096)
-      def bs: R[Byte]                            = ??? // blockerz flatMap foo
+
       def csv2row: Pipe[EffectType, String, Row] = ???
       //
       // def x: R[String] = bs through text.utf8Decode // through text.lines // through csv2row
@@ -136,11 +134,10 @@ trait repos {
     //
 
     /** */
-    def get(id: Id): R[Row] = ??? /// Stream emit something something
-    // F pure { kvs get id }
+    def get(id: Id): R[Row] = permRows filter (_._1 === id) map (_._2)
 
     /** keep this streamless for now */
-    final def append(v: V): R[Id] = ???
+    final def append(r: Row): R[Id] = ???
     //   F delay {
     //   Result safe {
     //     id = fresh next id
@@ -153,6 +150,13 @@ trait repos {
     /** */
     override def permRows: R[PermRow] = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
 
+    // private def readBytes: R[Byte] = (Stream resource Blocker[EffectType]) flatMap { blkr =>
+    //   io.file.readAll[EffectType](path, blkr.blockingContext, 4096)
+    // }
+
+    private def readLines: R[String]           = ???
+    private def appendLine(row: String): R[Id] = ???
+
   }
 
   /** */
@@ -163,6 +167,9 @@ trait repos {
 
     /** */
     protected final var kvs: Table = Map.empty
+
+    /** */
+    def path: Path
 
     /** */
     override def rows: R[Row] = ???
@@ -202,7 +209,7 @@ trait repos {
 
   /** */
   sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
-      override val V: WithId[V]
+      override val V: WithId.Aux[V]
   ) extends ValueOnlyRepository(V)
       with MemFileImplV[F, V]
 
@@ -213,12 +220,18 @@ trait repos {
       with MemFileImplKV[F, V]
 
   /** */
-  def valueRepository[F[_]: Sync: ContextShift, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
-    new MemFileValueRepository(v) {}
+  def valueRepository[F[_]: Sync: ContextShift, V: Eq](
+      v: WithId.Aux[V],
+      p: Path
+  ): ValueOnlyRepository[F, V] =
+    new MemFileValueRepository(v) { override def path = p }
 
   /** */
-  def keyValueRepository[F[_]: Sync: ContextShift, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
-    new MemFileKeyValueRepository(v) {}
+  def keyValueRepository[F[_]: Sync: ContextShift, V: Eq](
+      v: WithKey.AuxK[V],
+      p: Path
+  ): KeyValueRepository[F, V] =
+    new MemFileKeyValueRepository(v) { override def path = p }
 }
 
 object repos extends repos

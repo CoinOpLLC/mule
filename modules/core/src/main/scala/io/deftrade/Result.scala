@@ -6,6 +6,8 @@ import cats.data.{ EitherT, NonEmptyChain, Validated }
 
 import scala.util.Try
 
+import scala.language.higherKinds
+
 /** Package mixin. */
 trait results {
 
