@@ -3,7 +3,7 @@ package keyval
 
 import cats.implicits._
 import cats.{ Eq }
-import cats.effect.{ Blocker, ContextShift, ExitCode, IO, IOApp, Resource, Sync }
+import cats.effect.{ Blocker, ContextShift, Resource, Sync }
 
 import fs2._
 
@@ -21,13 +21,20 @@ trait repos {
 
     type EffectType[_]
 
+    implicit def F: Sync[EffectType]
+    implicit def X: ContextShift[EffectType]
+
     /** */
     final type R[x] = Stream[EffectType, x]
   }
 
   object ValueModuleTypes {
-    abstract class Aux[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+    abstract class Aux[F[_], W[?] <: WithValue.Aux[?], V](
         val V: W[V]
+    )(
+        implicit
+        final override val F: Sync[F],
+        final override val X: ContextShift[F]
     ) extends ValueModuleTypes {
       final type EffectType[x]         = F[x]
       final type ValueCompanionType[x] = W[x]
@@ -64,7 +71,7 @@ trait repos {
     def get(id: Id): R[Row]
 
     /** */
-    def append(v: Row): F[Result[Id]]
+    def append(v: Row): R[Id]
   }
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
@@ -82,23 +89,23 @@ trait repos {
     /**
       * Note that `get()` is overloaded (not overridden) here.
       */
-    def get(k: V.Key): R[V.Value]
+    def get(k: V.Key): R[Value]
 
     /** */
-    def insert(row: Row): F[Result[Unit]]
+    def insert(row: Row): R[Unit]
 
     /**
       * Default (overridable!) implementation tries insert, then update.
       *
       * @return the number of rows inserted
       */
-    def upsert(row: Row): F[Result[Int]] = ???
+    def upsert(row: Row): R[Int] = ???
 
     /** */
-    def update(row: Row): F[Result[Unit]]
+    def update(row: Row): R[Unit]
 
     /** */
-    def delete(k: V.Key): F[Result[Boolean]]
+    def delete(k: V.Key): R[Boolean]
   }
 
   /** */
@@ -133,14 +140,15 @@ trait repos {
     // F pure { kvs get id }
 
     /** keep this streamless for now */
-    final def append(v: V): F[Result[Id]] = F delay {
-      Result safe {
-        id = fresh next id
-        // FIXME the file append goes here k thx
-        kvs += (id -> v)
-        id
-      }
-    }
+    final def append(v: V): R[Id] = ???
+    //   F delay {
+    //   Result safe {
+    //     id = fresh next id
+    //     // FIXME the file append goes here k thx
+    //     kvs += (id -> v)
+    //     id
+    //   }
+    // }
 
     /** */
     override def permRows: R[PermRow] = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
@@ -167,47 +175,49 @@ trait repos {
     def get(k: Key): R[Value] = ???
 
     /** */
-    def update(row: Row): EffectType[Result[Unit]] = Sync[EffectType] delay {
-      Result safe { kvs += row }
-    }
+    def update(row: Row): R[Unit] = ???
+    //   Sync[EffectType] delay {
+    //   Result safe { kvs += row }
+    // }
 
     /** */
-    def delete(k: Key): F[Result[Boolean]] = F pure {
-      Result safe {
-        val oldKvs: Table = kvs
-        kvs -= k
-        oldKvs === kvs
-      }
-    }
+    def delete(k: Key): R[Boolean] = ???
+    //   F pure {
+    //   Result safe {
+    //     val oldKvs: Table = kvs
+    //     kvs -= k
+    //     oldKvs === kvs
+    //   }
+    // }
 
     /** */
-    def insert(row: Row): F[Result[Unit]] = F delay (Result safe { kvs += row })
+    def insert(row: Row): R[Unit] = ??? // F delay (Result safe { kvs += row })
 
     /** */
-    def append(v: V.Row): F[Result[V.Id]] = ???
+    def append(v: Row): R[Id] = ???
 
     /** */
-    def permRows: Stream[F, V.PermRow] = ???
+    def permRows: R[PermRow] = ???
   }
 
   /** */
-  sealed abstract case class MemFileValueRepository[F[_]: PHI, V: Eq](
+  sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithId[V]
   ) extends ValueOnlyRepository(V)
       with MemFileImplV[F, V]
 
   /** */
-  sealed abstract case class MemFileKeyValueRepository[F[_]: PHI, V: Eq](
+  sealed abstract case class MemFileKeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 
   /** */
-  def valueRepository[F[_]: PHI, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
+  def valueRepository[F[_]: Sync: ContextShift, V: Eq](v: WithId[V]): ValueOnlyRepository[F, V] =
     new MemFileValueRepository(v) {}
 
   /** */
-  def keyValueRepository[F[_]: PHI, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
+  def keyValueRepository[F[_]: Sync: ContextShift, V: Eq](v: WithKey.AuxK[V]): KeyValueRepository[F, V] =
     new MemFileKeyValueRepository(v) {}
 }
 
