@@ -25,3 +25,10 @@
 
   - `aggregate entities`
       - CQRS/ES backed actors
+
+
+=== NO WARRANTY ===
+
+>This is free software; see the source for copying conditions.
+There is no warranty, not even for merchantability or fitness
+for a particular purpose.

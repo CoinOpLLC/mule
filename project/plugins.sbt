@@ -43,11 +43,11 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2")
 /**
   * [License Header plugin](https://github.com/sbt/sbt-header)
   */
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "4.0.0")
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.2.0")
 
 /**
   * As with real warts, there will be blood: be prepeared.
-  * [Wart Remover](http://www.wartremover.org/)
+  * [[http://www.wartremover.org/ Wart Remover]]
   */
 addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.3")
 

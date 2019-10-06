@@ -23,5 +23,4 @@ class DemoSpec extends FlatSpec with Matchers {
     assert(yesterday < today)
 
   }
-
 }
