@@ -17,17 +17,13 @@
 package io.deftrade
 package keyval
 
-import implicits._
-
 import cats.implicits._
-import cats.{ Eq }
-import cats.effect.{ Blocker, ContextShift, Resource, Sync }
+import cats.Eq
+import cats.effect.{ Blocker, ContextShift, Sync }
 
-import fs2._
+import fs2.{ io, text, Pipe, Stream }
 
 import scala.language.higherKinds
-
-import scala.concurrent.ExecutionContext
 
 import java.nio.file.{ Path, Paths }
 
@@ -45,7 +41,7 @@ trait repos {
     implicit def X: ContextShift[EffectType]
 
     /** */
-    final type R[x] = Stream[EffectType, x]
+    final type EffectStream[x] = Stream[EffectType, x]
   }
 
   object ValueModuleTypes {
@@ -66,32 +62,51 @@ trait repos {
   }
 
   /** */
-  abstract class ValueRepository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+  protected abstract class ValueRepository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
       v: W[V]
   ) extends ValueModuleTypes.Aux[F, W, V](v) {
 
     import V._
 
-    /**  */
-    final type Pred = Row => Boolean
+    @SuppressWarnings(Array("org.wartremover.warts.Var")) private var id: Id = fresh.init
 
     /**  */
-    final def filter(pred: Pred): R[Row] = rows filter pred
+    final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
 
     /** */
-    final def fresh: Fresh[Id] = Fresh.zeroBasedIncr
-
-    /** */
-    def rows: R[Row]
-
-    /** */
-    def permRows: R[PermRow]
+    final def rows: EffectStream[Row] = permRows map (_._2)
 
     /**  @return a `Stream` of length zero or one. */
-    def get(id: Id): R[Row]
+    def get(id: Id): EffectStream[Row] = permRows filter (_._1 === id) map (_._2)
 
     /** */
-    def append(v: Row): R[Id]
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def permRows: EffectStream[PermRow] = readLines through csvToPermRow
+
+    /** */
+    /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def append(row: Row): EffectStream[Id] =
+      for {
+        id <- ids
+        _  <- Stream emit id -> row through permRowToCSV through appendingSink
+        _  <- Stream emit updateCache(row)
+      } yield id
+
+    private def fresh: Fresh[Id]      = Fresh.zeroBasedIncr
+    private def ids: EffectStream[Id] = Stream emit [EffectType, Id] { id = fresh next id; id }
+
+    private def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
+    private def csvToPermRow: Pipe[EffectType, String, PermRow] = ???
+
+    /** */
+    protected def readLines: EffectStream[String]
+
+    /** */
+    protected def appendingSink: Pipe[EffectType, String, Unit]
+
+    /** */
+    protected def updateCache(row: Row) = ()
   }
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
@@ -109,138 +124,76 @@ trait repos {
     /**
       * Note that `get()` is overloaded (not overridden) here.
       */
-    def get(k: V.Key): R[Value]
+    def get(k: Key): EffectStream[Value]
 
     /** */
-    def insert(row: Row): R[Unit]
+    def insert(row: Row): EffectStream[Unit]
 
     /**
       * Default (overridable!) implementation tries insert, then update.
       *
       * @return the number of rows inserted
       */
-    def upsert(row: Row): R[Int] = ???
+    def upsert(row: Row): EffectStream[Int] = ???
 
     /** */
-    def update(row: Row): R[Unit]
+    def update(row: Row): EffectStream[Unit]
 
     /** */
-    def delete(k: V.Key): R[Boolean]
+    def delete(k: V.Key): EffectStream[Boolean]
   }
 
   /** */
-  trait MemFileImplV[F[_], V] { self: ValueOnlyRepository[F, V] =>
+  private trait MemFileImplV[F[_], W[?] <: WithValue.Aux[?], V] { self: ValueRepository[F, W, V] =>
 
-    import V._
-
+    /** */
     def path: Path
 
-    /** FIXME this needs to be atomic swap. Think about it. :| */
-    private var id: Id = fresh.init
-
     /** */
-    protected final var kvs: Table = Map.empty
-
-    /** FIXME: */
-    final override def rows: R[Row] = ??? // kvs.toList.liftTo[EffectType].somehow
-    //
-
-    /** */
-    final def get(id: Id): R[Row] = permRows filter (_._1 === id) map (_._2)
-
-    /** keep this streamless for now */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def append(r: Row): R[Id] = {
-
-      def updateCache() = () // r match { case (k, v) => { kvs = kvs + (k -> v) } }
-
-      for {
-        id <- ids
-        _  <- Stream emit id -> r through permRowToCSV through aof
-        _  <- Stream emit updateCache()
-      } yield id
-    }
+    final protected def appendingSink: Pipe[EffectType, String, Unit] = ???
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final override def permRows: R[PermRow] = readLines through csvToPermRow
-
-    /** */
-    private def ids: R[Id] = ???
-
-    /** */
-    private def aof: Pipe[EffectType, String, Unit] = ???
-
-    /** */
-    private def csvToPermRow: Pipe[EffectType, String, PermRow] = ???
-
-    /** */
-    private def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    private def readLines: R[String] =
+    final protected def readLines: EffectStream[String] =
       (Stream resource Blocker[EffectType]) flatMap { blocker =>
         io.file readAll [EffectType] (path, blocker, 1024 * 1042)
       } through text.utf8Decode through text.lines
   }
 
   /** */
-  trait MemFileImplKV[F[_], V] /* extends MemFileImplV[F, V] */ {
+  private trait MemFileImplKV[F[_], V] extends MemFileImplV[F, WithKey.AuxK, V] {
     self: KeyValueRepository[F, V] =>
 
     import V._
 
     /** */
-    protected final var kvs: Table = Map.empty
+    private var kvs: Table = Map.empty
+
+    /** TODO: awkward impl Option[?] ~> Stream[F, ?] ought to be a thing, right? */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def get(k: Key): EffectStream[Value] =
+      (kvs get k).fold(Stream apply [EffectType, Value] ()) { v =>
+        Stream emit [EffectType, Value] v
+      }
 
     /** */
-    def path: Path
+    def update(row: Row): EffectStream[Unit] = ???
+
+    /** FIXME - not clear how to memorialize this in a Row... */
+    def delete(k: Key): EffectStream[Boolean] = ???
 
     /** */
-    override def rows: R[Row] = ???
-
-    /** Results in re-reading file.  */
-    def get(id: Id): R[Row] = ??? /// Stream emit something something
-    // def get(id: Id): F[Option[Row]] = F pure { none }
-
-    /** */
-    def get(k: Key): R[Value] = ???
-
-    /** */
-    def update(row: Row): R[Unit] = ???
-    //   Sync[EffectType] delay {
-    //   Result safe { kvs += row }
-    // }
-
-    /** */
-    def delete(k: Key): R[Boolean] = ???
-    //   F pure {
-    //   Result safe {
-    //     val oldKvs: Table = kvs
-    //     kvs -= k
-    //     oldKvs === kvs
-    //   }
-    // }
-
-    /** */
-    def insert(row: Row): R[Unit] = ??? // F delay (Result safe { kvs += row })
-
-    /** */
-    def append(v: Row): R[Id] = ???
-
-    /** */
-    def permRows: R[PermRow] = ???
+    def insert(row: Row): EffectStream[Unit] = ???
   }
 
   /** */
-  sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  private sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithId.Aux[V]
   ) extends ValueOnlyRepository(V)
-      with MemFileImplV[F, V]
+      with MemFileImplV[F, WithId.Aux, V]
 
   /** */
-  sealed abstract case class MemFileKeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  private sealed abstract case class MemFileKeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
@@ -248,16 +201,18 @@ trait repos {
   /** */
   def valueRepository[F[_]: Sync: ContextShift, V: Eq](
       v: WithId.Aux[V],
-      p: Path
-  ): ValueOnlyRepository[F, V] =
-    new MemFileValueRepository(v) { override def path = p }
+      p: String
+  ): Result[ValueOnlyRepository[F, V]] = Result safe {
+    new MemFileValueRepository(v) { override def path = Paths get p }
+  }
 
   /** */
   def keyValueRepository[F[_]: Sync: ContextShift, V: Eq](
       v: WithKey.AuxK[V],
-      p: Path
-  ): KeyValueRepository[F, V] =
-    new MemFileKeyValueRepository(v) { override def path = p }
+      p: String
+  ): Result[KeyValueRepository[F, V]] = Result safe {
+    new MemFileKeyValueRepository(v) { override def path = Paths get p }
+  }
 }
 
 object repos extends repos

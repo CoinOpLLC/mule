@@ -131,6 +131,7 @@ sealed trait WithValue {
 
 }
 
+/** */
 trait WithId extends WithValue {
 
   /** */
@@ -144,26 +145,26 @@ trait WithId extends WithValue {
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlw: Lazy[LabelledWrite[IdField :: HV]]
-  ): LabelledWrite[PermRow] =
-    new LabelledWrite[PermRow] {
-      val writeHKV: LabelledWrite[IdField :: HV] = hlw.value
-      def headers: CSV.Headers                   = writeHKV.headers
-      def write(r: PermRow): CSV.Row             = writeHKV write field[id.T](r._1) :: (genV to r._2)
-    }
+  ): LabelledWrite[PermRow] = new LabelledWrite[PermRow] {
+
+    val writeHKV: LabelledWrite[IdField :: HV] = hlw.value
+
+    def headers: CSV.Headers       = writeHKV.headers
+    def write(r: PermRow): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
+  }
 
   /** */
   implicit final def readPermRow[HV <: HList](
       implicit
       genV: LabelledGeneric.Aux[Value, HV],
       hlr: Lazy[LabelledRead[IdField :: HV]]
-  ): LabelledRead[PermRow] =
-    new LabelledRead[PermRow] {
-      val readHKV: LabelledRead[IdField :: HV] = hlr.value
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-        readHKV.read(row, headers) map { h =>
-          (h.head, genV from h.tail)
-        }
-    }
+  ): LabelledRead[PermRow] = new LabelledRead[PermRow] {
+
+    val readHKV: LabelledRead[IdField :: HV] = hlr.value
+
+    def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+      readHKV.read(row, headers) map (h => (h.head, genV from h.tail))
+  }
 }
 
 /** */
