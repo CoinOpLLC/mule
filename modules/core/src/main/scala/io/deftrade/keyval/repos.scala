@@ -150,7 +150,19 @@ trait repos {
     def path: Path
 
     /** */
-    final protected def appendingSink: Pipe[EffectType, String, Unit] = ???
+    final protected var table: Table = Map.empty
+    import _root_.io.deftrade.implicits._
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final protected def appendingSink: Pipe[EffectType, String, Unit] =
+      fs =>
+        for {
+          s <- fs
+          u <- Stream emit s |> { _ =>
+                ()
+              }
+        } yield u
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -166,13 +178,10 @@ trait repos {
 
     import V._
 
-    /** */
-    private var kvs: Table = Map.empty
-
     /** TODO: awkward impl Option[?] ~> Stream[F, ?] ought to be a thing, right? */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def get(k: Key): EffectStream[Value] =
-      (kvs get k).fold(Stream apply [EffectType, Value] ()) { v =>
+      (table get k).fold(Stream apply [EffectType, Value] ()) { v =>
         Stream emit [EffectType, Value] v
       }
 
