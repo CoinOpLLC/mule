@@ -10,7 +10,7 @@ import fs2.{ io, text, Stream }
 import java.nio.file.Paths
 // import java.nio.file.Paths
 
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
+@SuppressWarnings(Array("org.wartremover.warts.Any")) // FIXME why?
 object Converter extends IOApp {
 
   val converter: Stream[IO, Unit] = Stream.resource(Blocker[IO]).flatMap { blocker =>

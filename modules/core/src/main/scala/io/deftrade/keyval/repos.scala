@@ -17,6 +17,8 @@
 package io.deftrade
 package keyval
 
+import implicits._
+
 import cats.implicits._
 import cats.{ Eq }
 import cats.effect.{ Blocker, ContextShift, Resource, Sync }
@@ -140,39 +142,47 @@ trait repos {
     protected final var kvs: Table = Map.empty
 
     /** FIXME: */
-    override def rows: R[Row] = {
-
-      def csv2row: Pipe[EffectType, String, Row] = ???
-      //
-      // def x: R[String] = bs through text.utf8Decode // through text.lines // through csv2row
-      ???
-    }
+    final override def rows: R[Row] = ??? // kvs.toList.liftTo[EffectType].somehow
     //
 
     /** */
-    def get(id: Id): R[Row] = permRows filter (_._1 === id) map (_._2)
+    final def get(id: Id): R[Row] = permRows filter (_._1 === id) map (_._2)
 
     /** keep this streamless for now */
-    final def append(r: Row): R[Id] = ???
-    //   F delay {
-    //   Result safe {
-    //     id = fresh next id
-    //     // FIXME the file append goes here k thx
-    //     kvs += (id -> v)
-    //     id
-    //   }
-    // }
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def append(r: Row): R[Id] = {
+
+      def updateCache() = () // r match { case (k, v) => { kvs = kvs + (k -> v) } }
+
+      for {
+        id <- ids
+        _  <- Stream emit id -> r through permRowToCSV through aof
+        _  <- Stream emit updateCache()
+      } yield id
+    }
 
     /** */
-    override def permRows: R[PermRow] = ??? // Stream emit [F, PermRow] { /* rowz an stuff */ }
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final override def permRows: R[PermRow] = readLines through csvToPermRow
 
-    // private def readBytes: R[Byte] = (Stream resource Blocker[EffectType]) flatMap { blkr =>
-    //   io.file.readAll[EffectType](path, blkr.blockingContext, 4096)
-    // }
+    /** */
+    private def ids: R[Id] = ???
 
-    private def readLines: R[String]           = ???
-    private def appendLine(row: String): R[Id] = ???
+    /** */
+    private def aof: Pipe[EffectType, String, Unit] = ???
 
+    /** */
+    private def csvToPermRow: Pipe[EffectType, String, PermRow] = ???
+
+    /** */
+    private def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    private def readLines: R[String] =
+      (Stream resource Blocker[EffectType]) flatMap { blocker =>
+        io.file readAll [EffectType] (path, blocker, 1024 * 1042)
+      } through text.utf8Decode through text.lines
   }
 
   /** */
