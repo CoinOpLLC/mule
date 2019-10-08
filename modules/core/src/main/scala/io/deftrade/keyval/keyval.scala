@@ -176,6 +176,7 @@ object WithValue {
   trait Aux[V] extends WithValue { final type Value = V }
 }
 
+/** */
 object WithId {
 
   /**
@@ -239,7 +240,6 @@ trait WithKey extends WithValue {
           (h.head, (h.tail.head, lgv from h.tail.tail))
         }
     }
-
 }
 
 /** */

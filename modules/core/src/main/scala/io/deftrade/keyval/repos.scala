@@ -21,7 +21,11 @@ import cats.implicits._
 import cats.Eq
 import cats.effect.{ Blocker, ContextShift, Sync }
 
+import shapeless.{ HList, LabelledGeneric }
+
 import fs2.{ io, text, Pipe, Stream }
+
+import _root_.io.chrisdavenport.cormorant._
 
 import scala.language.higherKinds
 
@@ -31,7 +35,7 @@ import java.nio.file.{ Path, Paths }
   */
 trait repos {
 
-  trait ValueModuleTypes {
+  protected trait ModuleTypes {
 
     type ValueCompanionType[x] <: WithValue.Aux[x]
 
@@ -44,31 +48,30 @@ trait repos {
     final type EffectStream[x] = Stream[EffectType, x]
   }
 
-  object ValueModuleTypes {
+  protected object ModuleTypes {
     abstract class Aux[F[_], W[?] <: WithValue.Aux[?], V](
         val V: W[V]
     )(
         implicit
         final override val F: Sync[F],
         final override val X: ContextShift[F]
-    ) extends ValueModuleTypes {
-      final type EffectType[x]         = F[x]
+    ) extends ModuleTypes {
+
+      final type EffectType[x] = F[x]
+
       final type ValueCompanionType[x] = W[x]
-      import V.{ Index, Value }
 
       /** Basic in-memory table structure */
-      final type Table = Map[Index, Value]
+      final type Table = Map[V.Index, V.Value]
     }
   }
 
   /** */
-  protected abstract class ValueRepository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+  protected abstract class Repository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
       v: W[V]
-  ) extends ValueModuleTypes.Aux[F, W, V](v) {
+  ) extends ModuleTypes.Aux[F, W, V](v) {
 
     import V._
-
-    @SuppressWarnings(Array("org.wartremover.warts.Var")) private var id: Id = fresh.init
 
     /**  */
     final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
@@ -88,16 +91,10 @@ trait repos {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def append(row: Row): EffectStream[Id] =
       for {
-        id <- ids
+        id <- Stream emit [EffectType, Id] { id = fresh next id; id }
         _  <- Stream emit id -> row through permRowToCSV through appendingSink
         _  <- Stream emit updateCache(row)
       } yield id
-
-    private def fresh: Fresh[Id]      = Fresh.zeroBasedIncr
-    private def ids: EffectStream[Id] = Stream emit [EffectType, Id] { id = fresh next id; id }
-
-    private def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
-    private def csvToPermRow: Pipe[EffectType, String, PermRow] = ???
 
     /** */
     protected def readLines: EffectStream[String]
@@ -107,17 +104,39 @@ trait repos {
 
     /** */
     protected def updateCache(row: Row) = ()
+
+    /** */
+    protected def permRowToCSV: Pipe[EffectType, PermRow, String]
+
+    /** */
+    protected def csvToPermRow: Pipe[EffectType, String, PermRow]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var id: Id                = fresh.init
+    private lazy val fresh: Fresh[Id] = Fresh.zeroBasedIncr
   }
 
   /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
-  abstract class ValueOnlyRepository[F[_]: Sync: ContextShift, V: Eq](
+  abstract class ValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithId.Aux[V]
-  ) extends ValueRepository(V)
+  ) extends Repository(V) {
+
+    import V._
+
+    /** */
+    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
+
+    /** */
+    final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
+      ???
+    }
+
+  }
 
   /**  */
   abstract class KeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithKey.AuxK[V]
-  ) extends ValueRepository(V) {
+  ) extends Repository(V) {
 
     import V._
 
@@ -141,10 +160,23 @@ trait repos {
 
     /** */
     def delete(k: V.Key): EffectStream[Boolean]
+
+    /** */
+    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
+
+    /** FIXME review and import derivation superpowers */
+    final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = {
+      //
+      // def lgv[HV <: HList]: LabelledGeneric.Aux[Value, HV] = LabelledGeneric[Value]
+      // val lwpr = LabelledWrite[PermRow]
+      // val lrpr = LabelledRead[PermRow]
+      ess =>
+        ???
+    }
   }
 
   /** */
-  private trait MemFileImplV[F[_], W[?] <: WithValue.Aux[?], V] { self: ValueRepository[F, W, V] =>
+  private trait MemFileImplV[F[_], W[?] <: WithValue.Aux[?], V] { self: Repository[F, W, V] =>
 
     /** */
     def path: Path
@@ -198,7 +230,7 @@ trait repos {
   /** */
   private sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
       override val V: WithId.Aux[V]
-  ) extends ValueOnlyRepository(V)
+  ) extends ValueRepository(V)
       with MemFileImplV[F, WithId.Aux, V]
 
   /** */
@@ -211,7 +243,7 @@ trait repos {
   def valueRepository[F[_]: Sync: ContextShift, V: Eq](
       v: WithId.Aux[V],
       p: String
-  ): Result[ValueOnlyRepository[F, V]] = Result safe {
+  ): Result[ValueRepository[F, V]] = Result safe {
     new MemFileValueRepository(v) { override def path = Paths get p }
   }
 
