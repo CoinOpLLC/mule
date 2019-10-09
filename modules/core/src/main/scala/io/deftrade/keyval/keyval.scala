@@ -30,7 +30,8 @@ import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
 // import shapeless.syntax.singleton._
 
-import _root_.io.chrisdavenport.cormorant._
+import _root_.io.chrisdavenport.cormorant
+import cormorant.{ CSV, Error, LabelledRead, LabelledWrite }
 
 /** */
 object OpaqueKey {
@@ -97,7 +98,7 @@ sealed trait WithValue {
   /** */
   type Value
 
-  /** */
+  /** TODO: this is sketchy */
   implicit lazy val eqValue: Eq[Value] = Eq.fromUniversalEquals[Value]
 
   /** */
@@ -129,6 +130,19 @@ sealed trait WithValue {
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
 
+  /** */
+  implicit val lgv: LabelledGeneric[Value]
+}
+
+/** */
+object WithValue {
+
+  /**
+    * The type of the underlying record being indexed.
+    */
+  sealed abstract class Aux[V]()(implicit val lgv: LabelledGeneric[V]) extends WithValue {
+    final type Value = V
+  }
 }
 
 /** */
@@ -165,15 +179,6 @@ trait WithId extends WithValue {
     def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
       readHKV.read(row, headers) map (h => (h.head, genV from h.tail))
   }
-}
-
-/** */
-object WithValue {
-
-  /**
-    * The type of the underlying record being indexed.
-    */
-  trait Aux[V] extends WithValue { final type Value = V }
 }
 
 /** */
@@ -246,10 +251,10 @@ trait WithKey extends WithValue {
 object WithKey {
 
   /** The `Key` type is carried as a member. */
-  abstract class AuxK[V] extends WithKey with WithValue.Aux[V]
+  abstract class AuxK[V: LabelledGeneric] extends WithValue.Aux[V] with WithKey
 
   /** */
-  abstract class Aux[K, V] extends AuxK[V] { final type Key = K }
+  abstract class Aux[K, V: LabelledGeneric] extends AuxK[V] { final type Key = K }
 }
 
 /** */
@@ -260,11 +265,12 @@ object Key {
 
   /** */
   def apply[K](k: K): Key[K] = new Key(k) {}
-
 }
 
-/** When you absolutely, positively wanna (well behaved) case class as a `Key`. */
-abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
+/** When you want a case class as a `Key`. */
+abstract class WithAdtKey[K: Order, V: LabelledGeneric] extends WithKey.Aux[Key[K], V] {
+
+  /** */
   object Key extends KeyCompanion[Key] {
 
     /** */
@@ -279,7 +285,7 @@ abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
   *
   * Use case: `Predicate` type is non trival.
   */
-abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
+abstract class WithRefinedKey[K: Order, P, V: LabelledGeneric] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
   object Key extends OpaqueKeyCompanion[K, P]
@@ -289,4 +295,4 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P],
   * Companion base class which defines a key as a `Refined`
   * type, parameterized with the value type we are indexing.
   */
-abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
+abstract class WithOpaqueKey[K: Order, V: LabelledGeneric] extends WithRefinedKey[K, V, V]

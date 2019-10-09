@@ -130,7 +130,6 @@ trait repos {
     final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
       ???
     }
-
   }
 
   /**  */

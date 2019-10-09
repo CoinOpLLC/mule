@@ -128,7 +128,7 @@ trait Ledger { self: ModuleTypes =>
       *
       * Creates what could be called a `FairTrade`...
       */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet.Aux[C]): Trade = ???
   }
 
   /** type alias */
@@ -146,22 +146,31 @@ trait Ledger { self: ModuleTypes =>
     * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
     * values are '''not''' carried by instances of this class.
     */
-  sealed abstract case class Wallet[C] private (folio: Folio)
+  trait Wallet {
+    type CurrencyType
+    implicit val C: Currency[CurrencyType]
+    val folio: Folio
+  }
 
   /**
     * Wallet folios are guarranteed non-empty, in that there is at least one Position.
     */
-  object Wallet extends WithOpaqueKey[Long, Folio] {
+  object Wallet extends WithOpaqueKey[Long, Wallet] {
+
+    /** FIXME move this outside the object DUH */
+    sealed abstract case class Aux[C](val folio: Folio)(implicit val C: Currency[C]) extends Wallet {
+      final type CurrencyType = C
+    }
 
     /**
       * type parameter is checked for `Currency` status
       * TODO: additional validation?
       */
-    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
-      new Wallet[C](Folio(p +: ps: _*)) {}
+    def apply[C: Currency](p: Position, ps: Position*): Wallet.Aux[C] =
+      new Aux[C](Folio(p +: ps: _*)) {}
 
     /** type parameter is checked for `Currency` status */
-    private[deftrade] def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet[C](folio) {}
+    private[deftrade] def apply[C: Currency](folio: Folio): Wallet.Aux[C] = new Aux[C](folio) {}
   }
 
   /**
