@@ -25,12 +25,7 @@ import refined.api.{ Min, Refined }
 
 import spire.implicits._
 
-import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
-// import shapeless.syntax.singleton._
-
-import _root_.io.chrisdavenport.cormorant
-import cormorant.{ CSV, Error, LabelledRead, LabelledWrite }
 
 /** */
 object OpaqueKey {
@@ -118,32 +113,6 @@ trait WithId extends WithValue {
 
   /** */
   final type Index = Id
-
-  /** */
-  implicit final def writePermRow[HV <: HList](
-      implicit
-      genV: LabelledGeneric.Aux[Value, HV],
-      hlw: Lazy[LabelledWrite[IdField :: HV]]
-  ): LabelledWrite[PermRow] = new LabelledWrite[PermRow] {
-
-    val writeHKV: LabelledWrite[IdField :: HV] = hlw.value
-
-    def headers: CSV.Headers       = writeHKV.headers
-    def write(r: PermRow): CSV.Row = writeHKV write field[id.T](r._1) :: (genV to r._2)
-  }
-
-  /** */
-  implicit final def readPermRow[HV <: HList](
-      implicit
-      genV: LabelledGeneric.Aux[Value, HV],
-      hlr: Lazy[LabelledRead[IdField :: HV]]
-  ): LabelledRead[PermRow] = new LabelledRead[PermRow] {
-
-    val readHKV: LabelledRead[IdField :: HV] = hlr.value
-
-    def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-      readHKV.read(row, headers) map (h => (h.head, genV from h.tail))
-  }
 }
 
 /** */
@@ -181,35 +150,6 @@ trait WithKey extends WithValue {
 
   /** The full type of the [[Key]] column. */
   final type KeyField = FieldType[key.T, Key]
-
-  /** */
-  implicit final def writePermRow[HV <: HList](
-      implicit
-      lgv: LabelledGeneric.Aux[Value, HV],
-      llw: Lazy[LabelledWrite[IdField :: KeyField :: HV]]
-  ): LabelledWrite[PermRow] =
-    new LabelledWrite[PermRow] {
-      val lwHikv: LabelledWrite[IdField :: KeyField :: HV] = llw.value
-      def headers: CSV.Headers                             = lwHikv.headers
-      def write(pr: PermRow): CSV.Row = pr match {
-        case (i, (k, v)) =>
-          lwHikv write field[id.T](i) :: field[key.T](k) :: (lgv to v)
-      }
-    }
-
-  /** */
-  implicit final def readPermRow[HV <: HList](
-      implicit
-      lgv: LabelledGeneric.Aux[Value, HV],
-      llr: Lazy[LabelledRead[IdField :: KeyField :: HV]]
-  ): LabelledRead[PermRow] =
-    new LabelledRead[PermRow] {
-      val lrHikv: LabelledRead[IdField :: KeyField :: HV] = llr.value
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-        lrHikv.read(row, headers) map { h =>
-          (h.head, (h.tail.head, lgv from h.tail.tail))
-        }
-    }
 }
 
 /** */

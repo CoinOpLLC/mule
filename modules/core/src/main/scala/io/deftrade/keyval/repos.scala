@@ -24,7 +24,8 @@ import cats.effect.{ Blocker, ContextShift, Sync }
 import spire.math.Integral
 import spire.syntax.field._
 
-import shapeless.{ HList, LabelledGeneric }
+import shapeless.{ ::, HList, LabelledGeneric, Lazy }
+import shapeless.labelled._
 
 import fs2.{ io, text, Pipe, Stream }
 
@@ -34,36 +35,37 @@ import scala.language.higherKinds
 
 import java.nio.file.{ Path, Paths }
 
+final case class Fresh[K](init: K, next: K => K)
+
 /**
+  * Defines how to create a fresh '''globally unique''' key which
+  * is suitable to be persisted.
   */
-trait repos {
+/** */
+object Fresh {
+
+  def apply[K: Fresh] = implicitly[Fresh[K]]
 
   /**
-    * Defines how to create a fresh '''globally unique''' key which
-    * is suitable to be persisted.
+    * Equivalent to `autoincrement` or `serial` from SQL.
+    *
+    * TODO: PRNG version.
     */
-  final case class Fresh[K](init: K, next: K => K)
+  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
 
-  /** */
-  object Fresh {
+    val K = Integral[K]; import K._
 
-    def apply[K: Fresh] = implicitly[Fresh[K]]
-
-    /**
-      * Equivalent to `autoincrement` or `serial` from SQL.
-      *
-      * TODO: PRNG version.
-      */
-    def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
-
-      val K = Integral[K]; import K._
-
-      Fresh(
-        OpaqueKey(zero),
-        key => OpaqueKey(key.value + one)
-      )
-    }
+    Fresh(
+      OpaqueKey(zero),
+      key => OpaqueKey(key.value + one)
+    )
   }
+}
+
+/**
+  *
+  */
+trait repos {
 
   protected trait ModuleTypes {
 
@@ -76,6 +78,7 @@ trait repos {
 
     /** */
     final type EffectStream[x] = Stream[EffectType, x]
+
   }
 
   protected object ModuleTypes {
@@ -84,7 +87,8 @@ trait repos {
     )(
         implicit
         final override val F: Sync[F],
-        final override val X: ContextShift[F]
+        final override val X: ContextShift[F],
+        final val lgv: LabelledGeneric[V]
     ) extends ModuleTypes {
 
       final type EffectType[x] = F[x]
@@ -97,7 +101,7 @@ trait repos {
   }
 
   /** */
-  protected abstract class Repository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V](
+  protected abstract class Repository[F[_]: Sync: ContextShift, W[?] <: WithValue.Aux[?], V: Eq: LabelledGeneric](
       v: W[V]
   ) extends ModuleTypes.Aux[F, W, V](v) {
 
@@ -116,14 +120,13 @@ trait repos {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def permRows: EffectStream[PermRow] = readLines through csvToPermRow
 
-    /** */
     /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def append(row: Row): EffectStream[Id] =
       for {
-        id <- Stream emit [EffectType, Id] { id = fresh next id; id }
+        id <- Stream eval { F delay { id = fresh next id; id } }
         _  <- Stream emit id -> row through permRowToCSV through appendingSink
-        _  <- Stream emit updateCache(row)
+        _  <- Stream eval { F delay updateCache(row) }
       } yield id
 
     /** */
@@ -146,24 +149,53 @@ trait repos {
     private lazy val fresh: Fresh[Id] = Fresh.zeroBasedIncr
   }
 
-  /**  Necessary for ctor parameter V to carry the specific type mapping. (Index mapped to Id) */
-  abstract class ValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  /**
+    * Ctor parameter `V` carries types specific to `type V`.
+    * `type Index` mapped to [[WithValue.Id]].
+    */
+  abstract class ValueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       override val V: WithId.Aux[V]
   ) extends Repository(V) {
 
     import V._
 
     /** */
-    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
+    implicit final def writePermRow[HV <: HList](
+        implicit
+        lgv: LabelledGeneric.Aux[Row, HV],
+        llw: Lazy[LabelledWrite[IdField :: HV]]
+    ): LabelledWrite[PermRow] = new LabelledWrite[PermRow] {
+
+      val lwiv: LabelledWrite[IdField :: HV] = llw.value
+
+      def headers: CSV.Headers       = lwiv.headers
+      def write(r: PermRow): CSV.Row = lwiv write field[id.T](r._1) :: (lgv to r._2)
+    }
+
+    /** */
+    implicit final def readPermRow[HV <: HList](
+        implicit
+        lgv: LabelledGeneric.Aux[Row, HV],
+        llr: Lazy[LabelledRead[IdField :: HV]]
+    ): LabelledRead[PermRow] = new LabelledRead[PermRow] {
+
+      val lriv: LabelledRead[IdField :: HV] = llr.value
+
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+        lriv.read(row, headers) map (h => (h.head, lgv from h.tail))
+    }
 
     /** */
     final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
       ???
     }
+
+    /** */
+    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
   }
 
   /**  */
-  abstract class KeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  abstract class KeyValueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       override val V: WithKey.AuxK[V]
   ) extends Repository(V) {
 
@@ -191,16 +223,40 @@ trait repos {
     def delete(k: V.Key): EffectStream[Boolean]
 
     /** */
+    implicit final def writePermRow[HV <: HList](
+        implicit
+        lgv: LabelledGeneric.Aux[Value, HV],
+        llw: Lazy[LabelledWrite[IdField :: KeyField :: HV]]
+    ): LabelledWrite[PermRow] =
+      new LabelledWrite[PermRow] {
+        val lwHikv: LabelledWrite[IdField :: KeyField :: HV] = llw.value
+        def headers: CSV.Headers                             = lwHikv.headers
+        def write(pr: PermRow): CSV.Row = pr match {
+          case (i, (k, v)) =>
+            lwHikv write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+        }
+      }
+
+    /** */
+    implicit final def readPermRow[HV <: HList](
+        implicit
+        lgv: LabelledGeneric.Aux[Value, HV],
+        llr: Lazy[LabelledRead[IdField :: KeyField :: HV]]
+    ): LabelledRead[PermRow] =
+      new LabelledRead[PermRow] {
+        val lrHikv: LabelledRead[IdField :: KeyField :: HV] = llr.value
+        def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+          lrHikv.read(row, headers) map { h =>
+            (h.head, (h.tail.head, lgv from h.tail.tail))
+          }
+      }
+
+    /** */
     final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = ???
 
-    /** FIXME review and import derivation superpowers */
-    final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = {
-      //
-      // def lgv[HV <: HList]: LabelledGeneric.Aux[Value, HV] = LabelledGeneric[Value]
-      // val lwpr = LabelledWrite[PermRow]
-      // val lrpr = LabelledRead[PermRow]
-      ess =>
-        ???
+    /**  */
+    final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
+      ???
     }
   }
 
@@ -257,19 +313,19 @@ trait repos {
   }
 
   /** */
-  private sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  private sealed abstract case class MemFileValueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       override val V: WithId.Aux[V]
   ) extends ValueRepository(V)
       with MemFileImplV[F, WithId.Aux, V]
 
   /** */
-  private sealed abstract case class MemFileKeyValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  private sealed abstract case class MemFileKeyValueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       override val V: WithKey.AuxK[V]
   ) extends KeyValueRepository(V)
       with MemFileImplKV[F, V]
 
   /** */
-  def valueRepository[F[_]: Sync: ContextShift, V: Eq](
+  def valueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       v: WithId.Aux[V],
       p: String
   ): Result[ValueRepository[F, V]] = Result safe {
@@ -277,7 +333,7 @@ trait repos {
   }
 
   /** */
-  def keyValueRepository[F[_]: Sync: ContextShift, V: Eq](
+  def keyValueRepository[F[_]: Sync: ContextShift, V: Eq: LabelledGeneric](
       v: WithKey.AuxK[V],
       p: String
   ): Result[KeyValueRepository[F, V]] = Result safe {
