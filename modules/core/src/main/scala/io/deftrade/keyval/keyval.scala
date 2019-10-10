@@ -23,7 +23,6 @@ import cats.{ Eq, Order }
 import eu.timepit.refined
 import refined.api.{ Min, Refined }
 
-import spire.math.Integral
 import spire.implicits._
 
 import shapeless.{ ::, HList, LabelledGeneric, Lazy }
@@ -64,33 +63,6 @@ abstract class OpaqueKeyCompanion[K: Order, P] extends KeyCompanion[OpaqueKey[K,
 }
 
 /**
-  * Defines how to create a fresh '''globally unique''' key which
-  * is suitable to be persisted.
-  */
-final case class Fresh[K](init: K, next: K => K)
-
-/** */
-object Fresh {
-
-  def apply[K: Fresh] = implicitly[Fresh[K]]
-
-  /**
-    * Equivalent to `autoincrement` or `serial` from SQL.
-    *
-    * TODO: PRNG version.
-    */
-  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
-
-    val K = Integral[K]; import K._
-
-    Fresh(
-      OpaqueKey(zero),
-      key => OpaqueKey(key.value + one)
-    )
-  }
-}
-
-/**
   * Defines `Id` and other persistence helpers for a given value class `V`.
   */
 sealed trait WithValue {
@@ -107,13 +79,8 @@ sealed trait WithValue {
   /** A permanent identifier (eg auto-increment in a db col) */
   final type Id = OpaqueKey[Long, Value]
 
-  /**
-    * Standard auto-increment behavior on Long permanent id numbers.
-    * Resisting the temptation to parameterize this for now.
-    */
-  object Id {
-    implicit lazy val freshId: Fresh[Id] = Fresh.zeroBasedIncr
-  }
+  /** namespace placeholder */
+  object Id
 
   /**
     * Think spreadsheet or relational table,
@@ -130,8 +97,6 @@ sealed trait WithValue {
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
 
-  /** */
-  implicit val lgv: LabelledGeneric[Value]
 }
 
 /** */
@@ -140,7 +105,7 @@ object WithValue {
   /**
     * The type of the underlying record being indexed.
     */
-  sealed abstract class Aux[V]()(implicit val lgv: LabelledGeneric[V]) extends WithValue {
+  sealed abstract class Aux[V] extends WithValue {
     final type Value = V
   }
 }
@@ -250,11 +215,11 @@ trait WithKey extends WithValue {
 /** */
 object WithKey {
 
-  /** The `Key` type is carried as a member. */
-  abstract class AuxK[V: LabelledGeneric] extends WithValue.Aux[V] with WithKey
+  /** The `Key` type remains abstract. */
+  abstract class AuxK[V] extends WithValue.Aux[V] with WithKey
 
-  /** */
-  abstract class Aux[K, V: LabelledGeneric] extends AuxK[V] { final type Key = K }
+  /** The `Key` type is assinged `K`. */
+  abstract class Aux[K, V] extends AuxK[V] { final type Key = K }
 }
 
 /** */
@@ -268,7 +233,7 @@ object Key {
 }
 
 /** When you want a case class as a `Key`. */
-abstract class WithAdtKey[K: Order, V: LabelledGeneric] extends WithKey.Aux[Key[K], V] {
+abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
 
   /** */
   object Key extends KeyCompanion[Key] {
@@ -282,10 +247,8 @@ abstract class WithAdtKey[K: Order, V: LabelledGeneric] extends WithKey.Aux[Key[
   * Phantom type used to tag the key, which has type K as its underlying representation.
   * This can either be a trivial tag which encodes the independance of a key from the record
   * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
-  *
-  * Use case: `Predicate` type is non trival.
   */
-abstract class WithRefinedKey[K: Order, P, V: LabelledGeneric] extends WithKey.Aux[Refined[K, P], V] {
+abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
   object Key extends OpaqueKeyCompanion[K, P]
@@ -295,4 +258,4 @@ abstract class WithRefinedKey[K: Order, P, V: LabelledGeneric] extends WithKey.A
   * Companion base class which defines a key as a `Refined`
   * type, parameterized with the value type we are indexing.
   */
-abstract class WithOpaqueKey[K: Order, V: LabelledGeneric] extends WithRefinedKey[K, V, V]
+abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]

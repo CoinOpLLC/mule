@@ -187,7 +187,7 @@ trait Balances {
   ) extends Balance(expenses, revenues) {
 
     /** */
-    def partition(implicit ci: Wallet[C]): (IncomeStatement[C], CashFlowStatement[C]) =
+    def partition(implicit ci: Wallet.Aux[C]): (IncomeStatement[C], CashFlowStatement[C]) =
       ???
   }
 
@@ -362,7 +362,7 @@ trait Balances {
     ???
 
   /** FIXME: not sure this signature makes sense as it stands */
-  def breakdown[C: Currency: Wallet](
+  def breakdown[C: Currency: Wallet.Aux](
       prior: BalanceSheet[C],
       delta: BalanceSheet[C], // delta and raw come from TrialBalance
       raw: IncomeStatement[C] // mixed cash and accrual

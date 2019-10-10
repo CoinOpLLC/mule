@@ -100,7 +100,7 @@ trait Ledger { self: ModuleTypes =>
   sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
 
   /**    */
-  object TradePricer extends WithOpaqueKey[Long, TradePricer[_]] {
+  object TradePricer {
 
     /** Summon a pricer for a given currency. */
     def apply[C: Currency: TradePricer]: TradePricer[C] = implicitly
@@ -146,10 +146,9 @@ trait Ledger { self: ModuleTypes =>
     * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
     * values are '''not''' carried by instances of this class.
     */
-  trait Wallet {
-    type CurrencyType
-    implicit val C: Currency[CurrencyType]
-    val folio: Folio
+  /** FIXME move this outside the object DUH */
+  sealed abstract case class Wallet(C: CurrencyLike, folio: Folio) {
+    final type CurrencyType = C.Type
   }
 
   /**
@@ -157,20 +156,20 @@ trait Ledger { self: ModuleTypes =>
     */
   object Wallet extends WithOpaqueKey[Long, Wallet] {
 
-    /** FIXME move this outside the object DUH */
-    sealed abstract case class Aux[C](val folio: Folio)(implicit val C: Currency[C]) extends Wallet {
-      final type CurrencyType = C
-    }
+    final class Aux[C](C: Currency[C], folio: Folio) extends Wallet(C, folio) {}
+
+    /** */
+    def apply(c: CurrencyLike, folio: Folio): Wallet = new Wallet(c, folio) {}
 
     /**
       * type parameter is checked for `Currency` status
       * TODO: additional validation?
       */
-    def apply[C: Currency](p: Position, ps: Position*): Wallet.Aux[C] =
-      new Aux[C](Folio(p +: ps: _*)) {}
+    def apply[C: Currency](p: Position, ps: Position*): Wallet =
+      Wallet(Currency[C], Folio(p +: ps: _*))
 
     /** type parameter is checked for `Currency` status */
-    private[deftrade] def apply[C: Currency](folio: Folio): Wallet.Aux[C] = new Aux[C](folio) {}
+    private[deftrade] def apply[C: Currency](folio: Folio): Wallet = Wallet(Currency[C], folio)
   }
 
   /**
@@ -203,6 +202,21 @@ trait Ledger { self: ModuleTypes =>
     /** */
     final type MetaSha = Meta => Sha256
 
+    def apply(
+        recordedAt: Instant,
+        debitFrom: Folio.Key,
+        creditTo: Folio.Key,
+        trade: Trade,
+        metaSha: Sha256
+    ): Transaction =
+      new Transaction(
+        instant,
+        debitFrom,
+        creditTo,
+        trade,
+        metaSha
+      ) {}
+
     /**
       * Digester. FIXME: actually implement
       */
@@ -218,14 +232,13 @@ trait Ledger { self: ModuleTypes =>
         instrument: Instrument.Key,
         amount: Quantity,
         meta: Json
-    ): Transaction =
-      new Transaction(
-        instant,
-        debitFrom,
-        creditTo,
-        Trade(instrument -> amount),
-        meta |> digest
-      ) {}
+    ) = Transaction(
+      instant,
+      debitFrom,
+      creditTo,
+      Trade(instrument -> amount),
+      meta |> digest
+    )
 
     /**
       * ex nihilo, yada yada ...
@@ -310,10 +323,10 @@ trait Ledger { self: ModuleTypes =>
     def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
 
     /** */
-    def single(key: Key): Roster =
+    def single(entity: Key): Roster =
       unsafe(
-        principals = UnitPartition single key,
-        nonPrincipals = _ => NonEmptySet one key
+        principals = UnitPartition single entity,
+        nonPrincipals = _ => NonEmptySet one entity
       )
 
     private def unsafe(
