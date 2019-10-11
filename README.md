@@ -20,7 +20,7 @@
       - a formal abstraction eg a `RowSet`
       - and an algebra (eg `Monoid`)
 
-  - `repos`
+  - `stores`
       - instances which source and sink `collection`s or `stream`s of `value`s for persistence
 
   - `aggregate entities`

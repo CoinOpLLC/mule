@@ -3,7 +3,7 @@ package test
 
 import scala.language.higherKinds
 
-import time._, money._, keyval._, model._, repos._, capital.Instrument, Currency.USD
+import time._, money._, keyval._, model._, stores._, capital.Instrument, Currency.USD
 
 import enumeratum._
 

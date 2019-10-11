@@ -53,12 +53,12 @@ import refined.api.Refined
   *
   * Further, the package supports the instantiaton of the scheme by
   *   - providing a `Row` type (`Key -> Value`)
-  *   - providing a `Table` type (`Map[Key, Value]`) (see [[repos]])
+  *   - providing a `Table` type (`Map[Key, Value]`) (see [[stores]])
   *   - providing implicit derivations for [[csv]] file readers and writers of `Row`s and `Table`s.
   *
   * *,, it's just a scheme because calling it a "schema" is far too grand,,
   */
-package object keyval extends repos with csv {
+package object keyval extends stores with csv {
 
   /** Just an alias, bssically.  */
   type OpaqueKey[K, V] = Refined[K, V]
