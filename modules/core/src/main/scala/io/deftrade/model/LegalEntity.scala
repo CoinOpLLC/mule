@@ -173,6 +173,11 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
     /** The `findValues` macro collects all `value`s in the order written. */
     lazy val values = findValues
 
+    /** FIXME this is just a hack to use `SortedSet`s etc
+      * it is almost certainly wrong to do this, but why?
+      */
+    implicit val orderInstance: cats.Order[Role] = cats.Order by (_.entryName)
+
     /** */
     lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
   }

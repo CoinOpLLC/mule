@@ -17,6 +17,8 @@
 package io.deftrade
 package keyval
 
+import implicits._
+
 import cats.implicits._
 import cats.Eq
 import cats.effect.{ Blocker, ContextShift, Sync }
@@ -29,7 +31,8 @@ import shapeless.labelled._
 
 import fs2.{ io, text, Pipe, Stream }
 
-import _root_.io.chrisdavenport.cormorant._
+import _root_.io.chrisdavenport.cormorant
+import cormorant._
 
 import scala.language.higherKinds
 
@@ -171,32 +174,6 @@ trait stores {
     import V._
 
     /** */
-    // implicit final def writePermRow[HV <: HList](
-    //     implicit
-    //     lgv: LabelledGeneric.Aux[Row, HV],
-    //     llw: Lazy[LabelledWrite[IdField :: HV]]
-    // ): LabelledWrite[PermRow] = new LabelledWrite[PermRow] {
-    //
-    //   val lwiv: LabelledWrite[IdField :: HV] = llw.value
-    //
-    //   def headers: CSV.Headers       = lwiv.headers
-    //   def write(r: PermRow): CSV.Row = lwiv write field[id.T](r._1) :: (lgv to r._2)
-    // }
-
-    /** */
-    // implicit final def readPermRow[HV <: HList](
-    //     implicit
-    //     lgv: LabelledGeneric.Aux[Row, HV],
-    //     llr: Lazy[LabelledRead[IdField :: HV]]
-    // ): LabelledRead[PermRow] = new LabelledRead[PermRow] {
-    //
-    //   val lriv: LabelledRead[IdField :: HV] = llr.value
-    //
-    //   def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-    //     lriv.read(row, headers) map (h => (h.head, lgv from h.tail))
-    // }
-
-    /** */
     final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
       ???
     }
@@ -236,16 +213,22 @@ trait stores {
     /** */
     def delete(k: V.Key): EffectStream[Boolean]
 
-    implicit final def writePermRow2(
-        implicit lwikv: LabelledWrite[IdField :: KeyField :: HV]
+    // private lazy val wutwut: LabelledWrite[IdField :: KeyField :: HV] = deriveLabelledWrite
+
+    implicit final def writePermRow(
+        implicit lwhpr: LabelledWrite[IdField :: KeyField :: HV]
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
-        def headers: CSV.Headers = lwikv.headers
+        def headers: CSV.Headers = lwhpr.headers
         def write(pr: PermRow): CSV.Row = pr match {
           case (i, (k, v)) =>
-            lwikv write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+            lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
         }
       }
+    // LabelledWrite[A] = new LabelledWrite[A] {
+    //     def headers: CSV.Headers = writeH.headers
+    //     def write(a: A): CSV.Row = writeH.write(gen.to(a))
+    //   }
 
     /** */
     implicit final def readPermRow(
@@ -278,7 +261,6 @@ trait stores {
 
     /** */
     final protected var table: Table = Map.empty
-    import _root_.io.deftrade.implicits._
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))

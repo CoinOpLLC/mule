@@ -1,5 +1,3 @@
-scalafmtOnCompile in ThisBuild := true // all projects
-
 /**
   * TODO use this
   */

@@ -35,18 +35,9 @@ object Version {
 
   val OpenGamma = "2.3.2"
 
-  // on the way out
-  val Akka        = "2.5.12"
-  val AkkaHttp    = "10.1.5"
-  val HttpSession = "0.5.5"
-
   val TypesafeConfig = "1.3.3"
 
   val Fansi = "0.2.7"
-
-  val PgJdbc = "9.4.1212" // FIXME // ProjectVersion.PgJdbc
-  // val PgJdbc = "9.4-1201-jdbc41"
-
 }
 
 object Deps {
@@ -152,33 +143,6 @@ object Deps {
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
   val fansi = "com.lihaoyi" %% "fansi" % Fansi
-
-  val postgres = "org.postgresql" % "postgresql" % PgJdbc
-
-  // val quills = Seq(
-  //   "io.getquill" %% "quill-jdbc",
-  //   "io.getquill" %% "quill-async-postgres",
-  // ) map (_ % Quill)
-  //
-  /** toolkits */
-  val akkaHttp   = "com.typesafe.akka" %% "akka-http"   % AkkaHttp
-  val akkaActor  = "com.typesafe.akka" %% "akka-actor"  % Akka
-  val akkaStream = "com.typesafe.akka" %% "akka-stream" % Akka
-  // If testkit used, explicitly declare dependency on akka-streams-testkit in same version as akka-actor
-  val akkaHttpTk   = "com.typesafe.akka" %% "akka-http-testkit"   % AkkaHttp % Test
-  val akkaStreamTk = "com.typesafe.akka" %% "akka-stream-testkit" % Akka     % Test
-
-  val httpSession    = "com.softwaremill.akka-http-session" %% "core" % HttpSession
-  val httpSessionJwt = "com.softwaremill.akka-http-session" %% "jwt"  % HttpSession
-  // -> Session[T] support: JWT, CSFR, remember-me functionality... client and server, apparently
-
-  // lazy val httplibs = List(
-  //   akkaHttp,
-  //   akkaActor,
-  //   akkaStream,
-  //   httpSession,
-  //   httpSessionJwt
-  // )
 
   val http4s = "org.http4s" %% "http4s-core" % Http4s
   val httplibs = List(

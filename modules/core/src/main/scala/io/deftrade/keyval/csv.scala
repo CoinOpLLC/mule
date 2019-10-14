@@ -20,6 +20,7 @@ package keyval
 import money._
 
 import cats.implicits._
+import cats.Order
 import cats.data.NonEmptyList
 
 import enumeratum.{ CatsEnum, Enum, EnumEntry }
@@ -81,6 +82,11 @@ trait csv {
 
   /** Fully stacc'd enum type. */
   trait DtEnum[E <: EnumEntry] extends Enum[E] with CatsEnum[E] with CsvEnum[E] {
+
+    /** FIXME this is just a hack to use `SortedSet`s etc
+      * it is almost certainly wrong to do this, but why?
+      */
+    implicit val orderInstance: Order[E] = Order by (_.entryName)
 
     /**
       * TODO:

@@ -274,7 +274,7 @@ trait Ledger { self: ModuleTypes =>
     lazy val roles: NonEmptyMap[Role, NonEmptySet[Key]] =
       NonEmptyMap of (
         Role.Principal -> principals.keys,
-        Role.nonPrincipals.map(np => (np, nonPrincipals(np))): _*
+        Role.nonPrincipals map (np => (np, nonPrincipals(np))): _*
     )
 
     /** */
