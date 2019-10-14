@@ -26,13 +26,14 @@ import cats.effect.{ Blocker, ContextShift, Sync }
 import spire.math.Integral
 import spire.syntax.field._
 
-import shapeless.{ ::, HList, LabelledGeneric }
+import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import fs2.{ io, text, Pipe, Stream }
 
 import _root_.io.chrisdavenport.cormorant
 import cormorant._
+// import cormorant.generic.semiauto._
 
 import scala.language.higherKinds
 
@@ -70,33 +71,66 @@ object Fresh {
   */
 trait stores {
 
+  /** */
   protected trait ModuleTypes {
 
+    /** */
     type ValueCompanionType[x] <: WithValue.Aux[x]
 
+    /** */
+    type ValueType
+
+    /** */
+    type HValue <: HList
+
+    /** */
+    implicit val lgv: LabelledGeneric.Aux[ValueType, HValue]
+
+    /** */
+    implicit val llr: Lazy[LabelledRead[HValue]]
+
+    /** */
+    implicit val llw: Lazy[LabelledWrite[HValue]]
+
+    /** */
     type EffectType[_]
 
+    /** */
     implicit def F: Sync[EffectType]
+
+    /** */
     implicit def X: ContextShift[EffectType]
 
     /** */
     final type EffectStream[x] = Stream[EffectType, x]
-
   }
 
+  /** */
   protected object ModuleTypes {
-    abstract class Aux[F[_], W[?] <: WithValue.Aux[?], V, HV <: HList](
+
+    /** */
+    abstract class Aux[
+        F[_],
+        W[?] <: WithValue.Aux[?],
+        V,
+        HV <: HList
+    ](
         val V: W[V]
     )(
         implicit
         final override val F: Sync[F],
         final override val X: ContextShift[F],
-        val lgv: LabelledGeneric.Aux[V, HV]
+        override val lgv: LabelledGeneric.Aux[V, HV],
+        override val llr: Lazy[LabelledRead[HV]],
+        override val llw: Lazy[LabelledWrite[HV]]
     ) extends ModuleTypes {
 
-      final type EffectType[x] = F[x]
-
       final type ValueCompanionType[x] = W[x]
+
+      final type ValueType = V.Value
+      final type HValue    = HV // = lgv.Repr ?!?
+
+      final type EffectType[x] = F[x]
 
       /** Basic in-memory table structure */
       final type Table = Map[V.Index, V.Value]
@@ -104,17 +138,12 @@ trait stores {
   }
 
   /** */
-  protected abstract class Store[
-      F[_]: Sync: ContextShift,
+  protected trait Store[
+      F[_],
       W[?] <: WithValue.Aux[?],
-      V: Eq,
+      V,
       HV <: HList
-  ](
-      v: W[V]
-  )(
-      implicit
-      override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends ModuleTypes.Aux[F, W, V, HV](v) {
+  ] { self: ModuleTypes.Aux[F, W, V, HV] =>
 
     import V._
 
@@ -164,12 +193,8 @@ trait stores {
     * Ctor parameter `V` carries types specific to `type V`.
     * `type Index` mapped to [[WithValue.Id]].
     */
-  abstract class ValueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      override val V: WithId.Aux[V]
-  )(
-      implicit
-      override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends Store(V) {
+  trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId.Aux, V, HV] {
+    self: ModuleTypes.Aux[F, WithId.Aux, V, HV] =>
 
     import V._
 
@@ -183,12 +208,8 @@ trait stores {
   }
 
   /**  */
-  abstract class KeyValueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      override val V: WithKey.AuxK[V]
-  )(
-      implicit
-      override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends Store(V) {
+  trait KeyValueStore[F[_], V, HV <: HList] extends Store[F, WithKey.AuxK, V, HV] {
+    self: ModuleTypes.Aux[F, WithKey.AuxK, V, HV] =>
 
     import V._
 
@@ -213,8 +234,6 @@ trait stores {
     /** */
     def delete(k: V.Key): EffectStream[Boolean]
 
-    // private lazy val wutwut: LabelledWrite[IdField :: KeyField :: HV] = deriveLabelledWrite
-
     implicit final def writePermRow(
         implicit lwhpr: LabelledWrite[IdField :: KeyField :: HV]
     ): LabelledWrite[PermRow] =
@@ -225,10 +244,6 @@ trait stores {
             lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
         }
       }
-    // LabelledWrite[A] = new LabelledWrite[A] {
-    //     def headers: CSV.Headers = writeH.headers
-    //     def write(a: A): CSV.Row = writeH.write(gen.to(a))
-    //   }
 
     /** */
     implicit final def readPermRow(
@@ -242,9 +257,9 @@ trait stores {
       }
 
     /** */
-    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] =
-      // val hikv = LabelledRead[lgv.Repr]
+    final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = { prs =>
       ???
+    }
 
     /**  */
     final protected def csvToPermRow: Pipe[EffectType, String, PermRow] = { ess =>
@@ -253,8 +268,12 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplV[F[_], W[?] <: WithValue.Aux[?], V, HV <: HList] {
-    self: Store[F, W, V, HV] =>
+  private trait MemFileImplV[
+      F[_],
+      W[?] <: WithValue.Aux[?],
+      V,
+      HV <: HList
+  ] extends Store[F, W, V, HV] { self: ModuleTypes.Aux[F, W, V, HV] =>
 
     /** */
     def path: Path
@@ -283,7 +302,7 @@ trait stores {
 
   /** */
   private trait MemFileImplKV[F[_], V, HV <: HList] extends MemFileImplV[F, WithKey.AuxK, V, HV] {
-    self: KeyValueStore[F, V, HV] =>
+    self: ModuleTypes.Aux[F, WithKey.AuxK, V, HV] =>
 
     import V._
 
@@ -306,11 +325,14 @@ trait stores {
       V: Eq,
       HV <: HList
   ](
-      override val V: WithId.Aux[V]
+      final override val V: WithId.Aux[V]
   )(
       implicit
-      override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends ValueStore(V)
+      final override val lgv: LabelledGeneric.Aux[V, HV],
+      final override val llr: Lazy[LabelledRead[HV]],
+      final override val llw: Lazy[LabelledWrite[HV]]
+  ) extends ModuleTypes.Aux[F, WithId.Aux, V, HV](V)
+      with ValueStore[F, V, HV]
       with MemFileImplV[F, WithId.Aux, V, HV]
 
   /** */
@@ -319,31 +341,40 @@ trait stores {
       V: Eq,
       HV <: HList
   ](
-      override val V: WithKey.AuxK[V]
+      final override val V: WithKey.AuxK[V]
   )(
       implicit
-      override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends KeyValueStore(V)
+      final override val lgv: LabelledGeneric.Aux[V, HV],
+      final override val llr: Lazy[LabelledRead[HV]],
+      final override val llw: Lazy[LabelledWrite[HV]]
+  ) extends ModuleTypes.Aux[F, WithKey.AuxK, V, HV](V)
+      with KeyValueStore[F, V, HV]
       with MemFileImplKV[F, V, HV]
 
   /** */
   def valueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      v: WithId.Aux[V],
+      V: WithId.Aux[V],
       p: String
   )(
-      implicit lgv: LabelledGeneric.Aux[V, HV]
+      implicit
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]
   ): Result[ValueStore[F, V, HV]] = Result safe {
-    new MemFileValueStore(v) { override def path = Paths get p }
+    new MemFileValueStore(V) { override def path = Paths get p }
   }
 
   /** */
   def keyValueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      v: WithKey.AuxK[V],
+      V: WithKey.AuxK[V],
       p: String
   )(
-      implicit lgv: LabelledGeneric.Aux[V, HV]
+      implicit
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]
   ): Result[KeyValueStore[F, V, HV]] = Result safe {
-    new MemFileKeyValueStore(v) { override def path = Paths get p }
+    new MemFileKeyValueStore(V) { override def path = Paths get p }
   }
 }
 
