@@ -19,9 +19,6 @@ package money
 
 import io.deftrade.implicits._
 
-import eu.timepit.refined
-import refined.api.{ RefType, Validate }
-
 import cats._
 import cats.implicits._
 import cats.kernel.{ CommutativeGroup, Order }
@@ -129,45 +126,44 @@ object Money {
     } yield C(sign * n)
   }
 
-  /**
-    * Typeclass instance which integrates [[Money]] with the
-    * [[https://github.com/fthomas/refined Refined]] library.
-    *
-    * TODO why do we need this? The `Validate` mechanism and related inferences
-    * do nothing for us. YAGNI?
-    */
-  implicit lazy val refinedRefType: RefType[Money] =
-    new RefType[Money] {
-
-      private type F[T, P] = Money[T, P]
-
-      def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
-
-      def unwrap[T](tp: F[T, _]): T = tp.amount
-
-      def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
-    }
-
-  /**
-    * Valiation policy: Any `C` with a [[Currency]] implicit instance.
-    *
-    * Design rational(ization?):
-    *
-    * why not the following, which seems more obvious?
-    * {{{
-    * implicit object refinedRefType extends RefType[Money] { ... }
-    * }}}
-    *
-    * because:
-    *
-    * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
-    * in object refinedRefType
-    * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
-    * clashes with definition of the member itself;
-    * both have erased type (t: Object)Object
-    *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
-    */
-  implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
-    Validate alwaysPassed Currency[P]
+  // import eu.timepit.refined
+  // import refined.api.{ RefType, Validate }
+  // /**
+  //   * Typeclass instance which integrates [[Money]] with the
+  //   * [[https://github.com/fthomas/refined Refined]] library.
+  //   */
+  // implicit lazy val refinedRefType: RefType[Money] =
+  //   new RefType[Money] {
+  //
+  //     private type F[T, P] = Money[T, P]
+  //
+  //     def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
+  //
+  //     def unwrap[T](tp: F[T, _]): T = tp.amount
+  //
+  //     def unsafeRewrap[T, A, B](ta: F[T, A]): F[T, B] = ta |> unwrap |> unsafeWrap
+  //   }
+  //
+  // /**
+  //   * Valiation policy: Any `C` with a [[Currency]] implicit instance.
+  //   *
+  //   * Design rational(ization?):
+  //   *
+  //   * why not the following, which seems more obvious?
+  //   * {{{
+  //   * implicit object refinedRefType extends RefType[Money] { ... }
+  //   * }}}
+  //   *
+  //   * because:
+  //   *
+  //   * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+  //   * in object refinedRefType
+  //   * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
+  //   * clashes with definition of the member itself;
+  //   * both have erased type (t: Object)Object
+  //   *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+  //   */
+  // implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
+  //   Validate alwaysPassed Currency[P]
 
 }

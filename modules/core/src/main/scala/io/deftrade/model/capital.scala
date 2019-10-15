@@ -22,7 +22,7 @@ import time.ZonedDateTime
 import money.{ CurrencyLike, Financial }
 import keyval._
 import refinements.{ Label }
-import model.reference.{ Isin, Mic, Usin }
+import model.reference.{ IsIsin, IsUsin, Mic }
 
 import cats.Id
 import cats.instances.string._
@@ -47,7 +47,7 @@ final case class Instrument(
 )
 
 /** */
-object Instrument extends WithAdtKey[Usin, Instrument]
+object Instrument extends WithPredicateKey[String, IsUsin, Instrument]
 
 /** */
 trait PrimaryCapital {
@@ -60,7 +60,7 @@ trait PrimaryCapital {
   )
 
   /** */
-  object CommonStock extends WithAdtKey[Usin, CommonStock]
+  object CommonStock extends WithPredicateKey[String, IsUsin, CommonStock]
 
   /** */
   case class PreferredStock(
@@ -70,13 +70,13 @@ trait PrimaryCapital {
   )
 
   /** */
-  object PreferredStock extends WithAdtKey[Usin, PreferredStock]
+  object PreferredStock extends WithPredicateKey[String, IsUsin, PreferredStock]
 
   /** */
   case class Bond(matures: ZonedDateTime) extends Maturity
 
   /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
-  object Bond extends WithAdtKey[Isin, Bond]
+  object Bond extends WithPredicateKey[String, IsIsin, Bond]
 
   /** */
   case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
@@ -91,7 +91,7 @@ trait VanillaDerivatives {
   }
 
   /** */
-  object Index extends WithAdtKey[Isin, Index]
+  object Index extends WithPredicateKey[String, IsIsin, Index]
 
   /** Exchange Traded Derivative - Future (ETD) */
   case class EtdFuture(underlyer: Instrument.Key) extends Derivative[Id]

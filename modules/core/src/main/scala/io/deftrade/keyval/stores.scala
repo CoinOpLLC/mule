@@ -33,7 +33,8 @@ import fs2.{ io, text, Pipe, Stream }
 
 import _root_.io.chrisdavenport.cormorant
 import cormorant._
-// import cormorant.generic.semiauto._
+import cormorant.generic.semiauto._
+import cormorant.refined._
 
 import scala.language.higherKinds
 
@@ -256,8 +257,18 @@ trait stores {
           }
       }
 
+    final type HRow     = KeyField :: HValue
+    final type HPermRow = IdField :: HRow
+
     /** */
     final protected def permRowToCSV: Pipe[EffectType, PermRow, String] = { prs =>
+      // implicit val lwhv: LabelledWrite[HValue] = llw.value
+      // implicit val lwhr: LabelledWrite[HRow]   = deriveByNameHList()(key)
+      // val lwhpr: LabelledWrite[HPermRow]       = deriveByNameHList
+      // def headers: CSV.Headers                 = lwhpr.headers
+      // prs map {
+      //   case (i, (k, v)) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+      // }
       ???
     }
 

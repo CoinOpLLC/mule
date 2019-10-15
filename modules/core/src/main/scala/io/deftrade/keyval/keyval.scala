@@ -21,7 +21,7 @@ package keyval
 import cats.{ Eq, Order }
 
 import eu.timepit.refined
-import refined.api.{ Min, Refined }
+import refined.api.{ Min, Refined, Validate }
 
 import spire.implicits._
 
@@ -35,6 +35,9 @@ object OpaqueKey {
 
   /** */
   def unsafe[K: Order, V](k: K): OpaqueKey[K, V] = apply(k)
+
+  /** */
+  implicit def validate[K: Order, V]: Validate[K, V] = Validate alwaysPassed (())
 }
 
 /** Key type companion base class. */
@@ -44,17 +47,17 @@ abstract class KeyCompanion[K] {
   implicit def order: Order[K]
 }
 
-/** Key type companion mez class for [[OpaqueKey]] types. */
-abstract class OpaqueKeyCompanion[K: Order, P] extends KeyCompanion[OpaqueKey[K, P]] {
+/** Companion mez class for `Refined` key types. */
+abstract class RefinedKeyCompanion[K: Order, P] extends KeyCompanion[Refined[K, P]] {
 
   /** */
-  implicit def order = Order[OpaqueKey[K, P]]
+  implicit def order = Order[Refined[K, P]]
 
   /** */
-  def apply(k: K) = OpaqueKey[K, P](k)
+  // def apply(k: K): Refined[K, P] = Refined unsafeApply k
 
   /** Where the key type is integral, we will reserve the min value. */
-  def reserved(implicit K: Min[K]) = OpaqueKey[K, P](K.min)
+  def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
 }
 
 /**
@@ -162,26 +165,26 @@ object WithKey {
   abstract class Aux[K, V] extends AuxK[V] { final type Key = K }
 }
 
-/** */
-sealed abstract case class Key[K] private (k: K)
-
-/** */
-object Key {
-
-  /** */
-  def apply[K](k: K): Key[K] = new Key(k) {}
-}
-
-/** When you want a case class as a `Key`. */
-abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
-
-  /** */
-  object Key extends KeyCompanion[Key] {
-
-    /** */
-    override implicit def order: Order[Key] = Order by (_.k)
-  }
-}
+// /** */
+// sealed abstract case class Key[K] private (k: K)
+//
+// /** */
+// object Key {
+//
+//   /** */
+//   def apply[K](k: K): Key[K] = new Key(k) {}
+// }
+//
+// /** When you want a case class as a `Key`. */
+// abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
+//
+//   /** */
+//   object Key extends KeyCompanion[Key] {
+//
+//     /** */
+//     override implicit def order: Order[Key] = Order by (_.k)
+//   }
+// }
 
 /**
   * Phantom type used to tag the key, which has type K as its underlying representation.
@@ -191,7 +194,7 @@ abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
 abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
-  object Key extends OpaqueKeyCompanion[K, P]
+  object Key extends RefinedKeyCompanion[K, P]
 }
 
 /**
