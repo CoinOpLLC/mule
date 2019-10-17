@@ -94,7 +94,6 @@ sealed trait WithValue {
 
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
-
 }
 
 /** */
@@ -129,7 +128,6 @@ object WithId {
     * TODO revisit this decision and its implication.
     */
   trait Aux[V] extends WithValue.Aux[V]
-
 }
 
 /**
@@ -158,12 +156,28 @@ trait WithKey extends WithValue {
 /** */
 object WithKey {
 
-  /** The `Key` type remains abstract. */
-  abstract class AuxK[V] extends WithValue.Aux[V] with WithKey
-
   /** The `Key` type is assinged `K`. */
-  abstract class Aux[K, V] extends AuxK[V] { final type Key = K }
+  abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
+    final type Key = K
+  }
 }
+
+/**
+  * Phantom type used to tag the key, which has type K as its underlying representation.
+  * This can either be a trivial tag which encodes the independance of a key from the record
+  * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
+  */
+abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
+
+  /** */
+  object Key extends RefinedKeyCompanion[K, P]
+}
+
+/**
+  * Companion base class which defines a key as a `Refined`
+  * type, parameterized with the value type we are indexing.
+  */
+abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
 
 // /** */
 // sealed abstract case class Key[K] private (k: K)
@@ -185,20 +199,3 @@ object WithKey {
 //     override implicit def order: Order[Key] = Order by (_.k)
 //   }
 // }
-
-/**
-  * Phantom type used to tag the key, which has type K as its underlying representation.
-  * This can either be a trivial tag which encodes the independance of a key from the record
-  * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
-  */
-abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
-
-  /** */
-  object Key extends RefinedKeyCompanion[K, P]
-}
-
-/**
-  * Companion base class which defines a key as a `Refined`
-  * type, parameterized with the value type we are indexing.
-  */
-abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]

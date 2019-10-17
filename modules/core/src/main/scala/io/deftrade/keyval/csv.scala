@@ -23,6 +23,8 @@ import cats.implicits._
 import cats.Order
 import cats.data.NonEmptyList
 
+import shapeless.{ Lazy }
+
 import enumeratum.{ CatsEnum, Enum, EnumEntry }
 
 import io.chrisdavenport.cormorant._
@@ -30,6 +32,12 @@ import io.chrisdavenport.cormorant.implicits._
 
 /** module mixin */
 trait csv {
+
+  /** */
+  type LazyGet[k] = Lazy[Get[k]]
+
+  /** */
+  type LazyPut[k] = Lazy[Put[k]]
 
   /** cormorant csv `Get` */
   implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
