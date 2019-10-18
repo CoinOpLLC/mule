@@ -40,26 +40,6 @@ object OpaqueKey {
   implicit def validate[K: Order, V]: Validate[K, V] = Validate alwaysPassed (())
 }
 
-/** Key type companion base class. */
-abstract class KeyCompanion[K] {
-
-  /** */
-  implicit def order: Order[K]
-}
-
-/** Companion mez class for `Refined` key types. */
-abstract class RefinedKeyCompanion[K: Order, P] extends KeyCompanion[Refined[K, P]] {
-
-  /** */
-  implicit def order = Order[Refined[K, P]]
-
-  /** */
-  // def apply(k: K): Refined[K, P] = Refined unsafeApply k
-
-  /** Where the key type is integral, we will reserve the min value. */
-  def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
-}
-
 /**
   * Defines `Id` and other persistence helpers for a given value class `V`.
   */
@@ -127,7 +107,7 @@ object WithId {
     *
     * TODO revisit this decision and its implication.
     */
-  trait Aux[V] extends WithValue.Aux[V]
+  trait Aux[V] extends WithValue.Aux[V] with WithId
 }
 
 /**
@@ -141,7 +121,7 @@ trait WithKey extends WithValue {
   type Key
 
   /** Known accomplices. */
-  val Key: KeyCompanion[Key]
+  val Key: WithKey.KeyCompanion[Key]
 
   /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
   final type Row = (Key, Value)
@@ -160,6 +140,26 @@ object WithKey {
   abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
     final type Key = K
   }
+
+  /** Key type companion base class. */
+  abstract class KeyCompanion[K] {
+
+    /** */
+    implicit def order: Order[K]
+  }
+
+  /** Companion mez class for `Refined` key types. */
+  abstract class RefinedKeyCompanion[K: Order, P] extends KeyCompanion[Refined[K, P]] {
+
+    /** */
+    implicit def order = Order[Refined[K, P]]
+
+    /** */
+    // def apply(k: K): Refined[K, P] = Refined unsafeApply k
+
+    /** Where the key type is integral, we will reserve the min value. */
+    def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
+  }
 }
 
 /**
@@ -170,7 +170,7 @@ object WithKey {
 abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
-  object Key extends RefinedKeyCompanion[K, P]
+  object Key extends WithKey.RefinedKeyCompanion[K, P]
 }
 
 /**

@@ -23,49 +23,23 @@ import cats.implicits._
 import cats.Eq
 import cats.effect.{ Blocker, ContextShift, Sync }
 
-import spire.math.Integral
-import spire.syntax.field._
-
 import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
+
+import eu.timepit.refined
+import refined.api.Validate
 
 import fs2.{ io, text, Pipe, Stream }
 
 import _root_.io.chrisdavenport.cormorant
 import cormorant._
+import cormorant.implicits._
 import cormorant.generic.semiauto._
 import cormorant.refined._
 
 import scala.language.higherKinds
 
 import java.nio.file.{ Path, Paths }
-
-final case class Fresh[K](init: K, next: K => K)
-
-/**
-  * Defines how to create a fresh '''globally unique''' key which
-  * is suitable to be persisted.
-  */
-/** */
-object Fresh {
-
-  def apply[K: Fresh] = implicitly[Fresh[K]]
-
-  /**
-    * Equivalent to `autoincrement` or `serial` from SQL.
-    *
-    * TODO: PRNG version.
-    */
-  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
-
-    val K = Integral[K]; import K._
-
-    Fresh(
-      OpaqueKey(zero),
-      key => OpaqueKey(key.value + one)
-    )
-  }
-}
 
 /**
   *
@@ -127,6 +101,9 @@ trait stores {
 
       /** Basic in-memory table structure */
       final type Table = Map[V.Index, V.Value]
+      implicit def validateId: Validate[Long, V.Value] = ???
+      final implicit lazy val putId                    = Put[V.Id]
+      final implicit lazy val getId                    = Get[V.Id]
     }
   }
 
@@ -139,6 +116,12 @@ trait stores {
   ] { self: ModuleTypes.Aux[F, W, V, HV] =>
 
     import V._
+
+    /**  */
+    type HRow <: HList
+
+    /**  */
+    final type HPermRow = IdField :: HRow
 
     /**  */
     final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
@@ -191,10 +174,41 @@ trait stores {
 
     import V._
 
+    final type HRow = HValue
+
+    implicit final def writePermRow(
+        implicit
+        llw: Lazy[LabelledWrite[HValue]]
+    ): LabelledWrite[PermRow] =
+      new LabelledWrite[PermRow] {
+        implicit val lwhv        = llw.value
+        implicit val lwhpr       = LabelledWrite[HPermRow]
+        def headers: CSV.Headers = lwhpr.headers
+        override def write(pr: PermRow): CSV.Row = pr match {
+          case (i, v) =>
+            lwhpr write field[id.T](i) :: (lgv to v)
+        }
+      }
+
+    /** */
+    implicit final def readPermRow(
+        implicit
+        llr: Lazy[LabelledRead[HV]]
+    ): LabelledRead[PermRow] =
+      new LabelledRead[PermRow] {
+        implicit val lrhv  = llr.value
+        implicit val lrhpr = LabelledRead[HPermRow]
+        def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+          lrhpr read (row, headers) map { h =>
+            (h.head, lgv from h.tail)
+          }
+      }
+
     final protected def deriveCsvToV(
         implicit
         llr: Lazy[LabelledRead[HV]]
     ): Pipe[EffectType, String, PermRow] = { ess =>
+      implicit val lrhv = llr.value
       ???
     }
 
@@ -212,10 +226,17 @@ trait stores {
       K,
       V,
       HV <: HList
-  ] extends Store[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] {
+  ] extends Store[
+        F,
+        ({ type W[v] = WithKey.Aux[K, v] })#W,
+        V,
+        HV
+      ] {
     self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
 
     import V._
+
+    final type HRow = KeyField :: HValue
 
     /**
       * Note that `get()` is overloaded (not overridden) here.
@@ -239,9 +260,13 @@ trait stores {
     def delete(k: V.Key): EffectStream[Boolean]
 
     implicit final def writePermRow(
-        implicit lwhpr: LabelledWrite[IdField :: KeyField :: HV]
+        implicit
+        llw: Lazy[LabelledWrite[HValue]],
+        lputk: Lazy[Put[Key]]
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
+        implicit val lwhv        = llw.value
+        implicit val lwhpr       = LabelledWrite[HPermRow]
         def headers: CSV.Headers = lwhpr.headers
         def write(pr: PermRow): CSV.Row = pr match {
           case (i, (k, v)) =>
@@ -251,18 +276,20 @@ trait stores {
 
     /** */
     implicit final def readPermRow(
-        implicit lrikv: LabelledRead[IdField :: KeyField :: HV]
+        implicit
+        llr: Lazy[LabelledRead[HV]],
+        lgetk: Lazy[Get[Key]]
     ): LabelledRead[PermRow] =
       new LabelledRead[PermRow] {
+        implicit val lrhv  = llr.value
+        implicit val lrhpr = LabelledRead[HPermRow]
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-          lrikv.read(row, headers) map { h =>
+          lrhpr read (row, headers) map { h =>
             (h.head, (h.tail.head, lgv from h.tail.tail))
           }
       }
 
-    final type HRow     = KeyField :: HValue
-    final type HPermRow = IdField :: HRow
-
+    /** */
     final protected def deriveCsvToKv(
         implicit
         llr: Lazy[LabelledRead[HV]],
@@ -271,6 +298,7 @@ trait stores {
       ???
     }
 
+    /** */
     protected final def deriveKvToCsv(
         implicit
         llw: Lazy[LabelledWrite[HV]],
@@ -278,17 +306,6 @@ trait stores {
     ): Pipe[EffectType, PermRow, String] = { prs =>
       ???
     }
-
-    /** */
-    // implicit val lwhv: LabelledWrite[HValue] = llw.value
-    // implicit val lwhr: LabelledWrite[HRow]   = deriveByNameHList()(key)
-    // val lwhpr: LabelledWrite[HPermRow]       = deriveByNameHList
-    // def headers: CSV.Headers                 = lwhpr.headers
-    // prs map {
-    //   case (i, (k, v)) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
-    // }
-
-    /**  */
   }
 
   /** */
@@ -384,8 +401,14 @@ trait stores {
       llw: Lazy[LabelledWrite[HV]]
   ): Result[ValueStore[F, V, HV]] = Result safe {
     new MemFileValueStore(V) {
-      override def path                                                = Paths get p
+
+      /** */
+      override def path = Paths get p
+
+      /** */
       final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveVToCsv
+
+      /** */
       final lazy val csvToPermRow: Pipe[EffectType, String, V.PermRow] = deriveCsvToV
     }
   }
@@ -401,12 +424,16 @@ trait stores {
       llw: Lazy[LabelledWrite[HV]],
       lgetk: Lazy[Get[K]],
       lputk: Lazy[Put[K]]
-
-      /** */
   ): Result[KeyValueStore[F, K, V, HV]] = Result safe {
     new MemFileKeyValueStore(kv) { self =>
-      override def path                                                = Paths get p
+
+      /** */
+      override def path = Paths get p
+
+      /** */
       final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveKvToCsv
+
+      /** */
       final lazy val csvToPermRow: Pipe[EffectType, String, V.PermRow] = deriveCsvToKv
     }
   }
