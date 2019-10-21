@@ -25,7 +25,7 @@ import cats.{ Foldable, Monad, SemigroupK }
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
 
 import eu.timepit.refined
-//import refined.cats._
+import refined.cats.refTypeOrder
 import refined.auto._
 
 import scala.collection.immutable.SortedSet

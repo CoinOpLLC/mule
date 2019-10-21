@@ -47,7 +47,7 @@ final case class Instrument(
 )
 
 /** */
-object Instrument extends WithPredicateKey[String, IsUsin, Instrument]
+object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 
 /** */
 trait PrimaryCapital {
@@ -60,7 +60,7 @@ trait PrimaryCapital {
   )
 
   /** */
-  object CommonStock extends WithPredicateKey[String, IsUsin, CommonStock]
+  object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
 
   /** */
   case class PreferredStock(
@@ -70,13 +70,13 @@ trait PrimaryCapital {
   )
 
   /** */
-  object PreferredStock extends WithPredicateKey[String, IsUsin, PreferredStock]
+  object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
 
   /** */
   case class Bond(matures: ZonedDateTime) extends Maturity
 
   /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
-  object Bond extends WithPredicateKey[String, IsIsin, Bond]
+  object Bond extends WithRefinedKey[String, IsIsin, Bond]
 
   /** */
   case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
@@ -91,7 +91,7 @@ trait VanillaDerivatives {
   }
 
   /** */
-  object Index extends WithPredicateKey[String, IsIsin, Index]
+  object Index extends WithRefinedKey[String, IsIsin, Index]
 
   /** Exchange Traded Derivative - Future (ETD) */
   case class EtdFuture(underlyer: Instrument.Key) extends Derivative[Id]

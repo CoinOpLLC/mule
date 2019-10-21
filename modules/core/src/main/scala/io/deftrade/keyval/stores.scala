@@ -28,6 +28,7 @@ import shapeless.labelled._
 
 import eu.timepit.refined
 import refined.api.Validate
+import refined.cats.refTypeOrder
 
 import fs2.{ io, text, Pipe, Stream }
 
@@ -96,17 +97,18 @@ trait stores {
     ) extends ModuleTypes {
 
       final type ValueCompanionType[x] = W[x]
+      final type HValue                = HV // = lgv.Repr  test / validate / assume ?!?
+      final type EffectType[x]         = F[x]
 
-      final type ValueType = V.Value
-      final type HValue    = HV // = lgv.Repr ?!?
+      import V.{ Id, Index, Value }
 
-      final type EffectType[x] = F[x]
+      final type ValueType = Value
 
       /** Basic in-memory table structure */
-      final type Table = Map[V.Index, V.Value]
-      implicit def validateId: Validate[Long, V.Value] = ???
-      final implicit lazy val putId                    = Put[V.Id]
-      final implicit lazy val getId                    = Get[V.Id]
+      final type Table = Map[Index, Value]
+      implicit def validateId: Validate[Long, Value] = Validate alwaysPassed (())
+      final implicit lazy val putId                  = Put[Id]
+      final implicit lazy val getId                  = Get[Id]
     }
   }
 
@@ -306,9 +308,7 @@ trait stores {
         implicit
         llw: Lazy[LabelledWrite[HV]],
         lputk: Lazy[Put[Key]]
-    ): Pipe[EffectType, PermRow, String] = { prs =>
-      ???
-    }
+    ): Pipe[EffectType, PermRow, String] = writeLabelled[F, PermRow](printer)
   }
 
   /** */

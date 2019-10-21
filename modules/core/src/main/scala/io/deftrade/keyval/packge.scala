@@ -17,7 +17,7 @@
 package io.deftrade
 
 import cats.implicits._
-import cats.{ Order, Show }
+import cats.{ Show }
 
 import shapeless.syntax.singleton._
 
@@ -60,16 +60,11 @@ import refined.api.Refined
   */
 package object keyval extends stores with csv {
 
-  /** Just an alias, bssically.  */
+  /** Just an alias.  */
   type OpaqueKey[K, V] = Refined[K, V]
 
-  /**
-    * Use case: `Predicate` type is non trival.
-    */
-  type WithPredicateKey[K, P, V] = WithRefinedKey[K, P, V]
-
-  /** nb `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
-  implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
+  // /** nb `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
+  // implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
 
   /** nb `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
   implicit def showOpaqueKey[K: Show, V]: Show[OpaqueKey[K, V]] =

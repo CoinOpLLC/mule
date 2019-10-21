@@ -28,6 +28,7 @@ import eu.timepit.refined
 import refined.api.Refined
 import refined.W
 import refined.numeric.Interval
+import refined.cats.refTypeOrder
 
 import io.circe.Json
 
@@ -348,7 +349,7 @@ trait Ledger { self: ModuleTypes =>
   sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 
   /** */
-  object Account extends WithPredicateKey[Long, IsAccountNo, Account] {
+  object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
 
     /** */
     def apply(roster: Roster, folio: Folio.Key): Account = new Account(roster, folio) {}
