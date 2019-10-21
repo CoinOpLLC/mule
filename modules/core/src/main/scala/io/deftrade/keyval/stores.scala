@@ -36,6 +36,7 @@ import cormorant._
 import cormorant.implicits._
 import cormorant.generic.semiauto._
 import cormorant.refined._
+import cormorant.fs2._
 
 import scala.language.higherKinds
 
@@ -45,6 +46,8 @@ import java.nio.file.{ Path, Paths }
   *
   */
 trait stores {
+
+  private val errorToFail: Error => Fail = e => Fail("csv failure", e)
 
   /** */
   protected trait ModuleTypes {
@@ -126,22 +129,25 @@ trait stores {
     /**  */
     final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
 
-    /** */
-    final def rows: EffectStream[Row] = permRows map (_._2)
+    /** FIXME - `rethrow`(s)*/
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def rows: EffectStream[Row] = permRows.rethrow map (_._2)
+    // EitherT[EffectStream, Fail, Row]
 
     /**  @return a `Stream` of length zero or one. */
-    def get(id: Id): EffectStream[Row] = permRows filter (_._1 === id) map (_._2)
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def get(id: Id): EffectStream[Row] = permRows.rethrow filter (_._1 === id) map (_._2)
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def permRows: EffectStream[PermRow] = readLines through csvToPermRow
+    final def permRows: EffectStream[Result[PermRow]] = readLines through csvToPermRow
 
     /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def append(row: Row): EffectStream[Id] =
       for {
-        id <- Stream eval { F delay { id = fresh next id; id } }
-        _  <- Stream emit id -> row through permRowToCSV through appendingSink
+        id <- Stream eval { F delay { Id(rawId.getAndIncrement) } }
+        _  <- Stream eval { F delay { id -> row } } through permRowToCSV through appendingSink
         _  <- Stream eval { F delay updateCache(row) }
       } yield id
 
@@ -158,10 +164,10 @@ trait stores {
     protected def permRowToCSV: Pipe[EffectType, PermRow, String]
 
     /** */
-    protected def csvToPermRow: Pipe[EffectType, String, PermRow]
+    protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
 
-    @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    @volatile private var id: Id      = fresh.init
+    private lazy val rawId = new java.util.concurrent.atomic.AtomicLong(fresh.init().value)
+
     private lazy val fresh: Fresh[Id] = Fresh.zeroBasedIncr
   }
 
@@ -207,18 +213,15 @@ trait stores {
     final protected def deriveCsvToV(
         implicit
         llr: Lazy[LabelledRead[HV]]
-    ): Pipe[EffectType, String, PermRow] = { ess =>
-      implicit val lrhv = llr.value
-      ???
-    }
+    ): Pipe[EffectType, String, Result[PermRow]] =
+      readLabelledCompleteSafe[F, PermRow] andThen (_ map (_ leftMap errorToFail))
 
     final protected def deriveVToCsv(
         implicit
-        llw: Lazy[LabelledWrite[HV]],
-    ): Pipe[EffectType, PermRow, String] = { prs =>
-      ???
-    }
+        llw: Lazy[LabelledWrite[HV]]
+    ): Pipe[EffectType, PermRow, String] = writeLabelled[F, PermRow](printer)
   }
+  private def printer: Printer = ???
 
   /**  */
   trait KeyValueStore[
@@ -236,6 +239,7 @@ trait stores {
 
     import V._
 
+    /** */
     final type HRow = KeyField :: HValue
 
     /**
@@ -294,9 +298,8 @@ trait stores {
         implicit
         llr: Lazy[LabelledRead[HV]],
         lgetk: Lazy[Get[Key]]
-    ): Pipe[EffectType, String, PermRow] = { ess =>
-      ???
-    }
+    ): Pipe[EffectType, String, Result[PermRow]] =
+      readLabelledCompleteSafe[F, PermRow] andThen (_ map (_ leftMap errorToFail))
 
     /** */
     protected final def deriveKvToCsv(
@@ -342,7 +345,17 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplKV[F[_], K, V, HV <: HList] extends MemFileImplV[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] {
+  private trait MemFileImplKV[
+      F[_],
+      K,
+      V,
+      HV <: HList
+  ] extends MemFileImplV[
+        F,
+        ({ type W[v] = WithKey.Aux[K, v] })#W,
+        V,
+        HV
+      ] {
     self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
 
     import V._
@@ -409,7 +422,7 @@ trait stores {
       final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveVToCsv
 
       /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, V.PermRow] = deriveCsvToV
+      final lazy val csvToPermRow: Pipe[EffectType, String, Result[V.PermRow]] = deriveCsvToV
     }
   }
 
@@ -434,7 +447,7 @@ trait stores {
       final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveKvToCsv
 
       /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, V.PermRow] = deriveCsvToKv
+      final lazy val csvToPermRow: Pipe[EffectType, String, Result[V.PermRow]] = deriveCsvToKv
     }
   }
 }

@@ -42,6 +42,10 @@ object OpaqueKey {
 
 /**
   * Defines `Id` and other persistence helpers for a given value class `V`.
+  *
+  * Note: consequence of this design is that there is only one `Key` type per value object type.
+  *
+  * TODO revisit this decision and its implication.
   */
 sealed trait WithValue {
 
@@ -57,8 +61,10 @@ sealed trait WithValue {
   /** A permanent identifier (eg auto-increment in a db col) */
   final type Id = OpaqueKey[Long, Value]
 
-  /** namespace placeholder */
-  object Id
+  /**  */
+  object Id {
+    private[deftrade] def apply(raw: Long): Id = OpaqueKey(raw)
+  }
 
   /**
     * Think spreadsheet or relational table,
@@ -83,6 +89,8 @@ object WithValue {
     * The type of the underlying record being indexed.
     */
   sealed abstract class Aux[V] extends WithValue {
+
+    /** */
     final type Value = V
   }
 }
@@ -100,19 +108,11 @@ trait WithId extends WithValue {
 /** */
 object WithId {
 
-  /**
-    * Companion object base class.
-    *
-    * Note: consequence of this design is that there is only one `Key` type per value object type.
-    *
-    * TODO revisit this decision and its implication.
-    */
+  /** */
   trait Aux[V] extends WithValue.Aux[V] with WithId
 }
 
-/**
-  * Companion object base class.
-  */
+/**  */
 trait WithKey extends WithValue {
 
   /**
@@ -136,7 +136,7 @@ trait WithKey extends WithValue {
 /** */
 object WithKey {
 
-  /** The `Key` type is assinged `K`. */
+  /** The `Key` type member is assigned type parameter `K`. */
   abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
     final type Key = K
   }
@@ -193,7 +193,7 @@ abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
 // abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
 //
 //   /** */
-//   object Key extends KeyCompanion[Key] {
+//   object Key extends WithKey.KeyCompanion[Key] {
 //
 //     /** */
 //     override implicit def order: Order[Key] = Order by (_.k)

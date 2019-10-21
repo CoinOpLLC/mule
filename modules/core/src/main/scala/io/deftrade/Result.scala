@@ -56,6 +56,9 @@ object Result {
   /** */
   def apply[R](t: Try[R]): Result[R] = t.toEither leftMap throw2fail
 
+  /** */
+  def of[T](t: T): Result[T] = t.asRight
+
   /** And by safe we mean "will not `throw`" . */
   def safe[T](thunk: => T): Result[T] = Result(Try(thunk))
 
