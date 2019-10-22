@@ -24,11 +24,6 @@ import shapeless.syntax.singleton._
 import eu.timepit.refined
 import refined.api.Refined
 
-// import io.chrisdavenport.cormorant.implicits._
-// import io.chrisdavenport.cormorant.generic.semiauto._
-// import io.chrisdavenport.cormorant.parser._
-// import io.chrisdavenport.cormorant.refined._
-
 /**
   * Defines a
   * [[https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration]]
@@ -52,7 +47,7 @@ import refined.api.Refined
   *   - providing the `Key` types and instances as companion base classes.
   *
   * Further, the package supports the instantiaton of the scheme by
-  *   - providing a `Row` type (`Key -> Value`)
+  *   - providing a `Row` type `(Key, Value)`
   *   - providing a `Table` type (`Map[Key, Value]`) (see [[stores]])
   *   - providing implicit derivations for [[csv]] file readers and writers of `Row`s and `Table`s.
   *

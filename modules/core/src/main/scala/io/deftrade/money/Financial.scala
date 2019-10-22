@@ -31,6 +31,9 @@ import refined.W
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
 
+import shapeless.Witness
+import shapeless.syntax.singleton._
+
 /**
   * Witnesses that `N` is a numerical type suitable for financial calculations, and provides
   * an abstract interface based on [[spire.math.Fractional]].
@@ -68,12 +71,12 @@ trait Financial[N] extends Fractional[N] { self =>
   final type Positive    = N Refined refined.numeric.Positive
   final type NonNegative = N Refined refined.numeric.NonNegative
 
-  final type `(0,1)` = N Refined Is.`(0,1)`
-  final type `[0,1)` = N Refined Is.`[0,1)`
-  final type `(0,1]` = N Refined Is.`(0,1]`
-  final type `[0,1]` = N Refined Is.`[0,1]`
+  final type `(0,1)` = N Refined IsWithin.`(0,1)`
+  final type `[0,1)` = N Refined IsWithin.`[0,1)`
+  final type `(0,1]` = N Refined IsWithin.`(0,1]`
+  final type `[0,1]` = N Refined IsWithin.`[0,1]`
 
-  object Is {
+  object IsWithin {
     type `(0,1)` = Greater[LiterallyZero] And Less[LiterallyOne]
     type `[0,1)` = Not[Less[LiterallyZero]] And Less[LiterallyOne]
     type `(0,1]` = Greater[LiterallyZero] And Not[Greater[LiterallyOne]]
@@ -160,7 +163,9 @@ object Financial {
 
   /**  */
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
-    final type LiterallyZero = W.`0.0`.T
+    final val w0 = 0.0.witness
+    // final val w0 = BigDecimal(0).witness
+    final type LiterallyZero = w0.T
     final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { BigDecimal apply s }
   }
