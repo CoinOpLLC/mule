@@ -80,6 +80,8 @@ sealed trait WithValue {
 
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
+
+  final implicit def validateId: Validate[Long, Value] = Validate alwaysPassed (())
 }
 
 /** */

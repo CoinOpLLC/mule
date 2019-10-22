@@ -21,6 +21,5 @@ class DemoSpec extends FlatSpec with Matchers {
 
     import io.deftrade.time.work._
     assert(yesterday < today)
-
   }
 }

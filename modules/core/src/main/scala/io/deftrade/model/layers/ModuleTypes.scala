@@ -55,8 +55,8 @@ object ModuleTypes {
 
   /** */
   abstract class Aux[MA, Q]()(
-      implicit val MonetaryAmount: Financial[MA],
-      implicit val Quantity: Financial[Q]
+      implicit final val MonetaryAmount: Financial[MA],
+      implicit final val Quantity: Financial[Q]
   ) extends ModuleTypes {
 
     /** */

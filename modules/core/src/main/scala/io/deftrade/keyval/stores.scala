@@ -30,10 +30,11 @@ import eu.timepit.refined
 import refined.api.Validate
 import refined.cats.refTypeOrder
 
-import fs2.{ io, text, Pipe, Stream }
+import fs2.{ text, Pipe, Stream }
+import fs2.io.file.FileHandle
 
-import _root_.io.chrisdavenport.cormorant
-import cormorant._
+import io.chrisdavenport.cormorant
+import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
 import cormorant.implicits._
 import cormorant.generic.semiauto._
 import cormorant.refined._
@@ -41,7 +42,7 @@ import cormorant.fs2._
 
 import scala.language.higherKinds
 
-import java.nio.file.{ Path, Paths }
+import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
 
 /**
   *
@@ -54,10 +55,10 @@ trait stores {
   protected trait ModuleTypes {
 
     /** */
-    type ValueCompanionType[x] <: WithValue.Aux[x]
+    type ValueType
 
     /** */
-    type ValueType
+    type ValueCompanionType[x] <: WithValue.Aux[x]
 
     /** */
     type HValue <: HList
@@ -100,15 +101,14 @@ trait stores {
       final type HValue                = HV // = lgv.Repr  test / validate / assume ?!?
       final type EffectType[x]         = F[x]
 
-      import V.{ Id, Index, Value }
+      import V.{ validateId, Id, Index, Value }
 
       final type ValueType = Value
 
       /** Basic in-memory table structure */
       final type Table = Map[Index, Value]
-      implicit def validateId: Validate[Long, Value] = Validate alwaysPassed (())
-      final implicit lazy val putId                  = Put[Id]
-      final implicit lazy val getId                  = Get[Id]
+      final implicit lazy val putId = Put[Id]
+      final implicit lazy val getId = Get[Id]
     }
   }
 
@@ -133,24 +133,32 @@ trait stores {
 
     /** FIXME - `rethrow`(s)*/
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def rows: EffectStream[Row] = permRows.rethrow map (_._2)
+    final def rows: EffectStream[Row] = permRows map (_._2)
     // EitherT[EffectStream, Fail, Row]
 
     /**  @return a `Stream` of length zero or one. */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def get(id: Id): EffectStream[Row] = permRows.rethrow filter (_._1 === id) map (_._2)
+    def get(id: Id): EffectStream[Row] =
+      permRows filter (_._1 === id) map (_._2)
 
-    /** */
+    /**
+      * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
+      *
+      * Note: `IO Exception Policy := Whatever`
+      * TODO: This needs to evolve.
+      */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def permRows: EffectStream[Result[PermRow]] = readLines through csvToPermRow
+    final def permRows: EffectStream[PermRow] =
+      (readLines through csvToPermRow).rethrow handleErrorWith (_ => Stream.empty)
 
     /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def append(row: Row): EffectStream[Id] =
       for {
-        id <- Stream eval { F delay { Id(rawId.getAndIncrement) } }
-        _  <- Stream eval { F delay { id -> row } } through permRowToCSV through appendingSink
-        _  <- Stream eval { F delay updateCache(row) }
+        id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+        _ <- Stream eval F.delay {
+              updateCache(row); id -> row
+            } through permRowToCSV through appendingSink
       } yield id
 
     /** */
@@ -322,6 +330,21 @@ trait stores {
     /** */
     def path: Path
 
+    final val srfh = {
+      import OpenOption._
+      val openOptions = Seq(
+        CREATE,
+        READ,
+        WRITE,
+        APPEND,
+        // SYNC,
+        // DSYNC,
+      )
+      Stream resource Blocker[EffectType] map { blocker =>
+        FileHandle fromPath (path, blocker, openOptions)
+      }
+    }
+
     /** */
     final protected var table: Table = Map.empty
 
@@ -340,7 +363,7 @@ trait stores {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def readLines: EffectStream[String] =
       (Stream resource Blocker[EffectType]) flatMap { blocker =>
-        io.file readAll [EffectType] (path, blocker, 1024 * 1042)
+        fs2.io.file readAll [EffectType] (path, blocker, 1024 * 1042)
       } through text.utf8Decode through text.lines
   }
 
@@ -361,13 +384,13 @@ trait stores {
     import V._
 
     /** */
-    final def get(k: Key): EffectStream[Value] = Stream evals (F delay (table get k))
+    final def get(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
 
     /** */
     def update(row: Row): EffectStream[Unit] = ???
 
-    /** FIXME - not clear how to memorialize this in a Row... */
-    def delete(k: Key): EffectStream[Boolean] = ???
+    /** Empty `Value` memorializes (persists) `delete` for a given `key`.. */
+    def delete(key: Key): EffectStream[Boolean] = ???
 
     /** */
     def insert(row: Row): EffectStream[Unit] = ???
