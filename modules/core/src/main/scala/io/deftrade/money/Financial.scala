@@ -24,15 +24,10 @@ import cats.kernel.CommutativeGroup
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.numeric.{ Greater, Less }
-import refined.boolean.{ And, Not }
-import refined.W
+import refined.numeric.{ Interval }
 
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
-
-import shapeless.Witness
-import shapeless.syntax.singleton._
 
 /**
   * Witnesses that `N` is a numerical type suitable for financial calculations, and provides
@@ -65,23 +60,20 @@ import shapeless.syntax.singleton._
   */
 trait Financial[N] extends Fractional[N] { self =>
 
-  type LiterallyZero
-  type LiterallyOne
-
   final type Positive    = N Refined refined.numeric.Positive
   final type NonNegative = N Refined refined.numeric.NonNegative
 
-  final type `(0,1)` = N Refined IsWithin.`(0,1)`
-  final type `[0,1)` = N Refined IsWithin.`[0,1)`
-  final type `(0,1]` = N Refined IsWithin.`(0,1]`
-  final type `[0,1]` = N Refined IsWithin.`[0,1]`
+  final type `(0,1)` = N Refined IsInterval.`(0,1)`
+  final type `[0,1)` = N Refined IsInterval.`[0,1)`
+  final type `(0,1]` = N Refined IsInterval.`(0,1]`
+  final type `[0,1]` = N Refined IsInterval.`[0,1]`
 
-  object IsWithin {
-    type `(0,1)` = Greater[LiterallyZero] And Less[LiterallyOne]
-    type `[0,1)` = Not[Less[LiterallyZero]] And Less[LiterallyOne]
-    type `(0,1]` = Greater[LiterallyZero] And Not[Greater[LiterallyOne]]
-    type `[0,1]` = Not[Less[LiterallyZero]] And Not[Greater[LiterallyOne]]
-
+  object IsInterval {
+    import _root_.shapeless.nat.{ _0, _1 }
+    type `(0,1)` = Interval.Open[_0, _1]
+    type `[0,1)` = Interval.ClosedOpen[_0, _1]
+    type `(0,1]` = Interval.OpenClosed[_0, _1]
+    type `[0,1]` = Interval.Closed[_0, _1]
   }
 
   /**
@@ -143,8 +135,6 @@ trait Financial[N] extends Fractional[N] { self =>
 }
 
 /**
-  * FIXME: `LiterallyZero` and `LiterallyOne` -> how are these polymorphic?
-  * use BigDecimal(1.0).witness ?! Or what?
   */
 object Financial {
 
@@ -153,8 +143,6 @@ object Financial {
 
   /**  */
   trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
-    final type LiterallyZero = W.`0.0`.T
-    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe [Double] { java.lang.Double parseDouble s }
   }
 
@@ -163,10 +151,6 @@ object Financial {
 
   /**  */
   trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
-    final val w0 = 0.0.witness
-    // final val w0 = BigDecimal(0).witness
-    final type LiterallyZero = w0.T
-    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { BigDecimal apply s }
   }
 
@@ -175,15 +159,9 @@ object Financial {
 
   /** */
   trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
-    final type LiterallyZero = W.`0.0`.T
-    final type LiterallyOne  = W.`1.0`.T
     def parse(s: String) = Result safe { Rational apply s }
   }
 
   /**  */
   implicit object RationalIsFinancial extends RationalIsFinancial
 }
-// trait FinancialEntailsFractional {
-//   protected final implicit def financialEntailsFractional[V: Financial]: Fractional[V] =
-//     Financial[V].fractional
-// }

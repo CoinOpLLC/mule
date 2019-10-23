@@ -320,13 +320,13 @@ trait api {
     new FormatShowHashOrder[ChronoLocalDate, LocalDate](
       DateTimeFormatter.ISO_LOCAL_DATE,
       LocalDate from _
-    ) with Hash[LocalDate] with cats.Order[LocalDate]
+    ) with Hash[LocalDate] with Order[LocalDate]
 
   implicit lazy val shoLocalTime =
     new FormatShowHashOrder[LocalTime, LocalTime](
       DateTimeFormatter.ISO_LOCAL_TIME,
       LocalTime from _
-    ) with Hash[LocalTime] with cats.Order[LocalTime]
+    ) with Hash[LocalTime] with Order[LocalTime]
 
   // TODO make sure to test this
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -334,13 +334,13 @@ trait api {
     new FormatShowHashOrder[ChronoLocalDateTime[_], LocalDateTime](
       DateTimeFormatter.ISO_LOCAL_DATE_TIME,
       LocalDateTime from _
-    ) with Hash[LocalDateTime] with cats.Order[LocalDateTime]
+    ) with Hash[LocalDateTime] with Order[LocalDateTime]
 
   implicit lazy val shoInstant =
     new FormatShowHashOrder[Instant, Instant](
       DateTimeFormatter.ISO_INSTANT,
       Instant from _
-    ) with Hash[Instant] with cats.Order[Instant]
+    ) with Hash[Instant] with Order[Instant]
 
   /** TODO: expand on these */
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]

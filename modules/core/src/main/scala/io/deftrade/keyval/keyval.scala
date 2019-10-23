@@ -47,7 +47,7 @@ object OpaqueKey {
   *
   * TODO revisit this decision and its implication.
   */
-sealed trait WithValue {
+protected sealed trait WithValue {
 
   /** */
   type Value
@@ -63,6 +63,8 @@ sealed trait WithValue {
 
   /**  */
   object Id {
+
+    /**  */
     private[deftrade] def apply(raw: Long): Id = OpaqueKey(raw)
   }
 
@@ -85,7 +87,7 @@ sealed trait WithValue {
 }
 
 /** */
-object WithValue {
+protected object WithValue {
 
   /**
     * The type of the underlying record being indexed.

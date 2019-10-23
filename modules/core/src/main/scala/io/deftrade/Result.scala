@@ -128,6 +128,10 @@ sealed abstract case class Fail private (
 /** */
 object Fail {
 
+  def fromThrowable(s: String): Throwable => Fail = t => Fail(s, t)
+
+  lazy val fromString: String => Fail = s => Fail(s)
+
   /** */
   def apply(message: String): Fail = new Fail(message, none) {}
 

@@ -27,7 +27,6 @@ import shapeless.{ ::, HList, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import eu.timepit.refined
-import refined.api.Validate
 import refined.cats.refTypeOrder
 
 import fs2.{ text, Pipe, Stream }
@@ -49,7 +48,7 @@ import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
   */
 trait stores {
 
-  private val errorToFail: Error => Fail = e => Fail("csv failure", e)
+  private val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
 
   /** */
   protected trait ModuleTypes {
