@@ -26,54 +26,69 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 import spire.math.Fractional
 import spire.syntax.field._
 
+import eu.timepit.refined
+import refined.api.Refined
+import refined.numeric._
+import refined.auto._
+
 import scala.collection.immutable.SortedMap
 
 /** A pot divided. (Or something like it.) */
-sealed trait PartitionLike[K, V] { self =>
+sealed trait PartitionLike {
+
+  type Key
+
+  type Value
+
+  final type PositiveValue = Value Refined Positive
 
   /** */
-  def kvs: NonEmptyMap[K, V]
+  def kvs: NonEmptyMap[Key, PositiveValue]
 
   /** */
-  final def total(implicit V: Financial[V]): V = kvs reduce V.plus
+  final def total(implicit V: Financial[Value]): Value = kvs reduce { (x, y) =>
+    val xv: Value = x.value
+    val yv: Value = y.value
+    V.plus(x, y)
+  }
 
   /** */
-  final def keys: NonEmptySet[K] = kvs.keys
+  final def keys: NonEmptySet[Key] = kvs.keys
 
   /** */
-  final def toSortedMap: SortedMap[K, V] = kvs.toSortedMap
+  final def toSortedMap: SortedMap[Key, Value] = kvs.toSortedMap
 
   /** */
-  final def scaled(n: V)(implicit K: Order[K], V: Financial[V]): Partition[K, V] =
+  final def scaled(n: PositiveValue)(implicit K: Order[Key], V: Financial[Value]): Partition[Key, Value] =
     Partition unsafe (toSortedMap mapValues (_ * n))
 
   /** */
   final def scaled[N: Financial, C: Currency](
       amount: Money[N, C]
   )(
-      implicit V: Financial[V]
-  ): Map[K, Money[N, C]] =
+      implicit V: Financial[Value]
+  ): Map[Key, Money[N, C]] =
     toSortedMap mapValues (amount * _)
 
   /** Creates a [[UnitPartition]] from this one. */
-  final def normalized(implicit K: Order[K], V: Financial[V]): UnitPartition[K, V] =
-    self match {
-      case Partition(_)          => UnitPartition unsafe [K, V] (toSortedMap mapValues (_ / total))
-      case up @ UnitPartition(_) => up
-    }
+  final def normalized(implicit K: Order[Key], V: Financial[Value]): UnitPartition[Key, Value] =
+    UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_ / total))
 
   /** FIXME: implement and replace normalize */
   final def carmelized(
       implicit
-      K: Order[K],
-      V: Financial[V]
-  ): UnitPartition[K, V.`(0,1]`] = ???
+      K: Order[Key],
+      V: Financial[Value]
+  ): UnitPartition[Key, V.`(0,1]`] = ???
 }
 
 /** Modelling the total equity stake, and the stakeholders thereof. */
 sealed abstract case class Partition[K, V] private (
     kvs: NonEmptyMap[K, V]
-) extends PartitionLike[K, V] {
+) extends PartitionLike {
+
+  final type Key   = K
+  final type Value = V
 
   /** Creates a `Partition` of total `n`, proportional to self. */
   def proRated(n: V)(implicit K: Order[K], V: Financial[V]): Partition[K, V] =
@@ -131,7 +146,10 @@ object Partition {
   */
 sealed abstract case class UnitPartition[K, V] private (
     kvs: NonEmptyMap[K, V]
-) extends PartitionLike[K, V] {
+) extends PartitionLike {
+
+  final type Key   = K
+  final type Value = V
 
   /** Share acquired from each, according to their proportion. */
   def buyIn(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =

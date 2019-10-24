@@ -63,6 +63,8 @@ trait Financial[N] extends Fractional[N] { self =>
   final type Positive    = N Refined refined.numeric.Positive
   final type NonNegative = N Refined refined.numeric.NonNegative
 
+  // FIXME provide commutative groups for these!
+
   final type `(0,1)` = N Refined IsInterval.`(0,1)`
   final type `[0,1)` = N Refined IsInterval.`[0,1)`
   final type `(0,1]` = N Refined IsInterval.`(0,1]`

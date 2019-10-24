@@ -327,16 +327,19 @@ trait stores {
   ] extends Store[F, W, V, HV] { self: ModuleTypes.Aux[F, W, V, HV] =>
 
     /** */
+    final protected var table: Table = Map.empty
+
+    /** */
     def path: Path
 
-    final val srfh = {
+    private final val srfh = {
       import OpenOption._
       val openOptions = Seq(
         CREATE,
-        READ,
+        // READ,
         WRITE,
         APPEND,
-        // SYNC,
+        SYNC,
         // DSYNC,
       )
       Stream resource Blocker[EffectType] map { blocker =>
@@ -344,8 +347,10 @@ trait stores {
       }
     }
 
-    /** */
-    final protected var table: Table = Map.empty
+    srfh |> discardValue
+
+    private def appendLine(s: String): EffectStream[Unit] =
+      Stream eval F.delay { s |> discardValue }
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -353,9 +358,7 @@ trait stores {
       fs =>
         for {
           s <- fs
-          u <- Stream emit s |> { _ =>
-                ()
-              }
+          u <- appendLine(s)
         } yield u
 
     /** */
@@ -427,7 +430,7 @@ trait stores {
 
   /** */
   def valueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      V: WithId.Aux[V],
+      v: WithId.Aux[V],
       p: String
   )(
       implicit
@@ -435,7 +438,7 @@ trait stores {
       llr: Lazy[LabelledRead[HV]],
       llw: Lazy[LabelledWrite[HV]]
   ): Result[ValueStore[F, V, HV]] = Result safe {
-    new MemFileValueStore(V) {
+    new MemFileValueStore(v) {
 
       /** */
       override def path = Paths get p
