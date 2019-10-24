@@ -19,6 +19,8 @@ package model
 
 import keyval.DtEnum, layers.{ Accounting, ModuleTypes }
 
+import money.UnitPartition
+
 import cats.implicits._
 
 /**

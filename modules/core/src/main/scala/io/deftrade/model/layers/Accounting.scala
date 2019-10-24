@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import money.{ Currency, Financial }, keyval.DtEnum
+import money.{ Currency, Financial, UnitPartition }, keyval.DtEnum
 
 import cats.implicits._
 import cats.{ Order => Oardur }
