@@ -27,6 +27,7 @@ import spire.math.Fractional
 import spire.syntax.field._
 
 import eu.timepit.refined
+import refined.refineV
 import refined.api.Refined
 import refined.numeric._
 import refined.auto._
@@ -46,21 +47,17 @@ sealed trait PartitionLike {
   def kvs: NonEmptyMap[Key, PositiveValue]
 
   /** */
-  final def total(implicit V: Financial[Value]): Value = kvs reduce { (x, y) =>
-    val xv: Value = x.value
-    val yv: Value = y.value
-    V.plus(x, y)
-  }
+  final def total(implicit V: Financial[Value]): V.Positive = kvs reduce V.positiveSemigroup.combine
 
   /** */
   final def keys: NonEmptySet[Key] = kvs.keys
 
   /** */
-  final def toSortedMap: SortedMap[Key, Value] = kvs.toSortedMap
+  final def toSortedMap: SortedMap[Key, PositiveValue] = kvs.toSortedMap
 
   /** */
   final def scaled(n: PositiveValue)(implicit K: Order[Key], V: Financial[Value]): Partition[Key, Value] =
-    Partition unsafe (toSortedMap mapValues (_ * n))
+    Partition unsafe (toSortedMap mapValues (_.value * n))
 
   /** */
   final def scaled[N: Financial, C: Currency](
@@ -68,11 +65,11 @@ sealed trait PartitionLike {
   )(
       implicit V: Financial[Value]
   ): Map[Key, Money[N, C]] =
-    toSortedMap mapValues (amount * _)
+    toSortedMap mapValues (amount * _.value)
 
   /** Creates a [[UnitPartition]] from this one. */
   final def normalized(implicit K: Order[Key], V: Financial[Value]): UnitPartition[Key, Value] =
-    UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_ / total))
+    UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_.value / total))
 
   /** FIXME: implement and replace normalize */
   final def carmelized(
@@ -91,7 +88,13 @@ sealed abstract case class Partition[K, V] private (
   final type Value = V
 
   /** Creates a `Partition` of total `n`, proportional to self. */
-  def proRated(n: V)(implicit K: Order[K], V: Financial[V]): Partition[K, V] =
+  def proRated(
+      n: PositiveValue
+  )(
+      implicit
+      K: Order[Key],
+      V: Financial[Value]
+  ): Partition[Key, Value] =
     normalized scaled n // TODO feels half assed
 
   /** share acquired from each according to their proportion */
@@ -152,15 +155,15 @@ sealed abstract case class UnitPartition[K, V] private (
   final type Value = V
 
   /** Share acquired from each, according to their proportion. */
-  def buyIn(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
-    if (!(toSortedMap contains key) && share > V.zero)
-      Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
-    else
-      Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
+  def buyIn(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] = ???
+  // if (!(toSortedMap contains key) && refineV[Positive](share).isRight)
+  //   Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
+  // else
+  //   Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
 
   /** Share returned to each according to their proportion. */
-  def sellOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] =
-    UnitPartition.fromShares((toSortedMap - key).toList: _*)
+  def sellOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] = ???
+  // UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
 
 /** Conventional creation patterns. */

@@ -20,11 +20,11 @@ package money
 import implicits._
 
 import cats.implicits._
-import cats.kernel.CommutativeGroup
+import cats.kernel.{ CommutativeGroup, Monoid, Semigroup }
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.numeric.{ Interval }
+import refined.numeric.{ Interval, Positive => IsPositive, NonNegative => IsNonNegative }
 
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
@@ -60,8 +60,13 @@ import spire.math.{ Fractional, Integral, Rational }
   */
 trait Financial[N] extends Fractional[N] { self =>
 
-  final type Positive    = N Refined refined.numeric.Positive
-  final type NonNegative = N Refined refined.numeric.NonNegative
+  final type Positive = N Refined IsPositive
+
+  def positiveSemigroup: Semigroup[Positive]
+
+  final type NonNegative = N Refined IsNonNegative
+
+  def nonNegativeMonoid: Monoid[NonNegative]
 
   // FIXME provide commutative groups for these!
 
