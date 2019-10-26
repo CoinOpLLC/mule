@@ -24,7 +24,7 @@ import cats.kernel.{ CommutativeGroup, Monoid, Semigroup }
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.numeric.{ Interval, Positive => IsPositive, NonNegative => IsNonNegative }
+import refined.numeric
 
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
@@ -60,28 +60,19 @@ import spire.math.{ Fractional, Integral, Rational }
   */
 trait Financial[N] extends Fractional[N] { self =>
 
-  final type Positive = N Refined IsPositive
+  /** used by `refined` inferencing */
+  final implicit def N(implicit ev: scala.Numeric[N]) = ev
 
-  def positiveSemigroup: Semigroup[Positive]
+  def positiveSemigroup: Semigroup[N Refined numeric.Positive]
 
-  final type NonNegative = N Refined IsNonNegative
+  def nonNegativeMonoid: Monoid[N Refined numeric.NonNegative]
 
-  def nonNegativeMonoid: Monoid[NonNegative]
+  import Financial.IsUnitInterval
 
-  // FIXME provide commutative groups for these!
-
-  final type `(0,1)` = N Refined IsInterval.`(0,1)`
-  final type `[0,1)` = N Refined IsInterval.`[0,1)`
-  final type `(0,1]` = N Refined IsInterval.`(0,1]`
-  final type `[0,1]` = N Refined IsInterval.`[0,1]`
-
-  object IsInterval {
-    import _root_.shapeless.nat.{ _0, _1 }
-    type `(0,1)` = Interval.Open[_0, _1]
-    type `[0,1)` = Interval.ClosedOpen[_0, _1]
-    type `(0,1]` = Interval.OpenClosed[_0, _1]
-    type `[0,1]` = Interval.Closed[_0, _1]
-  }
+  final type `(0,1)` = N Refined IsUnitInterval.`(0,1)`
+  final type `[0,1)` = N Refined IsUnitInterval.`[0,1)`
+  final type `(0,1]` = N Refined IsUnitInterval.`(0,1]`
+  final type `[0,1]` = N Refined IsUnitInterval.`[0,1]`
 
   /**
     * How do we deal with scale and significant digits?
@@ -141,31 +132,58 @@ trait Financial[N] extends Fractional[N] { self =>
   }
 }
 
-/**
-  */
+/**  */
 object Financial {
+
+  /**  */
+  object IsUnitInterval {
+    import _root_.shapeless.nat.{ _0, _1 }
+    type `(0,1)` = numeric.Interval.Open[_0, _1]
+    type `[0,1)` = numeric.Interval.ClosedOpen[_0, _1]
+    type `(0,1]` = numeric.Interval.OpenClosed[_0, _1]
+    type `[0,1]` = numeric.Interval.Closed[_0, _1]
+  }
 
   /**  */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
-  /**  */
-  trait DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
+  import refined.cats._
+  import numeric.{ NonNegative, Positive }
+
+  implicit object DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
+
+    /**  */
+    def nonNegativeMonoid: Monoid[Double Refined NonNegative] = Monoid[Double Refined NonNegative]
+
+    /**  */
+    def positiveSemigroup: Semigroup[Double Refined Positive] = Semigroup[Double Refined Positive]
+
+    /**  */
     def parse(s: String) = Result safe [Double] { java.lang.Double parseDouble s }
   }
 
   /**  */
-  implicit object DoubleIsFinancial extends DoubleIsFinancial
+  implicit object BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
 
-  /**  */
-  trait BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
+    /**  */
+    def nonNegativeMonoid: Monoid[BigDecimal Refined NonNegative] = ??? // Monoid[BigDecimal Refined NonNegative]
+
+    /**  */
+    def positiveSemigroup: Semigroup[BigDecimal Refined Positive] = ??? // Semigroup[BigDecimal Refined Positive]
+
+    /**  */
     def parse(s: String) = Result safe { BigDecimal apply s }
   }
 
-  /**  */
-  implicit object BigDecimalIsFinancial extends BigDecimalIsFinancial
-
   /** */
-  trait RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
+  sealed abstract class RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
+
+    /**  */
+    def nonNegativeMonoid: Monoid[Rational Refined NonNegative] = ??? // Monoid[Rational Refined NonNegative]
+
+    /**  */
+    def positiveSemigroup: Semigroup[Rational Refined Positive] = ??? //Semigroup[Rational Refined Positive]
+
     def parse(s: String) = Result safe { Rational apply s }
   }
 

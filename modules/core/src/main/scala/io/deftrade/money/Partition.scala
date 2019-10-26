@@ -28,7 +28,7 @@ import spire.syntax.field._
 
 import eu.timepit.refined
 import refined.refineV
-import refined.api.Refined
+import refined.api.{ Refined, Validate }
 import refined.numeric._
 import refined.auto._
 
@@ -37,86 +37,135 @@ import scala.collection.immutable.SortedMap
 /** A pot divided. (Or something like it.) */
 sealed trait PartitionLike {
 
+  /** */
   type Key
 
+  /** */
+  implicit val K: Order[Key]
+
+  /** */
   type Value
 
+  /** */
+  implicit val V: Financial[Value]
+
+  /** */
   final type PositiveValue = Value Refined Positive
 
   /** */
-  def kvs: NonEmptyMap[Key, PositiveValue]
+  final type NormalizedValue = Value Refined Financial.IsUnitInterval.`(0,1]`
 
   /** */
-  final def total(implicit V: Financial[Value]): V.Positive = kvs reduce V.positiveSemigroup.combine
+  type RefinedValue <: Refined[Value, _]
+
+  /** */
+  val kvs: NonEmptyMap[Key, RefinedValue]
+
+  def total(implicit V: Financial[Value]): RefinedValue = ???
+
+  /** */
+  // final def total(implicit V: Financial[Value]): PositiveValue =
+  //   kvs reduce V.positiveSemigroup.combine
+  //
+  // final def total2(implicit V: Financial[Value]): NormalizedValue = V.one
 
   /** */
   final def keys: NonEmptySet[Key] = kvs.keys
 
   /** */
-  final def toSortedMap: SortedMap[Key, PositiveValue] = kvs.toSortedMap
+  final def toSortedMap: SortedMap[Key, Value] = kvs.toSortedMap map {
+    case (k, vrp) => (k, vrp.value)
+  }
 
   /** */
-  final def scaled(n: PositiveValue)(implicit K: Order[Key], V: Financial[Value]): Partition[Key, Value] =
-    Partition unsafe (toSortedMap mapValues (_.value * n))
+  final def scaled(
+      n: PositiveValue
+  ): Partition[Key, Value] =
+    Partition unsafe kvs.toSortedMap.mapValues { _ =>
+      val Right(res) = refineV[Positive](n.value) // (v.value * n.value)
+      res
+    }
 
   /** */
   final def scaled[N: Financial, C: Currency](
       amount: Money[N, C]
-  )(
-      implicit V: Financial[Value]
-  ): Map[Key, Money[N, C]] =
-    toSortedMap mapValues (amount * _.value)
+  ): Map[Key, Money[N, C]] = kvs.toSortedMap mapValues (amount * _.value)
 
   /** Creates a [[UnitPartition]] from this one. */
-  final def normalized(implicit K: Order[Key], V: Financial[Value]): UnitPartition[Key, Value] =
-    UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_.value / total))
+  def normalized: UnitPartition[Key, Value] = ???
+  // UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_ / total))
+  // this
 
-  /** FIXME: implement and replace normalize */
-  final def carmelized(
-      implicit
-      K: Order[Key],
-      V: Financial[Value]
-  ): UnitPartition[Key, V.`(0,1]`] = ???
+  protected implicit def HACK: Validate[Value, Positive] = ???
+  // implicit def wtf = V.positiveSemigroup
+
+  /** Creates a `Partition` of total `n`, proportional to self. */
+  def proRated(
+      n: Value
+  ): Result[Partition[Key, Value]] = ???
+  // for {
+  //   pn <- refineV[Positive](n)
+  // } yield normalized scaled pn // TODO feels half assed
+
+  /** share acquired from each according to their proportion */
+  def dilutedBy(key: Key, share: Value): Result[Partition[Key, Value]] = ???
+
+  /** share returned to each according to their proportion */
+  def retiredKey(key: Key): Result[Partition[Key, Value]] = ???
+
+  /** Share acquired from each, according to their proportion. */
+  final def buyIn(key: Key, share: Value): Result[Partition[Key, Value]] = dilutedBy(key, share)
+  // if (!(toSortedMap contains key) && refineV[Positive](share).isRight)
+  //   Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
+  // else
+  //   Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
+
+  /** Share returned to each according to their proportion. */
+  final def sellOut(key: Key): Result[Partition[Key, Value]] = retiredKey(key)
+  // UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
 
 /** Modelling the total equity stake, and the stakeholders thereof. */
 sealed abstract case class Partition[K, V] private (
-    kvs: NonEmptyMap[K, V]
+    override final val kvs: NonEmptyMap[K, V Refined Positive]
+)(
+    implicit
+    final override val K: Order[K],
+    final override val V: Financial[V]
 ) extends PartitionLike {
-
-  final type Key   = K
-  final type Value = V
-
-  /** Creates a `Partition` of total `n`, proportional to self. */
-  def proRated(
-      n: PositiveValue
-  )(
-      implicit
-      K: Order[Key],
-      V: Financial[Value]
-  ): Partition[Key, Value] =
-    normalized scaled n // TODO feels half assed
-
-  /** share acquired from each according to their proportion */
-  def dilutedBy(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[Partition[K, V]] =
-    ???
-
-  /** share returned to each according to their proportion */
-  def retiredKey(key: K)(implicit K: Order[K], V: Financial[V]): Result[Partition[K, V]] =
-    ???
-
+  final type Key          = K
+  final type Value        = V
+  final type RefinedValue = PositiveValue
 }
 
 /** */
 object Partition {
 
   /** */
-  private def apply[K: Order, V: Financial](kvs: NonEmptyMap[K, V]) = new Partition(kvs) {}
+  private def apply[K: Order, V: Financial](kvs: NonEmptyMap[K, V Refined Positive]) =
+    new Partition(kvs) {}
+
+  private[deftrade] def unsafe[K: Order, V: Financial](
+      sm: SortedMap[K, V Refined Positive]
+  ): Partition[K, V] = Partition(NonEmptyMap fromMapUnsafe sm)
 
   /** total shares outstanding computed from the sum of `shares` */
-  def fromShares[K: Order, V: Financial](shares: (K, V)*): Result[Partition[K, V]] =
-    if (shares.toList.nonEmpty) unsafe(shares |> SortedMap.apply[K, V]).asRight
-    else Result fail "must be non-empty"
+  def fromShares[K: Order, V: Financial](
+      shares: (K, V)*
+  ): Result[Partition[K, V]] = shares.toList match {
+    case Nil => Result fail "must be non-empty"
+    case shareNel =>
+      implicit def HACK: Validate[V, Positive] = ???
+      val posSharesNelE: List[Either[String, (K, V Refined Positive)]] = shareNel map {
+        case (k, v) => refineV[Positive](v) map (v => (k, v))
+      }
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
+      val eNelPosShares: Either[String, List[(K, V Refined Positive)]] = posSharesNelE.sequence
+      val ep: Either[String, Partition[K, V]] = for {
+        kvs <- eNelPosShares
+      } yield unsafe(SortedMap(kvs.toList: _*))
+      ep leftMap Fail.fromString
+  }
 
   /**
     * Creates an allocation function (`V => Partition`) from a set of tranches,
@@ -129,41 +178,30 @@ object Partition {
 
   /** def ipsa loquitur */
   def currified[K: Order, V: Financial](
-      compute: NonEmptySet[K] => V => NonEmptyMap[K, V]
+      compute: NonEmptySet[K] => V Refined Positive => NonEmptyMap[K, V Refined Positive]
   )(
       keys: NonEmptySet[K]
   )(
-      amount: V
+      amount: V Refined Positive
   ) = compute(keys)(amount) |> apply[K, V]
-
-  //
-  private[deftrade] def unsafe[K: Order, V: Financial](sm: SortedMap[K, V]): Partition[K, V] =
-    Partition(NonEmptyMap fromMapUnsafe sm)
 }
 
 /**
-  * Models the equity of an entity as a single Unit.
+  * Models a sharable value as a single `Unit`.
   *
   * (Not to be confused with Scala Unit.)
-  * TODO use refined to restrict V to be between 0 and 1
   */
 sealed abstract case class UnitPartition[K, V] private (
-    kvs: NonEmptyMap[K, V]
+    final override val kvs: NonEmptyMap[K, V Refined Financial.IsUnitInterval.`(0,1]`]
+)(
+    implicit
+    final override val K: Order[K],
+    final override val V: Financial[V]
 ) extends PartitionLike {
 
-  final type Key   = K
-  final type Value = V
-
-  /** Share acquired from each, according to their proportion. */
-  def buyIn(key: K, share: V)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] = ???
-  // if (!(toSortedMap contains key) && refineV[Positive](share).isRight)
-  //   Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
-  // else
-  //   Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
-
-  /** Share returned to each according to their proportion. */
-  def sellOut(key: K)(implicit K: Order[K], V: Financial[V]): Result[UnitPartition[K, V]] = ???
-  // UnitPartition.fromShares((toSortedMap - key).toList: _*)
+  final type Key          = K
+  final type Value        = V
+  final type RefinedValue = NormalizedValue
 }
 
 /** Conventional creation patterns. */
@@ -196,7 +234,6 @@ object UnitPartition {
     val computedShares = ps.map(_._2).fold(zero)(plus)
     if (computedShares === n && inRangeForallShares(n, ps)) fromShares(ps: _*)
     else Result fail s"$computedShares != $n"
-
   }
 
   /** `exact` slices are claimed by the caller; this is checked. */
@@ -213,13 +250,11 @@ object UnitPartition {
   object Single {
 
     /** Extracts a single key, if that's what's there. */
-    def unapply[K: Order, V: Financial](p: UnitPartition[K, V]): Option[K] = {
-      val VF = Fractional[V]; import VF._
+    def unapply[K: Order, V: Financial](p: UnitPartition[K, V]): Option[K] =
       p.kvs.toNel.toList match {
-        case (k, v) :: Nil if v === one => k.some
-        case _                          => none
+        case (k, _) :: Nil => k.some
+        case _             => none
       }
-    }
   }
 
   private def inRangeForallShares[K: Order, V: Financial](n: V, ps: Seq[(K, V)]) = {
@@ -228,5 +263,5 @@ object UnitPartition {
   }
 
   private[deftrade] def unsafe[K: Order, V: Financial](kvs: SortedMap[K, V]): UnitPartition[K, V] =
-    new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity)) {}
+    ??? //new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity)) {}
 }
