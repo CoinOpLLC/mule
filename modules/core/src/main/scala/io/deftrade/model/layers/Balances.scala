@@ -122,7 +122,7 @@ trait Balances {
     def updated(dc: DebitCreditKey[Debit, Credit], amount: Mny[C])(
         implicit C: Currency[C]
     ): TrialBalance[C] =
-      TrialBalance(debits |+| (dc.debits scaled -amount), credits |+| (dc.credits scaled amount))
+      TrialBalance(debits |+| (dc.debits priced -amount), credits |+| (dc.credits priced amount))
 
     /** */
     def swapped[T <: AccountingKey](sk: SwapKey[T], amount: Mny[C])(
@@ -374,5 +374,4 @@ trait Balances {
 
   /** */
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
-
 }

@@ -37,6 +37,11 @@ import scala.collection.immutable.SortedMap
 /** A pot divided. (Or something like it.) */
 sealed trait PartitionLike {
 
+  protected implicit def HACK: Validate[Value, Positive] = ???
+
+  /** self type */
+  type Repr <: PartitionLike
+
   /** */
   type Key
 
@@ -61,7 +66,9 @@ sealed trait PartitionLike {
   /** */
   val kvs: NonEmptyMap[Key, RefinedValue]
 
-  def total(implicit V: Financial[Value]): RefinedValue = ???
+  // TODO: "do the math" within the `Refined` type.
+  // use the `refined.cats` forces to get a Semigroup for RefinedValues sumN
+  def total: RefinedValue
 
   /** */
   // final def total(implicit V: Financial[Value]): PositiveValue =
@@ -86,20 +93,7 @@ sealed trait PartitionLike {
       res
     }
 
-  /** */
-  final def scaled[N: Financial, C: Currency](
-      amount: Money[N, C]
-  ): Map[Key, Money[N, C]] = kvs.toSortedMap mapValues (amount * _.value)
-
-  /** Creates a [[UnitPartition]] from this one. */
-  def normalized: UnitPartition[Key, Value] = ???
-  // UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_ / total))
-  // this
-
-  protected implicit def HACK: Validate[Value, Positive] = ???
-  // implicit def wtf = V.positiveSemigroup
-
-  /** Creates a `Partition` of total `n`, proportional to self. */
+  /** Creates a `Partition` of total `n`, proportional to self. `n` must be positive. */
   def proRated(
       n: Value
   ): Result[Partition[Key, Value]] = ???
@@ -107,21 +101,30 @@ sealed trait PartitionLike {
   //   pn <- refineV[Positive](n)
   // } yield normalized scaled pn // TODO feels half assed
 
-  /** share acquired from each according to their proportion */
-  def dilutedBy(key: Key, share: Value): Result[Partition[Key, Value]] = ???
+  /** */
+  final def priced[C: Currency](
+      amount: Money[Value, C]
+  ): Map[Key, Money[Value, C]] = kvs.toSortedMap mapValues (amount * _.value)
+
+  /** Creates a [[UnitPartition]] from this one. */
+  def normalized: UnitPartition[Key, Value] = ???
+  // UnitPartition unsafe [Key, Value] (toSortedMap mapValues (_ / total))
+  // this
+
+  /**
+    * Share acquired from each, according to their proportion,
+    * to make room for the `share` requested by the new `key`.
+    */
+  def dilutedBy(key: Key, share: Value): Result[Repr] = ???
 
   /** share returned to each according to their proportion */
-  def retiredKey(key: Key): Result[Partition[Key, Value]] = ???
+  def retiredKey(key: Key): Result[Repr] = ???
 
-  /** Share acquired from each, according to their proportion. */
-  final def buyIn(key: Key, share: Value): Result[Partition[Key, Value]] = dilutedBy(key, share)
   // if (!(toSortedMap contains key) && refineV[Positive](share).isRight)
   //   Partition.unsafe(toSortedMap + (key -> share)).normalized.asRight
   // else
   //   Result fail s"bad params: key=$key, share=$share, kvs=$kvs"
 
-  /** Share returned to each according to their proportion. */
-  final def sellOut(key: Key): Result[Partition[Key, Value]] = retiredKey(key)
   // UnitPartition.fromShares((toSortedMap - key).toList: _*)
 }
 
@@ -136,6 +139,11 @@ sealed abstract case class Partition[K, V] private (
   final type Key          = K
   final type Value        = V
   final type RefinedValue = PositiveValue
+  final type Repr         = Partition[Key, Value]
+
+  // import V._
+  // import refined.cats._
+  def total: PositiveValue = ??? //cats.Semigroup[PositiveValue].combineN(kvs)
 }
 
 /** */
@@ -174,6 +182,11 @@ object Partition {
   def waterfall[K: Order, V: Financial](
       tranches: Map[K, V],
       equity: K
+  ): Result[V => Partition[K, V]] = ???
+
+  /** */
+  def waterfall[K: Order, V: Financial](
+      tranches: K => V Refined Positive,
   ): V => Partition[K, V] = ???
 
   /** def ipsa loquitur */
@@ -202,6 +215,7 @@ sealed abstract case class UnitPartition[K, V] private (
   final type Key          = K
   final type Value        = V
   final type RefinedValue = NormalizedValue
+  final type Repr         = UnitPartition[Key, Value]
 }
 
 /** Conventional creation patterns. */
