@@ -63,9 +63,9 @@ trait Financial[N] extends Fractional[N] { self =>
   /** used by `refined` inferencing */
   final implicit def N(implicit ev: scala.Numeric[N]) = ev
 
-  def positiveSemigroup: Semigroup[N Refined numeric.Positive]
+  implicit def positiveSemigroup: Semigroup[N Refined numeric.Positive]
 
-  def nonNegativeMonoid: Monoid[N Refined numeric.NonNegative]
+  implicit def nonNegativeMonoid: Monoid[N Refined numeric.NonNegative]
 
   import Financial.IsUnitInterval
 
