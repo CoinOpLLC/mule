@@ -64,34 +64,11 @@ trait Financial[N] extends Fractional[N] { self =>
   /** used by `refined` inferencing */
   // final implicit def N(implicit ev: scala.Numeric[N]) = ev
 
+  /**  */
   implicit def positiveSemigroup: Semigroup[N Refined Positive]
 
+  /**  */
   implicit def nonNegativeMonoid: Monoid[N Refined NonNegative]
-
-  // object Less {
-  //   implicit def lessValidate[T, N](
-  //       implicit
-  //       wn: WitnessAs[N, T],
-  //       nt: Numeric[T]
-  //   ): Validate.Plain[T, Less[N]] =
-  //     Validate.fromPredicate(t => nt.lt(t, wn.snd), t => s"($t < ${wn.snd})", Less(wn.fst))
-  // }
-  //
-  // object Greater {
-  //   implicit def greaterValidate[T, N](
-  //       implicit
-  //       wn: WitnessAs[N, T],
-  //       nt: Numeric[T]
-  //   ): Validate.Plain[T, Greater[N]] =
-  //     Validate.fromPredicate(t => nt.gt(t, wn.snd), t => s"($t > ${wn.snd})", Greater(wn.fst))
-  // }
-
-  // import Financial.IsUnitInterval
-
-  // final type `(0,1)` = N Refined IsUnitInterval.`(0,1)`
-  // final type `[0,1)` = N Refined IsUnitInterval.`[0,1)`
-  // final type `(0,1]` = N Refined IsUnitInterval.`(0,1]`
-  // final type `[0,1]` = N Refined IsUnitInterval.`[0,1]`
 
   /**
     * How do we deal with scale and significant digits?

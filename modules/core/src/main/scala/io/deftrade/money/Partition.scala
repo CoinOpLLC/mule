@@ -18,7 +18,6 @@ package io.deftrade
 package money
 
 import implicits._
-import Financial.IsUnitInterval._
 
 import cats.implicits._
 import cats.{ Order }
@@ -68,7 +67,7 @@ sealed trait PartitionLike {
   type Value
 
   /** */
-  implicit val V: Financial[Value]; import V._
+  implicit val V: Financial[Value]
 
   /** */
   type RefinedValue <: Refined[Value, _]
@@ -119,11 +118,11 @@ sealed trait PartitionLike {
     * If the `key` currently has a value assigned, it is effectively ignored, as the `share`
     * parameter dictates the final value proportion.
     */
-  final def buyIn(key: Key, share: Value Refined `(0,1)`): Result[Repr] =
-    this match {
-      case Partition(_)     => ???
-      case UnitPartition(_) => ???
-    }
+  final def buyIn(key: Key, share: Value Refined IsNormalized): Result[Repr] = ???
+  // this match {
+  //   case Partition(_)     => ???
+  //   case UnitPartition(_) => ???
+  // }
 
   /** share returned to each according to their proportion */
   final def sellOut(key: Key): Repr = ???
@@ -132,13 +131,17 @@ sealed trait PartitionLike {
     *
     */
   final def assigned(
-      from: NonEmptyMap[Key, Value Refined IsNormalized],
+      from: Key,
+      portion: Value Refined IsNormalized,
       to: UnitPartition[Key, Value]
   ): Result[Repr] =
-    if (from.keys forall (keys contains _)) {
-      ???
+    if ((keys contains from) && (to.keys forall (keys contains _))) {
+      this match {
+        case Partition(_)     => ??? // FIXME Result of (Partition unsafe ???)
+        case UnitPartition(_) => ??? // FIXME UnitPartition unsafe ???
+      }
     } else {
-      ???
+      Result fail """¯\_(ツ)_/¯"""
     }
 }
 
@@ -245,12 +248,14 @@ sealed abstract case class UnitPartition[K, V] private (
   final type RefinedValue = V Refined IsNormalized
   final type Repr         = UnitPartition[Key, Value]
 
+  /** */
   final def total: RefinedValue = {
     val Right(normalOne) = refineV[IsNormalized](V.one)
     normalOne
   }
 
-  def normalized: UnitPartition[Key, Value] = this
+  /** */
+  final def normalized: UnitPartition[Key, Value] = this
 }
 
 /** Conventional creation patterns. */
@@ -280,18 +285,17 @@ object UnitPartition {
   ): Result[UnitPartition[K, V]] = {
     val V              = Fractional[V]; import V._
     val computedShares = ps.map(_._2).fold(zero)(plus)
-    if (computedShares === n && inRangeForallShares(n, ps)) fromShares(ps: _*)
+    if (computedShares === n) fromShares(ps: _*)
     else Result fail s"$computedShares != $n"
   }
 
   /** `exact` slices are claimed by the caller; this is checked. */
   def exact[K: Order, V: Financial](shares: (K, V)*): Result[UnitPartition[K, V]] = {
-    val VF        = Fractional[V]; import VF._
-    def isUnitary = one === shares.map(_._2).fold(zero)(plus)
-    if (isUnitary && inRangeForallShares(one, shares))
-      unsafe(SortedMap(shares: _*)).asRight
-    else
-      Result fail s"UnitPartition: invalid creation parms: $shares"
+    val VF = Fractional[V]; import VF._
+    shares.map(_._2).fold(zero)(plus) match {
+      case x if one === x => Result of unsafe(SortedMap(shares: _*))
+      case noUnity        => Result fail s"UnitPartition: $shares total $noUnity"
+    }
   }
 
   /** For the extractor. */
@@ -305,25 +309,17 @@ object UnitPartition {
       }
   }
 
-  private def inRangeForallShares[K: Order, V: Financial](n: V, ps: Seq[(K, V)]) = {
-    val V = Financial[V]
-    ps forall { case (_, q) => V.zero <= q && q <= n * V.one }
-  }
-
+  /** checks only that values are normalized */
   private[deftrade] def unsafe[
       K: Order,
       V: Financial
   ](
       kvs: SortedMap[K, V]
-  ): UnitPartition[K, V] = {
-
-    val x: SortedMap[K, V Refined IsNormalized] = for {
-      kv <- kvs
+  ): UnitPartition[K, V] =
+    new UnitPartition(NonEmptyMap fromMapUnsafe (for {
+      (k, v) <- kvs
     } yield {
-      val Right(nv) = refineV[IsNormalized](kv._2)
-      kv._1 -> nv
-    }
-
-    new UnitPartition(NonEmptyMap fromMapUnsafe x) {}
-  }
+      val Right(nv) = refineV[IsNormalized](v)
+      k -> nv
+    })) {}
 }
