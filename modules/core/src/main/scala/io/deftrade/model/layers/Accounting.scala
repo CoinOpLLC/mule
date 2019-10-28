@@ -261,9 +261,9 @@ trait Accounting { self: ModuleTypes =>
       from |+| to
     }
 
+    /** */
     def unapply[E <: AccountingKey](sk: SwapKey[E]): Option[(Treatment[E], Treatment[E])] =
       (sk.from, sk.to).some
-
   }
 
   /** */

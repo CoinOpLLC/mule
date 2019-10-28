@@ -18,6 +18,7 @@ package io.deftrade
 package money
 
 import implicits._
+import Financial.IsUnitInterval._
 
 import cats.implicits._
 import cats.{ Order }
@@ -37,7 +38,8 @@ import scala.collection.immutable.SortedMap
 /** A pot divided. (Or something like it.) */
 sealed trait PartitionLike {
 
-  protected implicit def HACK: Validate[Value, IsPositive] = ???
+  protected implicit def HACK: Validate[Value, IsPositive]    = ???
+  protected implicit def HACK2: Validate[Value, IsNormalized] = ???
 
   /** self type */
   type Repr <: PartitionLike
@@ -105,26 +107,40 @@ sealed trait PartitionLike {
       amount: Money[Value, C]
   ): Map[Key, Money[Value, C]] = kvs.toSortedMap mapValues (amount * _.value)
 
+  /** */
+  def total: RefinedValue
+
   /** Creates a [[UnitPartition]] from this one. */
   def normalized: UnitPartition[Key, Value]
 
   /**
     * Share acquired from each, according to their proportion,
     * to make room for the `share` requested by the new `key`.
+    *
+    * If the `key` currently has a value assigned, it is effectively ignored, as the `share`
+    * parameter dictates the final value proportion.
     */
-  final def buyIn(key: Key, share: NormalizedValue): Repr = ???
+  final def buyIn(key: Key, share: Value Refined `(0,1)`): Result[Repr] =
+    this match {
+      case Partition(kvs)     => ???
+      case UnitPartition(kvs) => ???
+    }
 
   /** share returned to each according to their proportion */
   final def sellOut(key: Key): Repr = ???
-  // UnitPartition.fromShares((toSortedMap - key).toList: _*)
 
   /**
     *
     */
-  final def assign(
-      assigned: NonEmptyMap[Key, NormalizedValue],
-      assignment: UnitPartition[Key, Value]
-  ): Repr = ???
+  final def assigned(
+      from: NonEmptyMap[Key, NormalizedValue],
+      to: UnitPartition[Key, Value]
+  ): Result[Repr] =
+    if (from.keys forall (keys contains _)) {
+      ???
+    } else {
+      ???
+    }
 
 }
 
@@ -231,9 +247,11 @@ sealed abstract case class UnitPartition[K, V] private (
   final type RefinedValue = NormalizedValue
   final type Repr         = UnitPartition[Key, Value]
 
-  final def total: NormalizedValue = ???
-  // val Right(one) = refineV[IsNormalized](V.one)
-  // one
+  final def total: NormalizedValue = {
+    val Right(normalOne) = refineV[IsNormalized](V.one)
+    normalOne
+  }
+
   def normalized: UnitPartition[Key, Value] = this
 }
 
