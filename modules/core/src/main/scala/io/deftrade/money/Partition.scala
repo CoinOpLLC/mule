@@ -26,20 +26,34 @@ import cats.data.{ NonEmptyMap, NonEmptySet }
 
 import spire.math.Fractional
 import spire.syntax.field._
+import spire.compat.numeric
 
 import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined, Validate }
-import refined.numeric.{ Positive => IsPositive }
+import refined.numeric._
 import refined.auto._
 
 import scala.collection.immutable.SortedMap
 
-/** A pot divided. (Or something like it.) */
-sealed trait PartitionLike {
+/** */
+object PartitionLike {
 
-  protected implicit def HACK: Validate[Value, IsPositive]    = ???
-  protected implicit def HACK2: Validate[Value, IsNormalized] = ???
+  /** */
+  final type IsNormalized = Financial.IsUnitInterval.`(0,1]`
+
+  /** */
+  final type IsPositive = refined.numeric.Positive
+}
+
+import PartitionLike._
+
+/**
+  * Models a total stake, and the stakeholders thereof.
+  *
+  * (A pot, divided.)
+  */
+sealed trait PartitionLike {
 
   /** self type */
   type Repr <: PartitionLike
@@ -54,28 +68,13 @@ sealed trait PartitionLike {
   type Value
 
   /** */
-  implicit val V: Financial[Value]
-
-  /** */
-  final type PositiveValue = Value Refined IsPositive
-
-  /** */
-  final type IsNormalized = Financial.IsUnitInterval.`(0,1]`
-
-  /** */
-  final type NormalizedValue = Value Refined IsNormalized
+  implicit val V: Financial[Value]; import V._
 
   /** */
   type RefinedValue <: Refined[Value, _]
 
   /** */
   val kvs: NonEmptyMap[Key, RefinedValue]
-
-  /** */
-  // final def total(implicit V: Financial[Value]): PositiveValue =
-  //   kvs reduce V.positiveSemigroup.combine
-  //
-  // final def total2(implicit V: Financial[Value]): NormalizedValue = V.one
 
   /** */
   final def keys: NonEmptySet[Key] = kvs.keys
@@ -87,7 +86,7 @@ sealed trait PartitionLike {
 
   /** */
   final def scaled(
-      n: PositiveValue
+      n: Value Refined IsPositive
   ): Partition[Key, Value] =
     Partition unsafe kvs.toSortedMap.mapValues { v =>
       val Right(positiveValue) = refineV[IsPositive](v.value * n.value) // how do we know? ;)
@@ -122,8 +121,8 @@ sealed trait PartitionLike {
     */
   final def buyIn(key: Key, share: Value Refined `(0,1)`): Result[Repr] =
     this match {
-      case Partition(kvs)     => ???
-      case UnitPartition(kvs) => ???
+      case Partition(_)     => ???
+      case UnitPartition(_) => ???
     }
 
   /** share returned to each according to their proportion */
@@ -133,7 +132,7 @@ sealed trait PartitionLike {
     *
     */
   final def assigned(
-      from: NonEmptyMap[Key, NormalizedValue],
+      from: NonEmptyMap[Key, Value Refined IsNormalized],
       to: UnitPartition[Key, Value]
   ): Result[Repr] =
     if (from.keys forall (keys contains _)) {
@@ -141,10 +140,9 @@ sealed trait PartitionLike {
     } else {
       ???
     }
-
 }
 
-/** Modelling the total equity stake, and the stakeholders thereof. */
+/**  */
 sealed abstract case class Partition[K, V] private (
     override final val kvs: NonEmptyMap[K, V Refined IsPositive]
 )(
@@ -154,14 +152,14 @@ sealed abstract case class Partition[K, V] private (
 ) extends PartitionLike {
   final type Key          = K
   final type Value        = V
-  final type RefinedValue = PositiveValue
+  final type RefinedValue = Value Refined IsPositive
   final type Repr         = Partition[Key, Value]
 
   import V._
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final def total: PositiveValue =
+  final def total: RefinedValue =
     kvs.reduce // yyep. :|
 
   /**  */
@@ -244,10 +242,10 @@ sealed abstract case class UnitPartition[K, V] private (
 
   final type Key          = K
   final type Value        = V
-  final type RefinedValue = NormalizedValue
+  final type RefinedValue = V Refined IsNormalized
   final type Repr         = UnitPartition[Key, Value]
 
-  final def total: NormalizedValue = {
+  final def total: RefinedValue = {
     val Right(normalOne) = refineV[IsNormalized](V.one)
     normalOne
   }
@@ -312,6 +310,20 @@ object UnitPartition {
     ps forall { case (_, q) => V.zero <= q && q <= n * V.one }
   }
 
-  private[deftrade] def unsafe[K: Order, V: Financial](kvs: SortedMap[K, V]): UnitPartition[K, V] =
-    ??? //new UnitPartition((NonEmptyMap fromMap kvs).fold(???)(identity)) {}
+  private[deftrade] def unsafe[
+      K: Order,
+      V: Financial
+  ](
+      kvs: SortedMap[K, V]
+  ): UnitPartition[K, V] = {
+
+    val x: SortedMap[K, V Refined IsNormalized] = for {
+      kv <- kvs
+    } yield {
+      val Right(nv) = refineV[IsNormalized](kv._2)
+      kv._1 -> nv
+    }
+
+    new UnitPartition(NonEmptyMap fromMapUnsafe x) {}
+  }
 }

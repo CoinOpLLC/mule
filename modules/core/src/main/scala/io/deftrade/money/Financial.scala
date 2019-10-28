@@ -24,7 +24,8 @@ import cats.kernel.{ CommutativeGroup, Monoid, Semigroup }
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.numeric
+import refined.numeric._
+import refined.cats._
 
 import spire.implicits._
 import spire.math.{ Fractional, Integral, Rational }
@@ -61,18 +62,36 @@ import spire.math.{ Fractional, Integral, Rational }
 trait Financial[N] extends Fractional[N] { self =>
 
   /** used by `refined` inferencing */
-  final implicit def N(implicit ev: scala.Numeric[N]) = ev
+  // final implicit def N(implicit ev: scala.Numeric[N]) = ev
 
-  implicit def positiveSemigroup: Semigroup[N Refined numeric.Positive]
+  implicit def positiveSemigroup: Semigroup[N Refined Positive]
 
-  implicit def nonNegativeMonoid: Monoid[N Refined numeric.NonNegative]
+  implicit def nonNegativeMonoid: Monoid[N Refined NonNegative]
 
-  import Financial.IsUnitInterval
+  // object Less {
+  //   implicit def lessValidate[T, N](
+  //       implicit
+  //       wn: WitnessAs[N, T],
+  //       nt: Numeric[T]
+  //   ): Validate.Plain[T, Less[N]] =
+  //     Validate.fromPredicate(t => nt.lt(t, wn.snd), t => s"($t < ${wn.snd})", Less(wn.fst))
+  // }
+  //
+  // object Greater {
+  //   implicit def greaterValidate[T, N](
+  //       implicit
+  //       wn: WitnessAs[N, T],
+  //       nt: Numeric[T]
+  //   ): Validate.Plain[T, Greater[N]] =
+  //     Validate.fromPredicate(t => nt.gt(t, wn.snd), t => s"($t > ${wn.snd})", Greater(wn.fst))
+  // }
 
-  final type `(0,1)` = N Refined IsUnitInterval.`(0,1)`
-  final type `[0,1)` = N Refined IsUnitInterval.`[0,1)`
-  final type `(0,1]` = N Refined IsUnitInterval.`(0,1]`
-  final type `[0,1]` = N Refined IsUnitInterval.`[0,1]`
+  // import Financial.IsUnitInterval
+
+  // final type `(0,1)` = N Refined IsUnitInterval.`(0,1)`
+  // final type `[0,1)` = N Refined IsUnitInterval.`[0,1)`
+  // final type `(0,1]` = N Refined IsUnitInterval.`(0,1]`
+  // final type `[0,1]` = N Refined IsUnitInterval.`[0,1]`
 
   /**
     * How do we deal with scale and significant digits?
@@ -138,25 +157,22 @@ object Financial {
   /**  */
   object IsUnitInterval {
     import _root_.shapeless.nat.{ _0, _1 }
-    type `(0,1)` = numeric.Interval.Open[_0, _1]
-    type `[0,1)` = numeric.Interval.ClosedOpen[_0, _1]
-    type `(0,1]` = numeric.Interval.OpenClosed[_0, _1]
-    type `[0,1]` = numeric.Interval.Closed[_0, _1]
+    type `(0,1)` = Interval.Open[_0, _1]
+    type `[0,1)` = Interval.ClosedOpen[_0, _1]
+    type `(0,1]` = Interval.OpenClosed[_0, _1]
+    type `[0,1]` = Interval.Closed[_0, _1]
   }
 
   /**  */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
-  import refined.cats._
-  import numeric.{ NonNegative, Positive }
-
   implicit object DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
 
-    /**  */
-    def nonNegativeMonoid: Monoid[Double Refined NonNegative] = Monoid[Double Refined NonNegative]
+    /**  */ // odd that these can be declared both not implicit, and override... ;?
+    override def nonNegativeMonoid = Monoid[Double Refined NonNegative]
 
     /**  */
-    def positiveSemigroup: Semigroup[Double Refined Positive] = Semigroup[Double Refined Positive]
+    override def positiveSemigroup = Semigroup[Double Refined Positive]
 
     /**  */
     def parse(s: String) = Result safe [Double] { java.lang.Double parseDouble s }
