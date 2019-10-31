@@ -135,7 +135,7 @@ sealed trait PartitionLike {
       portion: Value Refined IsNormalized,
       to: UnitPartition[Key, Value]
   ): Result[Repr] =
-    if ((keys contains from) && (to.keys forall (keys contains _))) {
+    if ((keys contains from) && (to.keys forall (k => !(keys contains k)))) {
       this match {
         case Partition(_)     => ??? // FIXME Result of (Partition unsafe ???)
         case UnitPartition(_) => ??? // FIXME UnitPartition unsafe ???
@@ -147,7 +147,7 @@ sealed trait PartitionLike {
 
 /**  */
 sealed abstract case class Partition[K, V] private (
-    override final val kvs: NonEmptyMap[K, V Refined IsPositive]
+    final override val kvs: NonEmptyMap[K, V Refined IsPositive]
 )(
     implicit
     final override val K: Order[K],
