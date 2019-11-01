@@ -79,7 +79,7 @@ trait stores {
   }
 
   /** */
-  protected object ModuleTypes {
+  protected[deftrade] object ModuleTypes {
 
     /** */
     abstract class Aux[

@@ -23,7 +23,9 @@ import cats.kernel.CommutativeGroup
 import scala.language.higherKinds
 
 /**
-  * If best effort isn't good enough, don't offer it.
+  * All abstract everything only.
+  *
+  * If our best effort isn't good enough, we don't offer it.
   */
 package object deftrade extends deftrade.results {
 

@@ -53,6 +53,8 @@ object Deps {
 
   val cats = "org.typelevel" %% "cats-core" % Cats
 
+  val catsFree = "org.typelevel" %% "cats-free" % Cats
+
   val kittens = "org.typelevel" %% "kittens" % Kittens
 
   val catsEffect = "org.typelevel" %% "cats-effect" % CatsEffect
@@ -152,6 +154,7 @@ object Deps {
   lazy val funlibs =
     List(
       cats,
+      catsFree,
       catsEffect,
       kittens,
       spire,

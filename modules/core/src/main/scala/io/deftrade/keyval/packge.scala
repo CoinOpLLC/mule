@@ -80,5 +80,4 @@ package object keyval extends stores with csv {
     * [[Key]] column type literal witness - same purpose as [[id]].
     */
   private[keyval] final implicit val key = Symbol("key").witness
-
 }
