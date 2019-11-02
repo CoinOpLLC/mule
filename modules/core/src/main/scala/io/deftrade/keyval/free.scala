@@ -1,100 +1,126 @@
 package io.deftrade
 package keyval
 
-import cats.implicits._
 import cats.{ ~> }
 import cats.free.Free
 import cats.free.Free.liftF
 
 import cats.effect.{ ContextShift, IO, Sync }
 
-import shapeless.labelled._
 import shapeless.{ HList, LabelledGeneric }
 
 import fs2.Stream
 
 import scala.language.higherKinds
 
-object stoars extends stores
+/** */
+trait freestore {
 
-import stoars.ModuleTypes
+  /** */
+  sealed trait Command[F[_], A]
 
-sealed abstract case class Foo private (
-    i: Int,
-    s: String
-)
+  /** */
+  object Command
 
-object Foo extends WithOpaqueKey[Long, Foo] {
-  def apply(
-      i: Int,
-      s: String
-  ) = new Foo(i, s) {}
-}
-
-sealed trait Command[A]
-object Command {
-  type IOStream[x] = Stream[IO, x]
-}
-abstract class FreeKeyValueStore[
-    K,
-    V,
-    HV <: HList
-](
-    override final val V: WithKey.Aux[K, V]
-)(
-    implicit
-    final val whatTheActualFuck: ContextShift[IO],
-    final override val lgv: LabelledGeneric.Aux[V, HV],
-    // final val impl: Command ~> ({ type SF[x] = Stream[IO, x] })#SF
-    final val impl: Command ~> Command.IOStream
-) extends ModuleTypes.Aux[
-      IO,
-      ({ type W[v] = WithKey.Aux[K, v] })#W,
+  /** */
+  trait FreeKeyValueStore[
+      F[_],
+      K,
       V,
-      HV
-    ](V) {
+      HV <: HList
+  ] { self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
 
-  import V._
+    import V._
 
-  // case class Select(key: Key)               extends Command[Option[Value]]
-  // case class Create(key: Key, value: Value) extends Command[Option[Id]]
-  // case class Update(key: Key, value: Value) extends Command[Boolean]
-  // case class Upsert(key: Key, value: Value) extends Command[Option[Id]] // check update() == true
-  // case class Delete(key: Key)               extends Command[Boolean]
+    /** */
+    final type EffectCommand[x] = Command[EffectType, x]
 
-  case class Get(key: Key)               extends Command[Result[Value]]
-  case class Let(key: Key, value: Value) extends Command[Result[Id]]
-  case class Set(key: Key, value: Value) extends Command[Result[Boolean]]
-  case class Put(key: Key, value: Value) extends Command[Result[Id]] // check update() == true
-  case class Del(key: Key)               extends Command[Result[Boolean]]
+    /** */
+    type FreeCommand[A] = Free[EffectCommand, A]
 
-  type FreeCommand[A] = Free[Command, A]
+    /** */
+    def impl: EffectCommand ~> EffectStream
+
+    case class Get(key: Key)               extends EffectCommand[Result[Value]]
+    case class Let(key: Key, value: Value) extends EffectCommand[Result[Id]]
+    case class Set(key: Key, value: Value) extends EffectCommand[Result[Boolean]]
+    case class Put(key: Key, value: Value) extends EffectCommand[Result[Id]]
+    case class Del(key: Key)               extends EffectCommand[Result[Boolean]]
+
+    /** */
+    def get(key: Key): FreeCommand[Result[Value]] =
+      liftF[EffectCommand, Result[Value]](Get(key))
+
+    /** */
+    def let(key: Key, value: Value): FreeCommand[Result[Id]] =
+      liftF[EffectCommand, Result[Id]](Let(key, value))
+
+    /** */
+    def set(key: Key, value: Value): FreeCommand[Result[Boolean]] =
+      liftF[EffectCommand, Result[Boolean]](Set(key, value))
+
+    /** */
+    def put(key: Key, value: Value): FreeCommand[Result[Id]] =
+      liftF[EffectCommand, Result[Id]](Put(key, value))
+
+    /** */
+    def del(key: Key): FreeCommand[Result[Boolean]] =
+      liftF[EffectCommand, Result[Boolean]](Del(key))
+  }
 
   /** */
-  def get(key: Key): FreeCommand[Result[Value]] =
-    liftF[Command, Result[Value]](Get(key))
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class XKVS[
+      F[_]: Sync: ContextShift,
+      K,
+      V,
+      HV <: HList
+  ] private (
+      final override val V: WithKey.Aux[K, V],
+      final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+  )(
+      implicit
+      final override val lgv: LabelledGeneric.Aux[V, HV]
+  ) extends ModuleTypes.Aux(V)
+      with FreeKeyValueStore[F, K, V, HV]
 
   /** */
-  def let(key: Key, value: Value): FreeCommand[Result[Id]] =
-    liftF[Command, Result[Id]](Let(key, value))
+  object XKVS {
 
-  /** */
-  def set(key: Key, value: Value): FreeCommand[Result[Boolean]] =
-    liftF[Command, Result[Boolean]](Set(key, value))
+    /** */
+    def apply[
+        F[_]: Sync: ContextShift,
+        K,
+        V,
+        HV <: HList
+    ](
+        V: WithKey.Aux[K, V],
+        impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+    )(
+        implicit lgv: LabelledGeneric.Aux[V, HV]
+    ) = new XKVS(V, impl) {}
 
-  /** */
-  def put(key: Key, value: Value): FreeCommand[Result[Id]] =
-    liftF[Command, Result[Id]](Put(key, value))
+    /** */
+    implicit def FIXME: ContextShift[IO] = ???
 
-  /** */
-  def del(key: Key): FreeCommand[Result[Boolean]] =
-    liftF[Command, Result[Boolean]](Del(key))
+    /** */
+    def withIO[K, V, HV <: HList](
+        V: WithKey.Aux[K, V],
+        impl: ({ type C[t] = Command[IO, t] })#C ~> ({ type S[r] = Stream[IO, r] })#S
+    )(
+        implicit lgv: LabelledGeneric.Aux[V, HV]
+    ) = apply[IO, K, V, HV](V, impl)
+  }
 }
 
-trait Wut {
-  implicit def whatTheActualFuck: ContextShift[IO] = ???
-  implicit def anotherFuckingHeadSmack: Command ~> Command.IOStream = ???
-  val x          = Foo
-  implicit val y = LabelledGeneric[Foo]
-  class FooStoar extends FreeKeyValueStore(x)
-}
+/** */
+object freestore extends freestore
+
+//
+// old api:
+//
+// case class Select(key: Key)               extends Command[Option[Value]]
+// case class Create(key: Key, value: Value) extends Command[Option[Id]]
+// case class Update(key: Key, value: Value) extends Command[Boolean]
+// case class Upsert(key: Key, value: Value) extends Command[Option[Id]] // update() == true
+// case class Delete(key: Key)               extends Command[Boolean]
