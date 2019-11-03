@@ -1,6 +1,8 @@
 package io.deftrade
 package keyval
 
+import io.deftrade.implicits._
+
 import cats.{ ~> }
 import cats.free.Free
 import cats.free.Free.liftF
@@ -33,7 +35,7 @@ trait freestore {
     import V._
 
     /** */
-    final type EffectCommand[x] = Command[EffectType, x]
+    final type EffectCommand[A] = Command[EffectType, A]
 
     /** */
     type FreeCommand[A] = Free[EffectCommand, A]
@@ -41,51 +43,30 @@ trait freestore {
     /** */
     def impl: EffectCommand ~> EffectStream
 
-    case class Get(key: Key)               extends EffectCommand[Result[Value]]
-    case class Let(key: Key, value: Value) extends EffectCommand[Result[Id]]
-    case class Set(key: Key, value: Value) extends EffectCommand[Result[Boolean]]
-    case class Put(key: Key, value: Value) extends EffectCommand[Result[Id]]
-    case class Del(key: Key)               extends EffectCommand[Result[Boolean]]
+    case class Get(key: Key)               extends EffectCommand[Value]
+    case class Let(key: Key, value: Value) extends EffectCommand[Id]
+    case class Set(key: Key, value: Value) extends EffectCommand[Boolean]
+    case class Put(key: Key, value: Value) extends EffectCommand[Id]
+    case class Del(key: Key)               extends EffectCommand[Boolean]
 
     /** */
-    def get(key: Key): FreeCommand[Result[Value]] =
-      liftF[EffectCommand, Result[Value]](Get(key))
+    def get(key: Key): FreeCommand[Value] = Get(key) |> liftF
 
     /** */
-    def let(key: Key, value: Value): FreeCommand[Result[Id]] =
-      liftF[EffectCommand, Result[Id]](Let(key, value))
+    def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF
 
     /** */
-    def set(key: Key, value: Value): FreeCommand[Result[Boolean]] =
-      liftF[EffectCommand, Result[Boolean]](Set(key, value))
+    def set(key: Key, value: Value): FreeCommand[Boolean] = Set(key, value) |> liftF
 
     /** */
-    def put(key: Key, value: Value): FreeCommand[Result[Id]] =
-      liftF[EffectCommand, Result[Id]](Put(key, value))
+    def put(key: Key, value: Value): FreeCommand[Id] = Put(key, value) |> liftF
 
     /** */
-    def del(key: Key): FreeCommand[Result[Boolean]] =
-      liftF[EffectCommand, Result[Boolean]](Del(key))
+    def del(key: Key): FreeCommand[Boolean] = Del(key) |> liftF
   }
 
   /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class XKVS[
-      F[_]: Sync: ContextShift,
-      K,
-      V,
-      HV <: HList
-  ] private (
-      final override val V: WithKey.Aux[K, V],
-      final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
-  )(
-      implicit
-      final override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends ModuleTypes.Aux(V)
-      with FreeKeyValueStore[F, K, V, HV]
-
-  /** */
-  object XKVS {
+  object FreeKeyValueStore {
 
     /** */
     def apply[
@@ -98,7 +79,7 @@ trait freestore {
         impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
     )(
         implicit lgv: LabelledGeneric.Aux[V, HV]
-    ) = new XKVS(V, impl) {}
+    ): FreeKeyValueStore[F, K, V, HV] = new FKVS(V, impl) {}
 
     /** */
     implicit def FIXME: ContextShift[IO] = ???
@@ -109,8 +90,44 @@ trait freestore {
         impl: ({ type C[t] = Command[IO, t] })#C ~> ({ type S[r] = Stream[IO, r] })#S
     )(
         implicit lgv: LabelledGeneric.Aux[V, HV]
-    ) = apply[IO, K, V, HV](V, impl)
+    ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
+
+    import cats.{ Id => Jd }
+    def strictImpureCompiler[
+        F[_]: Sync: ContextShift,
+        K,
+        V,
+        HV <: HList
+    ](
+        V: WithKey.Aux[K, V]
+    )(
+        fkvs: FreeKeyValueStore[F, K, V, HV]
+    ): ({ type C[t] = Command[F, t] })#C ~> Jd =
+      new (({ type C[t] = Command[F, t] })#C ~> Jd) {
+        import fkvs._
+        def apply[A](ca: Command[F, A]): Jd[A] = ca match {
+          case Get(k)    => k |> discardValue; ???
+          case Put(k, v) => (k, v) |> discardValue; ???
+          case _         => ???
+        }
+      }
   }
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  private sealed abstract class FKVS[
+      F[_]: Sync: ContextShift,
+      K,
+      V,
+      HV <: HList
+  ] private[freestore] (
+      final override val V: WithKey.Aux[K, V],
+      final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+  )(
+      implicit
+      final override val lgv: LabelledGeneric.Aux[V, HV]
+  ) extends ModuleTypes.Aux(V)
+      with FreeKeyValueStore[F, K, V, HV]
 }
 
 /** */

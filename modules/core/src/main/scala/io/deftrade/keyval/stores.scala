@@ -264,10 +264,10 @@ trait stores {
       *
       * @return the number of rows inserted
       */
-    def upsert(row: Row): EffectStream[Int] = ???
+    def upsert(row: Row): EffectStream[Id] = ???
 
     /** */
-    def update(row: Row): EffectStream[Unit]
+    def update(row: Row): EffectStream[Boolean]
 
     /** */
     def delete(k: V.Key): EffectStream[Boolean]
@@ -389,7 +389,7 @@ trait stores {
     final def get(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
 
     /** */
-    def update(row: Row): EffectStream[Unit] = ???
+    def update(row: Row): EffectStream[Boolean] = ???
 
     /** Empty `Value` memorializes (persists) `delete` for a given `key`.. */
     def delete(key: Key): EffectStream[Boolean] = ???
