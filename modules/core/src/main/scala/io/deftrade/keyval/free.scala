@@ -11,6 +11,8 @@ import cats.effect.{ ContextShift, IO, Sync }
 
 import shapeless.{ HList, LabelledGeneric }
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 import fs2.Stream
 
 import scala.language.higherKinds
@@ -78,11 +80,9 @@ trait freestore {
         V: WithKey.Aux[K, V],
         impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
     )(
-        implicit lgv: LabelledGeneric.Aux[V, HV]
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV]
     ): FreeKeyValueStore[F, K, V, HV] = new FKVS(V, impl) {}
-
-    /** */
-    implicit def FIXME: ContextShift[IO] = ???
 
     /** */
     def withIO[K, V, HV <: HList](
@@ -92,7 +92,7 @@ trait freestore {
         implicit lgv: LabelledGeneric.Aux[V, HV]
     ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
 
-    import cats.{ Id => Jd }
+    /** */
     def strictImpureCompiler[
         F[_]: Sync: ContextShift,
         K,
@@ -102,16 +102,24 @@ trait freestore {
         V: WithKey.Aux[K, V]
     )(
         fkvs: FreeKeyValueStore[F, K, V, HV]
-    ): ({ type C[t] = Command[F, t] })#C ~> Jd =
-      new (({ type C[t] = Command[F, t] })#C ~> Jd) {
+    ): ({ type C[t] = Command[F, t] })#C ~> cats.Id =
+      new (({ type C[t] = Command[F, t] })#C ~> cats.Id) {
         import fkvs._
-        def apply[A](ca: Command[F, A]): Jd[A] = ca match {
+        def apply[A](ca: Command[F, A]): cats.Id[A] = ca match {
           case Get(k)    => k |> discardValue; ???
+          case Let(k, v) => (k, v) |> discardValue; ???
+          case Set(k, v) => (k, v) |> discardValue; ???
           case Put(k, v) => (k, v) |> discardValue; ???
+          case Del(k)    => k |> discardValue; ???
           case _         => ???
         }
       }
+
+    /** */
+    implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
   }
+
+  object FKVS
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))

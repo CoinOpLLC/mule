@@ -230,7 +230,7 @@ trait stores {
         llw: Lazy[LabelledWrite[HV]]
     ): Pipe[EffectType, PermRow, String] = writeLabelled[F, PermRow](printer)
   }
-  private def printer: Printer = ???
+  private def printer: Printer = Printer.default
 
   /**  */
   trait KeyValueStore[
@@ -261,8 +261,6 @@ trait stores {
 
     /**
       * Default (overridable!) implementation tries insert, then update.
-      *
-      * @return the number of rows inserted
       */
     def upsert(row: Row): EffectStream[Id] = ???
 
@@ -347,10 +345,11 @@ trait stores {
       }
     }
 
-    srfh |> discardValue
-
     private def appendLine(s: String): EffectStream[Unit] =
-      Stream eval F.delay { s |> discardValue }
+      Stream eval F.delay {
+        srfh |> discardValue
+        s    |> discardValue // proxy for write operation
+      }
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -365,7 +364,7 @@ trait stores {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def readLines: EffectStream[String] =
       (Stream resource Blocker[EffectType]) flatMap { blocker =>
-        fs2.io.file readAll [EffectType] (path, blocker, 1024 * 1042)
+        fs2.io.file readAll [EffectType] (path, blocker, 1024 * 1024)
       } through text.utf8Decode through text.lines
   }
 
