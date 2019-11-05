@@ -16,10 +16,10 @@
 
 package io.deftrade
 package model
-
-import keyval.DtEnum, layers.{ Accounting, ModuleTypes }
+package layers
 
 import money.UnitPartition
+import keyval.DtEnum
 
 import cats.implicits._
 
@@ -57,23 +57,25 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     case object OtherAssets                        extends Asset1065
   }
 
-  sealed trait Liability1065 extends Liability
+  /** */
+  sealed trait Debt1065 extends Debt
 
   /** */
-  object Liability extends DtEnum[Liability1065] {
+  object Debt extends DtEnum[Debt1065] {
 
-    case object AccountsPayable         extends Liability
-    case object CurrentMortgateNotes    extends Liability
-    case object OtherCurrentLiabilities extends Liability
-    case object NonrecourseLoans        extends Liability
-    case object LoansFromPartners       extends Liability
-    case object MortgageNotes           extends Liability
-    case object OtherLiabilities        extends Liability
+    case object AccountsPayable         extends Debt
+    case object CurrentMortgateNotes    extends Debt
+    case object OtherCurrentLiabilities extends Debt
+    case object NonrecourseLoans        extends Debt
+    case object LoansFromPartners       extends Debt
+    case object MortgageNotes           extends Debt
+    case object OtherLiabilities        extends Debt
 
     /** */
     lazy val values = findValues
   }
 
+  /** */
   sealed trait Equity1065 extends Equity
 
   /** */
@@ -86,6 +88,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     lazy val values = findValues
   }
 
+  /** */
   sealed trait Revenue1065 extends Revenue
 
   /** */
@@ -173,7 +176,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
   object SimpleDebitCreditKey extends DtEnum[SDCK1065] {
 
     /** */
-    case object PayBill extends SDCK1065(Asset.Cash, Liability.AccountsPayable)
+    case object PayBill extends SDCK1065(Asset.Cash, Debt.AccountsPayable)
 
     /** */
     lazy val values = findValues
@@ -211,7 +214,6 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
 
     /** */
-    // lazy val values: IndexedSeq[SwapKey[Asset]] = findValues ++ SingleAssetSwapKey.values
     lazy val values = findValues
   }
 
@@ -224,7 +226,7 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
   /** */
   object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
 
-    import Liability._
+    import Debt._
 
     /** */
     case object LongTermToCurrentLiability

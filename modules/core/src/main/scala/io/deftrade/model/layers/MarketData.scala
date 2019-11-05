@@ -34,8 +34,7 @@ import refined.auto._
 import scala.language.higherKinds
 
 /** */
-trait MarketData {
-  self: Ledger with ModuleTypes =>
+trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     * Represents a price quote (in currency `C`) for instruments of type `A`.
@@ -282,7 +281,7 @@ trait MarketData {
     */
   sealed trait Market {
     def entity: LegalEntity.Key
-    def contra: Account.Key
+    def contra: Folio.Key
   }
 
   /** */
@@ -291,11 +290,12 @@ trait MarketData {
   /**
     * Models a private party whose [[Ledger.Folio]]s we run [[Ledger.Transaction]]s against.
     *
-    * The `Counterparty` is assumed to have an [[Ledger.Account]] on the [[Ledger]].
+    * The `Counterparty` is assumed to have an [[Accounts.Account]] whose [[Ledger.Folio]]s are
+    * recorded on on the [[Ledger]].
     */
   sealed abstract case class Counterparty(
       final val label: Label,
-      final val contra: Account.Key,
+      final val contra: Folio.Key,
       final val entity: LegalEntity.Key
   ) extends Market
 
@@ -310,7 +310,7 @@ trait MarketData {
     */
   sealed abstract case class Exchange private (
       final val mic: Mic,
-      final val contra: Account.Key,
+      final val contra: Folio.Key,
       final val entity: LegalEntity.Key
   ) extends Market
 

@@ -42,14 +42,13 @@ import scala.language.higherKinds
   *
   * Expanding:
   *
-  *   - `Assets + Expenses === Liabilities + Equity + Revenues`
+  *   - `Assets + Expenses === Debt + Equity + Revenues`
   *
   * When summing Transactions, this "cake slice" module implements the algebra which
   * maintains the above equality.
   *
   */
-trait Balances {
-  self: Ledger with Accounting with ModuleTypes =>
+trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   import AccountMap.implicits._
 
@@ -187,7 +186,7 @@ trait Balances {
   ) extends Balance(expenses, revenues) {
 
     /** */
-    def partition(implicit ci: Wallet.Aux[C]): (IncomeStatement[C], CashFlowStatement[C]) =
+    def partition(implicit ci: Wallet[C]): (IncomeStatement[C], CashFlowStatement[C]) =
       ???
   }
 
@@ -362,7 +361,7 @@ trait Balances {
     ???
 
   /** FIXME: not sure this signature makes sense as it stands */
-  def breakdown[C: Currency: Wallet.Aux](
+  def breakdown[C: Currency: Wallet](
       prior: BalanceSheet[C],
       delta: BalanceSheet[C], // delta and raw come from TrialBalance
       raw: IncomeStatement[C] // mixed cash and accrual

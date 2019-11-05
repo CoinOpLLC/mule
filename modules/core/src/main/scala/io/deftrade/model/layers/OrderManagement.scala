@@ -96,7 +96,8 @@ trait OrderManagement {
     */
   sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
       entity: LegalEntity.Key,
-      contra: Account.Key,
+      contra: Folio.Key,
+      // contra: Account.Key,
       markets: NonEmptySet[Market.Key]
   ) {
 
@@ -115,19 +116,25 @@ trait OrderManagement {
     type Phase[T, R] = Kleisli[ResultF, T, R]
 
     /** */
-    final def process[C: Currency, A](p: Account.Key, a: Allocation)(
+    final def process[C: Currency, A](
+        p: Folio.Key,
+        a: Allocation
+    )(
         folios: FolioTable
     )(
         block: => A
     ): Phase[A, FolioTable] =
-      riskCheck[C, A](p)(block) andThen trade(p) andThen allocate(a) andThen settle(folios)(p)
+      riskCheck[C, A](p)(block) andThen
+        trade(p) andThen
+        allocate(a) andThen
+        settle(folios)(p)
 
     /** */
-    def riskCheck[C: Currency, A](p: Account.Key)(a: A): Phase[A, Order] =
+    def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order] =
       ???
 
     /** */
-    def trade(p: Account.Key): Phase[Order, Execution] =
+    def trade(p: Folio.Key): Phase[Order, Execution] =
       ???
 
     /** */
@@ -138,12 +145,12 @@ trait OrderManagement {
     final def settle(
         folios: Map[Folio.Key, Folio.Value]
     )(
-        p: Account.Key
+        p: Folio.Key
     ): Phase[Execution, FolioTable] = ???
   }
 
   /** */
-  type Allocation = UnitPartition[Account.Key, Quantity]
+  type Allocation = UnitPartition[Folio.Key, Quantity]
 
   /** Namespace placeholder */
   object Allocation
@@ -154,14 +161,14 @@ trait OrderManagement {
   object OMS extends WithOpaqueKey[Long, OMS[cats.Id]] {
 
     /**
-      * Each OMS must maintain a contra [[Ledger.Account]].
-      * The creation of this account (and its [[Ledger.Account.Key]]) must occur
+      * Each OMS must maintain a contra [[Ledger.Folio.Key]].
+      * The creation of this account (and its [[Ledger.Folio.Key]]) must occur
       * before the OMS is created.
       *
       */
     def apply[F[_]: Monad: SemigroupK: Foldable](
         key: LegalEntity.Key,
-        contraAccount: Account.Key,
+        contraAccount: Folio.Key,
         market: Market.Key,
         ms: Market.Key*
     ): OMS[F] =

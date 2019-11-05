@@ -21,14 +21,10 @@ package layers
 import implicits._, time._, money._, keyval._, capital._, refinements.Sha256
 
 import cats.implicits._
-import cats.{ Eq, Foldable, Hash, Monad, MonoidK, Show }
-import cats.data.{ NonEmptyMap, NonEmptySet }
+import cats.{ Foldable, Hash, Monad, MonoidK }
 
 import eu.timepit.refined
 import refined.api.Refined
-import refined.W
-import refined.numeric.Interval
-import refined.cats.refTypeOrder
 
 import io.circe.Json
 
@@ -129,7 +125,7 @@ trait Ledger { self: ModuleTypes =>
       *
       * Creates what could be called a `FairTrade`...
       */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet.Aux[C]): Trade = ???
+    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
   }
 
   /** type alias */
@@ -147,30 +143,34 @@ trait Ledger { self: ModuleTypes =>
     * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
     * values are '''not''' carried by instances of this class.
     */
-  /** FIXME move this outside the object DUH */
-  sealed abstract case class Wallet(C: CurrencyLike, folio: Folio) {
-    final type CurrencyType = C.Type
+  sealed trait WalletLike {
+    val folio: Folio
+    implicit val C: CurrencyLike
+    type CurrencyType // == C.Type
+  }
+
+  sealed abstract case class Wallet[C] private[model] (
+      final override val folio: Folio
+  )(
+      implicit
+      final override val C: Currency[C]
+  ) extends WalletLike {
+    final type CurrencyType = C
   }
 
   /**
     * Wallet folios are guarranteed non-empty, in that there is at least one Position.
     */
-  object Wallet extends WithOpaqueKey[Long, Wallet] {
-
-    final class Aux[C](C: Currency[C], folio: Folio) extends Wallet(C, folio) {}
-
-    /** */
-    def apply(c: CurrencyLike, folio: Folio): Wallet = new Wallet(c, folio) {}
+  object Wallet extends WithOpaqueKey[Long, WalletLike] {
 
     /**
       * type parameter is checked for `Currency` status
       * TODO: additional validation?
       */
-    def apply[C: Currency](p: Position, ps: Position*): Wallet =
-      Wallet(Currency[C], Folio(p +: ps: _*))
+    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] = Wallet(Folio(p +: ps: _*))
 
     /** type parameter is checked for `Currency` status */
-    private[deftrade] def apply[C: Currency](folio: Folio): Wallet = Wallet(Currency[C], folio)
+    def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet(folio) {}
   }
 
   /**
@@ -249,118 +249,5 @@ trait Ledger { self: ModuleTypes =>
 
     /** TODO: investigate kittens for this. */
     implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
-  }
-
-  /**
-    * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
-    * and their crew.
-    *
-    * Although the signature guarrantees a measure of safety, construction is private to the
-    * class.
-    *
-    * @param principals Each has specified their share of the (capital) [[Account]].
-    * @param nonPrincipals N.b. the signature and what it implies:
-    *
-    *   - a total function returning a `NonEmptySet`
-    *   - implies that all non-Princple [[Role]]s must be filled with at least one [[Entity]].
-    *
-    */
-  sealed abstract case class Roster private (
-      principals: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
-  ) {
-    import LegalEntity.{ Key, Role }
-
-    /** */
-    lazy val roles: NonEmptyMap[Role, NonEmptySet[Key]] =
-      NonEmptyMap of (
-        Role.Principal -> principals.keys,
-        Role.nonPrincipals map (np => (np, nonPrincipals(np))): _*
-    )
-
-    /** */
-    def withAgent(agent: Key): Roster =
-      Roster unsafe (
-        principals,
-        role =>
-          role match {
-            case Role.Agent => NonEmptySet one agent
-            case np         => nonPrincipals(np)
-        }
-      )
-
-    /** */
-    def withAuditor(auditor: LegalEntity.Key): Roster =
-      Roster unsafe (
-        principals,
-        role =>
-          role match {
-            case Role.Auditor => NonEmptySet one auditor
-            case np           => nonPrincipals(np)
-        }
-      )
-  }
-
-  /**
-    * Creation patterns for account management teams.
-    */
-  object Roster {
-
-    import LegalEntity.{ Key, Role }
-
-    /**
-      * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
-      * regardless of their share of the principle pie
-      */
-    def forPrinciples(principles: UnitPartition[Key, Quantity]): Roster =
-      unsafe(
-        principles,
-        _ => NonEmptySet(principles.keys.head, principles.keys.tail)
-      )
-
-    /**
-      * Splits partition equally among [[LegalEntity.Role.Principal]]s.
-      */
-    def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
-
-    /** */
-    def single(entity: Key): Roster =
-      unsafe(
-        principals = UnitPartition single entity,
-        nonPrincipals = _ => NonEmptySet one entity
-      )
-
-    private def unsafe(
-        principals: UnitPartition[Key, Quantity],
-        nonPrincipals: Role => NonEmptySet[Key]
-    ): Roster = new Roster(principals, nonPrincipals) {}
-  }
-
-  /**
-    * Predicate defining a very conventional looking account numbering scheme.
-    */
-  type IsAccountNo = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
-
-  /**
-    * `Account`s consist of:
-    *   - a `Roster`: who gets to do what, and who are the beneficial owners.
-    *   - a `Folio` (list of instruments and their quantities)
-    */
-  sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
-
-  /** */
-  object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
-
-    /** */
-    def apply(roster: Roster, folio: Folio.Key): Account = new Account(roster, folio) {}
-
-    /** */
-    def single(entity: LegalEntity.Key, folio: Folio.Key) = Account(Roster single entity, folio)
-
-    /** TODO: use kittens? Why or why not? */
-    implicit def eq = Eq.fromUniversalEquals[Account]
-
-    /** TODO: placeholder */
-    implicit def show = Show.fromToString[Account]
   }
 }

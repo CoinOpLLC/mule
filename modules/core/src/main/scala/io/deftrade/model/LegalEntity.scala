@@ -82,9 +82,9 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
   /**
     * There are a finite enumeration of roles which [[LegalEntity]]s may take on with respect to
-    * [[layers.Ledger.Account]]s.
+    * [[layers.Accounts.Account]]s.
     *
-    * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Ledger.Roster]].
+    * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Accounts.Roster]].
     */
   sealed trait Role extends EnumEntry
 
@@ -112,7 +112,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * There is _always_ a distinguished [[Role]], the `Principal`.
       *
       * The [[LegalEntity]] which is the market participant
-      * responsible for establishing the [[layers.Ledger.Account]].
+      * responsible for establishing the [[layers.Accounts.Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
       * - beneficial owner for an asset

@@ -29,8 +29,8 @@ import shapeless.labelled._
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 
-import fs2.{ text, Pipe, Stream }
-import fs2.io.file.FileHandle
+import fs2.{ text, Chunk, Pipe, Stream }
+import fs2.io.file.{ pulls, FileHandle }
 
 import io.chrisdavenport.cormorant
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
@@ -331,7 +331,9 @@ trait stores {
     def path: Path
 
     private final val srfh = {
+
       import OpenOption._
+
       val openOptions = Seq(
         CREATE,
         // READ,
@@ -340,15 +342,24 @@ trait stores {
         SYNC,
         // DSYNC,
       )
+
       Stream resource Blocker[EffectType] map { blocker =>
         FileHandle fromPath (path, blocker, openOptions)
       }
     }
 
+    private def liftString(s: String): EffectStream[Byte] = {
+      val bs = s getBytes java.nio.charset.StandardCharsets.UTF_8
+      Stream chunk [EffectType, Byte] Chunk(bs: _*)
+    }
+
     private def appendLine(s: String): EffectStream[Unit] =
+      // for {
+      //   handle <- srfh
+      //   _      <- pulls.writeAllToFileHandle(s |> liftString, handle).stream
+      // } yield ()
       Stream eval F.delay {
-        srfh |> discardValue
-        s    |> discardValue // proxy for write operation
+        (pulls, srfh, s |> liftString) |> discardValue // proxy for write operation
       }
 
     /** */

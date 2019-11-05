@@ -28,11 +28,16 @@ import enumeratum._
 /**
   * Core accounting vocabulary.
   *
+  * Recall:
+  *
   * {{{
-  *     Assets === Liabilities
-  *     Assets + Expenses === Liabilities + Revenue
-  *     Income := Net(Revenue, Expenses)
-  *     Equity := Net(Liabilities, Debt)
+  *     Debits === Credits                 // basic identity
+  *     Assets === Liabilities             // Balance Sheet identity
+  *     Liabilities := Debt + Equity       // one or the other
+  *     Expenses < Revenue                 // for positive profit
+  *     Income := Revenue Net Expenses     // textbook definition
+  *     Equity := Liabilities Net Debt     // Equity statement
+  *            + (retained) Income         // more equity offsets more money in the bank
   * }}}
   */
 trait Accounting { self: ModuleTypes =>
@@ -60,7 +65,17 @@ trait Accounting { self: ModuleTypes =>
   object Credit extends DtEnum[Credit] {
 
     /** */
-    lazy val values = Liability.values ++ Equity.values ++ Revenue.values
+    lazy val values = Liability.values ++ Revenue.values
+  }
+
+  /** */
+  trait Liability extends Credit
+
+  /** */
+  object Liability extends DtEnum[Liability] {
+
+    /** */
+    lazy val values = Debt.values ++ Equity.values
   }
 
   /** */
@@ -76,12 +91,12 @@ trait Accounting { self: ModuleTypes =>
   val Asset: DtEnum[_ <: Asset]
 
   /** */
-  trait Liability extends Credit
-  val Liability: DtEnum[_ <: Liability]
-
-  /** */
   trait Income extends Debit
   val Income: DtEnum[_ <: Income]
+
+  /** */
+  trait Debt extends Liability
+  val Debt: DtEnum[_ <: Debt]
 
   /** */
   trait Equity extends Liability

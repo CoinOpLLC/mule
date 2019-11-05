@@ -29,9 +29,13 @@ import model.layers._
   * Different objects, package or otherwise, could make different policy decisions.
   */
 package object model
-    extends ModuleTypes.Aux[BigDecimal, Double]
-    with AccountingIRS1065
-    with Ledger
-    with Balances
-    with MarketData
-    with OrderManagement
+    extends ModuleTypes.Aux[
+      /* type MonetaryAmount = */ BigDecimal,
+      /* type Quantity       = */ Double
+    ]
+    with Ledger            // consider frozen
+    with AccountingIRS1065 // replace or enhance as necessary
+    with Balances          // depends only on generic Accounting; should be close to frozen
+    with MarketData        // WIP and necessarily modular
+    with OrderManagement   // total WIP; IBRK will be first integration
+    with Accounts // Comment me out! PII firewalling simplified by eliminating dependencies.
