@@ -29,7 +29,7 @@ import shapeless.labelled._
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 
-import fs2.{ text, Chunk, Pipe, Stream }
+import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle }
 
 import io.chrisdavenport.cormorant
@@ -330,7 +330,7 @@ trait stores {
     /** */
     def path: Path
 
-    private final val srfh = {
+    private final val sfh: EffectStream[FileHandle[EffectType]] = {
 
       import OpenOption._
 
@@ -343,33 +343,22 @@ trait stores {
         // DSYNC,
       )
 
-      Stream resource Blocker[EffectType] map { blocker =>
-        FileHandle fromPath (path, blocker, openOptions)
-      }
+      Stream resource (for {
+        blocker <- Blocker[EffectType]
+        handle  <- FileHandle fromPath (path, blocker, openOptions)
+      } yield handle)
     }
-
-    private def liftString(s: String): EffectStream[Byte] = {
-      val bs = s getBytes java.nio.charset.StandardCharsets.UTF_8
-      Stream chunk [EffectType, Byte] Chunk(bs: _*)
-    }
-
-    private def appendLine(s: String): EffectStream[Unit] =
-      // for {
-      //   handle <- srfh
-      //   _      <- pulls.writeAllToFileHandle(s |> liftString, handle).stream
-      // } yield ()
-      Stream eval F.delay {
-        (pulls, srfh, s |> liftString) |> discardValue // proxy for write operation
-      }
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def appendingSink: Pipe[EffectType, String, Unit] =
-      fs =>
-        for {
-          s <- fs
-          u <- appendLine(s)
-        } yield u
+      for {
+        s      <- _ // sicc
+        handle <- sfh
+      } yield
+        pulls
+          .writeAllToFileHandle(Stream eval (F pure s) through text.utf8Encode, handle)
+          .stream |> discardValue // nota bene
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
