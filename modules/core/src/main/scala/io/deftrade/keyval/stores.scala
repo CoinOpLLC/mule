@@ -254,10 +254,10 @@ trait stores {
     /**
       * Note that `get()` is overloaded (not overridden) here.
       */
-    def get(k: Key): EffectStream[Value]
+    def get(key: Key): EffectStream[Value]
 
     /** */
-    def insert(row: Row): EffectStream[Unit]
+    def insert(key: Key, value: Value): EffectStream[Id]
 
     /**
       * Default (overridable!) implementation tries insert, then update.
@@ -265,10 +265,10 @@ trait stores {
     def upsert(row: Row): EffectStream[Id] = ???
 
     /** */
-    def update(row: Row): EffectStream[Boolean]
+    def update(key: Key, value: Value): EffectStream[Id]
 
     /** */
-    def delete(k: V.Key): EffectStream[Boolean]
+    def delete(key: Key): EffectStream[Id]
 
     implicit final def writePermRow(
         implicit
@@ -330,7 +330,7 @@ trait stores {
     /** */
     def path: Path
 
-    private final val sfh: EffectStream[FileHandle[EffectType]] = {
+    private final lazy val appendHandles: EffectStream[FileHandle[EffectType]] = {
 
       import OpenOption._
 
@@ -353,12 +353,17 @@ trait stores {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def appendingSink: Pipe[EffectType, String, Unit] =
       for {
-        s      <- _ // sicc
-        handle <- sfh
+        handle <- appendHandles
+        s      <- _
       } yield
         pulls
-          .writeAllToFileHandle(Stream eval (F pure s) through text.utf8Encode, handle)
-          .stream |> discardValue // nota bene
+          .writeAllToFileHandle(
+            Stream eval
+              (F pure s) through
+              text.utf8Encode,
+            handle
+          )
+          .stream |> discardValue // nota bene this is intentional and necessary
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -388,13 +393,18 @@ trait stores {
     final def get(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
 
     /** */
-    def update(row: Row): EffectStream[Boolean] = ???
+    def update(key: Key, value: Value): EffectStream[Id] =
+      table get key match { // can't fold and get good type inference
+        case None    => Stream.empty
+        case Some(_) => append(key -> value)
+      }
 
-    /** Empty `Value` memorializes (persists) `delete` for a given `key`.. */
-    def delete(key: Key): EffectStream[Boolean] = ???
+    /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
+    def delete(key: Key): EffectStream[Id] = ???
 
     /** */
-    def insert(row: Row): EffectStream[Unit] = ???
+    def insert(key: Key, value: Value): EffectStream[Id] =
+      (table get key).fold(append(key -> value))(_ => Stream.empty)
   }
 
   /** */

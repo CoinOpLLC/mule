@@ -47,9 +47,9 @@ trait freestore {
 
     case class Get(key: Key)               extends EffectCommand[Value]
     case class Let(key: Key, value: Value) extends EffectCommand[Id]
-    case class Set(key: Key, value: Value) extends EffectCommand[Boolean]
+    case class Set(key: Key, value: Value) extends EffectCommand[Id]
     case class Put(key: Key, value: Value) extends EffectCommand[Id]
-    case class Del(key: Key)               extends EffectCommand[Boolean]
+    case class Del(key: Key)               extends EffectCommand[Id] // (sic)
 
     /** */
     def get(key: Key): FreeCommand[Value] = Get(key) |> liftF
@@ -58,13 +58,13 @@ trait freestore {
     def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF
 
     /** */
-    def set(key: Key, value: Value): FreeCommand[Boolean] = Set(key, value) |> liftF
+    def set(key: Key, value: Value): FreeCommand[Id] = Set(key, value) |> liftF
 
     /** */
     def put(key: Key, value: Value): FreeCommand[Id] = Put(key, value) |> liftF
 
     /** */
-    def del(key: Key): FreeCommand[Boolean] = Del(key) |> liftF
+    def del(key: Key): FreeCommand[Id] = Del(key) |> liftF
   }
 
   /** */
