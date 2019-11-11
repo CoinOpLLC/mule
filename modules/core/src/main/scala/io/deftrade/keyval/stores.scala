@@ -23,7 +23,7 @@ import cats.implicits._
 import cats.Eq
 import cats.effect.{ Blocker, ContextShift, Sync }
 
-import shapeless.{ ::, HList, LabelledGeneric, Lazy }
+import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import eu.timepit.refined
@@ -47,6 +47,8 @@ import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
   *
   */
 trait stores {
+
+  case object EmptyValue
 
   private val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
 
@@ -251,6 +253,8 @@ trait stores {
     /** */
     final type HRow = KeyField :: HValue
 
+    final type HEmptyRow = IdField :: KeyField :: /* EmptyValue.type :: */ HNil
+
     /**
       * Note that `get()` is overloaded (not overridden) here.
       */
@@ -278,14 +282,17 @@ trait stores {
       new LabelledWrite[PermRow] {
         implicit val lwhv        = llw.value
         implicit val lwhpr       = LabelledWrite[HPermRow]
+        implicit val lwher       = LabelledWrite[HEmptyRow]
         def headers: CSV.Headers = lwhpr.headers
         def write(pr: PermRow): CSV.Row = pr match {
-          case (i, (k, v)) =>
-            lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
         }
       }
 
-    /** */
+    /**
+      * FIXME: as it stands this is converting delete into a failure on read
+      */
     implicit final def readPermRow(
         implicit
         llr: Lazy[LabelledRead[HV]],
@@ -296,7 +303,7 @@ trait stores {
         implicit val lrhpr = LabelledRead[HPermRow]
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
           lrhpr read (row, headers) map { h =>
-            (h.head, (h.tail.head, lgv from h.tail.tail))
+            (h.head, (h.tail.head, (lgv from h.tail.tail).some))
           }
       }
 
@@ -396,7 +403,7 @@ trait stores {
     def update(key: Key, value: Value): EffectStream[Id] =
       table get key match { // can't fold and get good type inference
         case None    => Stream.empty
-        case Some(_) => append(key -> value)
+        case Some(_) => append(key -> value.some)
       }
 
     /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
@@ -404,7 +411,7 @@ trait stores {
 
     /** */
     def insert(key: Key, value: Value): EffectStream[Id] =
-      (table get key).fold(append(key -> value))(_ => Stream.empty)
+      (table get key).fold(append(key -> value.some))(_ => Stream.empty)
   }
 
   /** */

@@ -83,6 +83,7 @@ protected sealed trait WithValue {
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
 
+  /** */
   final implicit def validateId: Validate[Long, Value] = Validate alwaysPassed (())
 }
 
@@ -128,7 +129,7 @@ trait WithKey extends WithValue {
   val Key: WithKey.KeyCompanion[Key]
 
   /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
-  final type Row = (Key, Value)
+  final type Row = (Key, Option[Value])
 
   /** */
   final type Index = Key
