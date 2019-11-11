@@ -93,7 +93,7 @@ trait freestore {
     ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
 
     /** */
-    def strictImpureCompiler[
+    def compiler[
         F[_]: Sync: ContextShift,
         K,
         V,
@@ -101,17 +101,25 @@ trait freestore {
     ](
         V: WithKey.Aux[K, V]
     )(
-        fkvs: FreeKeyValueStore[F, K, V, HV]
-    ): ({ type C[t] = Command[F, t] })#C ~> cats.Id =
-      new (({ type C[t] = Command[F, t] })#C ~> cats.Id) {
-        import fkvs._
-        def apply[A](ca: Command[F, A]): cats.Id[A] = ca match {
-          case Get(k)    => k |> discardValue; ???
-          case Let(k, v) => (k, v) |> discardValue; ???
-          case Set(k, v) => (k, v) |> discardValue; ???
-          case Put(k, v) => (k, v) |> discardValue; ???
-          case Del(k)    => k |> discardValue; ???
-          case _         => ???
+        kvs: ModuleTypes.Aux[
+          F,
+          ({ type W[v] = WithKey.Aux[K, v] })#W, // I know, right? FIXME
+          V,
+          HV
+        ] with KeyValueStore[F, K, V, HV]
+    )(
+        implicit fkvs: FreeKeyValueStore[F, K, V, HV]
+    ): fkvs.EffectCommand ~> kvs.EffectStream =
+      new ~>[fkvs.EffectCommand, kvs.EffectStream] {
+        import fkvs._, kvs._
+
+        def apply[A](ca: EffectCommand[A]): EffectStream[A] = ca match {
+          // case Get(k)    => kvs select k
+          // case Let(k, v) => kvs insert (k, v)
+          // case Set(k, v) => kvs update (k, v)
+          // case Put(k, v) => kvs upsert (k, v)
+          // case Del(k)    => kvs delete k
+          case _ => ???
         }
       }
 
@@ -119,6 +127,7 @@ trait freestore {
     implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
   }
 
+  /** */
   object FKVS
 
   /** */

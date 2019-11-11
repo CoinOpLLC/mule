@@ -21,6 +21,7 @@ import implicits._
 
 import cats.implicits._
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
@@ -129,19 +130,6 @@ trait stores {
     /**  */
     final type HPermRow = IdField :: HRow
 
-    /**  */
-    final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
-
-    /** FIXME - `rethrow`(s)*/
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def rows: EffectStream[Row] = permRows map (_._2)
-    // EitherT[EffectStream, Fail, Row]
-
-    /**  @return a `Stream` of length zero or one. */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def get(id: Id): EffectStream[Row] =
-      permRows filter (_._1 === id) map (_._2)
-
     /**
       * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
       *
@@ -151,6 +139,18 @@ trait stores {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def permRows: EffectStream[PermRow] =
       (readLines through csvToPermRow).rethrow handleErrorWith (_ => Stream.empty)
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def rows: EffectStream[Row] = permRows map (_._2)
+
+    /**  */
+    final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
+
+    /**  @return a `Stream` of length zero or one. */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def get(id: Id): EffectStream[Row] =
+      permRows filter (_._1 === id) map (_._2)
 
     /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -216,8 +216,8 @@ trait stores {
         implicit val lrhv  = llr.value
         implicit val lrhpr = LabelledRead[HPermRow]
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-          lrhpr read (row, headers) map { h =>
-            (h.head, lgv from h.tail)
+          lrhpr read (row, headers) map { hpr =>
+            (hpr.head, lgv from hpr.tail)
           }
       }
 
@@ -255,24 +255,20 @@ trait stores {
 
     final type HEmptyRow = IdField :: KeyField :: /* EmptyValue.type :: */ HNil
 
-    /**
-      * Note that `get()` is overloaded (not overridden) here.
-      */
-    def get(key: Key): EffectStream[Value]
+    /** */
+    def select(key: Key): EffectStream[Value]
 
     /** */
     def insert(key: Key, value: Value): EffectStream[Id]
-
-    /**
-      * Default (overridable!) implementation tries insert, then update.
-      */
-    def upsert(row: Row): EffectStream[Id] = ???
 
     /** */
     def update(key: Key, value: Value): EffectStream[Id]
 
     /** */
     def delete(key: Key): EffectStream[Id]
+
+    /** */
+    final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
 
     implicit final def writePermRow(
         implicit
@@ -290,9 +286,7 @@ trait stores {
         }
       }
 
-    /**
-      * FIXME: as it stands this is converting delete into a failure on read
-      */
+    /**      */
     implicit final def readPermRow(
         implicit
         llr: Lazy[LabelledRead[HV]],
@@ -302,8 +296,17 @@ trait stores {
         implicit val lrhv  = llr.value
         implicit val lrhpr = LabelledRead[HPermRow]
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-          lrhpr read (row, headers) map { h =>
-            (h.head, (h.tail.head, (lgv from h.tail.tail).some))
+          row match {
+            case CSV.Row( // e,pty value := delete command
+                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+                ) if i === id.toString && k === key.toString =>
+              lrhpr read (row, headers) map { hpr =>
+                (hpr.head, (hpr.tail.head, none))
+              }
+            case _ =>
+              lrhpr read (row, headers) map { hpr =>
+                (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
+              }
           }
       }
 
@@ -397,7 +400,7 @@ trait stores {
     import V._
 
     /** */
-    final def get(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
+    final def select(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
 
     /** */
     def update(key: Key, value: Value): EffectStream[Id] =
@@ -407,7 +410,8 @@ trait stores {
       }
 
     /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
-    def delete(key: Key): EffectStream[Id] = ???
+    def delete(key: Key): EffectStream[Id] =
+      (table get key).fold(Stream.empty: EffectStream[Id])(_ => append(key -> none))
 
     /** */
     def insert(key: Key, value: Value): EffectStream[Id] =
