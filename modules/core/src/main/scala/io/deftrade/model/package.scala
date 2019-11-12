@@ -27,6 +27,29 @@ import model.layers._
   * Also, here we choose generic tax accounting for entities treated as partnerships.
   *
   * Different objects, package or otherwise, could make different policy decisions.
+  *
+
+ - CountryCode
+ - Market
+ - LegalEntity
+ - Account
+
+ - Instrument
+  - Bond
+  - CommonStock
+  - PreferredStock
+  - Index
+  - etc
+
+ - Folio
+    - Wallet
+ - Transaction
+    - Order
+    - Execution
+
+ - OMS
+ - MDS
+
   */
 package object model
     extends ModuleTypes.Aux[

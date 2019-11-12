@@ -38,7 +38,7 @@ import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
 import cormorant.implicits._
 import cormorant.generic.semiauto._
 import cormorant.refined._
-import cormorant.fs2._
+import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import scala.language.higherKinds
 
@@ -48,8 +48,6 @@ import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
   *
   */
 trait stores {
-
-  case object EmptyValue
 
   private val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
 
@@ -185,14 +183,24 @@ trait stores {
   /**
     * Ctor parameter `V` carries types specific to `type V`.
     * `type Index` mapped to [[WithValue.Id]].
+    *
+    * Cormorant CSV integration is accomplished by making these implicit methods
+    * [[writePermRow]], [[readPermRow]], which materialize
+    * [[io.chrisdavenport.cormorant.LabelledRead]] and
+    * [[io.chrisdavenport.cormorant.LabelledWrite]]
+    * instances for the [[WithValue.PermRow]] type for this store.
+    * available to the library.
+    *
     */
   trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId.Aux, V, HV] {
     self: ModuleTypes.Aux[F, WithId.Aux, V, HV] =>
 
     import V._
 
+    /** */
     final type HRow = HValue
 
+    /**  */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]]
@@ -221,18 +229,24 @@ trait stores {
           }
       }
 
+    /** */
     final protected def deriveCsvToV(
         implicit
         llr: Lazy[LabelledRead[HV]]
     ): Pipe[EffectType, String, Result[PermRow]] =
-      readLabelledCompleteSafe[F, PermRow] andThen (_ map (_ leftMap errorToFail))
+      readLabelledCompleteSafe[F, PermRow] andThen
+        (_ map (_ leftMap errorToFail))
 
+    /** */
     final protected def deriveVToCsv(
         implicit
         llw: Lazy[LabelledWrite[HV]]
-    ): Pipe[EffectType, PermRow, String] = writeLabelled[F, PermRow](printer)
+    ): Pipe[EffectType, PermRow, String] =
+      writeLabelled(printer)
   }
-  private def printer: Printer = Printer.default
+
+  /**  */
+  final def printer: Printer = Printer.default
 
   /**  */
   trait KeyValueStore[
@@ -253,7 +267,8 @@ trait stores {
     /** */
     final type HRow = KeyField :: HValue
 
-    final type HEmptyRow = IdField :: KeyField :: /* EmptyValue.type :: */ HNil
+    /** */
+    final type HEmptyRow = IdField :: KeyField :: HNil
 
     /** */
     def select(key: Key): EffectStream[Value]
@@ -270,16 +285,20 @@ trait stores {
     /** */
     final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
 
+    /** */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]],
         lputk: Lazy[Put[Key]]
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
-        implicit val lwhv        = llw.value
-        implicit val lwhpr       = LabelledWrite[HPermRow]
-        implicit val lwher       = LabelledWrite[HEmptyRow]
+
+        implicit val lwhv  = llw.value
+        implicit val lwhpr = LabelledWrite[HPermRow]
+        implicit val lwher = LabelledWrite[HEmptyRow]
+
         def headers: CSV.Headers = lwhpr.headers
+
         def write(pr: PermRow): CSV.Row = pr match {
           case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
           case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
@@ -293,16 +312,20 @@ trait stores {
         lgetk: Lazy[Get[Key]]
     ): LabelledRead[PermRow] =
       new LabelledRead[PermRow] {
+
         implicit val lrhv  = llr.value
         implicit val lrhpr = LabelledRead[HPermRow]
+
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
           row match {
-            case CSV.Row( // e,pty value := delete command
+
+            case CSV.Row(
                 NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
                 ) if i === id.toString && k === key.toString =>
               lrhpr read (row, headers) map { hpr =>
                 (hpr.head, (hpr.tail.head, none))
               }
+
             case _ =>
               lrhpr read (row, headers) map { hpr =>
                 (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
@@ -316,14 +339,16 @@ trait stores {
         llr: Lazy[LabelledRead[HV]],
         lgetk: Lazy[Get[Key]]
     ): Pipe[EffectType, String, Result[PermRow]] =
-      readLabelledCompleteSafe[F, PermRow] andThen (_ map (_ leftMap errorToFail))
+      readLabelledCompleteSafe[F, PermRow] andThen
+        (_ map (_ leftMap errorToFail))
 
     /** */
-    protected final def deriveKvToCsv(
+    final protected def deriveKvToCsv(
         implicit
         llw: Lazy[LabelledWrite[HV]],
         lputk: Lazy[Put[Key]]
-    ): Pipe[EffectType, PermRow, String] = writeLabelled[F, PermRow](printer)
+    ): Pipe[EffectType, PermRow, String] =
+      writeLabelled[F, PermRow](printer)
   }
 
   /** */
@@ -340,7 +365,7 @@ trait stores {
     /** */
     def path: Path
 
-    private final lazy val appendHandles: EffectStream[FileHandle[EffectType]] = {
+    final private lazy val appendHandles: EffectStream[FileHandle[EffectType]] = {
 
       import OpenOption._
 
@@ -380,7 +405,9 @@ trait stores {
     final protected def readLines: EffectStream[String] =
       (Stream resource Blocker[EffectType]) flatMap { blocker =>
         fs2.io.file readAll [EffectType] (path, blocker, 1024 * 1024)
-      } through text.utf8Decode through text.lines
+      } through
+        text.utf8Decode through
+        text.lines
   }
 
   /** */
@@ -400,7 +427,12 @@ trait stores {
     import V._
 
     /** */
-    final def select(key: Key): EffectStream[Value] = Stream evals F.delay { table get key }
+    final def select(key: Key): EffectStream[Value] =
+      Stream evals F.delay { table get key }
+
+    /** */
+    def insert(key: Key, value: Value): EffectStream[Id] =
+      (table get key).fold(append(key -> value.some))(_ => Stream.empty)
 
     /** */
     def update(key: Key, value: Value): EffectStream[Id] =
@@ -411,11 +443,8 @@ trait stores {
 
     /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
     def delete(key: Key): EffectStream[Id] =
-      (table get key).fold(Stream.empty: EffectStream[Id])(_ => append(key -> none))
-
-    /** */
-    def insert(key: Key, value: Value): EffectStream[Id] =
-      (table get key).fold(append(key -> value.some))(_ => Stream.empty)
+      (table get key)
+        .fold(Stream.empty: EffectStream[Id])(_ => append(key -> none))
   }
 
   /** */
@@ -428,7 +457,7 @@ trait stores {
   )(
       implicit
       final override val lgv: LabelledGeneric.Aux[V, HV],
-  ) extends ModuleTypes.Aux[F, WithId.Aux, V, HV](V)
+  ) extends ModuleTypes.Aux(V)
       with ValueStore[F, V, HV]
       with MemFileImplV[F, WithId.Aux, V, HV]
 

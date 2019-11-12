@@ -154,7 +154,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * `Auditor`s are first class participants, with a package of rights and responsibilities.
       *
       * There are a finite enumeration of [[Role]]s.
-      * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Ledger.Roster]]
+      * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Accounts.Roster]]
       * which is situation and juristiction specific.
       *
       * Practically, what this means is that `Auditor`s will have a (possibly limited) view
