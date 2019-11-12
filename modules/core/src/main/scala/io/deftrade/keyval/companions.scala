@@ -101,7 +101,7 @@ protected object WithValue {
 }
 
 /** */
-trait WithId extends WithValue {
+abstract class WithId[V] extends WithValue.Aux[V] with WithValue {
 
   /** */
   final type Row = Value
@@ -111,11 +111,7 @@ trait WithId extends WithValue {
 }
 
 /** */
-object WithId {
-
-  /** */
-  trait Aux[V] extends WithValue.Aux[V] with WithId
-}
+object WithId
 
 /**  */
 trait WithKey extends WithValue {

@@ -23,6 +23,7 @@ import capital.Instrument, reference.Mic
 
 import cats.implicits._
 import cats.Monad
+import cats.data.NonEmptySet
 
 import enumeratum.EnumEntry
 
@@ -284,8 +285,10 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def contra: Folio.Key
   }
 
-  /** */
-  object Market extends WithOpaqueKey[Long, Market]
+  /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
+  object Market extends WithOpaqueKey[Int, Market] {
+    implicit def orderMarket: cats.Order[Market] = ???
+  }
 
   /**
     * Models a private party whose [[Ledger.Folio]]s we run [[Ledger.Transaction]]s against.
@@ -300,7 +303,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   ) extends Market
 
   /** */
-  object Counterparty {}
+  object Counterparty extends WithId[Counterparty]
 
   /**
     * Single effective counterparty: the `Exchange` itself.
@@ -315,7 +318,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   ) extends Market
 
   /** */
-  object Exchange {
+  object Exchange extends WithId[Exchange] {
 
     /** */
     def fromMic(mic: Mic): Exchange = ??? // make new contra account
@@ -328,7 +331,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   /**
     * MDS := Market Data Source.
     */
-  sealed abstract case class MDS(market: Market) {
+  sealed abstract case class MDS(markets: NonEmptySet[Market]) {
 
     /** `Currency`-specific quote factory. */
     def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
@@ -352,11 +355,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
       trade.toList foldMapM quoteLeg[F, C]
   }
 
-  /** */
+  /** FIXME: normalize fields? */
   object MDS extends WithOpaqueKey[Long, MDS] {
 
     /** */
-    def apply(m: Market): MDS = new MDS(m) {
+    def single(m: Market): MDS = new MDS(NonEmptySet one m) {
 
       /** FIXME: how do we specialize? */
       def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???

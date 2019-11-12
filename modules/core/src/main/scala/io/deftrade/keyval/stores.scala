@@ -192,8 +192,8 @@ trait stores {
     * available to the library.
     *
     */
-  trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId.Aux, V, HV] {
-    self: ModuleTypes.Aux[F, WithId.Aux, V, HV] =>
+  trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
+    self: ModuleTypes.Aux[F, WithId, V, HV] =>
 
     import V._
 
@@ -453,13 +453,13 @@ trait stores {
       V: Eq,
       HV <: HList
   ](
-      final override val V: WithId.Aux[V]
+      final override val V: WithId[V]
   )(
       implicit
       final override val lgv: LabelledGeneric.Aux[V, HV],
   ) extends ModuleTypes.Aux(V)
       with ValueStore[F, V, HV]
-      with MemFileImplV[F, WithId.Aux, V, HV]
+      with MemFileImplV[F, WithId, V, HV]
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -479,7 +479,7 @@ trait stores {
 
   /** */
   def valueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      v: WithId.Aux[V],
+      v: WithId[V],
       p: String
   )(
       implicit

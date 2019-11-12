@@ -18,17 +18,22 @@ package io.deftrade
 package model
 package layers
 
-import implicits._, time._, money._, keyval._, capital._, refinements.Sha256
+import time._, money._, keyval._, capital._, refinements.Sha256
 
 import cats.implicits._
-import cats.{ Foldable, Hash, Monad, MonoidK }
+// import cats.{
+//   // Foldable,
+//   // Hash,
+//   // Monad,
+//   // MonoidK
+// }
 
 import eu.timepit.refined
 import refined.api.Refined
 
 import io.circe.Json
 
-import scala.language.higherKinds
+// import scala.language.higherKinds
 
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
@@ -90,8 +95,15 @@ trait Ledger { self: ModuleTypes =>
   /** A [[Folio]] in motion. */
   type Trade = Folio
 
-  /** */
-  lazy val Trade = Folio
+  /** In contrast to a [[Folio]] store, [[Trade]] stores holds immutable entries. */
+  object Trade extends WithId[Trade] {
+
+    /** */
+    def apply(ps: Position*): Trade = indexAndSum(ps.toList)
+
+    /** */
+    def empty: Trade = Map.empty
+  }
 
   /** TODO: Revisit decision to make these part of the implicit context. */
   sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
@@ -137,6 +149,8 @@ trait Ledger { self: ModuleTypes =>
   /**
     * Models ready cash per currency.
     *
+    * Wallet folios are guarranteed non-empty, in that there is at least one [[Position]].
+    *
     * In this way, implicit values of `Wallet` can be used to inject maps ("pricers") between
     * (certain) [[Folio]]s and (certain) [[money.Currency]]s into the implicit context.
     *
@@ -144,13 +158,14 @@ trait Ledger { self: ModuleTypes =>
     * values are '''not''' carried by instances of this class.
     */
   sealed trait WalletLike {
-    val folio: Folio
+    val folio: Folio.Key
     implicit val C: CurrencyLike
     type CurrencyType // == C.Type
   }
 
+  /** */
   sealed abstract case class Wallet[C] private[model] (
-      final override val folio: Folio
+      final override val folio: Folio.Key
   )(
       implicit
       final override val C: Currency[C]
@@ -159,7 +174,10 @@ trait Ledger { self: ModuleTypes =>
   }
 
   /**
-    * Wallet folios are guarranteed non-empty, in that there is at least one Position.
+    * Like [[Folio]]s, (but not [[Trade]]s), `Wallet`s are
+    * modeled as entities as opposed to values.
+    *
+    * TODO: revisit this decision
     */
   object Wallet extends WithOpaqueKey[Long, WalletLike] {
 
@@ -167,14 +185,20 @@ trait Ledger { self: ModuleTypes =>
       * type parameter is checked for `Currency` status
       * TODO: additional validation?
       */
-    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] = Wallet(Folio(p +: ps: _*))
+    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
+      // Wallet(Folio(p +: ps: _*))
+      ???
 
     /** type parameter is checked for `Currency` status */
-    def apply[C: Currency](folio: Folio): Wallet[C] = new Wallet(folio) {}
+    def apply[C: Currency](folio: Folio.Key): Wallet[C] =
+      new Wallet(folio) {}
   }
 
   /**
     * For [[Ledger]] updates, the `Transaction` is the concrete record of record, so to speak.
+    *
+    * Do we mean in the business sense or the computer science sense?
+    * Yes: both parties must agree upon the result.
     *
     * The exact semantics will depend on the higher level context
     *  (eg booking a trade vs receiving notice of settlement).
@@ -186,16 +210,15 @@ trait Ledger { self: ModuleTypes =>
       recordedAt: Instant,
       debitFrom: Folio.Key,
       creditTo: Folio.Key,
-      trade: Trade,
+      trade: Trade.Id,
       metaSha: Sha256
   )
 
   /**
-    * Do we mean in the business sense or the computer science sense?
-    *
-    * Yes: both parties must agree upon the result.
+    * Model as pure value classes, because `Transaction`s don't make sense
+    * as anything but immutable.
     */
-  object Transaction extends WithOpaqueKey[Long, Transaction] {
+  object Transaction extends WithId[Transaction] {
 
     /** */
     private val hackSha256: Sha256 = Refined unsafeApply (0 until 256 / 8 map (_.toByte)).toArray
@@ -207,7 +230,7 @@ trait Ledger { self: ModuleTypes =>
         recordedAt: Instant,
         debitFrom: Folio.Key,
         creditTo: Folio.Key,
-        trade: Trade,
+        trade: Trade.Id,
         metaSha: Sha256
     ): Transaction =
       new Transaction(
@@ -233,21 +256,22 @@ trait Ledger { self: ModuleTypes =>
         instrument: Instrument.Key,
         amount: Quantity,
         meta: Json
-    ) = Transaction(
-      instant,
-      debitFrom,
-      creditTo,
-      Trade(instrument -> amount),
-      meta |> digest
-    )
+    ) = ???
+    // Transaction(
+    //   instant,
+    //   debitFrom,
+    //   creditTo,
+    //   Trade(instrument -> amount),
+    //   meta |> digest
+    // )
 
-    /**
-      * ex nihilo, yada yada ...
-      * TODO: interop with `fs2.Stream[cats.effect.IO, ?]`
-      */
-    def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
-
-    /** TODO: investigate kittens for this. */
-    implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
+    // /**
+    //   * ex nihilo, yada yada ...
+    //   * TODO: interop with `fs2.Stream[cats.effect.IO, ?]`
+    //   */
+    // def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
+    //
+    // /** TODO: investigate kittens for this. */
+    // implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }
 }

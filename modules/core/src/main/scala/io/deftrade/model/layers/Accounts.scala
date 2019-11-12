@@ -112,7 +112,10 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
 
-  /** */
+  /**
+    * Accounts are modelled as long lived entities that can evolve over time.
+    * FIXME: `Roster` needs json to fit in a column. Normalize?
+    */
   object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
 
     /** */

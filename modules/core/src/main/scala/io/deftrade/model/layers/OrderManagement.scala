@@ -32,8 +32,7 @@ import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
 
 /** */
-trait OrderManagement {
-  self: MarketData with Ledger with ModuleTypes =>
+trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /**
     * What the client wants [[Execution]] of.
@@ -46,37 +45,43 @@ trait OrderManagement {
   sealed abstract case class Order(
       ts: Instant,
       market: Market.Key,
-      trade: Trade,
+      trade: Trade.Id,
       currency: CurrencyLike,
       limit: Option[MonetaryAmount]
   )
 
-  /** */
+  /** Once placed, [[Order]]s may be modified or canceled, and so are modeled as entities. */
   object Order extends WithOpaqueKey[Long, Order] {
 
     /**
       * Note that currency is required even for market orders.
       */
-    def market[C: Currency](market: Market.Key, trade: Trade): Order =
+    def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
       new Order(instant, market, trade, Currency[C], none) {}
 
     /** */
-    def limit[C: Currency](market: Market.Key, trade: Trade, limit: Mny[C]): Order =
+    def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Mny[C]): Order =
       new Order(instant, market, trade, Currency[C], limit.amount.some) {}
   }
 
   /**
-    * What actually happened to the [[Order]].
+    * What actually happened to the [[Order]] at the [[Market]].
+    *
+    * TODO: describe in more detail how partial executions end up as multiple [[Transaction]]s.
     */
   sealed abstract case class Execution(
       ts: Instant,
+      order: Order.Key,
       oms: OMS.Key,
-      orderKey: Order.Key,
-      tx: Transaction
+      tx: Transaction.Id
   )
 
-  /** */
-  object Execution extends WithOpaqueKey[Long, Execution] {}
+  /**
+    * `Execution`s are pure values (do not evolve.)
+    *
+    * Note this implies that `broken trades` require explicit modelling.
+    */
+  object Execution extends WithId[Execution]
 
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.
@@ -97,7 +102,6 @@ trait OrderManagement {
   sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
       entity: LegalEntity.Key,
       contra: Folio.Key,
-      // contra: Account.Key,
       markets: NonEmptySet[Market.Key]
   ) {
 

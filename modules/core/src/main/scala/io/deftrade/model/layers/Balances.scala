@@ -290,7 +290,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /** */
     def bs: BalanceSheet[C]
 
-    /** FIXME this must evole */
+    /** FIXME this must evolve into some kind of Stream based thing */
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): BookSet[C]
   }
 
@@ -302,14 +302,14 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       bs: BalanceSheet[C]
   ) extends BookSet[C] {
 
-    /** FIXME: sketchy; comprehend streams? */
+    /** FIXME: implement */
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
 
     /**
       * Cratchit needs to look at the current state of the books
       * in order to properly allocate balance sheet items (in the most general case)
       *
-      * FIXME: Need to make polymorphic (some how).
+      * FIXME: Need to make polymorphic (somehow). Also implement.
       */
     def deltaFrom(
         pt: PricedTrade[C],
@@ -336,6 +336,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       is: IncomeStatement[C],
       bs: BalanceSheet[C]
   ) extends BookSet[C] {
+
+    /** FIXME: implement */
     def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
   }
 
@@ -350,7 +352,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): AccrualBookSet[C] = new AccrualBookSet(asOf, period, cs, is, bs) {}
   }
 
-  /** */
+  /** FIXME: implement */
   def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](
       ts: F[Transaction]
   ): TrialBalance[C] =
