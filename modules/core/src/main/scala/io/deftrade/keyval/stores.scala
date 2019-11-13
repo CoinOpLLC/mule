@@ -58,7 +58,7 @@ trait stores {
     type ValueType
 
     /** */
-    type ValueCompanionType[x] <: WithValue.Aux[x]
+    type ValueCompanionType[x] <: WithValue
 
     /** */
     type HValue <: HList
@@ -85,7 +85,7 @@ trait stores {
     /** */
     abstract class Aux[
         F[_],
-        W[?] <: WithValue.Aux[?],
+        W[_] <: WithValue,
         V,
         HV <: HList
     ](
@@ -97,13 +97,12 @@ trait stores {
         override val lgv: LabelledGeneric.Aux[V, HV]
     ) extends ModuleTypes {
 
-      final type ValueCompanionType[x] = W[x]
-      final type HValue                = HV // = lgv.Repr  test / validate / assume ?!?
-      final type EffectType[x]         = F[x]
+      final override type ValueCompanionType[x] = W[x]
+      final type HValue                         = HV // = lgv.Repr  test / validate / assume ?!?
+      final type EffectType[x]                  = F[x]
+      final type ValueType                      = V
 
       import V.{ validateId, Id, Index, Value }
-
-      final type ValueType = Value
 
       /** Basic in-memory table structure */
       final type Table = Map[Index, Value]
@@ -115,7 +114,7 @@ trait stores {
   /** */
   protected trait Store[
       F[_],
-      W[?] <: WithValue.Aux[?],
+      W[_] <: WithValue,
       V,
       HV <: HList
   ] { self: ModuleTypes.Aux[F, W, V, HV] =>
@@ -256,11 +255,11 @@ trait stores {
       HV <: HList
   ] extends Store[
         F,
-        ({ type W[v] = WithKey.Aux[K, v] })#W,
+        WithKey.Aux[K, *],
         V,
         HV
       ] {
-    self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
+    self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
     import V._
 
@@ -354,7 +353,7 @@ trait stores {
   /** */
   private trait MemFileImplV[
       F[_],
-      W[?] <: WithValue.Aux[?],
+      W[_] <: WithValue,
       V,
       HV <: HList
   ] extends Store[F, W, V, HV] { self: ModuleTypes.Aux[F, W, V, HV] =>
@@ -489,14 +488,16 @@ trait stores {
   ): Result[ValueStore[F, V, HV]] = Result safe {
     new MemFileValueStore(v) {
 
+      import V._
+
       /** */
       override def path = Paths get p
 
       /** */
-      final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveVToCsv
+      final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
 
       /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, Result[V.PermRow]] = deriveCsvToV
+      final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
     }
   }
 

@@ -1,21 +1,19 @@
 resolvers += Resolver.sonatypeRepo("releases")
 
-addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
+// addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
+
+// addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0")
 
 scalafmtOnCompile in ThisBuild := true // all projects
 
 import Deps._
 
 lazy val common = Seq(
-  organization            := "io.deftrade",
-  scalaVersion            := Version.Scala,
-  dependencyUpdatesFilter -= moduleFilter(organization = "org.scala-lang"),
-  crossPaths              := false,
-  cancelable              := true,
-  // scalaVersion      := "2.12.4-bin-typelevel-4",
-  // scalaOrganization := "org.typelevel",
-  //
-  // scalacOptions                           += "-Yliteral-types",
+  organization                        := "io.deftrade",
+  scalaVersion                        := Version.Scala,
+  dependencyUpdatesFilter             -= moduleFilter(organization = "org.scala-lang"),
+  crossPaths                          := false,
+  cancelable                          := true,
   scalacOptions                       ++= Args.allScalaCflags,
   scalacOptions in (Compile, console) --= Args.nonConsoleScalaCflags.to[Seq],
   scalacOptions in (Test, console)    := (scalacOptions in (Compile, console)).value,
@@ -44,6 +42,7 @@ lazy val core = module(
     | - core finance domain model
     |""".stripMargin
 ).settings(common)
+  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
   )
