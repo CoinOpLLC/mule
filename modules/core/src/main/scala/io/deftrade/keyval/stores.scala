@@ -83,12 +83,7 @@ trait stores {
   protected[deftrade] object ModuleTypes {
 
     /** */
-    abstract class Aux[
-        F[_],
-        W[_] <: WithValue,
-        V,
-        HV <: HList
-    ](
+    abstract class Aux[F[_], W[_] <: WithValue, V, HV <: HList](
         val V: W[V]
     )(
         implicit
@@ -112,12 +107,8 @@ trait stores {
   }
 
   /** */
-  protected trait Store[
-      F[_],
-      W[_] <: WithValue,
-      V,
-      HV <: HList
-  ] { self: ModuleTypes.Aux[F, W, V, HV] =>
+  protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
+    self: ModuleTypes.Aux[F, W, V, HV] =>
 
     import V._
 
@@ -248,17 +239,7 @@ trait stores {
   final def printer: Printer = Printer.default
 
   /**  */
-  trait KeyValueStore[
-      F[_],
-      K,
-      V,
-      HV <: HList
-  ] extends Store[
-        F,
-        WithKey.Aux[K, *],
-        V,
-        HV
-      ] {
+  trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *], V, HV] {
     self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
     import V._
@@ -351,12 +332,8 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplV[
-      F[_],
-      W[_] <: WithValue,
-      V,
-      HV <: HList
-  ] extends Store[F, W, V, HV] { self: ModuleTypes.Aux[F, W, V, HV] =>
+  private trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, V, HV] {
+    self: ModuleTypes.Aux[F, W, V, HV] =>
 
     /** */
     final protected var table: Table = Map.empty
@@ -410,18 +387,14 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplKV[
-      F[_],
-      K,
-      V,
-      HV <: HList
-  ] extends MemFileImplV[
+  private trait MemFileImplKV[F[_], K, V, HV <: HList]
+      extends MemFileImplV[
         F,
-        ({ type W[v] = WithKey.Aux[K, v] })#W,
+        WithKey.Aux[K, *],
         V,
         HV
       ] {
-    self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
+    self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
     import V._
 

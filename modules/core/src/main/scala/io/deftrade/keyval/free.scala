@@ -78,7 +78,7 @@ trait freestore {
         HV <: HList
     ](
         V: WithKey.Aux[K, V],
-        impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+        impl: Command[F, *] ~> Stream[F, *]
     )(
         implicit
         lgv: LabelledGeneric.Aux[V, HV]
@@ -87,7 +87,7 @@ trait freestore {
     /** */
     def withIO[K, V, HV <: HList](
         V: WithKey.Aux[K, V],
-        impl: ({ type C[t] = Command[IO, t] })#C ~> ({ type S[r] = Stream[IO, r] })#S
+        impl: Command[IO, *] ~> Stream[IO, *]
     )(
         implicit lgv: LabelledGeneric.Aux[V, HV]
     ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
@@ -101,12 +101,7 @@ trait freestore {
     ](
         V: WithKey.Aux[K, V]
     )(
-        kvs: ModuleTypes.Aux[
-          F,
-          ({ type W[v] = WithKey.Aux[K, v] })#W, // I know, right? FIXME
-          V,
-          HV
-        ] with KeyValueStore[F, K, V, HV]
+        kvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with KeyValueStore[F, K, V, HV]
     )(
         implicit fkvs: FreeKeyValueStore[F, K, V, HV]
     ): fkvs.EffectCommand ~> kvs.EffectStream =
@@ -114,7 +109,7 @@ trait freestore {
         import fkvs._, kvs._
 
         def apply[A](ca: EffectCommand[A]): EffectStream[A] = ca match {
-          // case Get(k)    => kvs select k
+          case Get(k) => kvs select k
           // case Let(k, v) => kvs insert (k, v)
           // case Set(k, v) => kvs update (k, v)
           // case Put(k, v) => kvs upsert (k, v)
@@ -139,7 +134,8 @@ trait freestore {
       HV <: HList
   ] private[freestore] (
       final override val V: WithKey.Aux[K, V],
-      final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+      // final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
+      final override val impl: Command[F, *] ~> Stream[F, *]
   )(
       implicit
       final override val lgv: LabelledGeneric.Aux[V, HV]
