@@ -10,11 +10,9 @@ import cats.free.Free.liftF
 
 import cats.effect.{ ContextShift, IO, Sync }
 
-import shapeless.{ HList, LabelledGeneric }
+import shapeless.{ HList }
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
-import fs2.Stream
 
 import scala.language.higherKinds
 
@@ -28,23 +26,21 @@ trait freestore {
   object Command
 
   /** */
-  trait FreeKeyValueStore[
-      F[_],
-      K,
-      V,
-      HV <: HList
-  ] { self: ModuleTypes.Aux[F, ({ type W[v] = WithKey.Aux[K, v] })#W, V, HV] =>
+  trait FreeKeyValueStore {
 
-    import V._
+    type EffectType[_]
+
+    type Id
+
+    type Key
+
+    type Value
 
     /** */
     final type EffectCommand[A] = Command[EffectType, A]
 
     /** */
-    type FreeCommand[A] = Free[EffectCommand, A]
-
-    /** */
-    def impl: EffectCommand ~> EffectStream
+    final type FreeCommand[A] = Free[EffectCommand, A]
 
     case class Get(key: Key)               extends EffectCommand[Value]
     case class Let(key: Key, value: Value) extends EffectCommand[Id]
@@ -52,95 +48,57 @@ trait freestore {
     case class Put(key: Key, value: Value) extends EffectCommand[Id]
     case class Del(key: Key)               extends EffectCommand[Id] // (sic)
 
-    /** */
-    def get(key: Key): FreeCommand[Value] = Get(key) |> liftF
-
-    /** */
-    def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF
-
-    /** */
-    def set(key: Key, value: Value): FreeCommand[Id] = Set(key, value) |> liftF
-
-    /** */
-    def put(key: Key, value: Value): FreeCommand[Id] = Put(key, value) |> liftF
-
-    /** */
-    def del(key: Key): FreeCommand[Id] = Del(key) |> liftF
+    final def get(key: Key): FreeCommand[Value]            = Get(key)        |> liftF
+    final def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF
+    final def set(key: Key, value: Value): FreeCommand[Id] = Set(key, value) |> liftF
+    final def put(key: Key, value: Value): FreeCommand[Id] = Put(key, value) |> liftF
+    final def del(key: Key): FreeCommand[Id]               = Del(key)        |> liftF
   }
 
   /** */
   object FreeKeyValueStore {
 
-    /** */
-    def apply[
-        F[_]: Sync: ContextShift,
-        K,
-        V,
-        HV <: HList
-    ](
-        V: WithKey.Aux[K, V],
-        impl: Command[F, *] ~> Stream[F, *]
-    )(
-        implicit
-        lgv: LabelledGeneric.Aux[V, HV]
-    ): FreeKeyValueStore[F, K, V, HV] = new FKVS(V, impl) {}
+    implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
+
+    trait Aux[F[_], K, V, I] extends FreeKeyValueStore {
+      final override type EffectType[A] = F[A]
+      final override type Key           = K
+      final override type Value         = V
+      final override type Id            = I
+    }
 
     /** */
-    def withIO[K, V, HV <: HList](
-        V: WithKey.Aux[K, V],
-        impl: Command[IO, *] ~> Stream[IO, *]
-    )(
-        implicit lgv: LabelledGeneric.Aux[V, HV]
-    ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
+    def apply[F[_]: Sync: ContextShift, K, V](
+        V: WithKey.Aux[K, V]
+    ): FreeKeyValueStore.Aux[F, K, V, V.Id] =
+      new FreeKeyValueStore.Aux[F, K, V, V.Id] {}
+
+    /** */
+    def withIO[K, V](
+        V: WithKey.Aux[K, V]
+    ): FreeKeyValueStore.Aux[IO, K, V, V.Id] =
+      apply(V)
 
     /** TODO: needs work */
-    def compiler[
-        F[_]: Sync: ContextShift,
-        K,
-        V,
-        HV <: HList
-    ](
-        // V: WithKey.Aux[K, V],
+    def kvsCompiler[F[_]: Sync: ContextShift, K, V, HV <: HList](
         kvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with KeyValueStore[F, K, V, HV]
-    )(
-        // implicit
-        fkvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with FreeKeyValueStore[F, K, V, HV]
-    ): fkvs.EffectCommand ~> fkvs.EffectStream =
-      new ~>[fkvs.EffectCommand, fkvs.EffectStream] {
+    ): Command[F, *] ~> kvs.EffectStream =
+      new FunctionK[Command[F, *], kvs.EffectStream] {
+
+        val fkvs = FreeKeyValueStore(kvs.V)
         import fkvs._
 
-        def apply[A](ca: EffectCommand[A]): EffectStream[A] = ca match {
+        /** TODO: consider splitting up read and write */
+        def apply[A](ca: Command[F, A]): kvs.EffectStream[A] = ca match {
           case Get(k)    => kvs select k
           case Let(k, v) => kvs insert (k, v)
           case Set(k, v) => kvs update (k, v)
           case Put(k, v) => kvs upsert (k, v)
           case Del(k)    => kvs delete k
+          case _         => ??? // FIXME: why not exhaustive match?
         }
       }
-
-    /** */
-    implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
   }
-
-  /** */
-  object FKVS
-
-  /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  private sealed abstract class FKVS[
-      F[_]: Sync: ContextShift,
-      K,
-      V,
-      HV <: HList
-  ] private[freestore] (
-      final override val V: WithKey.Aux[K, V],
-      // final override val impl: ({ type C[t] = Command[F, t] })#C ~> ({ type S[r] = Stream[F, r] })#S
-      final override val impl: Command[F, *] ~> Stream[F, *]
-  )(
-      implicit
-      final override val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends ModuleTypes.Aux(V)
-      with FreeKeyValueStore[F, K, V, HV]
 }
 
 /** */

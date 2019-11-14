@@ -53,7 +53,7 @@ import refined.api.Refined
   *
   * *,, it's just a scheme because calling it a "schema" is far too grand,,
   */
-package object keyval extends stores with csv {
+package object keyval extends stores with freestore with csv {
 
   /** Just an alias.  */
   type OpaqueKey[K, V] = Refined[K, V]
