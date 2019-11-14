@@ -4,6 +4,7 @@ package keyval
 import io.deftrade.implicits._
 
 import cats.{ ~> }
+import cats.arrow.FunctionK
 import cats.free.Free
 import cats.free.Free.liftF
 
@@ -106,9 +107,9 @@ trait freestore {
         implicit fkvs: FreeKeyValueStore[F, K, V, HV]
     ): fkvs.EffectCommand ~> kvs.EffectStream =
       new ~>[fkvs.EffectCommand, kvs.EffectStream] {
-        import fkvs._, kvs._
+        import fkvs._
 
-        def apply[A](ca: EffectCommand[A]): EffectStream[A] = ca match {
+        def apply[A](ca: EffectCommand[A]): kvs.EffectStream[A] = ca match {
           case Get(k) => kvs select k
           // case Let(k, v) => kvs insert (k, v)
           // case Set(k, v) => kvs update (k, v)
@@ -145,12 +146,3 @@ trait freestore {
 
 /** */
 object freestore extends freestore
-
-//
-// old api:
-//
-// case class Select(key: Key)               extends Command[Option[Value]]
-// case class Create(key: Key, value: Value) extends Command[Option[Id]]
-// case class Update(key: Key, value: Value) extends Command[Boolean]
-// case class Upsert(key: Key, value: Value) extends Command[Option[Id]] // update() == true
-// case class Delete(key: Key)               extends Command[Boolean]
