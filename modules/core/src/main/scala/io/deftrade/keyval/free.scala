@@ -92,29 +92,28 @@ trait freestore {
         implicit lgv: LabelledGeneric.Aux[V, HV]
     ): FreeKeyValueStore[IO, K, V, HV] = apply[IO, K, V, HV](V, impl)
 
-    /** */
+    /** TODO: needs work */
     def compiler[
         F[_]: Sync: ContextShift,
         K,
         V,
         HV <: HList
     ](
-        V: WithKey.Aux[K, V]
-    )(
+        // V: WithKey.Aux[K, V],
         kvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with KeyValueStore[F, K, V, HV]
     )(
-        implicit fkvs: FreeKeyValueStore[F, K, V, HV]
-    ): fkvs.EffectCommand ~> kvs.EffectStream =
-      new ~>[fkvs.EffectCommand, kvs.EffectStream] {
-        import fkvs._, kvs._
+        // implicit
+        fkvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with FreeKeyValueStore[F, K, V, HV]
+    ): fkvs.EffectCommand ~> fkvs.EffectStream =
+      new ~>[fkvs.EffectCommand, fkvs.EffectStream] {
+        import fkvs._
 
         def apply[A](ca: EffectCommand[A]): EffectStream[A] = ca match {
-          case Get(k) => kvs select k
-          // case Let(k, v) => kvs insert (k, v)
-          // case Set(k, v) => kvs update (k, v)
-          // case Put(k, v) => kvs upsert (k, v)
-          // case Del(k)    => kvs delete k
-          case _ => ???
+          case Get(k)    => kvs select k
+          case Let(k, v) => kvs insert (k, v)
+          case Set(k, v) => kvs update (k, v)
+          case Put(k, v) => kvs upsert (k, v)
+          case Del(k)    => kvs delete k
         }
       }
 
