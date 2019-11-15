@@ -27,18 +27,6 @@ import enumeratum._
 
 /**
   * Core accounting vocabulary.
-  *
-  * Recall:
-  *
-  * {{{
-  *     Debits === Credits                 // basic identity
-  *     Assets === Liabilities             // Balance Sheet identity
-  *     Liabilities := Debt + Equity       // one or the other
-  *     Expenses < Revenue                 // for positive profit
-  *     Income := Revenue Net Expenses     // textbook definition
-  *     Equity := Liabilities Net Debt     // Equity statement
-  *            + (retained) Income         // more equity offsets more money in the bank
-  * }}}
   */
 trait Accounting { self: ModuleTypes =>
 

@@ -26,6 +26,7 @@ trait freestore {
   object Command
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   trait FreeKeyValueStore {
 
     type EffectType[_]
@@ -37,16 +38,13 @@ trait freestore {
     type Value
 
     /** */
-    final type EffectCommand[A] = Command[EffectType, A]
+    final type FreeCommand[A] = Free[Command[EffectType, *], A]
 
-    /** */
-    final type FreeCommand[A] = Free[EffectCommand, A]
-
-    case class Get(key: Key)               extends EffectCommand[Value]
-    case class Let(key: Key, value: Value) extends EffectCommand[Id]
-    case class Set(key: Key, value: Value) extends EffectCommand[Id]
-    case class Put(key: Key, value: Value) extends EffectCommand[Id]
-    case class Del(key: Key)               extends EffectCommand[Id] // (sic)
+    case class Get(key: Key)               extends Command[EffectType, Value]
+    case class Let(key: Key, value: Value) extends Command[EffectType, Id]
+    case class Set(key: Key, value: Value) extends Command[EffectType, Id]
+    case class Put(key: Key, value: Value) extends Command[EffectType, Id]
+    case class Del(key: Key)               extends Command[EffectType, Id] // (sic)
 
     final def get(key: Key): FreeCommand[Value]            = Get(key)        |> liftF
     final def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF

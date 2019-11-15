@@ -36,16 +36,18 @@ import scala.language.higherKinds
 /**
   * Double entry [[Balance]] calculation from a sequence of [[Ledger.Transaction]]s.
   *
-  * Recall the fundamental equation of double entry bookkeeping:
-  *
-  *   - `Debits === Credits`
-  *
-  * Expanding:
-  *
-  *   - `Assets + Expenses === Debt + Equity + Revenues`
-  *
   * When summing Transactions, this "cake slice" module implements the algebra which
-  * maintains the above equality.
+  * maintains the relations below:
+  *
+  * {{{
+  *     Debits === Credits                 // accounting identity
+  *     Assets === Liabilities             // balance sheet identity
+  *     Liabilities := Debt + Equity       // one or the other
+  *     Assets + Income + Expenses === Debt + Equity + Revenues  // substituting
+  *     Income := Revenue Net Expenses     // textbook definition
+  *     Equity := Liabilities Net Debt     // rearranging
+  *            +  Income                   // Equity book value evolves!
+  * }}}
   *
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
@@ -167,12 +169,12 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       }
 
     /** */
-    def from[CC[_]: Foldable, C: Currency](
+    def from[F[_]: Foldable, C: Currency](
         marker: TradePricer[C]
     )(
-        xs: CC[Transaction]
-    ): TrialBalance[C] = ??? // xs.sum // FIXME this is all I should have to say!
-
+        xs: F[Transaction]
+    ): TrialBalance[C] =
+      ??? // xs.sum // FIXME this is all I should have to say!
   }
 
   /**
@@ -238,12 +240,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         unapply(_).fold(???)(identity)
       }
   }
-
-  /** */
-  sealed abstract case class EquityStatement[C] private (wut: Null)
-
-  /** */
-  object EquityStatement
 
   /**
     * `BalanceSheet`s form a `CommutativeGroup`.
@@ -362,6 +358,27 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     // fold that TrialBalance into the running sum
     ???
 
+  /**  */
+  type DeltaCashBooks[C] = (CashFlowStatement[C], BalanceSheet[C])
+
+  /** */
+  type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
+
+  /**
+    https://en.wikipedia.org/wiki/Statement_of_changes_in_equity
+
+    */
+  sealed abstract case class EquityStatement[C] private (wut: Null)
+
+  /** */
+  object EquityStatement
+
+  /** */
+  sealed trait DeltaEquity
+
+  /** */
+  object DeltaEquity
+
   /** FIXME: not sure this signature makes sense as it stands */
   def breakdown[C: Currency: Wallet](
       prior: BalanceSheet[C],
@@ -370,9 +387,4 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   ): (CashFlowStatement[C], EquityStatement[C]) =
     ???
 
-  /**  */
-  type DeltaCashBooks[C] = (CashFlowStatement[C], BalanceSheet[C])
-
-  /** */
-  type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 }
