@@ -23,10 +23,13 @@ import keyval._, time._, money._
 import cats.implicits._
 import cats.{ Foldable, Monad, SemigroupK }
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
+import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
+
+import fs2.Stream
 
 import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
@@ -50,7 +53,10 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       limit: Option[MonetaryAmount]
   )
 
-  /** Once placed, [[Order]]s may be modified or canceled, and so are modeled as entities. */
+  /**
+    * Once placed, an [[Order]] may be modified or canceled,
+    * and so is modeled as an entity which can evolve.
+    */
   object Order extends WithOpaqueKey[Long, Order] {
 
     /**
@@ -79,7 +85,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
   /**
     * `Execution`s are pure values (do not evolve.)
     *
-    * Note this implies that `broken trades` require explicit modelling.
+    * Note: this implies that so-called "broken trades" require explicit modelling.
     */
   object Execution extends WithId[Execution]
 
