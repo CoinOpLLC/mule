@@ -99,7 +99,7 @@ trait Ledger { self: ModuleTypes =>
   object Trade extends WithId[Trade] {
 
     /** */
-    def apply(ps: Position*): Trade = indexAndSum(ps.toList)
+    def apply(ps: Leg*): Trade = indexAndSum(ps.toList)
 
     /** */
     def empty: Trade = Map.empty
@@ -137,7 +137,11 @@ trait Ledger { self: ModuleTypes =>
       *
       * Creates what could be called a `FairTrade`...
       */
-    def normalize[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+    def settlement[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+  }
+
+  trait SettlableTrade {
+    def trade: Trade
   }
 
   /** type alias */
@@ -174,20 +178,18 @@ trait Ledger { self: ModuleTypes =>
   }
 
   /**
+    * Binds [[Currency]]s to [[Folio.Key]]s.
+    *
+    * Consisting of a Folio.
     * Like [[Folio]]s, (but not [[Trade]]s), `Wallet`s are
     * modeled as entities as opposed to values.
     *
     * TODO: revisit this decision
     */
-  object Wallet extends WithOpaqueKey[Long, WalletLike] {
+  object Wallet extends WithOpaqueKey[Long, WalletLike] { self =>
 
-    /**
-      * type parameter is checked for `Currency` status
-      * TODO: additional validation?
-      */
-    def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
-      // Wallet(Folio(p +: ps: _*))
-      ???
+    // def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
+    //   self.apply(Folio(p +: ps: _*))
 
     /** type parameter is checked for `Currency` status */
     def apply[C: Currency](folio: Folio.Key): Wallet[C] =

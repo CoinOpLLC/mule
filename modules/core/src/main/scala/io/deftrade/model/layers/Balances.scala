@@ -52,7 +52,7 @@ import scala.language.higherKinds
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
-  import AccountMap.implicits._
+  import AccountingKey.implicits._
 
   /** */
   sealed trait BalanceLike extends Product with Serializable {
@@ -113,7 +113,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.debits, b.credits).some
   }
 
-  /** Most general / least safe... */
+  /** */
   sealed abstract case class TrialBalance[C] private (
       override val debits: Debits[C],
       override val credits: Credits[C]
@@ -386,5 +386,4 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       raw: IncomeStatement[C] // mixed cash and accrual
   ): (CashFlowStatement[C], EquityStatement[C]) =
     ???
-
 }

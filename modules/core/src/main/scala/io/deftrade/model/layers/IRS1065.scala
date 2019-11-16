@@ -16,9 +16,8 @@
 
 package io.deftrade
 package model
-package layers
 
-import money.UnitPartition
+import layers._
 import keyval.DtEnum
 
 import cats.implicits._
@@ -26,7 +25,7 @@ import cats.implicits._
 /**
   * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
   */
-trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
+trait IRS1065 { self: ModuleTypes with Accounting =>
 
   /** */
   sealed trait Asset1065 extends Asset
@@ -142,24 +141,24 @@ trait AccountingIRS1065 extends Accounting { self: ModuleTypes =>
     *   - Any other vocabularies to examine? Make this (differently) extensible?
     *   - Annoyance: why doesn't type inference work for Nettable?
     */
-  object Nettable extends DtEnum[NettableLike] {
+  object Nettables extends DtEnum[Nettable] {
 
     import Asset._
 
     case object Depreciable
-        extends Nettable[Asset](
+        extends Nettable.Aux[Asset](
           BuildingsAndOtherDepreciableAssets,
           LessAccumulatedDepreciation
         )
 
     case object Depletable
-        extends Nettable[Asset](
+        extends Nettable.Aux[Asset](
           DepletableAssets,
           LessAccumulatedDepletion
         )
 
     case object Amortizable
-        extends Nettable[Asset](
+        extends Nettable.Aux[Asset](
           IntangibleAssets,
           LessAccumulatedAmortization
         )

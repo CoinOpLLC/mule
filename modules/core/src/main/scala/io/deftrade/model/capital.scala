@@ -24,14 +24,11 @@ import keyval._
 import refinements.{ Label }
 import model.reference.{ IsIsin, IsUsin, Mic }
 
-import cats.Id
 import cats.instances.string._
 
 // import shapeless.syntax.singleton._
 
 import io.circe.Json
-
-import scala.language.higherKinds
 
 /**
   * Models a tradeable thing.
@@ -39,84 +36,150 @@ import scala.language.higherKinds
   * TODO:
   *   - use the XBRL definitions for these, a la OpenGamma
   *   - see implementations in `Refine` library
+  *   - `symbol` implies a unified symbology. (These don't just happen.)
   */
 final case class Instrument(
     symbol: Label,
+    currency: CurrencyLike,
     issuer: LegalEntity.Key,
-    meta: Json
+    meta: Json,
 )
 
-/** */
+/**
+  * `Instrument`s evolve over time.
+  *
+  * E.g. t is not inconcievable that one might want to allow for,
+  * and track, a change in currency.
+  */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 
 /** */
-trait PrimaryCapital {
+trait Aspects {
+
+  /** */
+  sealed trait Contract { def instrument: Instrument.Key }
+
+  /** */
+  sealed trait Tracks extends Contract { def members: Set[Instrument.Key] }
+
+  /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
+  sealed trait Maturity extends Contract { def matures: ZonedDateTime }
+
+  /** */
+  sealed trait Expiry extends Contract { def expires: ZonedDateTime }
+
+  /** All derivatives (e.g. Futures) are assumed to expire. */
+  sealed trait Derivative extends Expiry { def underlyer: WithKey#Key }
+
+  /** Everyting with a strike is assumed to expire. */
+  sealed trait Strike[N] { self: Derivative =>
+    def strike: N
+  }
+
+  /** */
+  object Strike {
+    // def apply[N: Financial](strike: N): Strike[N]
+    /** */
+    object LogMoneynessStrike {
+      // def apply[N: Financial](strike: N, forward: N): LogMoneynessStrike[N] =
+      //   apply(ln(strike / forward)) TODO abstract ln over Financial[N] ?!
+    }
+  }
+}
+
+/** */
+trait PrimaryCapital extends Aspects {
 
   /** */
   case class CommonStock(
+      override val instrument: Instrument.Key,
       mic: Mic,
-      c: CurrencyLike,
       tclass: Option[Label]
-  )
+  ) extends Contract
 
   /** */
   object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
 
   /** */
   case class PreferredStock(
+      override val instrument: Instrument.Key,
       mic: Mic,
-      c: CurrencyLike,
       series: Label,
-  )
+  ) extends Contract
 
   /** */
   object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
 
   /** */
-  case class Bond(matures: ZonedDateTime) extends Maturity
+  case class Bond(
+      override val instrument: Instrument.Key,
+      override val matures: ZonedDateTime
+  ) extends Maturity
 
   /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
   object Bond extends WithRefinedKey[String, IsIsin, Bond]
 
   /** */
-  case class TreasurySecurity(matures: ZonedDateTime) extends Maturity
+  case class TreasurySecurity(
+      override val instrument: Instrument.Key,
+      override val matures: ZonedDateTime
+  ) extends Maturity
 }
 
 /** */
-trait VanillaDerivatives {
+trait VanillaDerivatives extends Aspects {
+
+  sealed trait PutCall
+  case object Put  extends PutCall
+  case object Call extends PutCall
 
   /** */
-  case class Index(underlyer: List[Instrument.Key]) extends Derivative[List] {
-    def components: List[Instrument.Key] = underlyer
-  }
+  case class Index(
+      override val instrument: Instrument.Key,
+      override val members: Set[Instrument.Key]
+  ) extends Tracks
 
   /** */
   object Index extends WithRefinedKey[String, IsIsin, Index]
 
   /** Exchange Traded Derivative - Future (ETD) */
-  case class EtdFuture(underlyer: Instrument.Key) extends Derivative[Id]
+  case class EtdFuture(
+      override val instrument: Instrument.Key,
+      override val expires: ZonedDateTime,
+      override val underlyer: Instrument.Key
+  ) extends Derivative
+
+  object EtdFuture extends WithRefinedKey[String, IsIsin, EtdFuture]
 
   /**Exchange Traded Derivative - Option (ETD)  */
-  case class EtdOption(underlyer: Instrument.Key) extends Derivative[Id]
+  case class EtdOption[N: Financial](
+      val putCall: PutCall,
+      override val instrument: Instrument.Key,
+      override val expires: ZonedDateTime,
+      override val underlyer: Instrument.Key,
+      override val strike: N,
+  ) extends Derivative
+      with Strike[N]
 
   /** I mean, right? */
-  case class EtdFutureOption(underlyer: Instrument.Key) extends Derivative[Id]
+  case class EtdFutureOption[N: Financial](
+      val putCall: PutCall,
+      override val instrument: Instrument.Key,
+      override val expires: ZonedDateTime,
+      override val underlyer: EtdFuture.Key,
+      override val strike: N,
+  ) extends Derivative
+      with Strike[N]
 
   /** */
-  case class IndexOption(underlyer: Instrument.Key) extends Derivative[Id]
-
-  /** */
-  case class StockOption(underlyer: Instrument.Key) extends Derivative[Id]
-
-  /** */
-  case class BondFuture(underlyer: Instrument.Key) extends Derivative[Id]
-
-  /** */
-  case class BondFutureOption(index: Index.Key) extends Derivative[Id] {
-
-    /** FIXME need to be able to derive this */
-    def underlyer: Instrument.Key = ??? // index
-  }
+  case class EtdIndexOption[N: Financial](
+      val putCall: PutCall,
+      override val instrument: Instrument.Key,
+      override val expires: ZonedDateTime,
+      override val underlyer: Index.Key,
+      override val strike: N,
+  ) extends Derivative
+      with Strike[N]
 }
 
 /** WIP */
@@ -171,7 +234,7 @@ trait Fx {
   case class FxVanillaOption()
 }
 
-/** */
+/** WIP */
 trait Ibor {
 
   /** */
@@ -186,6 +249,8 @@ trait Ibor {
 
 /**
   * Bespoke lending products.
+  *
+  * TODO: do these next
   */
 trait Lending {
 
@@ -200,67 +265,6 @@ trait Lending {
 
   /** */
   case class ConvertibleNote()
-}
-
-/** FIXME: "Index" anything should reference the index - need a Table of Indexes */
-sealed trait Derivative[F[_]] {
-
-  /** */
-  def underlyer: F[Instrument.Key]
-}
-
-/** */
-sealed trait Index {
-
-  /** */
-  def underlyer: Instrument
-}
-
-/** */
-sealed trait Maturity {
-
-  /** */
-  def matures: ZonedDateTime
-}
-
-/** */
-sealed trait Expiry {
-
-  /** */
-  def expires: ZonedDateTime
-}
-
-/** */
-sealed trait Strike[N] {
-
-  /** */
-  def strike: N
-}
-
-/** */
-object Strike {
-
-  /** */
-  sealed abstract case class SimpleStrike[N] private (strike: N) extends Strike[N]
-
-  /** */
-  object SimpleStrike {
-    def apply[N: Financial](strike: N): SimpleStrike[N] = new SimpleStrike(strike) {}
-  }
-
-  /** */
-  sealed abstract case class LogMoneynessStrike[N] private (strike: N) extends Strike[N]
-
-  /** */
-  object LogMoneynessStrike {
-
-    /** */
-    def apply[N: Financial](strike: N): LogMoneynessStrike[N] = new LogMoneynessStrike(strike) {}
-
-    /** */
-    def apply[N: Financial](strike: N, forward: N): LogMoneynessStrike[N] =
-      ??? // apply(ln(strike / forward)) TODO abstract ln over Financial[N] ?!
-  }
 }
 
 /** */

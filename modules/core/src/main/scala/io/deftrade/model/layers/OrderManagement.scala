@@ -23,13 +23,12 @@ import keyval._, time._, money._
 import cats.implicits._
 import cats.{ Foldable, Monad, SemigroupK }
 import cats.data.{ EitherT, Kleisli, NonEmptySet }
-import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
 
-import fs2.Stream
+// import fs2.Stream
 
 import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
