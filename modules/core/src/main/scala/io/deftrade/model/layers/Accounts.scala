@@ -2,7 +2,7 @@ package io.deftrade
 package model
 package layers
 
-import money._, keyval._
+import keyval._
 
 import cats.implicits._
 import cats.{ Eq, Show }

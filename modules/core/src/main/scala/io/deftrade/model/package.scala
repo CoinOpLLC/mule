@@ -52,13 +52,27 @@ import model.layers._
 
   */
 package object model
+/*
+  types we all need to agree on:
+     */
     extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,
       /* type Quantity       = */ Double
     ]
-    with Ledger            // consider frozen
-    with AccountingIRS1065 // replace or enhance as necessary
-    with Balances          // depends only on generic Accounting; should be close to frozen
-    with MarketData        // WIP and necessarily modular
-    with OrderManagement   // total WIP; IBRK will be first integration
-    with Accounts // Comment me out! PII firewalling simplified by eliminating dependencies.
+    //
+    // the full stack of layered capabilitities
+    //
+    with Ledger          // possibly distributed, possibly anonymous
+    with Accounting      // debits, credits, and all that
+    with Balances        // depends only on generic Accounting
+    with MarketData      // WIP; IBRK will be first integration
+    with OrderManagement // WIP; IBRK will be first integration
+    //
+    // PII firewalling simplified by eliminating dependencies:
+    // Accounts can be commented out!
+    //
+    with Accounts // binding of legal entities to folios */
+    //
+    // necessary package level configuration
+    //
+    with IRS1065 // replace or enhance as necessary

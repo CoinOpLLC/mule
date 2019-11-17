@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.deftrade
 package model
 package layers
 
-import money.{ Currency, Financial, UnitPartition }, keyval.DtEnum
+import money.{ Currency, Financial }, keyval.DtEnum
 
 import cats.implicits._
-import cats.{ Order => Oardur }
 
 import enumeratum._
 
@@ -37,7 +35,38 @@ trait Accounting { self: ModuleTypes =>
   object AccountingKey {
 
     /** FIXME whither cats enum?  */
-    implicit def orderKeys[K <: AccountingKey]: Oardur[K] = Oardur by (_.entryName)
+    implicit def orderKeys[K <: AccountingKey]: cats.Order[K] = cats.Order by (_.entryName)
+
+    /** */
+    object implicits {
+
+      /** */
+      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+
+        /**
+          * Filters a map by narrowing the scope of the keys contained.
+          *
+          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+          *
+          * @param subKey Easily provided via an extractor.
+          * @return A map containing those entries whose keys match a subclassing pattern.
+          * @see [[keyval.DtEnum]]
+          *
+          */
+        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
+          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+
+        /** */
+        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
+
+        /** */
+        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
+          m map {
+            case (k, n) =>
+              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
+          }
+      }
+    }
   }
 
   /** */
@@ -99,37 +128,6 @@ trait Accounting { self: ModuleTypes =>
 
     /** */
     def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
-
-    /** */
-    object implicits {
-
-      /** */
-      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
-
-        /**
-          * Filters a map by narrowing the scope of the keys contained.
-          *
-          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
-          *
-          * @param subKey Easily provided via an extractor.
-          * @return A map containing those entries whose keys match a subclassing pattern.
-          * @see [[keyval.DtEnum]]
-          *
-          */
-        def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
-          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
-
-        /** */
-        def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
-
-        /** */
-        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
-          m map {
-            case (k, n) =>
-              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
-          }
-      }
-    }
   }
 
   /** */
@@ -157,7 +155,7 @@ trait Accounting { self: ModuleTypes =>
   final type Incomes[C] = AccountMap[Income, C]
 
   /** */
-  sealed trait NettableLike extends EnumEntry with Serializable {
+  sealed trait Nettable extends EnumEntry with Serializable {
 
     /** */
     type AssetType <: Asset
@@ -174,9 +172,15 @@ trait Accounting { self: ModuleTypes =>
   }
 
   /** */
-  abstract class Nettable[D <: Asset](val gross: D, val less: D) extends NettableLike {
-    final type AssetType = D
+  object Nettable {
+
+    /** */
+    abstract class Aux[D <: Asset](val gross: D, val less: D) extends Nettable {
+      final type AssetType = D
+    }
   }
+
+  val Nettables: DtEnum[Nettable]
 
   /**
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
@@ -246,26 +250,26 @@ trait Accounting { self: ModuleTypes =>
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.
     */
-  abstract class SwapKey[T <: AccountingKey] private[model] (
-      val from: Treatment[T],
-      val to: Treatment[T]
+  abstract class SwapKey[K <: AccountingKey] private[model] (
+      val from: Treatment[K],
+      val to: Treatment[K]
   ) extends DoubleEntryKey.Aux(from, to)
 
   /** */
   object SwapKey {
 
     /** */
-    def accountMap[A <: AccountingKey, C: Currency](
-        ks: SwapKey[A],
+    def accountMap[K <: AccountingKey, C: Currency](
+        ks: SwapKey[K],
         amount: Mny[C]
-    ): AccountMap[A, C] = {
+    ): AccountMap[K, C] = {
       def from = ks.from.toSortedMap mapValues (-amount * _)
       def to   = ks.to.toSortedMap mapValues (amount * _)
       from |+| to
     }
 
     /** */
-    def unapply[E <: AccountingKey](sk: SwapKey[E]): Option[(Treatment[E], Treatment[E])] =
+    def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(Treatment[K], Treatment[K])] =
       (sk.from, sk.to).some
   }
 
