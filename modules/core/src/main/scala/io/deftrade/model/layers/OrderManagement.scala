@@ -21,15 +21,12 @@ package layers
 import keyval._, time._, money._
 
 import cats.implicits._
-import cats.{ Foldable, Monad, SemigroupK }
-import cats.data.{ EitherT, Kleisli, NonEmptySet }
-import cats.effect.Sync
+import cats.{ Monad }
+import cats.data.{ Kleisli, NonEmptySet }
 
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
-
-import fs2.Stream
 
 import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
@@ -105,7 +102,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     * domain model, use phantom types to ensure proper sequencing.
     *
     */
-  sealed abstract case class OMS[F[_]: Monad: SemigroupK: Foldable] private (
+  sealed abstract case class OMS[F[_]: Monad] private (
       entity: LegalEntity.Key,
       contra: Folio.Key,
       markets: NonEmptySet[Market.Key]
@@ -120,10 +117,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     type FolioTable = Map[Folio.Key, Folio.Value]
 
     /** */
-    type ResultF[R] = EitherT[F, Fail, R]
-
-    /** */
-    type Phase[T, R] = Kleisli[ResultF, T, R]
+    type Phase[T, R] = Kleisli[ResultT[F, *], T, R]
 
     /** */
     final def process[C: Currency, A](
@@ -140,16 +134,13 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         settle(folios)(p)
 
     /** */
-    def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order] =
-      ???
+    def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order]
 
     /** */
-    def trade(p: Folio.Key): Phase[Order, Execution] =
-      ???
+    def trade(p: Folio.Key): Phase[Order, Execution]
 
     /** */
-    def allocate(a: Allocation): Phase[Execution, Execution] =
-      ???
+    def allocate(a: Allocation): Phase[Execution, Execution]
 
     /** */
     final def settle(
@@ -176,12 +167,23 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       * before the OMS is created.
       *
       */
-    def apply[F[_]: Monad: SemigroupK: Foldable](
+    def apply[F[_]: Monad](
         key: LegalEntity.Key,
         contraAccount: Folio.Key,
         market: Market.Key,
         ms: Market.Key*
     ): OMS[F] =
-      new OMS[F](key, contraAccount, NonEmptySet(market, SortedSet(ms: _*))) {}
+      new OMS[F](key, contraAccount, NonEmptySet(market, SortedSet(ms: _*))) {
+
+        /** */
+        def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order] = ???
+
+        /** */
+        def trade(p: Folio.Key): Phase[Order, Execution] = ???
+
+        /** */
+        def allocate(a: Allocation): Phase[Execution, Execution] = ???
+
+      }
   }
 }
