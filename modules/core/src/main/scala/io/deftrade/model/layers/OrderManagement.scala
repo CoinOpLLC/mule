@@ -28,63 +28,16 @@ import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
 
+import fs2.Stream
+
 import scala.collection.immutable.SortedSet
 import scala.language.higherKinds
 
 /** */
 trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
-  /**
-    * What the client wants [[Execution]] of.
-    *
-    * Note: a denominating currency is always required by the [[MarketData.Exchange]]s,
-    * in order to fully specify the trade, even if there is no limit amount attached.
-    *
-    * TODO: revisit parent/child orders
-    */
-  sealed abstract case class Order(
-      ts: Instant,
-      market: Market.Key,
-      trade: Trade.Id,
-      currency: CurrencyLike,
-      limit: Option[MonetaryAmount]
-  )
-
-  /**
-    * Once placed, an [[Order]] may be modified or canceled,
-    * and so is modeled as an entity which can evolve.
-    */
-  object Order extends WithOpaqueKey[Long, Order] {
-
-    /**
-      * Note that currency is required even for market orders.
-      */
-    def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
-      new Order(instant, market, trade, Currency[C], none) {}
-
-    /** */
-    def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Mny[C]): Order =
-      new Order(instant, market, trade, Currency[C], limit.amount.some) {}
-  }
-
-  /**
-    * What actually happened to the [[Order]] at the [[Market]].
-    *
-    * TODO: describe in more detail how partial executions end up as multiple [[Transaction]]s.
-    */
-  sealed abstract case class Execution(
-      ts: Instant,
-      order: Order.Key,
-      oms: OMS.Key,
-      tx: Transaction.Id
-  )
-
-  /**
-    * `Execution`s are pure values (do not evolve.)
-    *
-    * Note: this implies that so-called "broken trades" require explicit modelling.
-    */
-  object Execution extends WithId[Execution]
+  /** FIXME placeholder */
+  type FolioTable = Map[Folio.Key, Folio.Value]
 
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.
@@ -95,17 +48,16 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     * Reference:
     * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270 Functional and Reactive Domain Modelling, section 4.4]]
     *
-    * TODO: Flesh this out - currently just a sketch
-    *   - `SemigroupK` for `Kleisli` is restrictive.
-    *   - OTOH it *is* a pipeline and so the Kleisli modeling has fidelity.
-    *   - If it is possible for the arrows to be sequenced in a semantically incorrect way per the
-    * domain model, use phantom types to ensure proper sequencing.
-    *
+    * TODO: Revisit [[cats.data.Kleisli]] usage
+    *   - Why not [[fs2.Pipe]]?
+    *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
   sealed abstract case class OMS[F[_]: Monad] private (
       entity: LegalEntity.Key,
+      entry: Folio.Key,
       contra: Folio.Key,
-      markets: NonEmptySet[Market.Key]
+      markets: NonEmptySet[Market.Key],
+      folios: FolioTable
   ) {
 
     /**
@@ -114,40 +66,91 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *   (Folio.Key, Instrument.Key, Quantity)
       * }}}
       */
-    type FolioTable = Map[Folio.Key, Folio.Value]
+    /** */
+    type EffectStream[A] = Stream[F, A]
 
     /** */
-    type Phase[T, R] = Kleisli[ResultT[F, *], T, R]
+    type Phase[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
+
+    /**
+      * What the client wants [[Execution]] of.
+      *
+      * Note: a denominating currency is always required by the [[MarketData.Exchange]]s,
+      * in order to fully specify the trade, even if there is no limit amount attached.
+      *
+      * TODO: revisit parent/child orders
+      */
+    sealed abstract case class Order(
+        ts: Instant,
+        market: Market.Key,
+        trade: Trade.Id,
+        currency: CurrencyLike,
+        limit: Option[MonetaryAmount]
+    )
+
+    /**
+      * Once placed, an [[Order]] may be modified or canceled,
+      * and so is modeled as an entity which can evolve.
+      */
+    object Order extends WithOpaqueKey[Long, Order] {
+
+      /**
+        * Note that currency is required even for market orders.
+        */
+      def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
+        new Order(instant, market, trade, Currency[C], none) {}
+
+      /** */
+      def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Mny[C]): Order =
+        new Order(instant, market, trade, Currency[C], limit.amount.some) {}
+    }
+
+    /**
+      * What actually happened to the [[Order]] at the [[Market]].
+      *
+      * TODO: describe in more detail how partial executions end up as multiple [[Transaction]]s.
+      */
+    sealed abstract case class Execution(
+        ts: Instant,
+        order: Order.Key,
+        oms: OMS.Key,
+        tx: Transaction.Id
+    )
+
+    /**
+      * `Execution`s are pure values (do not evolve.)
+      *
+      * Note: this implies that so-called "broken trades" require explicit modelling.
+      */
+    object Execution extends WithId[Execution]
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def process[C: Currency, A](
-        p: Folio.Key,
-        a: Allocation
-    )(
-        folios: FolioTable
+        allocation: Allocation
     )(
         block: => A
-    ): Phase[A, FolioTable] =
-      riskCheck[C, A](p)(block) andThen
-        trade(p) andThen
-        allocate(a) andThen
-        settle(folios)(p)
+    ): Phase[A, Unit] =
+      riskCheck[C, A](block) andThen
+        trade andThen
+        allocate(allocation) andThen
+        settle(folios)(entry)
 
     /** */
-    def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order]
+    def riskCheck[C: Currency, A](a: A): Phase[A, Order]
 
-    /** */
-    def trade(p: Folio.Key): Phase[Order, Execution]
+    /**  */
+    def trade: Phase[Order, Execution]
 
     /** */
     def allocate(a: Allocation): Phase[Execution, Execution]
 
     /** */
-    final def settle(
-        folios: Map[Folio.Key, Folio.Value]
+    def settle(
+        folios: FolioTable
     )(
         p: Folio.Key
-    ): Phase[Execution, FolioTable] = ???
+    ): Phase[Execution, Unit]
   }
 
   /** */
@@ -169,20 +172,29 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       */
     def apply[F[_]: Monad](
         key: LegalEntity.Key,
-        contraAccount: Folio.Key,
+        entry: Folio.Key,
+        contra: Folio.Key,
+        folios: FolioTable,
         market: Market.Key,
         ms: Market.Key*
     ): OMS[F] =
-      new OMS[F](key, contraAccount, NonEmptySet(market, SortedSet(ms: _*))) {
+      new OMS[F](key, entry, contra, NonEmptySet(market, SortedSet(ms: _*)), folios) {
 
         /** */
-        def riskCheck[C: Currency, A](p: Folio.Key)(a: A): Phase[A, Order] = ???
+        def riskCheck[C: Currency, A](a: A): Phase[A, Order] = ???
 
-        /** */
-        def trade(p: Folio.Key): Phase[Order, Execution] = ???
+        /** This phase is implemented by the brokerage api integration code - IBRK is first. */
+        def trade: Phase[Order, Execution] = ???
 
         /** */
         def allocate(a: Allocation): Phase[Execution, Execution] = ???
+
+        /** */
+        def settle(
+            folios: FolioTable
+        )(
+            p: Folio.Key
+        ): Phase[Execution, Unit] = ???
 
       }
   }

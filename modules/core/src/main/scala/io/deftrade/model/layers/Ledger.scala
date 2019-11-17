@@ -120,28 +120,37 @@ trait Ledger { self: ModuleTypes =>
   }
 
   /** */
-  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
+  sealed abstract case class PricedTrade[C](trade: Trade.Id, amount: Mny[C])
 
   /** */
   object PricedTrade {
 
-    /**      */
-    def apply[C: Currency: TradePricer](trade: Trade): Result[PricedTrade[C]] =
-      for {
-        amount <- TradePricer[C] price trade
-      } yield new PricedTrade[C](trade, amount) {}
+    def HACK(trade: Trade.Id): Trade = ???
 
-    /**
-      * Reduct to "currency as `Instrument`" convention, according to the contents
-      * of a certain (implicit) [[Wallet]].
-      *
-      * Creates what could be called a `FairTrade`...
-      */
-    def settlement[C: Currency](pt: PricedTrade[C])(implicit ci: Wallet[C]): Trade = ???
+    /**      */
+    def apply[C: Currency: TradePricer](trade: Trade.Id): Result[PricedTrade[C]] =
+      for {
+        amount <- TradePricer[C] price HACK(trade)
+      } yield new PricedTrade[C](trade, amount) {}
   }
 
-  trait SettlableTrade {
-    def trade: Trade
+  /** */
+  sealed abstract case class SettlableTrade private (trade: Trade)
+
+  /**
+    * An even exchange.
+    */
+  object SettlableTrade {
+
+    def apply[C: Currency](folio: Folio.Key)(pt: PricedTrade[C]) =
+      new SettlableTrade(cashOut(folio)(pt.trade, pt.amount)) {}
+
+    final def cashOut[C: Currency](
+        folio: Folio.Key
+    )(
+        trade: Trade.Id,
+        amount: Mny[C]
+    ): Trade = ???
   }
 
   /** type alias */
@@ -149,52 +158,6 @@ trait Ledger { self: ModuleTypes =>
 
   /** */
   lazy val ValuedFolio = PricedTrade
-
-  /**
-    * Models ready cash per currency.
-    *
-    * Wallet folios are guarranteed non-empty, in that there is at least one [[Position]].
-    *
-    * In this way, implicit values of `Wallet` can be used to inject maps ("pricers") between
-    * (certain) [[Folio]]s and (certain) [[money.Currency]]s into the implicit context.
-    *
-    * @note The `C` type parameter is purely phantom; in particular, implicit [[money.Currency]]
-    * values are '''not''' carried by instances of this class.
-    */
-  sealed trait WalletLike {
-    val folio: Folio.Key
-    implicit val C: CurrencyLike
-    type CurrencyType // == C.Type
-  }
-
-  /** */
-  sealed abstract case class Wallet[C] private[model] (
-      final override val folio: Folio.Key
-  )(
-      implicit
-      final override val C: Currency[C]
-  ) extends WalletLike {
-    final type CurrencyType = C
-  }
-
-  /**
-    * Binds [[Currency]]s to [[Folio.Key]]s.
-    *
-    * Consisting of a Folio.
-    * Like [[Folio]]s, (but not [[Trade]]s), `Wallet`s are
-    * modeled as entities as opposed to values.
-    *
-    * TODO: revisit this decision
-    */
-  object Wallet extends WithOpaqueKey[Long, WalletLike] { self =>
-
-    // def apply[C: Currency](p: Position, ps: Position*): Wallet[C] =
-    //   self.apply(Folio(p +: ps: _*))
-
-    /** type parameter is checked for `Currency` status */
-    def apply[C: Currency](folio: Folio.Key): Wallet[C] =
-      new Wallet(folio) {}
-  }
 
   /**
     * For [[Ledger]] updates, the `Transaction` is the concrete record of record, so to speak.

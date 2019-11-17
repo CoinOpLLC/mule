@@ -102,6 +102,7 @@ package market {
     case object T1M         extends Tenor("P1M")
     case object T2M         extends Tenor("P2M")
     case object T3M         extends Tenor("P3M")
+    case object T1Q         extends Tenor("P3M")
     case object T6M         extends Tenor("P6M")
     case object T9M         extends Tenor("P9M")
     case object T1Y         extends Tenor("P1Y")
@@ -149,12 +150,12 @@ package market {
     case object F1M    extends Frequency("P1M", MonthsPerYear / 1)
     case object F2M    extends Frequency("P2M", MonthsPerYear / 2)
     case object F3M    extends Frequency("P3M", MonthsPerYear / 3)
+    case object F1Q    extends Frequency("P3M", MonthsPerYear / 3)
     case object F4M    extends Frequency("P4M", MonthsPerYear / 4)
     case object F6M    extends Frequency("P6M", MonthsPerYear / 6)
     case object F12M   extends Frequency("P12M", MonthsPerYear / 12)
 
     lazy val values = findValues
-
   }
 
   sealed trait DayCount extends EnumEntry {

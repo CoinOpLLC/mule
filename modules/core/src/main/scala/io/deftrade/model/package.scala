@@ -17,6 +17,7 @@
 package io.deftrade
 
 import model.layers._
+import model.augments._
 
 /**
   * Financial types and methods.
@@ -27,29 +28,6 @@ import model.layers._
   * Also, here we choose generic tax accounting for entities treated as partnerships.
   *
   * Different objects, package or otherwise, could make different policy decisions.
-  *
-
- - CountryCode
- - Market
- - LegalEntity
- - Account
-
- - Instrument
-  - Bond
-  - CommonStock
-  - PreferredStock
-  - Index
-  - etc
-
- - Folio
-    - Wallet
- - Transaction
-    - Order
-    - Execution
-
- - OMS
- - MDS
-
   */
 package object model
 /*
@@ -69,10 +47,10 @@ package object model
     with OrderManagement // WIP; IBRK will be first integration
     //
     // PII firewalling simplified by eliminating dependencies:
-    // Accounts can be commented out!
+    // `Accounts` layer can be commented out!
     //
     with Accounts // binding of legal entities to folios */
     //
-    // necessary package level configuration
+    // necessary package level augmentation
     //
     with IRS1065 // replace or enhance as necessary

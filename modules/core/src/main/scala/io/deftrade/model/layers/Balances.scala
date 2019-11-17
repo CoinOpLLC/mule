@@ -188,7 +188,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   ) extends Balance(expenses, revenues) {
 
     /** */
-    def partition(implicit ci: Wallet[C]): (IncomeStatement[C], CashFlowStatement[C]) =
+    def partition: (IncomeStatement[C], CashFlowStatement[C]) =
       ???
   }
 
@@ -380,7 +380,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   object DeltaEquity
 
   /** FIXME: not sure this signature makes sense as it stands */
-  def breakdown[C: Currency: Wallet](
+  def breakdown[C: Currency](
       prior: BalanceSheet[C],
       delta: BalanceSheet[C], // delta and raw come from TrialBalance
       raw: IncomeStatement[C] // mixed cash and accrual

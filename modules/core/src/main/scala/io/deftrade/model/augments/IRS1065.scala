@@ -16,6 +16,7 @@
 
 package io.deftrade
 package model
+package augments
 
 import layers._
 import keyval.DtEnum
