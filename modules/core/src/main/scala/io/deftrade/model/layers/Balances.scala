@@ -34,7 +34,7 @@ import spire.syntax.field._
 import scala.language.higherKinds
 
 /**
-  * Double entry [[Balance]] calculation from a sequence of [[Ledger.Transaction]]s.
+  * Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   *
   * When summing Transactions, this "cake slice" module implements the algebra which
   * maintains the relations below:
