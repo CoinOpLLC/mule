@@ -18,22 +18,20 @@ package io.deftrade
 package model
 package layers
 
-import time._, money._, keyval._, capital._, refinements.Sha256
+import implicits._, time._, money._, keyval._, capital._
+import refinements.Sha256
 
 import cats.implicits._
-// import cats.{
-//   // Foldable,
-//   // Hash,
-//   // Monad,
-//   // MonoidK
-// }
+
+import cats.effect.Sync
+import fs2.Stream
 
 import eu.timepit.refined
 import refined.api.Refined
 
 import io.circe.Json
 
-// import scala.language.higherKinds
+import scala.language.higherKinds
 
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
@@ -96,7 +94,7 @@ trait Ledger { self: ModuleTypes =>
   type Trade = Folio
 
   /** In contrast to a [[Folio]] store, [[Trade]] stores holds immutable entries. */
-  object Trade extends WithId[Trade] {
+  object Trade extends WithId[Leg] { // sicc - to be continued
 
     /** */
     def apply(ps: Leg*): Trade = indexAndSum(ps.toList)
@@ -104,6 +102,10 @@ trait Ledger { self: ModuleTypes =>
     /** */
     def empty: Trade = Map.empty
   }
+
+  /** res ipsa fixit pleaz */
+  def HACK_SELECT(trade: Trade.Id): Trade = ???
+  def HACK_APPEND(trade: Trade): Trade.Id = ???
 
   /** TODO: Revisit decision to make these part of the implicit context. */
   sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
@@ -125,12 +127,10 @@ trait Ledger { self: ModuleTypes =>
   /** */
   object PricedTrade {
 
-    def HACK(trade: Trade.Id): Trade = ???
-
     /**      */
     def apply[C: Currency: TradePricer](trade: Trade.Id): Result[PricedTrade[C]] =
       for {
-        amount <- TradePricer[C] price HACK(trade)
+        amount <- TradePricer[C] price HACK_SELECT(trade)
       } yield new PricedTrade[C](trade, amount) {}
   }
 
@@ -173,15 +173,18 @@ trait Ledger { self: ModuleTypes =>
     */
   sealed abstract case class Transaction private (
       recordedAt: Instant,
-      debitFrom: Folio.Key,
-      creditTo: Folio.Key,
+      from: Folio.Key,
+      to: Folio.Key,
       trade: Trade.Id,
-      metaSha: Sha256
+      metaHash: Sha256
   )
 
   /**
     * Model as pure value classes, because `Transaction`s don't make sense
     * as anything but immutable.
+    *
+    * Useful invariant: No `Transaction` is created except within the context
+    * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
     */
   object Transaction extends WithId[Transaction] {
 
@@ -191,20 +194,8 @@ trait Ledger { self: ModuleTypes =>
     /** */
     final type MetaSha = Meta => Sha256
 
-    def apply(
-        recordedAt: Instant,
-        debitFrom: Folio.Key,
-        creditTo: Folio.Key,
-        trade: Trade.Id,
-        metaSha: Sha256
-    ): Transaction =
-      new Transaction(
-        instant,
-        debitFrom,
-        creditTo,
-        trade,
-        metaSha
-      ) {}
+    private def apply(from: Folio.Key, to: Folio.Key, rc: Trade.Id, metaHash: Sha256): Transaction =
+      new Transaction(instant, from, to, rc, metaHash) {}
 
     /**
       * Digester. FIXME: actually implement
@@ -214,28 +205,28 @@ trait Ledger { self: ModuleTypes =>
     /** f'rinstance */
     type Meta = Json
 
-    /** */
-    def single(
-        debitFrom: Folio.Key,
-        creditTo: Folio.Key,
+    /**       */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def single[F[_]: Sync](record: Trade => Stream[F, Trade.Id])(
+        from: Folio.Key,
+        to: Folio.Key,
         instrument: Instrument.Key,
         amount: Quantity,
         meta: Json
-    ) = ???
-    // Transaction(
-    //   instant,
-    //   debitFrom,
-    //   creditTo,
-    //   Trade(instrument -> amount),
-    //   meta |> digest
-    // )
+    ): Stream[F, Transaction] = multi(record)(from, to, Trade(instrument -> amount), meta)
 
-    // /**
-    //   * ex nihilo, yada yada ...
-    //   * TODO: interop with `fs2.Stream[cats.effect.IO, ?]`
-    //   */
-    // def empty[F[_]: Monad: MonoidK: Foldable]: F[Transaction] = MonoidK[F].empty[Transaction]
-    //
+    /**       */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def multi[F[_]: Sync](record: Trade => Stream[F, Trade.Id])(
+        from: Folio.Key,
+        to: Folio.Key,
+        trade: Trade,
+        meta: Json
+    ): Stream[F, Transaction] =
+      for {
+        id <- trade |> record
+      } yield Transaction(from, to, id, meta |> digest)
+
     // /** TODO: investigate kittens for this. */
     // implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
   }

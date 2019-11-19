@@ -84,8 +84,8 @@ object xaction {
 
   sealed abstract case class Xaction[N: Financial, C: Currency](
       asOf: Instant,
-      debitFrom: Entity.Key,
-      creditTo: Entity.Key,
+      from: Entity.Key,
+      to: Entity.Key,
       amount: Money[N, C],
       memo: String
   )
