@@ -18,12 +18,15 @@ package io.deftrade
 package model
 package layers
 
-import money._, time._
+import time._, money._
 
 import cats.implicits._
 import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
+
+import cats.effect.Sync
+import fs2.Stream
 
 import eu.timepit.refined
 import refined.auto._

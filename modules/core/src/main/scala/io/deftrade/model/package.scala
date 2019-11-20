@@ -31,7 +31,7 @@ import model.augments._
   */
 package object model
 /*
-  types we all need to agree on:
+  All layers and augments need to agree on certain types:
      */
     extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,

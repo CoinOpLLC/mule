@@ -35,6 +35,15 @@ import scala.language.higherKinds
 
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
+  *
+  * A note on `Mark` vs `Price`: as attested generally in use within the domain of finance,
+  * and specifically as used here: we distinguish between marking and pricing:
+  *   - Marking: what stuff is worth. [[capital.Instrument]]s are marked
+  * with respect to market trading data.
+  *   - Pricing: what stuff ought to be worth. "Fair value", if you will, for various values
+  * of "fair and "value". [[capital.Instrument]]s are priced based on pricing models.
+  * It should also be noted that the sophistication with which marks are extrapolated from market
+  * data creates ambiguities between the two categories in the real world; model mindfully. :|
   */
 trait Ledger { self: ModuleTypes =>
 
@@ -45,6 +54,9 @@ trait Ledger { self: ModuleTypes =>
     * How much of a given [[capital.Instrument]] is held.
     *
     * Can also be thought of as a [[Trade]] [[Leg]] at rest.
+
+    * Positions are Marked, as opposed to Priced: the mark-to-market is necessary for net balance
+    * presentation and margin calculations.
     */
   type Position = (Instrument.Key, Quantity)
 
@@ -93,7 +105,10 @@ trait Ledger { self: ModuleTypes =>
   /** A [[Folio]] in motion. */
   type Trade = Folio
 
-  /** In contrast to a [[Folio]] store, [[Trade]] stores holds immutable entries. */
+  /**
+    * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.stores]] hold
+    * immutable entries.
+    */
   object Trade extends WithId[Leg] { // sicc - to be continued
 
     /** */
@@ -103,9 +118,32 @@ trait Ledger { self: ModuleTypes =>
     def empty: Trade = Map.empty
   }
 
-  /** res ipsa fixit pleaz */
-  def HACK_SELECT(trade: Trade.Id): Trade = ???
-  def HACK_APPEND(trade: Trade): Trade.Id = ???
+  /** raw price data usually comes this way */
+  sealed abstract case class InstrumentPricer[F[_], C](
+      price: Instrument.Key => Stream[F, Result[Mny[C]]]
+  )
+
+  /** TODO: need some way of composing these... */
+  object InstrumentPricer {
+
+    // type KMES[F[_], A, C] = Kleisli[Stream[F, *], A, Mny[C]]
+
+    private def apply[F[_]: Sync, C: Currency](
+        price: Instrument.Key => Stream[F, Result[Mny[C]]]
+    ) =
+      new InstrumentPricer(price) {}
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def combine[F[_]: Sync, C: Currency](
+        a: InstrumentPricer[F, C],
+        b: InstrumentPricer[F, C]
+    ): InstrumentPricer[F, C] = // FIXME this code is lazy and not in a good way
+      apply(instrument => (a price instrument) ++ (b price instrument) take 1)
+  }
+
+  /**    */
+  sealed abstract case class LegPricer[C](price: Leg => Result[Mny[C]])
 
   /** TODO: Revisit decision to make these part of the implicit context. */
   sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
@@ -126,6 +164,9 @@ trait Ledger { self: ModuleTypes =>
 
   /** */
   object PricedTrade {
+
+    /** res ipsa fixit pleaz */
+    def HACK_SELECT(trade: Trade.Id): Trade = ???
 
     /**      */
     def apply[C: Currency: TradePricer](trade: Trade.Id): Result[PricedTrade[C]] =
