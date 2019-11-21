@@ -25,8 +25,8 @@ import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
-import cats.effect.Sync
-import fs2.Stream
+// import cats.effect.Sync
+// import fs2.Stream
 
 import eu.timepit.refined
 import refined.auto._
@@ -173,7 +173,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     def from[F[_]: Foldable, C: Currency](
-        marker: TradePricer[C]
+        marker: TradePricer[F, C]
     )(
         xs: F[Transaction]
     ): TrialBalance[C] =

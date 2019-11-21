@@ -118,18 +118,47 @@ trait Ledger { self: ModuleTypes =>
     def empty: Trade = Map.empty
   }
 
-  /** raw price data usually comes this way */
-  sealed abstract case class InstrumentPricer[F[_], C](
-      price: Instrument.Key => Stream[F, Result[Mny[C]]]
-  )
+  /**
+    */
+  sealed trait Pricer {
+    type Thing
+    type CurrencyTag
+    type EffectType[_]
+    val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
+    implicit val C: Currency[CurrencyTag]
+  }
 
-  /** TODO: need some way of composing these... */
+  /** */
+  object Pricer {
+
+    /** I call this the untitled fois gras patttern. */
+    abstract class Aux[F[_]: Sync, T, C: Currency](
+        val price: T => Stream[F, Mny[C]]
+    )(
+        implicit
+        final override val C: Currency[C]
+    ) extends Pricer {
+      final type Thing         = T
+      final type CurrencyTag   = C
+      final type EffectType[_] = F[_]
+    }
+
+    /** always returned for a failed lookup (by convention) */
+    lazy val NoClue: Result[Nothing] = Result fail "lookup failed"
+  }
+
+  /** raw price data usually comes this way */
+  sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
+      final override val price: Instrument.Key => Stream[F, Mny[C]]
+  ) extends Pricer.Aux[F, Instrument.Key, C](price)
+
+  /**  */
   object InstrumentPricer {
 
     // type KMES[F[_], A, C] = Kleisli[Stream[F, *], A, Mny[C]]
 
     private def apply[F[_]: Sync, C: Currency](
-        price: Instrument.Key => Stream[F, Result[Mny[C]]]
+        price: Instrument.Key => Stream[F, Mny[C]]
     ) =
       new InstrumentPricer(price) {}
 
@@ -143,19 +172,23 @@ trait Ledger { self: ModuleTypes =>
   }
 
   /**    */
-  sealed abstract case class LegPricer[C](price: Leg => Result[Mny[C]])
+  sealed abstract case class LegPricer[F[_]: Sync, C: Currency](
+      final override val price: Leg => Stream[F, Mny[C]]
+  ) extends Pricer.Aux[F, Leg, C](price)
 
   /** TODO: Revisit decision to make these part of the implicit context. */
-  sealed abstract case class TradePricer[C](price: Trade => Result[Mny[C]])
+  sealed abstract case class TradePricer[F[_]: Sync, C: Currency](
+      final override val price: Trade => Stream[F, Mny[C]]
+  ) extends Pricer.Aux[F, Trade, C](price)
 
   /**    */
   object TradePricer {
 
     /** Summon a pricer for a given currency. */
-    def apply[C: Currency: TradePricer]: TradePricer[C] = implicitly
+    def apply[F[_]: Sync, C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
 
     /** Create a pricer from a pricing function. */
-    def apply[C: Currency](price: Trade => Result[Mny[C]]): TradePricer[C] =
+    def apply[F[_]: Sync, C: Currency](price: Trade => Stream[F, Mny[C]]): TradePricer[F, C] =
       new TradePricer(price) {}
   }
 
@@ -168,10 +201,12 @@ trait Ledger { self: ModuleTypes =>
     /** res ipsa fixit pleaz */
     def HACK_SELECT(trade: Trade.Id): Trade = ???
 
-    /**      */
-    def apply[C: Currency: TradePricer](trade: Trade.Id): Result[PricedTrade[C]] =
+    /**      FIXME: delete hack shit */
+    def of[F[_]: Sync, C: Currency: TradePricer[F, *]](
+        trade: Trade.Id
+    ): Stream[F, PricedTrade[C]] =
       for {
-        amount <- TradePricer[C] price HACK_SELECT(trade)
+        amount <- TradePricer[F, C] price HACK_SELECT(trade)
       } yield new PricedTrade[C](trade, amount) {}
   }
 
