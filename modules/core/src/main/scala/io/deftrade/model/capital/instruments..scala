@@ -41,6 +41,7 @@ import io.circe.Json
   */
 final case class Instrument(
     symbol: Label,
+    market: Mic,
     currency: CurrencyLike,
     issuer: LegalEntity.Key,
     meta: Json,
@@ -58,16 +59,13 @@ object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 object columns {
 
   /** */
-  sealed trait Contract { def instrument: Instrument.Key }
-
-  /** */
-  sealed trait Tracks extends Contract { def members: Set[Instrument.Key] }
+  sealed trait Tracker { def members: Set[Instrument.Key] }
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
-  sealed trait Maturity extends Contract { def matures: ZonedDateTime }
+  sealed trait Maturity { def matures: ZonedDateTime }
 
   /** */
-  sealed trait Expiry extends Contract { def expires: ZonedDateTime }
+  sealed trait Expiry { def expires: ZonedDateTime }
 
   /** All derivatives (e.g. Futures) are assumed to expire. */
   sealed trait Derivative extends Expiry { def underlyer: WithKey#Key }
@@ -98,59 +96,57 @@ object layers {
 
     /** */
     case class CommonStock(
-        override val instrument: Instrument.Key,
-        mic: Mic,
         tclass: Option[Label]
-    ) extends Contract
+    )
 
     /** */
     object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
 
     /** */
     case class PreferredStock(
-        override val instrument: Instrument.Key,
-        mic: Mic,
         series: Label,
-    ) extends Contract
+    )
 
     /** */
     object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
 
     /** */
     case class Bond(
-        override val instrument: Instrument.Key,
         override val matures: ZonedDateTime
     ) extends Maturity
 
-    /** We presume "bonds" (as opposed to loans) are issued by Corporations, not natural persons. */
+    /**
+      * `Bonds` (as opposed to loans) are always issued by corporations, never by natural persons.
+      */
     object Bond extends WithRefinedKey[String, IsIsin, Bond]
 
     /** */
     case class TreasurySecurity(
-        override val instrument: Instrument.Key,
         override val matures: ZonedDateTime
     ) extends Maturity
   }
 
-  /** And by vanilla we mean exchange traded. */
+  /**
+    * And by "vanilla" we mean an exchange traded derivative (ETD).
+    */
   trait VanillaDerivatives {
 
     sealed trait PutCall
-    case object Put  extends PutCall
-    case object Call extends PutCall
+    object PutCall {
+      case object Put  extends PutCall
+      case object Call extends PutCall
+    }
 
     /** */
     case class Index(
-        override val instrument: Instrument.Key,
         override val members: Set[Instrument.Key]
-    ) extends Tracks
+    ) extends Tracker
 
     /** */
     object Index extends WithRefinedKey[String, IsIsin, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
     case class EtdFuture(
-        override val instrument: Instrument.Key,
         override val expires: ZonedDateTime,
         override val underlyer: Instrument.Key
     ) extends Derivative
@@ -160,7 +156,6 @@ object layers {
     /**Exchange Traded Derivative - Option (ETD)  */
     case class EtdOption[N: Financial](
         val putCall: PutCall,
-        override val instrument: Instrument.Key,
         override val expires: ZonedDateTime,
         override val underlyer: Instrument.Key,
         override val strike: N,
@@ -170,7 +165,6 @@ object layers {
     /** I mean, right? */
     case class EtdFutureOption[N: Financial](
         val putCall: PutCall,
-        override val instrument: Instrument.Key,
         override val expires: ZonedDateTime,
         override val underlyer: EtdFuture.Key,
         override val strike: N,
@@ -180,7 +174,6 @@ object layers {
     /** */
     case class EtdIndexOption[N: Financial](
         val putCall: PutCall,
-        override val instrument: Instrument.Key,
         override val expires: ZonedDateTime,
         override val underlyer: Index.Key,
         override val strike: N,

@@ -60,13 +60,13 @@ trait Ledger { self: ModuleTypes =>
     */
   type Position = (Instrument.Key, Quantity)
 
-  /** */
+  /** placeholder */
   object Position
 
   /** A [[Position]] in motion. */
   type Leg = Position
 
-  /** */
+  /** placeholder */
   lazy val Leg = Position
 
   /**
@@ -118,8 +118,7 @@ trait Ledger { self: ModuleTypes =>
     def empty: Trade = Map.empty
   }
 
-  /**
-    */
+  /**  */
   sealed trait Pricer {
     type Thing
     type CurrencyTag
@@ -133,7 +132,7 @@ trait Ledger { self: ModuleTypes =>
 
     /** I call this the untitled fois gras patttern. */
     abstract class Aux[F[_]: Sync, T, C: Currency](
-        val price: T => Stream[F, Mny[C]]
+        override val price: T => Stream[F, Mny[C]]
     )(
         implicit
         final override val C: Currency[C]
@@ -185,28 +184,25 @@ trait Ledger { self: ModuleTypes =>
   object TradePricer {
 
     /** Summon a pricer for a given currency. */
-    def apply[F[_]: Sync, C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
+    def apply[F[_], C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
 
     /** Create a pricer from a pricing function. */
-    def apply[F[_]: Sync, C: Currency](price: Trade => Stream[F, Mny[C]]): TradePricer[F, C] =
+    def from[F[_]: Sync, C: Currency](price: Trade => Stream[F, Mny[C]]): TradePricer[F, C] =
       new TradePricer(price) {}
   }
 
   /** */
-  sealed abstract case class PricedTrade[C](trade: Trade.Id, amount: Mny[C])
+  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
 
   /** */
   object PricedTrade {
 
-    /** res ipsa fixit pleaz */
-    def HACK_SELECT(trade: Trade.Id): Trade = ???
-
     /**      FIXME: delete hack shit */
     def of[F[_]: Sync, C: Currency: TradePricer[F, *]](
-        trade: Trade.Id
+        trade: Trade
     ): Stream[F, PricedTrade[C]] =
       for {
-        amount <- TradePricer[F, C] price HACK_SELECT(trade)
+        amount <- TradePricer[F, C] price trade
       } yield new PricedTrade[C](trade, amount) {}
   }
 
@@ -221,10 +217,14 @@ trait Ledger { self: ModuleTypes =>
     def apply[C: Currency](folio: Folio.Key)(pt: PricedTrade[C]) =
       new SettlableTrade(cashOut(folio)(pt.trade, pt.amount)) {}
 
+    /**
+      * Note: `folio` parameter makes sense when there is more than one XYZ coin in the folio for
+      * currency XYZ (e.g. USD bank account, physical cash...)
+      */
     final def cashOut[C: Currency](
         folio: Folio.Key
     )(
-        trade: Trade.Id,
+        trade: Trade,
         amount: Mny[C]
     ): Trade = ???
   }

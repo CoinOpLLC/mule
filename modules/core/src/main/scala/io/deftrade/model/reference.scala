@@ -62,10 +62,12 @@ package object reference {
   type Ein = String Refined IsEin
 
   /** */
-  val Mic = """[A-Z]{3,4}""".witness
+  val IsMic = """[A-Z]{3,4}""".witness
+
+  type IsMic = MatchesRegex[IsMic.T]
 
   /** */
-  type Mic = String Refined MatchesRegex[Mic.T] // market venue
+  type Mic = String Refined IsMic // market venue
 
   /**
     * An ISIN is a twelve character string that must match a certain regex, and whose characters

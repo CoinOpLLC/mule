@@ -19,7 +19,7 @@ package model
 package layers
 
 import money._, keyval._
-import capital.Instrument, reference.Mic
+import capital.Instrument, reference.{ IsMic, Mic }
 
 import cats.implicits._
 import cats.Monad
@@ -56,7 +56,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *     - A design that doesn't abstract over `QuotedIn`, '''including live data''', is useless.
     *     - OTOH, dead simple immutable for testing / demo also required
     */
-  trait QuotedIn[A, C] extends Any {
+  trait QuotedIn[T, C] extends Any {
 
     /** */
     final def bid: MonetaryAmount = quote match { case (bid, _) => bid }
@@ -103,14 +103,27 @@ trait MarketData { self: Ledger with ModuleTypes =>
   object QuotedIn {
 
     /**
-      * Securities of any kind.
+      * Immutable value class representing a quote.
       */
-    def apply[C: Currency]: QuotedIn[reference.Usin, C] = ???
+    sealed abstract case class Memo[A, C] private[QuotedIn] (
+        final val quote: (MonetaryAmount, MonetaryAmount)
+    ) extends QuotedIn[A, C] {
 
-    /**
-      * Forex.
-      */
-    def apply[C1: Currency, C2: Currency]: QuotedIn[C1, C2] = ???
+      /** */
+      def tick(implicit C: Currency[C]): MonetaryAmount =
+        MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
+    }
+
+    /** */
+    def apply[A, C2: Currency](
+        bid: MonetaryAmount,
+        ask: MonetaryAmount
+    ): QuotedIn[A, C2] = new Memo[A, C2]((bid, ask)) {}
+
+    /** */
+    def asTraded[A, C2: Currency](
+        amount: MonetaryAmount
+    ): QuotedIn[A, C2] = apply(amount, amount)
 
     /**
       * Inverse quotes are particular to Forex.
@@ -156,40 +169,14 @@ trait MarketData { self: Ledger with ModuleTypes =>
       }
   }
 
-  /**
-    * Immutable value class representing a quote.
-    *
-    * TODO: reconsider the subtle name.
-    */
-  sealed abstract case class QuoteIn[A, C] private (
-      final val quote: (MonetaryAmount, MonetaryAmount)
-  ) extends QuotedIn[A, C] {
-
-    /** */
-    def tick(implicit C: Currency[C]): MonetaryAmount =
-      MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
-  }
-
-  /** */
-  object QuoteIn {
-
-    /** */
-    def apply[A, C2: Currency](
-        bid: MonetaryAmount,
-        ask: MonetaryAmount
-    ): QuoteIn[A, C2] = new QuoteIn[A, C2]((bid, ask)) {}
-
-    /** */
-    def asTraded[A, C2: Currency](
-        trade: MonetaryAmount
-    ): QuoteIn[A, C2] = apply(trade, trade)
-  }
-
   /** An exchange rate. */
-  sealed abstract case class Rate[C1, C2]()(implicit
-                                            C1: Currency[C1],
-                                            C2: Currency[C2],
-                                            Q: C1 QuotedIn C2) {
+  sealed abstract case class Rate[C1, C2]()(
+      implicit
+      C1: Currency[C1],
+      C2: Currency[C2],
+      Q: C1 QuotedIn C2
+  ) {
+
     import Q._
 
     /** */
@@ -286,7 +273,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
   }
 
   /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
-  object Market extends WithOpaqueKey[Int, Market] {
+  object Market extends WithRefinedKey[String, IsMic, Market] {
+    // object Market extends WithOpaqueKey[Int, Market] {
     implicit def orderMarket: cats.Order[Market] = ???
   }
 
@@ -365,4 +353,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
       def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
     }
   }
+
+  /** placeholder */
+  trait OrderBook
+
+  /** placeholder */
+  object OrderBook
+
 }
