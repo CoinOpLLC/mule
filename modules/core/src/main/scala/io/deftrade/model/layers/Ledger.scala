@@ -143,12 +143,12 @@ trait Ledger { self: ModuleTypes =>
     }
   }
 
-  /** raw price data usually comes this way */
+  /** Price data per unit of instrument. */
   sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
       final override val price: Instrument.Key => Stream[F, Mny[C]]
   ) extends Pricer.Aux[F, Instrument.Key, C](price)
 
-  /**  */
+  /** */
   object InstrumentPricer {
 
     /** */
@@ -169,7 +169,7 @@ trait Ledger { self: ModuleTypes =>
       apply(instrument => (a price instrument) ++ (b price instrument) take 1)
   }
 
-  /**    */
+  /**  Enables volume discounts or other quantity-specific pricing. */
   sealed abstract case class LegPricer[F[_]: Sync, C: Currency](
       final override val price: Leg => Stream[F, Mny[C]]
   ) extends Pricer.Aux[F, Leg, C](price)
@@ -191,7 +191,10 @@ trait Ledger { self: ModuleTypes =>
       }
   }
 
-  /**  */
+  /**
+    * Enables package deals, or portfolio valuation informed by covariance,
+    * or other holistic methodology.
+    */
   sealed abstract case class TradePricer[F[_]: Sync, C: Currency](
       final override val price: Trade => Stream[F, Mny[C]]
   ) extends Pricer.Aux[F, Trade, C](price)
@@ -221,8 +224,45 @@ trait Ledger { self: ModuleTypes =>
       }
   }
 
-  /** */
-  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C])
+  /**
+    * The deal with cash:
+    *   - cash has to be fungable and self-pricing.
+    *   - for legal tender instruments, we only ever know ''our'' actual instrument (bank acct).
+    *   - need to keep quantity per instrument!!! Folio lets us do that.
+    *
+    * So a bank account is a kind of [[capital.Instrument]], and the key is `String Refined IsBan`.
+    *
+    * When we talk to contra accounts, this seems fine:
+    * contra account `Folio`s will get stuffed full of extraneous payment details
+    * '''but so what?''' We don't share contra accounts,
+    * and it will help trackability to know ''our side'' of the
+    * cash transaction history.
+    *
+    * FIXME: For transactions between parties on the Ledger:
+    * how would we anonymize the cash account details? Sharing BANs is bad.
+    *   - There is wiggle room (implementation flexibility)
+    * between what is tx and what is folio event log!
+    *
+    * TODO: is is possible or desirable to generalize fungability?
+    */
+  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C]) {
+
+    /** We select coins from our wallet thus. */
+    final def square(
+        against: Folio.Key
+    )(
+        trade: Trade,
+        amount: Mny[C]
+    )(
+        implicit
+        C: Currency[C]
+    ): Trade =
+      // find legal tender of right currency in folio
+      // pos balance after subtraction of amount?
+      // yes: subtract amount
+      // no: subtract balance and recurse
+      ???
+  }
 
   /** */
   object PricedTrade {
@@ -234,30 +274,6 @@ trait Ledger { self: ModuleTypes =>
       for {
         amount <- TradePricer[F, C] price trade
       } yield new PricedTrade[C](trade, amount) {}
-  }
-
-  /** */
-  sealed abstract case class SettlableTrade private (trade: Trade)
-
-  /**
-    * An even exchange.
-    */
-  object SettlableTrade {
-
-    /** */
-    def apply[C: Currency](folio: Folio.Key)(pt: PricedTrade[C]) =
-      new SettlableTrade(cashOut(folio)(pt.trade, pt.amount)) {}
-
-    /**
-      * Note: `folio` parameter makes sense when there is more than one XYZ coin in the folio for
-      * currency XYZ (e.g. USD bank account, physical cash...)
-      */
-    final def cashOut[C: Currency](
-        folio: Folio.Key
-    )(
-        trade: Trade,
-        amount: Mny[C]
-    ): Trade = ???
   }
 
   /** type alias */

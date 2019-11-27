@@ -58,8 +58,7 @@ final case class Instrument(
 /**
   * `Instrument`s evolve over time.
   *
-  * E.g. t is not inconcievable that one might want to allow for,
-  * and track, a change in currency.
+  * E.g. one might want to allow for, and track, a change in currency.
   */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 
