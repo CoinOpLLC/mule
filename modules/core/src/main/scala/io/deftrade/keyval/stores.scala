@@ -150,6 +150,14 @@ trait stores {
             } through permRowToCSV through appendingSink
       } yield id
 
+    /** When writing whole `Map`s, all rows get the same `Id`. */
+    final def appendAll[G[_]: cats.Foldable, K2, V2](
+        rows: G[Row]
+    )(
+        implicit
+        ev: V <:< (K2, V2)
+    ): EffectStream[Id] = ???
+
     /** */
     protected def readLines: EffectStream[String]
 

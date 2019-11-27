@@ -141,9 +141,6 @@ trait Ledger { self: ModuleTypes =>
       final type CurrencyTag   = C
       final type EffectType[_] = F[_]
     }
-
-    /** always returned for a failed lookup (by convention) */
-    lazy val NoClue: Result[Nothing] = Result fail "lookup failed"
   }
 
   /** raw price data usually comes this way */
@@ -154,9 +151,11 @@ trait Ledger { self: ModuleTypes =>
   /**  */
   object InstrumentPricer {
 
-    // type KMES[F[_], A, C] = Kleisli[Stream[F, *], A, Mny[C]]
+    /** */
+    def apply[F[_], C: Currency: InstrumentPricer[F, *]]: InstrumentPricer[F, C] = implicitly
 
-    private def apply[F[_]: Sync, C: Currency](
+    /** */
+    def apply[F[_]: Sync, C: Currency](
         price: Instrument.Key => Stream[F, Mny[C]]
     ) =
       new InstrumentPricer(price) {}
@@ -175,7 +174,24 @@ trait Ledger { self: ModuleTypes =>
       final override val price: Leg => Stream[F, Mny[C]]
   ) extends Pricer.Aux[F, Leg, C](price)
 
-  /** TODO: Revisit decision to make these part of the implicit context. */
+  /** */
+  object LegPricer {
+
+    /** Summon a pricer for a given currency. */
+    def apply[F[_], C: Currency: LegPricer[F, *]]: LegPricer[F, C] = implicitly
+
+    /** */
+    def apply[F[_]: Sync, C: Currency](price: Leg => Stream[F, Mny[C]]): LegPricer[F, C] =
+      new LegPricer(price) {}
+
+    /** Create a pricer from a pricing function. */
+    def default[F[_]: Sync, C: Currency: InstrumentPricer[F, *]]: LegPricer[F, C] =
+      apply {
+        case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
+      }
+  }
+
+  /**  */
   sealed abstract case class TradePricer[F[_]: Sync, C: Currency](
       final override val price: Trade => Stream[F, Mny[C]]
   ) extends Pricer.Aux[F, Trade, C](price)
@@ -186,9 +202,23 @@ trait Ledger { self: ModuleTypes =>
     /** Summon a pricer for a given currency. */
     def apply[F[_], C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
 
-    /** Create a pricer from a pricing function. */
-    def from[F[_]: Sync, C: Currency](price: Trade => Stream[F, Mny[C]]): TradePricer[F, C] =
+    /** */
+    def apply[F[_]: Sync, C: Currency](
+        price: Trade => Stream[F, Mny[C]]
+    ): TradePricer[F, C] =
       new TradePricer(price) {}
+
+    /** Create a pricer from a pricing function. */
+    def default[F[_]: Sync, C: Currency: LegPricer[F, *]]: TradePricer[F, C] =
+      TradePricer { trade =>
+        val lp = LegPricer[F, C]
+        @SuppressWarnings(Array("org.wartremover.warts.Any"))
+        val prices = for {
+          leg   <- Stream evals (Sync[F] delay trade.toList)
+          price <- lp price leg
+        } yield price
+        prices foldMap identity
+      }
   }
 
   /** */
@@ -197,7 +227,7 @@ trait Ledger { self: ModuleTypes =>
   /** */
   object PricedTrade {
 
-    /**      FIXME: delete hack shit */
+    /**  */
     def of[F[_]: Sync, C: Currency: TradePricer[F, *]](
         trade: Trade
     ): Stream[F, PricedTrade[C]] =
@@ -214,6 +244,7 @@ trait Ledger { self: ModuleTypes =>
     */
   object SettlableTrade {
 
+    /** */
     def apply[C: Currency](folio: Folio.Key)(pt: PricedTrade[C]) =
       new SettlableTrade(cashOut(folio)(pt.trade, pt.amount)) {}
 

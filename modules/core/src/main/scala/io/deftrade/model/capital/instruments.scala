@@ -18,16 +18,20 @@ package io.deftrade
 package model
 package capital
 
-import time.{ ZonedDateTime }
+import time.ZonedDateTime
 import time.market.Frequency
 import money.{ CurrencyLike, Financial }
 import keyval._
 import refinements.{ Label }
-import model.reference.{ IsIsin, IsUsin, Mic }
+import model.reference.{ IsIsin, IsUsin }
 
+// import cats.implicits._
+import cats.syntax.eq._
 import cats.instances.string._
 
 // import shapeless.syntax.singleton._
+
+import enumeratum.EnumEntry
 
 import io.circe.Json
 
@@ -41,11 +45,15 @@ import io.circe.Json
   */
 final case class Instrument(
     symbol: Label,
-    market: Mic,
-    currency: CurrencyLike,
     issuer: LegalEntity.Key,
+    currency: CurrencyLike,
     meta: Json,
-)
+) {
+
+  /** And by fiat we mean convention... */
+  def isLegalTender: Boolean =
+    symbol.value === currency.code.value
+}
 
 /**
   * `Instrument`s evolve over time.
@@ -131,10 +139,11 @@ object layers {
     */
   trait VanillaDerivatives {
 
-    sealed trait PutCall
-    object PutCall {
+    sealed trait PutCall extends EnumEntry
+    object PutCall extends DtEnum[PutCall] {
       case object Put  extends PutCall
       case object Call extends PutCall
+      lazy val values = findValues
     }
 
     /** */
