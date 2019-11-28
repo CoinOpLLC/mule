@@ -21,12 +21,12 @@ package layers
 import time._, money._
 
 import cats.implicits._
-import cats.{ Foldable, Invariant, Monad, SemigroupK }
+import cats.{ Invariant, Monad, SemigroupK }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
-// import cats.effect.Sync
-// import fs2.Stream
+import cats.effect.Sync
+import fs2.Stream
 
 import eu.timepit.refined
 import refined.auto._
@@ -46,10 +46,12 @@ import scala.language.higherKinds
   *     Debits === Credits                 // accounting identity
   *     Assets === Liabilities             // balance sheet identity
   *     Liabilities := Debt + Equity       // one or the other
-  *     Assets + Income + Expenses === Debt + Equity + Revenues  // substituting
-  *     Income := Revenue Net Expenses     // textbook definition
-  *     Equity := Liabilities Net Debt     // rearranging
-  *            +  Income                   // Equity book value evolves!
+  *     Equity := CommonStock + APIC + RetainedNetIncome  // CommonStock is *par*, usually zero
+  *
+  *     Assets + Expenses === Liabilities + Revenues // substitution
+  *     NetIncome := Revenue Net Expenses   // textbook definition
+  *
+  *     DeltaEquity := NetIncome Net Distributions  // Assets increase or Debt decreases to offset
   * }}}
   *
   */
@@ -172,11 +174,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       }
 
     /** */
-    def from[F[_]: Foldable, C: Currency](
+    def from[F[_]: Sync, C: Currency](
         marker: TradePricer[F, C]
     )(
-        xs: F[Transaction]
-    ): TrialBalance[C] =
+        xs: Stream[F, Transaction]
+    ): Stream[F, TrialBalance[C]] =
       ??? // xs.sum // FIXME this is all I should have to say!
   }
 

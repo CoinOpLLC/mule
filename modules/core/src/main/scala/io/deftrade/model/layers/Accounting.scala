@@ -107,8 +107,8 @@ trait Accounting { self: ModuleTypes =>
   trait Asset extends Debit
   val Asset: DtEnum[_ <: Asset]
 
-  /** */
-  trait Income extends Debit
+  /** And by income we mean net income. */
+  trait Income extends Credit
   val Income: DtEnum[_ <: Income]
 
   /** */
