@@ -21,7 +21,7 @@ package layers
 import time._, money._
 
 import cats.implicits._
-import cats.{ Invariant, Monad, SemigroupK }
+import cats.{ Foldable, Invariant, Monad, SemigroupK }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
