@@ -93,6 +93,7 @@ object Result {
 /** */
 object ResultV {
 
+  /** */
   def apply[T](unsafe: => T): ResultV[T] =
     Validated catchNonFatal unsafe leftMap throw2fail
 }

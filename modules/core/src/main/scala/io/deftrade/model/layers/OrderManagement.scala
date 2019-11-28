@@ -199,3 +199,22 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       }
   }
 }
+/*
+ * example "blotter" gathered randomly from the web - for reference only
+ * there is a lot wrong with this example, actually, and it won't translate directly or uniquely
+ *
+ * Client name
+ * Trade name
+ * Settlement Date
+ * Buy/Sell
+ * CUSIP
+ * SecuritySymbol
+ * SecurityDesc.
+ * Quantity
+ * UnitPrice
+ * Principal/Proceeds
+ * TotalCommission
+ * Fees
+ * Net Proceeds
+ * Broker
+ */
