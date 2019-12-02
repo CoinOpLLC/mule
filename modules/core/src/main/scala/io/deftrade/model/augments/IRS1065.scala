@@ -91,7 +91,7 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   sealed trait Revenue1065 extends Revenue
 
-  /** */
+  /** FIXME check this */
   object Revenue extends DtEnum[Revenue1065] {
     case object Finance        extends Revenue
     case object Investment     extends Revenue

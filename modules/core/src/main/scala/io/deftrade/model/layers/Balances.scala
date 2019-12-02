@@ -39,19 +39,23 @@ import scala.language.higherKinds
 /**
   * Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   *
-  * When summing Transactions, this "cake slice" module implements the algebra which
-  * maintains the relations below:
+  * When summing Transactions, this module slice implements the algebra which
+  * maintains all the accounting identities.
+  *
+  * These are the terms and identities as we use them:
   *
   * {{{
-  *     Debits === Credits                 // accounting identity
-  *     Assets === Liabilities             // balance sheet identity
-  *     Liabilities := Debt + Equity       // one or the other
-  *     Equity := CommonStock + APIC + RetainedNetIncome  // CommonStock is *par*, usually zero
-  *
-  *     Assets + Expenses === Liabilities + Revenues // substitution
-  *     NetIncome := Revenue Net Expenses   // textbook definition
-  *
-  *     DeltaEquity := NetIncome Net Distributions  // Assets increase or Debt decreases to offset
+  *     Debits := Assets + Expenses                  // accounting definition
+  *     Credits := Liability + Revenue               // accounting definition
+  *     Debits === Credits                           // accounting identity
+  *     Assets === Liabilities                       // balance sheet identity
+  *     Assets + Expenses === Liabilities + Revenue  // substituting
+  *     Income := Revenue net Expenses               // the "bottom line"
+  *     Liabilities := Debt + Equity                 // always one or the other
+  *     RetainedEarnings = Income net Distributions  // business keeps what partners don't take
+  *     Equity :=                                    // total value of partners' stakes
+  *       PaidInCapital +                            // total raised across all rounds
+  *       RetainedEarnings                           // add to book value of partners' equity
   * }}}
   *
   */
@@ -115,7 +119,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /** Decompose into separate `Debit` and `Credit` maps. */
     def unapply[D <: Debit, C <: Credit, CCY: Currency](
         b: Balance[D, C, CCY]
-    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] = (b.debits, b.credits).some
+    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] =
+      (b.debits, b.credits).some
   }
 
   /** */
@@ -125,16 +130,25 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   ) extends Balance(debits, credits) {
 
     /** */
-    def updated(dc: DebitCreditKey[Debit, Credit], amount: Mny[C])(
+    def updated(
+        keys: DebitCreditKey[Debit, Credit],
+        amount: Mny[C]
+    )(
         implicit C: Currency[C]
     ): TrialBalance[C] =
-      TrialBalance(debits |+| (dc.debits priced -amount), credits |+| (dc.credits priced amount))
+      TrialBalance(
+        debits |+| (keys.debits priced -amount),
+        credits |+| (keys.credits priced amount)
+      )
 
     /** */
-    def swapped[T <: AccountingKey](sk: SwapKey[T], amount: Mny[C])(
+    def swapped[T <: AccountingKey](
+        keys: SwapKey[T],
+        amount: Mny[C]
+    )(
         implicit C: Currency[C]
     ): TrialBalance[C] = {
-      val am: AccountMap[AccountingKey, C] = (SwapKey accountMap (sk, amount)).widenKeys
+      val am: AccountMap[AccountingKey, C] = (SwapKey accountMap (keys, amount)).widenKeys
       TrialBalance(
         debits |+| (am collectKeys Debit.unapply),
         credits |+| (am collectKeys Credit.unapply)
@@ -175,11 +189,16 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     def from[F[_]: Sync, C: Currency](
-        marker: TradePricer[F, C]
+        pricer: TradePricer[F, C],
+        cratchit: Transaction => DoubleEntryKey
     )(
         xs: Stream[F, Transaction]
     ): Stream[F, TrialBalance[C]] =
-      ??? // xs.sum // FIXME this is all I should have to say!
+      // price the transaction
+      // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
+      // create a TrialBalance from the price and de keys
+      // fold that TrialBalance into the running sum
+      ???
   }
 
   /**
@@ -221,7 +240,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     * - Operations
     * - Investment
     * - Financing
-    * - TODO: should cash accounting get their own flavors? for now reuse `Revenue` and `Expense`.
     */
   sealed abstract case class CashFlowStatement[C] private (
       val outflows: Expenses[C],
@@ -283,16 +301,20 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def period: Period
 
     /** */
-    final def beginning: LocalDate = asOf - period
-
-    /** */
     def cs: CashFlowStatement[C]
 
     /** */
     def bs: BalanceSheet[C]
 
-    /** FIXME this must evolve into some kind of Stream based thing */
-    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): BookSet[C]
+    /** */
+    type Repr <: BookSet[C]
+
+    /** `previous.asOf === this.asOf - this.Period` */
+    def previous: Repr
+
+    /**  */
+    def next[F[_]: Monad](xs: Stream[F, Transaction]): Stream[F, Repr] =
+      ??? // sketchy
   }
 
   /** */
@@ -300,11 +322,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       asOf: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
-      bs: BalanceSheet[C]
+      bs: BalanceSheet[C],
+      previous: CashBookSet[C]
   ) extends BookSet[C] {
 
-    /** FIXME: implement */
-    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+    final type Repr = CashBookSet[C]
 
     /**
       * Cratchit needs to look at the current state of the books
@@ -321,12 +343,16 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /** */
   object CashBookSet {
+
+    /** */
     def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
-        bs: BalanceSheet[C]
-    ): CashBookSet[C] = new CashBookSet(asOf, period, cs, bs) {}
+        bs: BalanceSheet[C],
+        previous: CashBookSet[C]
+    ): CashBookSet[C] =
+      new CashBookSet(asOf, period, cs, bs, previous) {}
   }
 
   /** */
@@ -335,11 +361,12 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       period: Period,
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
-      bs: BalanceSheet[C]
+      bs: BalanceSheet[C],
+      previous: AccrualBookSet[C]
   ) extends BookSet[C] {
 
-    /** FIXME: implement */
-    def nextPeriod[L[_]: Foldable](xs: L[Transaction]): CashBookSet[C] = ???
+    final type Repr = AccrualBookSet[C]
+
   }
 
   /** */
@@ -349,19 +376,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         period: Period,
         cs: CashFlowStatement[C],
         is: IncomeStatement[C],
-        bs: BalanceSheet[C]
-    ): AccrualBookSet[C] = new AccrualBookSet(asOf, period, cs, is, bs) {}
+        bs: BalanceSheet[C],
+        previous: AccrualBookSet[C]
+    ): AccrualBookSet[C] =
+      new AccrualBookSet(asOf, period, cs, is, bs, previous) {}
   }
-
-  /** FIXME: implement */
-  def trialBalance[F[_]: Foldable: Monad: SemigroupK, C: Currency](
-      ts: F[Transaction]
-  ): TrialBalance[C] =
-    // price the transaction
-    // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
-    // create a TrialBalance from the price and de keys
-    // fold that TrialBalance into the running sum
-    ???
 
   /**  */
   type DeltaCashBooks[C] = (CashFlowStatement[C], BalanceSheet[C])

@@ -121,7 +121,7 @@ trait stores {
     /**
       * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
       *
-      * Note: `IO Exception Policy := Whatever`
+      * Note: not distinguishing between `not found` and `IO error`
       * TODO: This needs to evolve.
       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))

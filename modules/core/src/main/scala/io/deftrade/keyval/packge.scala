@@ -52,6 +52,17 @@ import refined.api.Refined
   *   - providing implicit derivations for [[csv]] file readers and writers of `Row`s and `Table`s.
   *
   * *,, it's just a scheme because calling it a "schema" is far too grand,,
+  *
+  * TODO: consider explicitly separating the structural items (keys and links between keys)
+  * from the descriptive attributes, as with
+  * [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling.
+  *
+  *   - Q: What is a "business key?"
+  *   - A: "Real business keys only change when the business changes!"
+  *   - same goes for those essential, universal, canonical attributes
+  *   - everything else is `meta: Json`
+  *     - which can be stored / indexed as binary in Mongo and Postgres
+  *     - which can be projected through lenses (optics) to create Satellite views.
   */
 package object keyval extends stores with freestore with csv {
 

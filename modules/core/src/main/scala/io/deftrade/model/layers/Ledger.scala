@@ -225,30 +225,37 @@ trait Ledger { self: ModuleTypes =>
   }
 
   /**
-    * The deal with cash:
+    * Requirements for dealing with '''cash''':
     *   - cash has to be fungable and self-pricing.
     *   - for legal tender instruments, we only ever know ''our'' actual instrument (bank acct).
-    *   - need to keep quantity per instrument!!! Folio lets us do that.
+    *   - need to keep quantity per such "instrument" (bank acct)!
     *
-    * So a bank account is a kind of [[capital.Instrument]], and the key is `String Refined IsBan`.
+    * So:
+    *   - a bank account is a kind of [[capital.Instrument]],
+    *   - and the key is `String Refined IsBan`,
+    *   - and a `Folio` can contain a number of such "instruments" and associated quantities
+    *     (bank balances.)
+    *   - `instrument.symbol === currency.code` for all fungible currency instruments
+    *   - the `Trade`s recorded in the books do not record these bank account details but instead
+    *     deal in generic instruments with [[capital.Instrument.Key]]s constucted systematically
+    *     from Currency names.
+    *   - the bank account allocation details are recoverable through the
+    *     [[keyval.stores.KeyValueStore]] for `Folio`s.
     *
-    * When we talk to contra accounts, this seems fine:
-    * contra account `Folio`s will get stuffed full of extraneous payment details
-    * '''but so what?''' We don't share contra accounts,
-    * and it will help trackability to know ''our side'' of the
-    * cash transaction history.
-    *
-    * FIXME: For transactions between parties on the Ledger:
-    * how would we anonymize the cash account details? Sharing BANs is bad.
-    *   - There is wiggle room (implementation flexibility)
-    * between what is tx and what is folio event log!
-    *
-    * TODO: is is possible or desirable to generalize fungability?
+    * TODO: is is possible or desirable to generalize fungability
+    * to asset classes other than currencies?
     */
   sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C]) {
 
-    /** We select coins from our wallet thus. */
-    final def square(
+    /**
+      * @return `Stream` effect will effectively subtract amount from the `against` folio
+      *   via a "coin selection" algo (allocating across multi bank accts)
+      * - creates a complete, "paid" trade with a single unified, universal, anonymous,
+      *   currency specific instrument of `amount`
+      * - records that `Trade` in its store and returns the id, which is ready-to-use in
+      *   creating a [[Transaction]].
+      */
+    final def paid[F[_]: Sync](
         against: Folio.Key
     )(
         trade: Trade,
@@ -256,7 +263,7 @@ trait Ledger { self: ModuleTypes =>
     )(
         implicit
         C: Currency[C]
-    ): Trade =
+    ): Stream[F, Result[Trade.Id]] =
       // find legal tender of right currency in folio
       // pos balance after subtraction of amount?
       // yes: subtract amount
@@ -276,23 +283,25 @@ trait Ledger { self: ModuleTypes =>
       } yield new PricedTrade[C](trade, amount) {}
   }
 
-  /** type alias */
+  /**
+    * type alias
+    */
   type ValuedFolio[C] = PricedTrade[C]
 
   /** */
   lazy val ValuedFolio = PricedTrade
 
   /**
-    * For [[Ledger]] updates, the `Transaction` is the concrete record of record, so to speak.
+    * The concrete record for `Ledger` updates.
     *
-    * Do we mean in the business sense or the computer science sense?
-    * Yes: both parties must agree upon the result.
+    * Do we mean `Transaction` in the ''business'' sense, or the ''computer science'' sense?
+    * '''Yes''': both parties must agree upon the result, under all semantics for the term.
     *
     * The exact semantics will depend on the higher level context
     *  (eg booking a trade vs receiving notice of settlement).
     *
     * Note: there is no currency field; cash payments are reified in currency-as-instrument.
-    * Store the _cryptographic hash_ of whatever metadata there is.
+    * Store the '''cryptographic hash''' of whatever metadata there is.
     */
   sealed abstract case class Transaction private (
       recordedAt: Instant,

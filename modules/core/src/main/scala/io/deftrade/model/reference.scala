@@ -176,6 +176,21 @@ package object reference {
   /** */
   type Unreg = String Refined IsUnreg
 
+  /**
+    * `UsBan` identifiers represent bank account numbers in the US
+    * TODO: Next up is IBAN
+    */
+  val MatchesRxUsBan = """\d{8,10}""".witness
+
+  /** */
+  type MatchesRxUsBan = MatchesRegex[MatchesRxUsBan.T]
+
+  /** */
+  type IsUsBan = MatchesRxUnreg // And CheckedUsBan
+
+  /** */
+  type UsBan = String Refined IsUsBan
+
   // https://en.wikipedia.org/wiki/Luhn_algorithm
   private[model] def luhn(digit: Int, idx: Int): Int =
     if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10

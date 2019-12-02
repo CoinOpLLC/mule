@@ -197,38 +197,38 @@ trait Accounting { self: ModuleTypes =>
   sealed trait DoubleEntryKey extends EnumEntry with Product with Serializable {
 
     /** */
-    type EntryType <: AccountingKey
+    type EntryKey <: AccountingKey
 
     /** */
-    type ContraType <: AccountingKey
+    type ContraKey <: AccountingKey
 
     /** */
-    def entries: Treatment[EntryType]
+    def entries: Treatment[EntryKey]
 
     /** */
-    def contras: Treatment[ContraType]
+    def contras: Treatment[ContraKey]
   }
 
   /** placeholder */
   object DoubleEntryKey {
 
     /** */
-    sealed abstract class Aux[ENTRY <: AccountingKey, CONTRA <: AccountingKey](
-        es: Treatment[ENTRY],
-        cs: Treatment[CONTRA]
+    sealed abstract class Aux[K1 <: AccountingKey, K2 <: AccountingKey](
+        es: Treatment[K1],
+        cs: Treatment[K2]
     ) extends DoubleEntryKey {
 
       /** */
-      final type EntryType = ENTRY
+      final type EntryKey = K1
 
       /** */
-      final type ContraType = CONTRA
+      final type ContraKey = K2
 
       /** */
-      final def entries: Treatment[EntryType] = es
+      final def entries: Treatment[EntryKey] = es
 
       /** */
-      final def contras: Treatment[ContraType] = cs
+      final def contras: Treatment[ContraKey] = cs
     }
   }
 
