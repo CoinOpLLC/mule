@@ -102,6 +102,7 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
     lazy val values = findValues
   }
 
+  /** */
   sealed trait Expense1065 extends Expense
 
   /** */
@@ -123,6 +124,7 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
     lazy val values = findValues
   }
 
+  /** */
   sealed trait Income1065 extends Income
 
   /** FIXME: this needs work */
@@ -130,6 +132,24 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
 
     case object OperatingIncome  extends Income
     case object InvestmentIncome extends Income
+
+    /** */
+    lazy val values = findValues
+  }
+
+  /**
+    * As a [[Credit]], a `Reserve` can represent:
+    *   - an equity portion,
+    *   - a "bad debt" (asset) contra account
+    *   - an estimated future liability
+    *
+    */
+  sealed trait Reserve1065 extends Reserve
+
+  /**
+    * TODO: Define further, or move from IRS1065 and create another augment.
+    */
+  object Reserve extends DtEnum[Reserve1065] {
 
     /** */
     lazy val values = findValues

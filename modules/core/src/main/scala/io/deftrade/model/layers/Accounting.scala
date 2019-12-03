@@ -111,6 +111,10 @@ trait Accounting { self: ModuleTypes =>
   trait Income extends Credit
   val Income: DtEnum[_ <: Income]
 
+  /** Reserved for now. :| */
+  trait Reserve extends Credit
+  val Reserve: DtEnum[_ <: Reserve]
+
   /** */
   trait Debt extends Liability
   val Debt: DtEnum[_ <: Debt]

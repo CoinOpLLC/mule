@@ -21,7 +21,7 @@ package layers
 import time._, money._
 
 import cats.implicits._
-import cats.{ Foldable, Invariant, Monad, SemigroupK }
+import cats.{ Invariant, Monad }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
@@ -32,7 +32,7 @@ import eu.timepit.refined
 import refined.auto._
 
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
-import spire.syntax.field._
+// import spire.syntax.field._
 
 import scala.language.higherKinds
 
@@ -42,7 +42,7 @@ import scala.language.higherKinds
   * When summing Transactions, this module slice implements the algebra which
   * maintains all the accounting identities.
   *
-  * These are the terms and identities as we use them:
+  * These are the terms and identities as '''we''' use them:
   *
   * {{{
   *     Debits := Assets + Expenses                  // accounting definition
@@ -54,8 +54,9 @@ import scala.language.higherKinds
   *     Liabilities := Debt + Equity                 // always one or the other
   *     RetainedEarnings = Income net Distributions  // business keeps what partners don't take
   *     Equity :=                                    // total value of partners' stakes
-  *       PaidInCapital +                            // total raised across all rounds
-  *       RetainedEarnings                           // add to book value of partners' equity
+  *       ShareCapital                               // total raised across all rounds
+  *     + Reserves                                   // you never know
+  *     + RetainedEarnings                           // add to book value of partners' equity
   * }}}
   *
   */
@@ -217,7 +218,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    *
     */
   object IncomeStatement {
 
@@ -371,7 +371,9 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /** */
   object AccrualBookSet {
-    def apply[C: Currency](
+
+    /** */
+    private[model] def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
@@ -389,25 +391,31 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
   /**
-    https://en.wikipedia.org/wiki/Statement_of_changes_in_equity
-
+    * Should really be called
+    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity Statement of Changes in Equity]],
+    * but that is judged insufficienty consise and regular.
+    *
+    * Since there is no other equity stament, this shall be it.
+    *
+    * Nota Bene the (arithmetic) indifference of the equity holder to equity
+    * transactions at market price: their book value is unaffected by such
+    * transactions.
+    *
+    * Change in Equity value: `Credits net Debits`, as usual for a [[Balance]]
+    *
+    *   - Debits
+    *       - Dividends paid (per share)
+    *       - Share buy-backs (premium over book value per share)
+    *
+    *   - Credits
+    *       - Shares issued (premium over book value per share)
+    *       - Comprehensive Income (per share)
     */
-  sealed abstract case class EquityStatement[C] private (wut: Null)
+  sealed abstract case class EquityStatement[C] private (
+      override val debits: Debits[C],
+      override val credits: Credits[C]
+  ) extends Balance(debits, credits)
 
   /** */
   object EquityStatement
-
-  /** */
-  sealed trait DeltaEquity
-
-  /** */
-  object DeltaEquity
-
-  /** FIXME: not sure this signature makes sense as it stands */
-  def breakdown[C: Currency](
-      prior: BalanceSheet[C],
-      delta: BalanceSheet[C], // delta and raw come from TrialBalance
-      raw: IncomeStatement[C] // mixed cash and accrual
-  ): (CashFlowStatement[C], EquityStatement[C]) =
-    ???
 }
