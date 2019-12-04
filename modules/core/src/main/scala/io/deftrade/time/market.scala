@@ -154,6 +154,7 @@ package market {
     case object F4M    extends Frequency("P4M", MonthsPerYear / 4)
     case object F6M    extends Frequency("P6M", MonthsPerYear / 6)
     case object F12M   extends Frequency("P12M", MonthsPerYear / 12)
+    case object F1Y    extends Frequency("P12M", MonthsPerYear / 12)
 
     lazy val values = findValues
   }

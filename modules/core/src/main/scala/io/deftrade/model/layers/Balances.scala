@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import time._, money._
+import time._, market.Frequency, money._, implicits._
 
 import cats.implicits._
 import cats.{ Invariant, Monad }
@@ -26,7 +26,7 @@ import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
 import cats.effect.Sync
-import fs2.Stream
+import fs2.{ Pipe, Stream }
 
 import eu.timepit.refined
 import refined.auto._
@@ -92,8 +92,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       cs: AccountMap[C, CCY]
   ) extends BalanceLike {
 
-    import io.deftrade.implicits._ // FIXME: why tf does this have to be here?
-
     /** */
     final type DebitType = D
 
@@ -124,7 +122,14 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       (b.debits, b.credits).some
   }
 
-  /** */
+  /**
+    * There are exactly two transformations of a `TrialBalance`
+    * and an `amount: Mny[C]` which result in another legal `TrialBalance`:
+    *   - grow (shrink) balance by amount
+    *   - constant balance; swap amount between keys within debits (credits)
+    *
+    * These are broken out into separate methods: TODO: consider unfying.
+    */
   sealed abstract case class TrialBalance[C] private (
       override val debits: Debits[C],
       override val credits: Credits[C]
@@ -155,23 +160,19 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         credits |+| (am collectKeys Credit.unapply)
       )
     }
-
-    /** */
-    def partition(implicit C: Currency[C]): (IncomeStatement[C], BalanceSheet[C]) =
-      (
-        IncomeStatement(debits collectKeys Expense.unapply, credits collectKeys Revenue.unapply),
-        BalanceSheet(debits collectKeys Asset.unapply, credits collectKeys Liability.unapply)
-      )
   }
 
-  /** */
+  /**
+    * Only public interface for creation is transformation, starting with `empty`.
+    */
   object TrialBalance {
 
     /** */
     private[model] def apply[C: Currency](
         debits: Debits[C],
         credits: Credits[C]
-    ): TrialBalance[C] = new TrialBalance(debits, credits) {}
+    ): TrialBalance[C] =
+      new TrialBalance(debits, credits) {}
 
     /** */
     def empty[C: Currency]: TrialBalance[C] =
@@ -190,11 +191,10 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     def from[F[_]: Sync, C: Currency](
+        frequency: Frequency,
         pricer: TradePricer[F, C],
         cratchit: Transaction => DoubleEntryKey
-    )(
-        xs: Stream[F, Transaction]
-    ): Stream[F, TrialBalance[C]] =
+    ): Pipe[F, Transaction, TrialBalance[C]] =
       // price the transaction
       // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
       // create a TrialBalance from the price and de keys
@@ -206,16 +206,12 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     * Note: These are a mixture of cash and accrual items when "raw".
     * A cash account can be determined from its `Instrument.Key`.
     * This can be used to create a filter for `CashFlowStatement`s.
+    * FIXME this is BS
     */
   sealed abstract case class IncomeStatement[C] private (
       val expenses: Expenses[C],
       val revenues: Revenues[C]
-  ) extends Balance(expenses, revenues) {
-
-    /** */
-    def partition: (IncomeStatement[C], CashFlowStatement[C]) =
-      ???
-  }
+  ) extends Balance(expenses, revenues)
 
   /**
     */
@@ -240,6 +236,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     * - Operations
     * - Investment
     * - Financing
+    *
+    * - FIXME: isn't the typing too restrictive here? Consider cash capital transactions.
     */
   sealed abstract case class CashFlowStatement[C] private (
       val outflows: Expenses[C],
@@ -264,10 +262,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       }
   }
 
-  /**
-    * `BalanceSheet`s form a `CommutativeGroup`.
-    *  All operations are double entry by construction.
-    */
+  /** */
   sealed abstract case class BalanceSheet[C] private (
       val assets: Assets[C],
       val liabilities: Liabilities[C]
@@ -328,17 +323,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     final type Repr = CashBookSet[C]
 
-    /**
-      * Cratchit needs to look at the current state of the books
-      * in order to properly allocate balance sheet items (in the most general case)
-      *
-      * FIXME: Need to make polymorphic (somehow). Also implement.
-      */
-    def deltaFrom(
-        pt: PricedTrade[C],
-        dek: DoubleEntryKey,
-        meta: Transaction.Meta
-    ): DeltaCashBooks[C] = ???
   }
 
   /** */
