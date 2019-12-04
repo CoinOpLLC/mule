@@ -127,7 +127,7 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   sealed trait Income1065 extends Income
 
-  /** FIXME: this needs work */
+  /** TODO: this needs work */
   object Income extends DtEnum[Income1065] {
 
     case object OperatingIncome  extends Income
@@ -156,7 +156,23 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   }
 
   /**
+    * FIXME: review against IRS docs
+    * FIXME: still need to deal with BuyIn / BuyOut situation in partnerships
+    * (aka stock buybacks and issuance in public companies)
+    */
+  sealed trait Distribution1065 extends Distribution
+
+  /** */
+  object Distribution extends DtEnum[Distribution1065] {
+
+    /** */
+    lazy val values = findValues
+  }
+
+  /**
     * Depreciation, depletion, and amortization are the reasons some [[Asset]]s are Nettable.
+    *
+    * FIXME: Why aren't the "LessXyz" extries "contra-assets" (i.e. credits, technically)
     *
     * TODO:
     *   - Any other vocabularies to examine? Make this (differently) extensible?

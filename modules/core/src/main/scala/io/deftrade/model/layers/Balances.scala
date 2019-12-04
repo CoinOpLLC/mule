@@ -31,6 +31,8 @@ import fs2.{ Pipe, Stream }
 import eu.timepit.refined
 import refined.auto._
 
+import io.circe.Json
+
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
 // import spire.syntax.field._
 
@@ -193,7 +195,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def from[F[_]: Sync, C: Currency](
         frequency: Frequency,
         pricer: TradePricer[F, C],
-        cratchit: Transaction => DoubleEntryKey
+        cratchit: (Transaction, Json) => DoubleEntryKey
     ): Pipe[F, Transaction, TrialBalance[C]] =
       // price the transaction
       // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
@@ -302,6 +304,9 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def bs: BalanceSheet[C]
 
     /** */
+    def es: EquityStatement[C]
+
+    /** */
     type Repr <: BookSet[C]
 
     /** `previous.asOf === this.asOf - this.Period` */
@@ -309,18 +314,23 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /**  */
     def next[F[_]: Monad](xs: Stream[F, Transaction]): Stream[F, Repr] =
-      ??? // sketchy
+      // first make  TrialBalance
+      // then partition into books
+      // never return these, only Stream[F, BookSet]
+      ??? // still sketchy
   }
 
   /** */
-  sealed abstract case class CashBookSet[C](
+  sealed abstract case class CashBookSet[C] private (
       asOf: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C],
+      es: EquityStatement[C],
       previous: CashBookSet[C]
   ) extends BookSet[C] {
 
+    /** */
     final type Repr = CashBookSet[C]
 
   }
@@ -329,26 +339,29 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   object CashBookSet {
 
     /** */
-    def apply[C: Currency](
+    private[Balances] def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
         bs: BalanceSheet[C],
+        es: EquityStatement[C],
         previous: CashBookSet[C]
     ): CashBookSet[C] =
-      new CashBookSet(asOf, period, cs, bs, previous) {}
+      new CashBookSet(asOf, period, cs, bs, es, previous) {}
   }
 
   /** */
-  sealed abstract case class AccrualBookSet[C](
+  sealed abstract case class AccrualBookSet[C] private (
       asOf: LocalDate,
       period: Period,
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
       bs: BalanceSheet[C],
+      es: EquityStatement[C],
       previous: AccrualBookSet[C]
   ) extends BookSet[C] {
 
+    /** */
     final type Repr = AccrualBookSet[C]
 
   }
@@ -357,22 +370,17 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   object AccrualBookSet {
 
     /** */
-    private[model] def apply[C: Currency](
+    private[Balances] def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
         cs: CashFlowStatement[C],
         is: IncomeStatement[C],
         bs: BalanceSheet[C],
+        es: EquityStatement[C],
         previous: AccrualBookSet[C]
     ): AccrualBookSet[C] =
-      new AccrualBookSet(asOf, period, cs, is, bs, previous) {}
+      new AccrualBookSet(asOf, period, cs, is, bs, es, previous) {}
   }
-
-  /**  */
-  type DeltaCashBooks[C] = (CashFlowStatement[C], BalanceSheet[C])
-
-  /** */
-  type DeltaAccrualBooks[C] = (IncomeStatement[C], CashFlowStatement[C], BalanceSheet[C])
 
   /**
     * Should really be called

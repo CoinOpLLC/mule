@@ -100,6 +100,10 @@ trait Accounting { self: ModuleTypes =>
   val Expense: DtEnum[_ <: Expense]
 
   /** */
+  trait Distribution extends Debit
+  val Distribution: DtEnum[_ <: Distribution]
+
+  /** */
   trait Revenue extends Credit
   val Revenue: DtEnum[_ <: Revenue]
 
