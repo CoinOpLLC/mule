@@ -26,7 +26,7 @@ import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
 import cats.effect.Sync
-import fs2.{ Pipe, Stream }
+import fs2.{ Pipe }
 
 import eu.timepit.refined
 import refined.auto._
@@ -288,6 +288,49 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       }
   }
 
+  /**
+    * Should really be called
+    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity Statement of Changes in Equity]],
+    * but that is judged insufficienty consise and regular.
+    *
+    * Since there is no other equity stament, this shall be it.
+    *
+    * Nota Bene the (arithmetic) indifference of the equity holder to equity
+    * transactions at market price: their book value is unaffected by such
+    * transactions.
+    *
+    * Change in Equity value: `Credits net Debits`, as usual for a [[Balance]]
+    *
+    *   - Debits
+    *       - Dividends paid (per share)
+    *       - Share buy-backs (premium over book value per share)
+    *
+    *   - Credits
+    *       - Shares issued (premium over book value per share)
+    *       - Comprehensive Income (per share)
+    */
+  sealed abstract case class EquityStatement[C] private (
+      override val debits: Debits[C],
+      override val credits: Credits[C]
+  ) extends Balance(debits, credits)
+
+  /** */
+  object EquityStatement {
+
+    private[model] def apply[C: Currency](
+        debits: Debits[C],
+        credits: Credits[C]
+    ): EquityStatement[C] = new EquityStatement(debits, credits) {}
+
+    /** */
+    implicit def equityStatementCommutativeGroup[C: Currency]: CommutativeGroup[EquityStatement[C]] =
+      (Invariant[CommutativeGroup] imap CommutativeGroup[(Debits[C], Credits[C])]) {
+        case (ds, cs) => apply(ds, cs)
+      } {
+        unapply(_).fold(???)(identity)
+      }
+  }
+
   /** */
   sealed trait BookSet[C] {
 
@@ -313,7 +356,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def previous: Repr
 
     /**  */
-    def next[F[_]: Monad](xs: Stream[F, Transaction]): Stream[F, Repr] =
+    def next[F[_]: Monad](
+        frequency: Frequency,
+        pricer: TradePricer[F, C],
+        cratchit: (Transaction, Json) => DoubleEntryKey
+    ): Pipe[F, Transaction, Repr] =
       // first make  TrialBalance
       // then partition into books
       // never return these, only Stream[F, BookSet]
@@ -332,7 +379,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     final type Repr = CashBookSet[C]
-
   }
 
   /** */
@@ -363,7 +409,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     final type Repr = AccrualBookSet[C]
-
   }
 
   /** */
@@ -381,33 +426,4 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): AccrualBookSet[C] =
       new AccrualBookSet(asOf, period, cs, is, bs, es, previous) {}
   }
-
-  /**
-    * Should really be called
-    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity Statement of Changes in Equity]],
-    * but that is judged insufficienty consise and regular.
-    *
-    * Since there is no other equity stament, this shall be it.
-    *
-    * Nota Bene the (arithmetic) indifference of the equity holder to equity
-    * transactions at market price: their book value is unaffected by such
-    * transactions.
-    *
-    * Change in Equity value: `Credits net Debits`, as usual for a [[Balance]]
-    *
-    *   - Debits
-    *       - Dividends paid (per share)
-    *       - Share buy-backs (premium over book value per share)
-    *
-    *   - Credits
-    *       - Shares issued (premium over book value per share)
-    *       - Comprehensive Income (per share)
-    */
-  sealed abstract case class EquityStatement[C] private (
-      override val debits: Debits[C],
-      override val credits: Credits[C]
-  ) extends Balance(debits, credits)
-
-  /** */
-  object EquityStatement
 }

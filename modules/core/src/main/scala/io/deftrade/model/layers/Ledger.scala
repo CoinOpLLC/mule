@@ -311,6 +311,23 @@ trait Ledger { self: ModuleTypes =>
       metaHash: Sha256
   )
 
+  /** f'rinstance */
+  type Meta = Json
+
+  import refinements.IsSha256
+
+  /**
+    * The Meta store is content-addressed: entries are indexed with their own Sha256.
+    *
+    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
+    * a `Meta` key value store containing the value, you have access to the value itself.
+    *
+    * Note this value is effectively unforgeable / self validating.
+    *
+    * FIXME String should be byte string.
+    */
+  object Meta extends WithRefinedKey[String, IsSha256, Meta]
+
   /**
     * Model as pure value classes, because `Transaction`s don't make sense
     * as anything but immutable.
@@ -333,9 +350,6 @@ trait Ledger { self: ModuleTypes =>
       * Digester. FIXME: actually implement
       */
     def digest: MetaSha = _ => hackSha256
-
-    /** f'rinstance */
-    type Meta = Json
 
     /**       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
