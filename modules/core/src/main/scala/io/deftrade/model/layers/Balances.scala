@@ -26,7 +26,7 @@ import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
 import cats.effect.Sync
-import fs2.{ Pipe }
+import fs2.{ Pipe, Stream }
 
 import eu.timepit.refined
 import refined.auto._
@@ -138,7 +138,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   ) extends Balance(debits, credits) {
 
     /** */
-    def updated(
+    final def updated(
         keys: DebitCreditKey[Debit, Credit],
         amount: Mny[C]
     )(
@@ -150,7 +150,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       )
 
     /** */
-    def swapped[T <: AccountingKey](
+    final def swapped[T <: AccountingKey](
         keys: SwapKey[T],
         amount: Mny[C]
     )(
@@ -162,6 +162,12 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         credits |+| (am collectKeys Credit.unapply)
       )
     }
+
+    /** */
+    final def cashBooks: CashBookSet[C] = ???
+
+    /** */
+    final def accrualBooks: AccrualBookSet[C] = ???
   }
 
   /**
@@ -193,11 +199,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     def from[F[_]: Sync, C: Currency](
-        frequency: Frequency,
-        pricer: TradePricer[F, C],
-        cratchit: (Transaction, Json) => DoubleEntryKey
+        period: Period,
+        cratchit: Transaction => Stream[F, DoubleEntryKey]
     ): Pipe[F, Transaction, TrialBalance[C]] =
-      // price the transaction
+      // extract the price from the Transaction
+      //  TODO: how to guarantee this can be done in the general case
       // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
       // create a TrialBalance from the price and de keys
       // fold that TrialBalance into the running sum
@@ -215,8 +221,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       val revenues: Revenues[C]
   ) extends Balance(expenses, revenues)
 
-  /**
-    */
+  /** */
   object IncomeStatement {
 
     private[model] def apply[C: Currency](
@@ -335,10 +340,16 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   sealed trait BookSet[C] {
 
     /** */
+    type Repr <: BookSet[C]
+
+    /** */
     def asOf: LocalDate
 
     /** */
     def period: Period
+
+    /** `previous.asOf === this.asOf - this.Period` */
+    def previous: Repr
 
     /** */
     def cs: CashFlowStatement[C]
@@ -348,33 +359,16 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** */
     def es: EquityStatement[C]
-
-    /** */
-    type Repr <: BookSet[C]
-
-    /** `previous.asOf === this.asOf - this.Period` */
-    def previous: Repr
-
-    /**  */
-    def next[F[_]: Monad](
-        frequency: Frequency,
-        pricer: TradePricer[F, C],
-        cratchit: (Transaction, Json) => DoubleEntryKey
-    ): Pipe[F, Transaction, Repr] =
-      // first make  TrialBalance
-      // then partition into books
-      // never return these, only Stream[F, BookSet]
-      ??? // still sketchy
   }
 
   /** */
   sealed abstract case class CashBookSet[C] private (
       asOf: LocalDate,
       period: Period,
+      previous: CashBookSet[C],
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C],
       es: EquityStatement[C],
-      previous: CashBookSet[C]
   ) extends BookSet[C] {
 
     /** */
@@ -385,26 +379,32 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   object CashBookSet {
 
     /** */
-    private[Balances] def apply[C: Currency](
+    private[Balances] def apply[F[_], C: Currency](
         asOf: LocalDate,
         period: Period,
+        previous: CashBookSet[C],
         cs: CashFlowStatement[C],
         bs: BalanceSheet[C],
         es: EquityStatement[C],
-        previous: CashBookSet[C]
     ): CashBookSet[C] =
-      new CashBookSet(asOf, period, cs, bs, es, previous) {}
+      new CashBookSet(asOf, period, previous, cs, bs, es) {}
+
+    /** TODO: restricted set of DoubleEntryKeys for cash books? */
+    def pipe[F[_]: Sync, C: Currency](
+        period: Period,
+        cratchit: Transaction => Stream[F, DoubleEntryKey]
+    ): Pipe[F, Transaction, CashBookSet[C]] = ???
   }
 
   /** */
   sealed abstract case class AccrualBookSet[C] private (
       asOf: LocalDate,
       period: Period,
+      previous: AccrualBookSet[C],
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
       bs: BalanceSheet[C],
       es: EquityStatement[C],
-      previous: AccrualBookSet[C]
   ) extends BookSet[C] {
 
     /** */
@@ -418,12 +418,18 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     private[Balances] def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
+        previous: AccrualBookSet[C],
         cs: CashFlowStatement[C],
         is: IncomeStatement[C],
         bs: BalanceSheet[C],
         es: EquityStatement[C],
-        previous: AccrualBookSet[C]
     ): AccrualBookSet[C] =
-      new AccrualBookSet(asOf, period, cs, is, bs, es, previous) {}
+      new AccrualBookSet(asOf, period, previous, cs, is, bs, es) {}
+
+    /** */
+    def pipe[F[_]: Sync, C: Currency](
+        period: Period,
+        cratchit: Transaction => Stream[F, DoubleEntryKey]
+    ): Pipe[F, Transaction, AccrualBookSet[C]] = ???
   }
 }

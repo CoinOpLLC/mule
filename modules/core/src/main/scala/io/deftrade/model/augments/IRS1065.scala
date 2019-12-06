@@ -182,6 +182,12 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
 
     import Asset._
 
+    case object Defaultable
+        extends Nettable.Aux[Asset](
+          AccountsReceivable,
+          LessBadDebtAllowance
+        )
+
     case object Depreciable
         extends Nettable.Aux[Asset](
           BuildingsAndOtherDepreciableAssets,

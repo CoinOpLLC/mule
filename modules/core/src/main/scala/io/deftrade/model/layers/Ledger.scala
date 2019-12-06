@@ -125,6 +125,7 @@ trait Ledger { self: ModuleTypes =>
     type EffectType[_]
     val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
     implicit val C: Currency[CurrencyTag]
+    implicit val F: Sync[EffectType]
   }
 
   /** */
@@ -135,11 +136,12 @@ trait Ledger { self: ModuleTypes =>
         override val price: T => Stream[F, Mny[C]]
     )(
         implicit
-        final override val C: Currency[C]
+        final override val C: Currency[C],
+        final override val F: Sync[F]
     ) extends Pricer {
       final type Thing         = T
       final type CurrencyTag   = C
-      final type EffectType[_] = F[_]
+      final type EffectType[x] = F[x]
     }
   }
 
@@ -325,6 +327,7 @@ trait Ledger { self: ModuleTypes =>
     * Note this value is effectively unforgeable / self validating.
     *
     * FIXME String should be byte string.
+    * FIXME `WithHashId` should be a thing.
     */
   object Meta extends WithRefinedKey[String, IsSha256, Meta]
 
