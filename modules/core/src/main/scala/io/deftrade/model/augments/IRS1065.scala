@@ -93,10 +93,11 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
 
   /** FIXME check this */
   object Revenue extends DtEnum[Revenue1065] {
-    case object Finance        extends Revenue
-    case object Investment     extends Revenue
-    case object Receipts       extends Revenue
-    case object OrdinaryIncome extends Revenue
+    case object Finance    extends Revenue
+    case object Investment extends Revenue
+    case object Receipts   extends Revenue
+    case object NetSales   extends Revenue
+    // case object OrdinaryIncome extends Revenue
 
     /** */
     lazy val values = findValues
@@ -204,6 +205,21 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   }
 
   ///////////////////////////// Double Entry Key stuff /////////////////////////////
+
+  /**
+    *
+    */
+  object WipKeys {
+    // first key: all one transaction!
+    // AccountsReceivable += NetSales
+    // Inventories -= COGS (Debit swap)
+    // RetainedEarnings += Income
+    //                     := NetSales - COGS
+
+    // second key: customer pays bills
+    // AccountsReceivable -= CashReceipts
+
+  }
 
   /** */
   sealed abstract class SDCK1065(d: Debit, c: Credit) extends SimpleDebitCreditKey(d, c)
