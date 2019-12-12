@@ -40,7 +40,7 @@ package object model
     //
     // the full stack of layered capabilitities
     //
-    with Ledger          // possibly distributed, possibly anonymous
+    with Ledger          // possibly distributed
     with Accounting      // debits, credits, and all that
     with Balances        // depends only on generic Accounting
     with MarketData      // WIP; IBRK will be first integration
@@ -49,7 +49,7 @@ package object model
     // PII firewalling simplified by eliminating dependencies:
     // `Accounts` layer can be commented out!
     //
-    with Accounts // binding of legal entities to folios */
+    with Accounts // binding of legal entities to sets of positions */
     //
     // necessary package level augmentation
     //

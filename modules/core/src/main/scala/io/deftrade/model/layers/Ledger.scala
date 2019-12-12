@@ -36,8 +36,10 @@ import scala.language.higherKinds
 /**
   * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
   *
-  * A note on `Mark` vs `Price`: as attested generally in use within the domain of finance,
-  * and specifically as used here: we distinguish between marking and pricing:
+  *
+  * TODO: consider introducing `Mark`ing as a variant of `Pricing`.
+  * A note on `Mark` vs `Price`: as attested generally within the domain of finance,
+  * and specifically as used here: we propose to distinguish between marking and pricing:
   *   - Marking: what stuff is worth. [[capital.Instrument]]s are marked
   * with respect to market trading data.
   *   - Pricing: what stuff ought to be worth. "Fair value", if you will, for various values
@@ -108,6 +110,9 @@ trait Ledger { self: ModuleTypes =>
   /**
     * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.stores]] hold
     * immutable entries.
+    *
+    * TODO: `Trade` stores should use WithHashId to get the natural reuse of `Trade`s
+    * and minimization of store size.
     */
   object Trade extends WithId[Leg] { // sicc - to be continued
 

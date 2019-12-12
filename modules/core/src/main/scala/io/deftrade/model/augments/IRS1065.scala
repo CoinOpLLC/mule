@@ -63,16 +63,20 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   object Debt extends DtEnum[Debt1065] {
 
-    case object AccountsPayable         extends Debt
-    case object CurrentMortgateNotes    extends Debt
-    case object OtherCurrentLiabilities extends Debt
-    case object NonrecourseLoans        extends Debt
-    case object LoansFromPartners       extends Debt
-    case object MortgageNotes           extends Debt
-    case object OtherLiabilities        extends Debt
+    case object AccountsPayable         extends Debt1065
+    case object CurrentMortgateNotes    extends Debt1065
+    case object OtherCurrentLiabilities extends Debt1065
+    case object NonrecourseLoans        extends Debt1065
+    case object LoansFromPartners       extends Debt1065
+    case object MortgageNotes           extends Debt1065
+    case object OtherLiabilities        extends Debt1065
 
-    /** */
-    lazy val values = findValues
+    case object AccruedExpenses      extends Debt1065 // file under OtherCurrentLiabilities
+    case object Reserves             extends Debt1065 // file under OtherCurrentLiabilities
+    case object DistributionsPayable extends Debt1065 // file under OtherCurrentLiabilities
+
+    /** FIXME: need to fit Reserves into the mix */
+    lazy val values = findValues // ++ Reserve.values
   }
 
   /** */
@@ -81,8 +85,8 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   object Equity extends DtEnum[Equity1065] {
 
-    case object PartnersCapital  extends Equity
-    case object RetainedEarnings extends Equity
+    case object PartnersCapital  extends Equity1065
+    case object RetainedEarnings extends Equity1065
 
     /** */
     lazy val values = findValues
@@ -91,12 +95,12 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   sealed trait Revenue1065 extends Revenue
 
-  /** FIXME check this */
+  /** */
   object Revenue extends DtEnum[Revenue1065] {
-    case object Finance        extends Revenue
-    case object Investment     extends Revenue
-    case object Receipts       extends Revenue
-    case object OrdinaryIncome extends Revenue
+    case object Sales          extends Revenue1065
+    case object OrdinaryIncome extends Revenue1065
+    case object Finance        extends Revenue1065
+    case object Investment     extends Revenue1065
 
     /** */
     lazy val values = findValues
@@ -106,19 +110,14 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   sealed trait Expense1065 extends Expense
 
   /** */
-  sealed trait OpEx extends Expense
-
-  /** */
-  sealed trait CapEx extends Expense
-
-  /** */
   object Expense extends DtEnum[Expense1065] {
-    case object Investment            extends CapEx
-    case object Finance               extends CapEx // FIXME check this
-    case object COGS                  extends OpEx
-    case object RepairsAndMaintenance extends OpEx
-    case object Salaries              extends OpEx
-    case object Rent                  extends OpEx
+    case object Investment            extends Expense1065
+    case object Finance               extends Expense1065
+    case object COGS                  extends Expense1065
+    case object RepairsAndMaintenance extends Expense1065
+    case object Salaries              extends Expense1065
+    case object Rent                  extends Expense1065
+    case object OtherRental           extends Expense1065
 
     /** */
     lazy val values = findValues
@@ -130,8 +129,20 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** TODO: this needs work */
   object Income extends DtEnum[Income1065] {
 
-    case object OperatingIncome  extends Income
-    case object InvestmentIncome extends Income
+    /** ordinary business income Schedule K item 1 */
+    case object Operating extends Income1065
+
+    /** Real estate rental. */
+    case object NetRentalPer8825 extends Income1065
+
+    /** Net [[Expense.OtherRental]] to calculate other net rental income. */
+    case object OtherGrossRental extends Income1065
+
+    case object Interest          extends Income1065
+    case object OrdinaryDividend  extends Income1065
+    case object QualifiedDividend extends Income1065
+
+    case object Investment extends Income1065
 
     /** */
     lazy val values = findValues
@@ -151,19 +162,8 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
     */
   object Reserve extends DtEnum[Reserve1065] {
 
-    /** */
-    lazy val values = findValues
-  }
-
-  /**
-    * FIXME: review against IRS docs
-    * FIXME: still need to deal with BuyIn / BuyOut situation in partnerships
-    * (aka stock buybacks and issuance in public companies)
-    */
-  sealed trait Distribution1065 extends Distribution
-
-  /** */
-  object Distribution extends DtEnum[Distribution1065] {
+    case object BadLoan    extends Reserve1065
+    case object OptionPool extends Reserve1065
 
     /** */
     lazy val values = findValues
@@ -212,13 +212,32 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   ///////////////////////////// Double Entry Key stuff /////////////////////////////
 
   /** */
-  sealed abstract class SDCK1065(d: Debit, c: Credit) extends SimpleDebitCreditKey(d, c)
+  sealed abstract class SingleDebitCreditKey(d: Debit, c: Credit)
+      extends DebitCreditKey[Debit, Credit](
+        Treatment single d,
+        Treatment single c
+      )
 
   /** Keys that grow or shrink the balance. */
-  object SimpleDebitCreditKey extends DtEnum[SDCK1065] {
+  object SingleDebitCreditKey extends DtEnum[SingleDebitCreditKey] {
 
     /** */
-    case object PayBill extends SDCK1065(Asset.Cash, Debt.AccountsPayable)
+    case object PayBill extends SingleDebitCreditKey(Asset.Cash, Debt.AccountsPayable)
+
+    /** */
+    case object BorrowShort extends SingleDebitCreditKey(Asset.Cash, Debt.OtherCurrentLiabilities)
+
+    /** FIXME how to distinguish between borrow and payback? */
+    case object BorrowLong extends SingleDebitCreditKey(Asset.Cash, Debt.OtherLiabilities)
+
+    /** */
+    case object SellStock extends SingleDebitCreditKey(Asset.Cash, Equity.PartnersCapital)
+
+    /** apply to trial balance */
+    case object SellProduct extends SingleDebitCreditKey(Asset.AccountsReceivable, Revenue.Sales)
+
+    /** FIXME: need new class `DebitSwapKey` - this is a swap within a Trial Balance */
+    case object CostProduct extends DebitSwapKey //(Asset.Inventories, Expense.COGS)
 
     /** */
     lazy val values = findValues
@@ -231,32 +250,37 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   ) extends SwapKey[Asset](f, t)
 
   /** */
-  sealed abstract class SingleAssetSwapKey private[model] (from: Asset, to: Asset)
-      extends SwapKey[Asset](Treatment single from, Treatment single to)
+  object AssetSwapKey extends DtEnum[AssetSwapKey] {
+
+    /**  */
+    lazy val values = findValues ++ SingleAssetSwapKey.values
+  }
 
   /** */
-  object SingleAssetSwapKey {
+  sealed abstract class SingleAssetSwapKey private[model] (from: Asset, to: Asset)
+      extends AssetSwapKey(Treatment single from, Treatment single to)
+
+  /** */
+  object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {
+
+    import Asset._
+
+    lazy val values = findValues
 
     /** */
     def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(K, K)] =
       (sk.from, sk.to) match {
         case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
       }
-  }
-
-  /** */
-  object AssetSwapKey extends DtEnum[AssetSwapKey] {
-
-    import Asset._
 
     /** */
-    case object ShipProduct extends SingleAssetSwapKey(Inventories, AccountsReceivable)
+    case object MakeProduct extends SingleAssetSwapKey(Cash, Inventories)
 
     /** */
-    case object PurchaseInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
+    case object ReceiveProductPayment extends SingleAssetSwapKey(AccountsReceivable, Cash)
 
     /** */
-    lazy val values = findValues
+    case object BuyInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
   }
 
   /** */
@@ -268,16 +292,32 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
 
+    /** */
+    lazy val values = findValues ++ SingleLiabilitySwapKey.values
+  }
+
+  /** */
+  sealed abstract class SingleLiabilitySwapKey private[model] (from: Liability, to: Liability)
+      extends LiabilitySwapKey(Treatment single from, Treatment single to)
+
+  /** */
+  object SingleLiabilitySwapKey extends DtEnum[SingleLiabilitySwapKey] {
+
     import Debt._
 
     /** */
-    case object LongTermToCurrentLiability
-        extends LiabilitySwapKey(
-          Treatment single OtherLiabilities,
-          Treatment single OtherCurrentLiabilities
-        )
+    def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(K, K)] =
+      (sk.from, sk.to) match {
+        case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
+      }
 
     /** */
+    case object MakeCurrent
+        extends SingleLiabilitySwapKey(
+          OtherLiabilities,
+          OtherCurrentLiabilities
+        )
+
     lazy val values = findValues
   }
 }
