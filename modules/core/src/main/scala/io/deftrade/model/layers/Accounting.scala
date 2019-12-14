@@ -245,7 +245,7 @@ trait Accounting { self: ModuleTypes =>
     final def credits: Treatment[C] = contras
   }
 
-  /** placeholder */
+  /** */
   object DebitCreditKey {
 
     /** */
@@ -291,6 +291,49 @@ trait Accounting { self: ModuleTypes =>
       (sk.from, sk.to).some
   }
 
-  /** FIXME implement! */
-  trait DebitSwapKey
+  /** not sealed - extension point */
+  abstract class DebitSwapKey[D <: Debit](
+      from: Treatment[D],
+      to: Treatment[D]
+  ) extends SwapKey(from, to)
+
+  /** */
+  object DebitSwapKey {
+
+    /** */
+    def accountMap[D <: Debit, CCY: Currency](
+        ks: DebitSwapKey[D],
+        amount: Mny[CCY]
+    ): (AccountMap[D, CCY], AccountMap[D, CCY]) =
+      (ks.from.toSortedMap mapValues (amount * _), ks.to.toSortedMap mapValues (amount * _))
+
+    /** */
+    def unapply[D <: Debit](
+        dsk: DebitSwapKey[D]
+    ): Option[(Treatment[D], Treatment[D])] =
+      (dsk.from, dsk.to).some
+  }
+
+  /** */
+  abstract class CreditSwapKey[C <: Credit] private[model] (
+      f: Treatment[C],
+      t: Treatment[C]
+  ) extends SwapKey[C](f, t)
+
+  /** */
+  object CreditSwapKey {
+
+    /** */
+    def accountMap[C <: Credit, CCY: Currency](
+        ks: CreditSwapKey[C],
+        amount: Mny[CCY]
+    ): (AccountMap[C, CCY], AccountMap[C, CCY]) =
+      (ks.from.toSortedMap mapValues (amount * _), ks.to.toSortedMap mapValues (amount * _))
+
+    /** */
+    def unapply[C <: Credit](
+        dsk: CreditSwapKey[C]
+    ): Option[(Treatment[C], Treatment[C])] =
+      (dsk.from, dsk.to).some
+  }
 }

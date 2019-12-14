@@ -252,31 +252,18 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
     case object SellProduct extends SingleDebitCreditKey(Asset.AccountsReceivable, Revenue.Sales)
 
     /** FIXME: need new class `DebitSwapKey` - this is a swap within a Trial Balance */
-    case object CostProduct extends DebitSwapKey //(Asset.Inventories, Expense.COGS)
+    case object CostProduct extends SingleDebitSwapKey(Asset.Inventories, Expense.COGS)
 
     /** */
     lazy val values = findValues
   }
 
   /** */
-  sealed abstract class AssetSwapKey private[model] (
-      f: Treatment[Asset],
-      t: Treatment[Asset]
-  ) extends SwapKey[Asset](f, t)
+  sealed abstract class SingleDebitSwapKey private[model] (from: Debit, to: Debit)
+      extends DebitSwapKey[Debit](Treatment single from, Treatment single to)
 
   /** */
-  object AssetSwapKey extends DtEnum[AssetSwapKey] {
-
-    /**  */
-    lazy val values = findValues ++ SingleAssetSwapKey.values
-  }
-
-  /** */
-  sealed abstract class SingleAssetSwapKey private[model] (from: Asset, to: Asset)
-      extends AssetSwapKey(Treatment single from, Treatment single to)
-
-  /** */
-  object SingleAssetSwapKey extends DtEnum[SingleAssetSwapKey] {
+  object SingleDebitSwapKey extends DtEnum[SingleDebitSwapKey] {
 
     import Asset._
 
@@ -289,34 +276,21 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
       }
 
     /** */
-    case object MakeProduct extends SingleAssetSwapKey(Cash, Inventories)
+    case object MakeProduct extends SingleDebitSwapKey(Cash, Inventories)
 
     /** */
-    case object ReceiveProductPayment extends SingleAssetSwapKey(AccountsReceivable, Cash)
+    case object ReceiveProductPayment extends SingleDebitSwapKey(AccountsReceivable, Cash)
 
     /** */
-    case object BuyInstrument extends SingleAssetSwapKey(OtherInvestments, Cash)
+    case object BuyInstrument extends SingleDebitSwapKey(OtherInvestments, Cash)
   }
 
   /** */
-  sealed abstract class LiabilitySwapKey private[model] (
-      f: Treatment[Liability],
-      t: Treatment[Liability]
-  ) extends SwapKey[Liability](f, t)
+  sealed abstract class SingleCreditSwapKey private[model] (from: Credit, to: Credit)
+      extends CreditSwapKey[Credit](Treatment single from, Treatment single to)
 
   /** */
-  object LiabilitySwapKey extends DtEnum[LiabilitySwapKey] {
-
-    /** */
-    lazy val values = findValues ++ SingleLiabilitySwapKey.values
-  }
-
-  /** */
-  sealed abstract class SingleLiabilitySwapKey private[model] (from: Liability, to: Liability)
-      extends LiabilitySwapKey(Treatment single from, Treatment single to)
-
-  /** */
-  object SingleLiabilitySwapKey extends DtEnum[SingleLiabilitySwapKey] {
+  object SingleCreditSwapKey extends DtEnum[SingleCreditSwapKey] {
 
     import Debt._
 
@@ -328,7 +302,7 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
 
     /** */
     case object MakeCurrent
-        extends SingleLiabilitySwapKey(
+        extends SingleCreditSwapKey(
           OtherLiabilities,
           OtherCurrentLiabilities
         )
