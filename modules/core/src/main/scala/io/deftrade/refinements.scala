@@ -104,7 +104,7 @@ object refinements {
   type VarChar255 = String Refined IsVarChar255
 
   /** */
-  type IsSha256 = Size[W.`256`.T]
+  type IsSha256 = Size[W.`32`.T]
 
   /** */
   type Sha256 = Array[Byte] Refined IsSha256

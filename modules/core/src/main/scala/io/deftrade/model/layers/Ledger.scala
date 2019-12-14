@@ -34,10 +34,11 @@ import io.circe.Json
 import scala.language.higherKinds
 
 /**
-  * Tabulation of `Ledger`s of `Folio`s from `Transaction`s.
+  * Basic transacting.
   *
-  * A note on `Mark` vs `Price`: as attested generally in use within the domain of finance,
-  * and specifically as used here: we distinguish between marking and pricing:
+  * TODO: consider introducing `Mark`ing as a variant of `Pricing`.
+  * A note on `Mark` vs `Price`: as attested generally within the domain of finance,
+  * and specifically as used here: we propose to distinguish between marking and pricing:
   *   - Marking: what stuff is worth. [[capital.Instrument]]s are marked
   * with respect to market trading data.
   *   - Pricing: what stuff ought to be worth. "Fair value", if you will, for various values
@@ -108,6 +109,9 @@ trait Ledger { self: ModuleTypes =>
   /**
     * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.stores]] hold
     * immutable entries.
+    *
+    * TODO: `Trade` stores should use WithHashId to get the natural reuse of `Trade`s
+    * and minimization of store size.
     */
   object Trade extends WithId[Leg] { // sicc - to be continued
 
@@ -125,6 +129,7 @@ trait Ledger { self: ModuleTypes =>
     type EffectType[_]
     val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
     implicit val C: Currency[CurrencyTag]
+    implicit val F: Sync[EffectType]
   }
 
   /** */
@@ -135,11 +140,12 @@ trait Ledger { self: ModuleTypes =>
         override val price: T => Stream[F, Mny[C]]
     )(
         implicit
-        final override val C: Currency[C]
+        final override val C: Currency[C],
+        final override val F: Sync[F]
     ) extends Pricer {
       final type Thing         = T
       final type CurrencyTag   = C
-      final type EffectType[_] = F[_]
+      final type EffectType[x] = F[x]
     }
   }
 
@@ -325,6 +331,7 @@ trait Ledger { self: ModuleTypes =>
     * Note this value is effectively unforgeable / self validating.
     *
     * FIXME String should be byte string.
+    * FIXME `WithHashId` should be a thing.
     */
   object Meta extends WithRefinedKey[String, IsSha256, Meta]
 

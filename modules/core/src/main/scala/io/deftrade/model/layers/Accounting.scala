@@ -100,10 +100,6 @@ trait Accounting { self: ModuleTypes =>
   val Expense: DtEnum[_ <: Expense]
 
   /** */
-  trait Distribution extends Debit
-  val Distribution: DtEnum[_ <: Distribution]
-
-  /** */
   trait Revenue extends Credit
   val Revenue: DtEnum[_ <: Revenue]
 
@@ -217,10 +213,10 @@ trait Accounting { self: ModuleTypes =>
     def contras: Treatment[ContraKey]
   }
 
-  /** placeholder */
+  /** */
   object DoubleEntryKey {
 
-    /** */
+    /** subclass which assigns type parameters to type members */
     sealed abstract class Aux[K1 <: AccountingKey, K2 <: AccountingKey](
         es: Treatment[K1],
         cs: Treatment[K2]
@@ -250,7 +246,21 @@ trait Accounting { self: ModuleTypes =>
   }
 
   /** placeholder */
-  object DebitCreditKey
+  object DebitCreditKey {
+
+    /** */
+    def accountMap[D <: Debit, C <: Credit, CCY: Currency](
+        ks: DebitCreditKey[D, C],
+        amount: Mny[CCY]
+    ): (AccountMap[D, CCY], AccountMap[C, CCY]) =
+      (ks.debits.toSortedMap mapValues (amount * _), ks.credits.toSortedMap mapValues (amount * _))
+
+    /** */
+    def unapply[D <: Debit, C <: Credit](
+        dck: DebitCreditKey[D, C]
+    ): Option[(Treatment[D], Treatment[C])] =
+      (dck.debits, dck.credits).some
+  }
 
   /**
     * Keys that preserve the balance of a [[Balances.BalanceSheet]].
@@ -281,12 +291,6 @@ trait Accounting { self: ModuleTypes =>
       (sk.from, sk.to).some
   }
 
-  /** */
-  abstract class SimpleDebitCreditKey(
-      final val debit: Debit,
-      final val credit: Credit
-  ) extends DebitCreditKey(Treatment single debit, Treatment single credit)
-
-  /** */
-  val SimpleDebitCreditKey: DtEnum[_ <: SimpleDebitCreditKey]
+  /** FIXME implement! */
+  trait DebitSwapKey
 }
