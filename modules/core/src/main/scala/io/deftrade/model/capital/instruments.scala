@@ -59,6 +59,7 @@ final case class Instrument(
   * `Instrument`s evolve over time.
   *
   * E.g. one might want to allow for, and track, a change in currency.
+  * FIXME find some other way, this is nuts - when are new `ISIN`s issued?
   */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 

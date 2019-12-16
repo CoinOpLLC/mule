@@ -18,11 +18,12 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, time._, money._
+import keyval._, time._, money._, capital._
 
 import cats.implicits._
 import cats.{ Monad }
 import cats.data.{ Kleisli, NonEmptySet }
+import cats.effect.IO
 
 import eu.timepit.refined
 import refined.cats.refTypeOrder
@@ -71,6 +72,66 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /** */
     type Phase[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
+
+    /** WIP Composing Contracts from Peyton Jones et al */
+    sealed trait Contract {
+
+      /** */
+      def trade: Trade.Id = ???
+
+      /** */
+      def and(c: Contract): Contract = ???
+
+      /** */
+      def or(c: Contract): Contract = ???
+
+      /** */
+      def truncate(zdt: ZonedDateTime): Contract = ???
+
+      /** */
+      def elseThen(c: Contract): Contract = ???
+
+      /** */
+      def scale(q: Quantity): Contract = ???
+    }
+
+    /** */
+    object Contract {
+
+      def apply(leg: Leg) = leg match {
+        case (k, x) => Contract one k scale x
+      }
+
+      /**  */
+      def zeroCouponInstrument(t: ZonedDateTime, x: Quantity, k: Instrument.Key) =
+        Contract(k -> x) truncate t
+
+      /** */
+      def zero: Contract = ???
+
+      /** */
+      def one(k: Instrument.Key): Contract = ??? // Contract(instrument)
+
+      /** */
+      def give(c: Contract): Contract = ??? // flip sign of Quantity
+
+      /** */
+      def get(c: Contract): Contract = ???
+
+      /** */
+      def anytime(c: Contract): Contract = ???
+
+      /** FIXME: Obs != Stream in subtle ways */
+      type Obs[A] = Stream[IO, A]
+
+      object Obs {
+        def konst[A](a: A): Obs[A] = Stream eval (IO delay a)
+      }
+
+      def time(zdt: ZonedDateTime): Obs[Period] = ???
+
+      def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
+    }
 
     /**
       * What the client wants [[Execution]] of.
