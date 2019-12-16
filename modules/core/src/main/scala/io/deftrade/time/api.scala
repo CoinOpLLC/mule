@@ -230,17 +230,6 @@ trait api {
     Instant ofEpochSecond (epochSecond, nanoAdjustment)
   def instant(text: CharSequence) = Instant parse text
 
-  implicit class InstantOps(val i: Instant) extends Ordered[Instant] {
-
-    def nano: Int         = i.getNano
-    def epochSecond: Long = i.getEpochSecond
-
-    def +(amount: TemporalAmount): InstantOps = i plus amount
-    def -(amount: TemporalAmount): InstantOps = i minus amount
-
-    override def compare(that: Instant): Int = i compareTo that
-  }
-
   type Year = java.time.Year
 
   def year               = Year.now

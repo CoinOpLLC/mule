@@ -73,30 +73,57 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /** */
     type Phase[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
 
-    /** WIP Composing Contracts from Peyton Jones et al */
-    sealed trait Contract {
+    /**
+      * WIP that follows Composing Contracts from Simon Peyton Jones et al.
+      * TODO: finish
 
-      /** */
-      def trade: Trade.Id = ???
+data Contract =
+     Zero
+   | One  Currency
+   | Give Contract
+   | And  Contract Contract
+   | Or   Contract Contract
+   | Cond    (Obs Bool)   Contract Contract
+   | Scale   (Obs Double) Contract
+   | When    (Obs Bool)   Contract
+   | Anytime (Obs Bool)   Contract
+   | Until   (Obs Bool)   Contract
 
-      /** */
-      def and(c: Contract): Contract = ???
+      */
+    sealed trait Contract
 
-      /** */
-      def or(c: Contract): Contract = ???
+    case object Zero extends Contract
 
-      /** */
-      def truncate(zdt: ZonedDateTime): Contract = ???
+    sealed abstract case class One private (k: CurrencyLike) extends Contract
+    object One { def apply[C: Currency]: Contract = new One(Currency[C]) {} }
 
-      /** */
-      def elseThen(c: Contract): Contract = ???
-
-      /** */
-      def scale(q: Quantity): Contract = ???
-    }
+    sealed abstract case class Give(c: Contract) extends Contract
+    object Give { def apply(c: Contract): Contract = new Give(c) {} }
 
     /** */
     object Contract {
+
+      /** */
+      implicit class Ops(val c: Contract) /* extends AnyVal */ {
+
+        /** */
+        final def and(c2: Contract): Contract = ???
+
+        /** */
+        final def or(c2: Contract): Contract = ???
+
+        /** truncate the horizon of a contract */
+        final def truncate(zdt: ZonedDateTime): Contract = ???
+
+        /** acquire underlying contract at the specficied date */
+        final def at(zdt: ZonedDateTime): Contract = ???
+
+        /** */
+        final def elseThen(c2: Contract): Contract = ???
+
+        /** */
+        final def scale(q: Quantity): Contract = ???
+      }
 
       def apply(leg: Leg) = leg match {
         case (k, x) => Contract one k scale x
@@ -107,7 +134,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         Contract(k -> x) truncate t
 
       /** */
-      def zero: Contract = ???
+      def zero: Contract = Zero
 
       /** */
       def one(k: Instrument.Key): Contract = ??? // Contract(instrument)

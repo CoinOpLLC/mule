@@ -18,9 +18,9 @@ package io.deftrade
 package model
 package capital
 
-import time.ZonedDateTime
+import time.{ LocalDate, Period, ZonedDateTime }
 import time.market.Frequency
-import money.{ CurrencyLike, Financial }
+import money.{ Currency, CurrencyLike, Financial }
 import keyval._
 import refinements.{ Label }
 import model.reference.{ IsIsin, IsUsin }
@@ -62,6 +62,76 @@ final case class Instrument(
   * FIXME find some other way, this is nuts - when are new `ISIN`s issued?
   */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
+
+sealed trait Contract
+
+case object Zero extends Contract
+
+sealed abstract case class One private (k: CurrencyLike) extends Contract
+object One { def apply[C: Currency]: Contract = new One(Currency[C]) {} }
+
+sealed abstract case class Give(c: Contract) extends Contract
+object Give { def apply(c: Contract): Contract = new Give(c) {} }
+
+/** */
+object Contract {
+
+  /** */
+  implicit class Ops(val c: Contract) /* extends AnyVal */ {
+
+    /** */
+    final def and(c2: Contract): Contract = ???
+
+    /** */
+    final def or(c2: Contract): Contract = ???
+
+    /** truncate the horizon of a contract */
+    final def truncate(zdt: ZonedDateTime): Contract = ???
+
+    /** acquire underlying contract at the specficied date */
+    final def at(zdt: ZonedDateTime): Contract = ???
+
+    /** */
+    final def elseThen(c2: Contract): Contract = ???
+
+    /** */
+    final def scale[N: Financial](q: N): Contract = ???
+  }
+
+  // def apply(leg: Leg) = leg match {
+  //   case (k, x) => Contract one k scale x
+  // }
+
+  /**  */
+  def zeroCouponInstrument[N: Financial, C: Currency](t: ZonedDateTime, x: N) =
+    Contract.one[C] scale x truncate t
+
+  /** */
+  def zero: Contract = Zero
+
+  /** */
+  def one[C: Currency]: Contract = One(Currency[C])
+
+  /** */
+  def give(c: Contract): Contract = ??? // flip sign
+
+  /** */
+  def get(c: Contract): Contract = ???
+
+  /** */
+  def anytime(c: Contract): Contract = ???
+
+  /** FIXME: Obs != Stream in subtle ways */
+  type Obs[A] = fs2.Stream[cats.effect.IO, A]
+
+  object Obs {
+    def konst[A](a: A): Obs[A] = ??? // Stream eval (IO delay a)
+  }
+
+  def time(zdt: ZonedDateTime): Obs[Period] = ???
+
+  def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
+}
 
 /** */
 object columns {
