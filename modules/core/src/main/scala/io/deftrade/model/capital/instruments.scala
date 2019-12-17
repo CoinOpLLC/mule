@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package capital
 
-import time.{ LocalDate, Period, ZonedDateTime }
+import time.{ ZonedDateTime }
 import time.market.Frequency
 import money.{ Currency, CurrencyLike, Financial }
 import keyval._
@@ -85,49 +85,39 @@ sealed trait Contract
 /** */
 object Contract {
 
-  case object Zero                                                                  extends Contract
-  sealed abstract case class One private[Contract] (k: CurrencyLike)                extends Contract
-  sealed abstract case class Give private[Contract] (c: Contract)                   extends Contract
-  sealed abstract case class Scale[N: Financial] private[Contract] (v: Obs[N])      extends Contract
-  sealed abstract case class And private[Contract] (c1: Contract, c2: Contract)     extends Contract
-  sealed abstract case class Or private[Contract] (c1: Contract, c2: Contract)      extends Contract
-  sealed abstract case class When private[Contract] (v: Obs[Boolean], c: Contract)  extends Contract
-  sealed abstract case class Until private[Contract] (v: Obs[Boolean], c: Contract) extends Contract
-  sealed abstract case class Anytime private[Contract] (
-      v: Obs[Boolean],
-      c: Contract
-  ) extends Contract
-  sealed abstract case class Cond private[Contract] (
-      v: Obs[Boolean], // if
-      c1: Contract, // then
-      c2: Contract // else
-  ) extends Contract
+  case object Zero                                                             extends Contract
+  sealed abstract case class One(k: CurrencyLike)                              extends Contract
+  sealed abstract case class Give(c: Contract)                                 extends Contract
+  sealed abstract case class And(c1: Contract, c2: Contract)                   extends Contract
+  sealed abstract case class Or(c1: Contract, c2: Contract)                    extends Contract
+  sealed abstract case class When(o: Obs[Boolean], c: Contract)                extends Contract
+  sealed abstract case class Until(o: Obs[Boolean], c: Contract)               extends Contract
+  sealed abstract case class Upto(o: Obs[Boolean], c: Contract)                extends Contract
+  sealed abstract case class Anytime(o: Obs[Boolean], c: Contract)             extends Contract
+  sealed abstract case class Scale[N: Financial](o: Obs[N], c: Contract)       extends Contract
+  sealed abstract case class Cond(o: Obs[Boolean], c1: Contract, c2: Contract) extends Contract
 
   /** */
   implicit class Ops(val c: Contract) /* extends AnyVal */ {
 
     /** */
-    final def and(c2: Contract): Contract = ???
+    final def and(c2: Contract): Contract = new And(c, c2) {}
 
     /** */
-    final def or(c2: Contract): Contract = ???
+    final def or(c2: Contract): Contract = new Or(c, c2) {}
 
-    /** truncate the horizon of a contract */
-    final def truncate(zdt: ZonedDateTime): Contract = ???
-
-    /** acquire underlying contract at the specficied date */
-    final def at(zdt: ZonedDateTime): Contract = ???
+    /**  */
+    final def when(o: Obs[Boolean]): Contract = new When(o, c) {}
 
     /** */
-    final def elseThen(c2: Contract): Contract = ???
-
-    /** */
-    final def scale[N: Financial](q: N): Contract = ???
+    final def scale[N: Financial](o: Obs[N]): Contract = new Scale(o, c) {}
   }
+
+  def at(zdt: ZonedDateTime): Obs[Boolean] = ???
 
   /**  */
   def zeroCouponInstrument[N: Financial, C: Currency](t: ZonedDateTime, x: N) =
-    Contract.one[C] scale x truncate t
+    when(at(t), one scale (Obs konst x))
 
   /** */
   def zero: Contract = Zero
@@ -139,19 +129,42 @@ object Contract {
   def give(c: Contract): Contract = new Give(c) {}
 
   /** */
-  def when(v: Obs[Boolean], c: Contract): Contract = new When(v, c) {}
+  def when(o: Obs[Boolean], c: Contract): Contract = new When(o, c) {}
 
   /** */
-  def anytime(v: Obs[Boolean], c: Contract): Contract = new Anytime(v, c) {}
+  def until(o: Obs[Boolean], c: Contract): Contract = new Until(o, c) {}
+
+  /** */
+  def upto(o: Obs[Boolean], c: Contract): Contract = new Upto(o, c) {}
+
+  /** */
+  def anytime(o: Obs[Boolean], c: Contract): Contract = new Anytime(o, c) {}
+
+  /** */
+  type PStream[A] = fs2.Stream[fs2.Pure, A]
+  final val PStream = fs2.Stream
+
+  /** */
+  type RV[A] = PStream[A]
+
+  /** */
+  type PR[A] = PStream[RV[A]]
 
   /**  */
-  trait Obs[A]
+  case class Obs[A](f: ZonedDateTime => PR[A])
 
-  /**  */
+  /**    */
   object Obs {
-    def konst[A](a: A): Obs[A]                     = ???
-    def time(zdt: ZonedDateTime): Obs[Period]      = ???
-    def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def konst[A](a: A): Obs[A] = Obs(_ => (PStream emit (PStream emit a)).repeat)
+
+    // "The value of the observable date at date t is just t."
+    //  date :: Obs Date
+    //  date = Obs (\t -> PR $ timeSlices [t])
+    // def time(zdt: ZonedDateTime): Obs[Period]      = ???
+    // def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
   }
 }
 

@@ -18,12 +18,11 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, time._, money._, capital._
+import keyval._, time._, money._
 
 import cats.implicits._
 import cats.{ Monad }
 import cats.data.{ Kleisli, NonEmptySet }
-import cats.effect.IO
 
 import eu.timepit.refined
 import refined.cats.refTypeOrder
