@@ -63,18 +63,45 @@ final case class Instrument(
   */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 
+/**
+  * WIP that follows Composing Contracts from Simon Peyton Jones et al.
+  * TODO: finish
+
+data Contract =
+ Zero
+| One  Currency
+| Give Contract
+| And  Contract Contract
+| Or   Contract Contract
+| Cond    (Obs Bool)   Contract Contract
+| Scale   (Obs Double) Contract
+| When    (Obs Bool)   Contract
+| Anytime (Obs Bool)   Contract
+| Until   (Obs Bool)   Contract
+
+  */
 sealed trait Contract
-
-case object Zero extends Contract
-
-sealed abstract case class One private (k: CurrencyLike) extends Contract
-object One { def apply[C: Currency]: Contract = new One(Currency[C]) {} }
-
-sealed abstract case class Give(c: Contract) extends Contract
-object Give { def apply(c: Contract): Contract = new Give(c) {} }
 
 /** */
 object Contract {
+
+  case object Zero                                                                  extends Contract
+  sealed abstract case class One private[Contract] (k: CurrencyLike)                extends Contract
+  sealed abstract case class Give private[Contract] (c: Contract)                   extends Contract
+  sealed abstract case class Scale[N: Financial] private[Contract] (v: Obs[N])      extends Contract
+  sealed abstract case class And private[Contract] (c1: Contract, c2: Contract)     extends Contract
+  sealed abstract case class Or private[Contract] (c1: Contract, c2: Contract)      extends Contract
+  sealed abstract case class When private[Contract] (v: Obs[Boolean], c: Contract)  extends Contract
+  sealed abstract case class Until private[Contract] (v: Obs[Boolean], c: Contract) extends Contract
+  sealed abstract case class Anytime private[Contract] (
+      v: Obs[Boolean],
+      c: Contract
+  ) extends Contract
+  sealed abstract case class Cond private[Contract] (
+      v: Obs[Boolean], // if
+      c1: Contract, // then
+      c2: Contract // else
+  ) extends Contract
 
   /** */
   implicit class Ops(val c: Contract) /* extends AnyVal */ {
@@ -98,10 +125,6 @@ object Contract {
     final def scale[N: Financial](q: N): Contract = ???
   }
 
-  // def apply(leg: Leg) = leg match {
-  //   case (k, x) => Contract one k scale x
-  // }
-
   /**  */
   def zeroCouponInstrument[N: Financial, C: Currency](t: ZonedDateTime, x: N) =
     Contract.one[C] scale x truncate t
@@ -110,27 +133,26 @@ object Contract {
   def zero: Contract = Zero
 
   /** */
-  def one[C: Currency]: Contract = One(Currency[C])
+  def one[C: Currency]: Contract = new One(Currency[C]) {}
 
   /** */
-  def give(c: Contract): Contract = ??? // flip sign
+  def give(c: Contract): Contract = new Give(c) {}
 
   /** */
-  def get(c: Contract): Contract = ???
+  def when(v: Obs[Boolean], c: Contract): Contract = new When(v, c) {}
 
   /** */
-  def anytime(c: Contract): Contract = ???
+  def anytime(v: Obs[Boolean], c: Contract): Contract = new Anytime(v, c) {}
 
-  /** FIXME: Obs != Stream in subtle ways */
-  type Obs[A] = fs2.Stream[cats.effect.IO, A]
+  /**  */
+  trait Obs[A]
 
+  /**  */
   object Obs {
-    def konst[A](a: A): Obs[A] = ??? // Stream eval (IO delay a)
+    def konst[A](a: A): Obs[A]                     = ???
+    def time(zdt: ZonedDateTime): Obs[Period]      = ???
+    def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
   }
-
-  def time(zdt: ZonedDateTime): Obs[Period] = ???
-
-  def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
 }
 
 /** */

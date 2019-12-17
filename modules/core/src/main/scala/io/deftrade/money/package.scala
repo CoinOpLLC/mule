@@ -24,9 +24,7 @@ import cats.kernel.CommutativeGroup
   *   '''financial market participants''': banks, certainly, but also hedge funds,
   *   private equity funds, insurance companies, mortgage companies, etc.
   *
-  *   ==Requirements:==
-  *   - scalazzi compliant
-  *   - plays well with cats
+  *   ==Imperatives:==
   *   - exploit java Currency support for [[https://en.wikipedia.org/wiki/ISO_4217 ISO 4217]]
   *   - take some ''inspiration'' from `squants.market`
   *   - comprehend the facilities provided by other FOSS packages
@@ -38,7 +36,7 @@ import cats.kernel.CommutativeGroup
   *   - distinct types for each currency
   *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
   *   - abstract over currencies for single implicit `cats.CommutativeGroup` function
-  *   - few dependencies:
+  *   - dependencies (the usual suspects):
   *       - `typelevel algebra` (which includes `spire`)
   *       - `Enumeratum` to walk thru implemented currency codes
   *       - integration with `Refined` via `RefType[F[_,_]]`
