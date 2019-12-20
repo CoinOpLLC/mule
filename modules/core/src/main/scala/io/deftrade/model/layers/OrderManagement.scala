@@ -195,7 +195,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         )(
             p: Folio.Key
         ): Phase[Execution, Unit] = ???
-
       }
   }
 }

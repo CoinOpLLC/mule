@@ -34,9 +34,6 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
   /** */
   object Asset extends DtEnum[Asset1065] {
 
-    /** */
-    lazy val values = findValues
-
     case object Cash                               extends Asset1065
     case object AccountsReceivable                 extends Asset1065
     case object LessBadDebtAllowance               extends Asset1065
@@ -55,6 +52,11 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
     case object IntangibleAssets                   extends Asset1065
     case object LessAccumulatedAmortization        extends Asset1065
     case object OtherAssets                        extends Asset1065
+
+    case object PrepaidExpenses extends Asset1065 // file under OtherCurrent
+
+    /** */
+    lazy val values = findValues
   }
 
   /** */
