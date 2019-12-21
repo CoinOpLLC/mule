@@ -268,7 +268,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - indexAndSum settled positions for reconcilliation
     */
   sealed trait Market {
-    def entity: LegalEntity.Key
+    def entity: Party.Key
     def contra: Folio.Key
   }
 
@@ -287,7 +287,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   sealed abstract case class Counterparty(
       final val label: Label,
       final val contra: Folio.Key,
-      final val entity: LegalEntity.Key
+      final val entity: Party.Key
   ) extends Market
 
   /** */
@@ -302,7 +302,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   sealed abstract case class Exchange private (
       final val mic: Mic,
       final val contra: Folio.Key,
-      final val entity: LegalEntity.Key
+      final val entity: Party.Key
   ) extends Market
 
   /** */
@@ -312,7 +312,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def fromMic(mic: Mic): Exchange = ??? // make new contra account
 
     /** */
-    def withEntity(entity: LegalEntity.Key): Exchange => Exchange =
+    def withEntity(entity: Party.Key): Exchange => Exchange =
       x => new Exchange(x.mic, x.contra, entity) {}
   }
 

@@ -249,12 +249,12 @@ object IsinScratch {
 object Repos extends WithOpaqueKey[Long, OMS[Id]] {
 
   /** */
-  type LegalEntities = LegalEntity.Table
+  type LegalEntities = Party.Table
 
   /** */
-  implicit def w00t: Fresh[LegalEntity.Key] = ??? // to compile duh
+  implicit def w00t: Fresh[Party.Key] = ??? // to compile duh
   /** */
-  object LegalEntities extends SimplePointInTimeRepository[_root_.cats.Id, LegalEntity.Key, LegalEntity]
+  object LegalEntities extends SimplePointInTimeRepository[_root_.cats.Id, Party.Key, Party]
 
   /**
     * `CashInstruments`:

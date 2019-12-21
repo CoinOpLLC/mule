@@ -49,7 +49,7 @@ import fs2.{ Pure, Stream }
   */
 final case class Instrument(
     symbol: Label,
-    issuer: LegalEntity.Key,
+    issuer: Party.Key,
     currency: CurrencyLike,
     meta: Json,
 ) {

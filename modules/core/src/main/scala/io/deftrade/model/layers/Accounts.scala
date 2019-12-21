@@ -30,10 +30,10 @@ trait Accounts { self: Ledger with ModuleTypes =>
     *
     */
   sealed abstract case class Roster private (
-      principals: UnitPartition[LegalEntity.Key, Quantity],
-      nonPrincipals: LegalEntity.Role => NonEmptySet[LegalEntity.Key]
+      principals: UnitPartition[Party.Key, Quantity],
+      nonPrincipals: Party.Role => NonEmptySet[Party.Key]
   ) {
-    import LegalEntity.{ Key, Role }
+    import Party.{ Key, Role }
 
     /** */
     lazy val roles: NonEmptyMap[Role, NonEmptySet[Key]] =
@@ -54,7 +54,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
 
     /** */
-    def withAuditor(auditor: LegalEntity.Key): Roster =
+    def withAuditor(auditor: Party.Key): Roster =
       Roster unsafe (
         principals,
         role =>
@@ -70,7 +70,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   object Roster {
 
-    import LegalEntity.{ Key, Role }
+    import Party.{ Key, Role }
 
     /**
       * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
@@ -83,7 +83,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
 
     /**
-      * Splits partition equally among [[LegalEntity.Role.Principal]]s.
+      * Splits partition equally among [[Party.Role.Principal]]s.
       */
     def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
 
@@ -122,7 +122,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def apply(roster: Roster, folio: Folio.Key): Account = new Account(roster, folio) {}
 
     /** */
-    def single(entity: LegalEntity.Key, folio: Folio.Key) = Account(Roster single entity, folio)
+    def single(entity: Party.Key, folio: Folio.Key) = Account(Roster single entity, folio)
 
     /** TODO: use kittens? Why or why not? */
     implicit def eq = Eq.fromUniversalEquals[Account]

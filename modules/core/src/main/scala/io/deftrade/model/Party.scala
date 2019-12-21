@@ -34,18 +34,20 @@ import io.circe.Json
   * Models real world actors under the aegis of, and registered with, real world
   * justistictions.
   *
-  * Small step towards privacy by design: [[LegalEntity.TaxId]]'s are not used as keys.
+  * Small step towards privacy by design: [[Party.TaxId]]'s are not used as keys.
   */
-sealed trait LegalEntity extends Serializable {
+sealed trait Party extends Serializable {
   def name: Label
-  def taxId: LegalEntity.TaxId
+  def taxId: Party.TaxId
   def meta: Json
 }
 
 /**
   * Players that are recognized by the system (ours).
   */
-object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
+object Party extends WithOpaqueKey[Int, Party] {
+
+  import refined.auto._
 
   /** */
   type IsTaxId = IsSsn Or IsEin
@@ -53,38 +55,38 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
   /** */
   type TaxId = String Refined IsTaxId
 
-  import refined.auto._
-
   /**
-    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `LegalEntity`s.
+    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `Party`s.
     */
   final case class NaturalPerson(
       name: Label,
       ssn: Ssn,
       dob: LocalDate,
       meta: Json
-  ) extends LegalEntity {
+  ) extends Party {
     def taxId = ssn
   }
 
   /**
-    * `Corporation`s are `LegalEntity`s too!
+    * `Corporation`s are `Party`s too!
     */
-  final case class Corporation(name: Label, ein: Ein, meta: Json) extends LegalEntity {
+  final case class Corporation(name: Label, ein: Ein, meta: Json) extends Party {
     def taxId = ein
   }
 
-  implicit def eqEntity = Eq.fromUniversalEquals[LegalEntity]
+  /** */
+  implicit def eqEntity = Eq.fromUniversalEquals[Party]
 
-  implicit def showEntity = Show.show[LegalEntity] {
+  /** */
+  implicit def showEntity = Show.show[Party] {
     _.toString // this can evolve!
   }
 
   /**
-    * There are a finite enumeration of roles which [[LegalEntity]]s may take on with respect to
+    * There are a finite enumeration of roles which [[Party]]s may take on with respect to
     * [[layers.Accounts.Account]]s.
     *
-    * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Accounts.Roster]].
+    * Every `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]].
     */
   sealed trait Role extends EnumEntry
 
@@ -111,7 +113,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       *
       * There is _always_ a distinguished [[Role]], the `Principal`.
       *
-      * The [[LegalEntity]] which is the market participant
+      * The [[Party]] which is the market participant
       * responsible for establishing the [[layers.Accounts.Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
@@ -124,7 +126,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
     /**
       * The primary delegate selected by a `Principal`.
-      * Also, simply, the `LegalEntity`(s) whose names are listed on the `Account`,
+      * Also, simply, the `Party`(s) whose names are listed on the `Account`,
       * and the primary point of contact for the `Account`.
       *
       * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
@@ -136,7 +138,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
 
     /**
       * The primary delegate selected by the `Agent`.
-      * `LegalEntity`(s) with responsibility for, and authority over,
+      * `Party`(s) with responsibility for, and authority over,
       * the disposition of assets in the `Account`.
       *
       * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
@@ -154,7 +156,7 @@ object LegalEntity extends WithOpaqueKey[Int, LegalEntity] {
       * `Auditor`s are first class participants, with a package of rights and responsibilities.
       *
       * There are a finite enumeration of [[Role]]s.
-      * Every `Role` is mapped to a [[LegalEntity]] via a [[layers.Accounts.Roster]]
+      * Every `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]]
       * which is situation and juristiction specific.
       *
       * Practically, what this means is that `Auditor`s will have a (possibly limited) view

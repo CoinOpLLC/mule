@@ -53,19 +53,13 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
   sealed abstract case class OMS[F[_]: Monad] private (
-      entity: LegalEntity.Key,
+      entity: Party.Key,
       entry: Folio.Key,
       contra: Folio.Key,
       markets: NonEmptySet[Market.Key],
       folios: FolioTable
   ) {
 
-    /**
-      * `Folio` is a `Map` of `Map`s, which, normalized and written out as a list,
-      * has rows of type: {{{
-      *   (Folio.Key, Instrument.Key, Quantity)
-      * }}}
-      */
     /** */
     type EffectStream[A] = Stream[F, A]
 
@@ -171,7 +165,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       */
     def apply[F[_]: Monad](
-        key: LegalEntity.Key,
+        key: Party.Key,
         entry: Folio.Key,
         contra: Folio.Key,
         folios: FolioTable,

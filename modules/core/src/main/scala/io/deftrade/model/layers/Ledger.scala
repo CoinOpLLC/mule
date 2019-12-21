@@ -83,9 +83,10 @@ trait Ledger { self: ModuleTypes =>
   type Folio = Map[Instrument.Key, Quantity]
 
   /**
-    * Tricky semantics: the collection of all [[Folio]]s is a [[scala.collection.Map]] of `Map`s.
-    * FIXME: csv won't work as is; needs (K1, (K2, V)) => (K1, K2, V) type function on Row...
-    * ... shapeless?
+    * A `Folio` store is a `Map` of `Map`s, which, normalized and written out as a list,
+    * has rows of type: {{{
+    *   (Folio.Key, Instrument.Key, Quantity)
+    * }}}
     */
   object Folio extends WithOpaqueKey[Long, Position] { // sicc hacc
 
@@ -94,8 +95,6 @@ trait Ledger { self: ModuleTypes =>
       * and sums them as the `Map`s form commutative groups.
       *
       * Implementation differs, for efficiency.
-      *
-      * TODO: verify implementation against concept.
       */
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
 
