@@ -184,7 +184,6 @@ package object time extends time.api {
         case nanos =>
           FiniteDuration(d.getSeconds, SECONDS) + FiniteDuration(nanos.toLong, NANOSECONDS)
       }
-
   }
 
   /** */
@@ -198,7 +197,6 @@ package object time extends time.api {
     def -(other: TemporalAmount): Period = p minus other
     def +(other: TemporalAmount): Period = p plus other
     def *(scalar: Int): Period           = p multipliedBy scalar
-
   }
 
   /** */
@@ -218,7 +216,6 @@ package object time extends time.api {
 
     def -(amount: Period) = ym minus amount
     def +(amount: Period) = ym plus amount
-
   }
 
   implicit class InstantOps(val i: Instant) extends AnyVal /* with Ordered[Instant] */ {
@@ -236,5 +233,4 @@ package object time extends time.api {
   implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
     def adjusted(ta: TemporalAdjuster) = value `with` ta
   }
-
 }

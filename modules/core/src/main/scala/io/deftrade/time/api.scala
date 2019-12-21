@@ -333,5 +333,4 @@ trait api {
 
   /** TODO: expand on these */
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
-
 }
