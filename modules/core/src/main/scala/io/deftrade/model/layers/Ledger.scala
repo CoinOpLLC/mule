@@ -55,9 +55,6 @@ trait Ledger { self: ModuleTypes =>
     * How much of a given [[capital.Instrument]] is held.
     *
     * Can also be thought of as a [[Trade]] [[Leg]] at rest.
-
-    * Positions are Marked, as opposed to Priced: the mark-to-market is necessary for net balance
-    * presentation and margin calculations.
     */
   type Position = (Instrument.Key, Quantity)
 
@@ -131,7 +128,20 @@ trait Ledger { self: ModuleTypes =>
     implicit val F: Sync[EffectType]
   }
 
-  /** */
+  /**
+    * The three different kinds of `Pricer`, listed in order of abstraction (most to least):
+    *
+    *   - `Model`: reports a ''fair value'' modelled price
+    *     - may depend on `market data` for callibration
+    *     - therefore limited by accuracy (in practice)
+    *   - `Mark`: reports the current ''mark to market'' price
+    *     - may depend on a `model` for interpolation to thinly traded / untraded assets...
+    *     - therefore extensible to all assets (theoretically)
+    *   - `Book`: the price we paid for the asset
+    *     - only covers the assets we own(ed).
+    *
+    * FIXME: implement this
+    */
   object Pricer {
 
     /** I call this the untitled fois gras patttern. */
