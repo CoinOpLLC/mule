@@ -6,7 +6,7 @@ import time._, money._
 
 import cats.implicits._
 
-import spire.math.Fractional
+import cats.{ Order, Show }
 
 import fs2.{ Pure, Stream }
 
@@ -38,40 +38,39 @@ trait contracts {
     * FIXME: split this up with a specialization for date and maybe bool and fractional.
     * defeature `A`
     */
-  case class PR[A] private (ozdt0: Option[ZonedDateTime], unPr: LazyList[RV[A]]) {
-    def take(n: Int): PR[A]                                       = ???
-    def horizon[A](pr: PR[A]): Int                                = ???
-    def and(pr: PR[Boolean])(implicit ev: A =:= Boolean): Boolean = ???
-  }
+  sealed abstract case class PR[A] private (unPr: LazyList[RV[A]])
 
   /** `Value Process` primitives */
   object PR {
 
-    private val timestep      = 1.day
-    private lazy val dontcare = java.time.ZonedDateTime.now
+    private def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
+
+    private val timestep = 1.day
 
     /** */
-    def apply(zdt0: ZonedDateTime): PR[ZonedDateTime] = PR(zdt0.some, ???)
+    def apply[A](unPr: LazyList[RV[A]]): PR[A] = new PR(unPr) {}
 
     /** */
-    def apply[A](unPr: LazyList[RV[A]]): PR[A] = PR(none, unPr)
+    def take[A](n: Int): PR[A] => PR[A] = ???
+
+    /** */
+    def horizon[A]: PR[A] => Int = ???
+
+    /** */
+    def and: PR[Boolean] => Boolean = ???
 
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def bigK[A](a: A): PR[A] = PR((Stream emit (Stream emit a)).repeat)
 
-    /** */
-    def date(zdt0: ZonedDateTime): PR[ZonedDateTime] = ???
+    /** FIXME: nice try but mentod needs to be made visible - interface? */
+    def date(zdt0: ZonedDateTime): PR[ZonedDateTime] =
+      new PR(slicesFrom(zdt0)) {
+        def zdtZero = zdt0 // FIXME
+      }
 
     /** */
-    def cond[A](yf: PR[Boolean])(then: PR[A])(elze: PR[A]): PR[A] = ???
-
-    /**
-      * A [[spire.math.Fractional]] `N` means a `Fractional PR[N]``.
-      *
-      * TODO: really?
-      */
-    implicit def fractionalPR[N: Fractional]: Fractional[PR[N]] = ???
+    def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
 
     /** */
     def lift[A, B](f: A => B): PR[A] => PR[B] =
@@ -86,6 +85,19 @@ trait contracts {
             rva.zipWith(rvb)(f)
           }
       }
+
+    /** */
+    implicit def prOrder[A]: Order[PR[A]] = ???
+
+    /** */
+    implicit def prShow[A]: Show[PR[A]] = ???
+
+    /**
+      * A [[spire.math.Fractional]] `N` means a `Fractional PR[N]``.
+      *
+      * TODO: really?
+      */
+    implicit def fractionalPR[N: Fractional]: Fractional[PR[N]] = ???
   }
 
   /**
@@ -97,7 +109,9 @@ trait contracts {
     */
   case class Obs[A](f: ZonedDateTime => PR[A])
 
-  /** */
+  /**
+    *
+    */
   object Obs {
 
     /** `konst(x)` is an observable that has value x at any time. */
