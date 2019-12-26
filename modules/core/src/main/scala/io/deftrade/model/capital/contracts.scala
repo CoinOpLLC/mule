@@ -31,8 +31,21 @@ trait contracts {
   /** Random Variable representation. */
   type RV[A] = LazyList[A]
 
-  /** placeholder */
-  object RV
+  /** */
+  object RV {
+
+    /**
+      * Calculates a previous slice in a lattice by averaging each adjacent pair of values
+      * in the specified slice
+      */
+    def prevSlice(slice: RV[Double]): RV[Double] = ???
+
+    /** the name says it all */
+    def muhRates(r0: Double, delta: Double): PR[Double] = ???
+
+    /** TODO: in the real world, this needs params, no? */
+    def probabilityLattice: LazyList[RV[Double]] = ???
+  }
 
   /** `Value Process` representation.
     * FIXME: split this up with a specialization for date and maybe bool and fractional.
@@ -43,12 +56,19 @@ trait contracts {
   /** `Value Process` primitives */
   object PR {
 
-    private def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
-
-    private val timestep = 1.day
+    /** not doing intra-day quanting... yet... */
+    val timestep = 1.day
 
     /** */
     def apply[A](unPr: LazyList[RV[A]]): PR[A] = new PR(unPr) {}
+
+    /** */
+    def eval[A](o: Obs[A]): PR[A] = o match {
+      case Obs.Const(a) => bigK(a)
+    }
+
+    /** */
+    def eval[N: Financial, C: Currency](c: Context): Contract => PR[N] = c => ???
 
     /** */
     def take[A](n: Int): PR[A] => PR[A] = ???
@@ -63,11 +83,12 @@ trait contracts {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def bigK[A](a: A): PR[A] = PR((Stream emit (Stream emit a)).repeat)
 
+    /** */
+    def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
+
     /** FIXME: nice try but mentod needs to be made visible - interface? */
     def date(zdt0: ZonedDateTime): PR[ZonedDateTime] =
-      new PR(slicesFrom(zdt0)) {
-        def zdtZero = zdt0 // FIXME
-      }
+      PR(slicesFrom(zdt0))
 
     /** */
     def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
@@ -101,33 +122,60 @@ trait contracts {
   }
 
   /**
-    * Observable.
-    *
     * From van Straaten:
-    * > An observable is thus represented as a function from a starting date to a value process. The "time-varying" nature of an observable is captured primarily by the value process itself (PR a); the Date in the function's type is simply used to specify the start date for the resulting value process.
+    * > An `Obs`ervable is thus represented as a function from a starting date to a value process. The "time-varying" nature of an observable is captured primarily by the value process itself (PR a); the Date in the function's type is simply used to specify the start date for the resulting value process.
     *
+    * This is true, but we'll follow the approach of [[http://netrium.org/ Netrium]]
+    * (make `Obs` an ADT.)
+    *
+    * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
+    * ''somewhere'' there has to be a function:
+    * {{{
+        f: ZonedDateTime => PR[A]
+      }}}
+    *
+    * No examples can be located where processes offset in time are supported;
+    * the released Netrium package has the ability to store a single date
+    * in the `Model` (and doesn't use that).
+    *
+    * Will just support constants for now, using Netrium's basic factoring but not defining
+    * or implementing any Contract execution capabilities, which could change because
+    *   - a move to Monadic Contract definition
+    *   - distributed ledger enabling (see e.g. `Fae`)
     */
-  case class Obs[A](f: ZonedDateTime => PR[A])
+  sealed trait Obs[A]
 
   /**
     *
     */
   object Obs {
 
-    /** `konst(x)` is an observable that has value x at any time. */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def konst[A](a: A): Obs[A] =
-      Obs(_ => PR bigK a)
+    /** FIXME implement this in io.deftrade.time please */
+    implicit def FIXME: Order[ZonedDateTime] = ???
+
+    /** `const(x)` is an observable that has value x at any time. */
+    def const[A](a: A): Obs[A] = new Const(a) {}
+    sealed abstract case class Const[A](a: A) extends Obs[A]
 
     /** */
-    def at(zdt: ZonedDateTime): Obs[Boolean] = ???
+    def at(zdt: ZonedDateTime): Obs[Boolean] =
+      const(date === const(zdt))
 
-    // "The value of the observable date at date t is just t."
-    //  date :: Obs Date
-    //  date = Obs (\t -> PR $ timeSlices [t])
+    /**
+      * "The value of the observable date at date t is just t."
+      * `date :: Obs Date`
+      * `date = Obs (\t -> PR $ timeSlices [t])`
+      */
+    def date: Obs[ZonedDateTime] = ???
 
-    // def time(zdt: ZonedDateTime): Obs[Period]      = ???
-    // def wsjPrimeRate(date: LocalDate): Obs[Period] = ???
+    /** FIXME: is this how we want the interface to look? */
+    def wsjPrimeRate(date: LocalDate): Obs[Double] = ???
+
+    /** */
+    implicit def obsOrder[A: Order]: Order[Obs[A]] = ???
+
+    /** */
+    implicit def obsShow[A]: Show[Obs[A]] = ???
   }
 
   /** */
@@ -198,7 +246,20 @@ trait contracts {
 
       /**  */
       def zeroCouponBond[N: Financial, C: Currency](t: ZonedDateTime, x: N) =
-        when(Obs at t, one scale (Obs konst x))
+        when(Obs at t, one scale (Obs const x))
     }
+  }
+
+  /**  */
+  sealed trait Context
+
+  /**  */
+  object Context {
+
+    /**  FIXME: Many other params */
+    case class Pricing(zdt: ZonedDateTime) extends Context
+
+    /**  TODO: something */
+    case class Execution() extends Context
   }
 }
