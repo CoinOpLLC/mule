@@ -73,7 +73,7 @@ trait csv {
     /** Use these methods to create implicits per Enum. */
     def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] = Get tryOrMessage (
       field => scala.util.Try { e withName field.x },
-      field => s"Failed to decode Enum: $e: Received $field"
+      field => s"Failed to decode Enum: ${e.toString}: Received ${field.toString}"
     )
 
     /** */

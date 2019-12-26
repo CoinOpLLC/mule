@@ -123,7 +123,7 @@ trait Financial[N] extends Fractional[N] { self =>
     /**  */
     implicit def wholeValidate[I: Integral]: Validate.Plain[N, IsWhole[I]] = {
       val p: N => Boolean = n => IsWhole.unapply[I](n).fold(false)(_ => true)
-      Validate fromPredicate (p, t => s"$t isn't a whole number", IsWhole[I])
+      Validate fromPredicate (p, t => s"${t.toString} isn't a whole number", IsWhole[I])
     }
   }
 }

@@ -249,11 +249,15 @@ trait Accounting { self: ModuleTypes =>
   object DebitCreditKey {
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[D <: Debit, C <: Credit, CCY: Currency](
         ks: DebitCreditKey[D, C],
         amount: Mny[CCY]
     ): (AccountMap[D, CCY], AccountMap[C, CCY]) =
-      (ks.debits.toSortedMap mapValues (amount * _), ks.credits.toSortedMap mapValues (amount * _))
+      (
+        (ks.debits.kvs map (amount * _.value)).toSortedMap,
+        (ks.credits.kvs map (amount * _.value)).toSortedMap
+      )
 
     /** */
     def unapply[D <: Debit, C <: Credit](
@@ -277,12 +281,13 @@ trait Accounting { self: ModuleTypes =>
   object SwapKey {
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[K <: AccountingKey, C: Currency](
         ks: SwapKey[K],
         amount: Mny[C]
     ): AccountMap[K, C] = {
-      def from = ks.from.toSortedMap mapValues (-amount * _)
-      def to   = ks.to.toSortedMap mapValues (amount * _)
+      def from = (ks.from.kvs map (-amount * _.value)).toSortedMap
+      def to   = (ks.to.kvs map (amount * _.value)).toSortedMap
       from |+| to
     }
 
@@ -301,11 +306,15 @@ trait Accounting { self: ModuleTypes =>
   object DebitSwapKey {
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[D <: Debit, CCY: Currency](
         ks: DebitSwapKey[D],
         amount: Mny[CCY]
     ): (AccountMap[D, CCY], AccountMap[D, CCY]) =
-      (ks.from.toSortedMap mapValues (amount * _), ks.to.toSortedMap mapValues (amount * _))
+      (
+        (ks.from.kvs map (amount * _.value)).toSortedMap,
+        (ks.to.kvs map (amount * _.value)).toSortedMap
+      )
 
     /** */
     def unapply[D <: Debit](
@@ -324,11 +333,15 @@ trait Accounting { self: ModuleTypes =>
   object CreditSwapKey {
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[C <: Credit, CCY: Currency](
         ks: CreditSwapKey[C],
         amount: Mny[CCY]
     ): (AccountMap[C, CCY], AccountMap[C, CCY]) =
-      (ks.from.toSortedMap mapValues (amount * _), ks.to.toSortedMap mapValues (amount * _))
+      (
+        (ks.from.kvs map (amount * _.value)).toSortedMap,
+        (ks.to.kvs map (amount * _.value)).toSortedMap
+      )
 
     /** */
     def unapply[C <: Credit](

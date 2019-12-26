@@ -44,7 +44,7 @@ trait results {
 
   /** Formats a general `message` from the argument, and records that argument as the `cause`. */
   private[deftrade] lazy val throw2fail: Throwable => Fail =
-    x => Fail(s"${x.getClass}: ${x.getMessage}", x)
+    x => Fail(s"${x.getClass.toString}: ${x.getMessage}", x)
 }
 
 /** Impedence matching utilities, basically. */

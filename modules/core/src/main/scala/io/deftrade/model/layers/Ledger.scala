@@ -170,9 +170,10 @@ trait Ledger { self: ModuleTypes =>
     def apply[F[_], C: Currency: InstrumentPricer[F, *]]: InstrumentPricer[F, C] = implicitly
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def apply[F[_]: Sync, C: Currency](
         price: Instrument.Key => Stream[F, Mny[C]]
-    ) =
+    ): InstrumentPricer[F, C] =
       new InstrumentPricer(price) {}
 
     /** */
@@ -196,10 +197,12 @@ trait Ledger { self: ModuleTypes =>
     def apply[F[_], C: Currency: LegPricer[F, *]]: LegPricer[F, C] = implicitly
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def apply[F[_]: Sync, C: Currency](price: Leg => Stream[F, Mny[C]]): LegPricer[F, C] =
       new LegPricer(price) {}
 
     /** Create a pricer from a pricing function. */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def default[F[_]: Sync, C: Currency: InstrumentPricer[F, *]]: LegPricer[F, C] =
       apply {
         case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
@@ -221,16 +224,17 @@ trait Ledger { self: ModuleTypes =>
     def apply[F[_], C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def apply[F[_]: Sync, C: Currency](
         price: Trade => Stream[F, Mny[C]]
     ): TradePricer[F, C] =
       new TradePricer(price) {}
 
     /** Create a pricer from a pricing function. */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def default[F[_]: Sync, C: Currency: LegPricer[F, *]]: TradePricer[F, C] =
       TradePricer { trade =>
         val lp = LegPricer[F, C]
-        @SuppressWarnings(Array("org.wartremover.warts.Any"))
         val prices = for {
           leg   <- Stream evals (Sync[F] delay trade.toList)
           price <- lp price leg
@@ -378,7 +382,6 @@ trait Ledger { self: ModuleTypes =>
     ): Stream[F, Transaction] = multi(record)(from, to, Trade(instrument -> amount), meta)
 
     /**       */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def multi[F[_]: Sync](record: Trade => Stream[F, Trade.Id])(
         from: Folio.Key,
         to: Folio.Key,

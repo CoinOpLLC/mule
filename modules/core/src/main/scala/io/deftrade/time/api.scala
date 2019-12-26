@@ -100,7 +100,7 @@ trait api {
         case ld: LocalDate => ld |> adjust
         case _ =>
           throw new DateTimeException(
-            s"only args of type LocalDate are accepted; found ${t.getClass}"
+            s"only args of type LocalDate are accepted; found ${t.getClass.toString}"
           )
       }
     }

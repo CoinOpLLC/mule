@@ -83,12 +83,13 @@ sealed trait PartitionLike {
   }
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def scaled(
       n: Value Refined IsPositive
   ): Partition[Key, Value] =
-    Partition unsafe kvs.toSortedMap.mapValues { v =>
-      val Right(positiveValue) = refineV[IsPositive](v.value * n.value) // how do we know? ;)
-      positiveValue
+    Partition apply kvs.map { v =>
+      val Right(pv) = refineV[IsPositive](v.value * n.value) // how do we know? ;)
+      pv
     }
 
   /** Creates a `Partition` of total `n`, proportional to self. `n` must be positive. */
@@ -100,9 +101,10 @@ sealed trait PartitionLike {
     } yield normalized scaled pn) leftMap Fail.fromString
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def priced[C: Currency](
       amount: Money[Value, C]
-  ): Map[Key, Money[Value, C]] = kvs.toSortedMap mapValues (amount * _.value)
+  ): Map[Key, Money[Value, C]] = (kvs map (amount * _.value)).toSortedMap
 
   /** */
   def total: RefinedValue
@@ -165,8 +167,9 @@ sealed abstract case class Partition[K, V] private (
     kvs.reduce // yyep. :|
 
   /**  */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def normalized: UnitPartition[Key, Value] =
-    UnitPartition unsafe (toSortedMap mapValues (_ / total))
+    UnitPartition unsafe (kvs map (_.value / total)).toSortedMap // because (posN / posN) is posN
 
   /** Partition only */
   final def retired(key: Key): Result[Repr] = ???
@@ -180,7 +183,9 @@ sealed abstract case class Partition[K, V] private (
 object Partition {
 
   /** */
-  private def apply[K: cats.Order, V: Financial](kvs: NonEmptyMap[K, V Refined IsPositive]) =
+  private[model] def apply[K: cats.Order, V: Financial](
+      kvs: NonEmptyMap[K, V Refined IsPositive]
+  ) =
     new Partition(kvs) {}
 
   private[deftrade] def unsafe[K: cats.Order, V: Financial](
@@ -285,7 +290,7 @@ object UnitPartition {
     val V              = Fractional[V]; import V._
     val computedShares = ps.map(_._2).fold(zero)(plus)
     if (computedShares === n) fromShares(ps: _*)
-    else Result fail s"$computedShares != $n"
+    else Result fail s"${computedShares.toString} != ${n.toString}"
   }
 
   /** `exact` slices are claimed by the caller; this is checked. */
@@ -293,7 +298,8 @@ object UnitPartition {
     val VF = Fractional[V]; import VF._
     shares.map(_._2).fold(zero)(plus) match {
       case x if one === x => Result of unsafe(SortedMap(shares: _*))
-      case noUnity        => Result fail s"UnitPartition: $shares total $noUnity"
+      case noUnity =>
+        Result fail s"UnitPartition: ${shares.toString} total ${noUnity.toString}"
     }
   }
 

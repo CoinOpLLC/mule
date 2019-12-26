@@ -236,6 +236,7 @@ trait stores {
         (_ map (_ leftMap errorToFail))
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def deriveVToCsv(
         implicit
         llw: Lazy[LabelledWrite[HV]]
@@ -273,53 +274,53 @@ trait stores {
     /** */
     final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
 
-    /** */
+    /** FIXME: reimplement */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]],
         lputk: Lazy[Put[Key]]
-    ): LabelledWrite[PermRow] =
-      new LabelledWrite[PermRow] {
+    ): LabelledWrite[PermRow] = ???
+    // new LabelledWrite[PermRow] {
+    //
+    //   implicit val lwhv  = llw.value
+    //   implicit val lwhpr = LabelledWrite[HPermRow]
+    //   implicit val lwher = LabelledWrite[HEmptyRow]
+    //
+    //   def headers: CSV.Headers = lwhpr.headers
+    //
+    //   def write(pr: PermRow): CSV.Row = pr match {
+    //     case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+    //     case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
+    //   }
+    // }
 
-        implicit val lwhv  = llw.value
-        implicit val lwhpr = LabelledWrite[HPermRow]
-        implicit val lwher = LabelledWrite[HEmptyRow]
-
-        def headers: CSV.Headers = lwhpr.headers
-
-        def write(pr: PermRow): CSV.Row = pr match {
-          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
-          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
-        }
-      }
-
-    /**      */
+    /** FIXME: reimplement */
     implicit final def readPermRow(
         implicit
         llr: Lazy[LabelledRead[HV]],
         lgetk: Lazy[Get[Key]]
-    ): LabelledRead[PermRow] =
-      new LabelledRead[PermRow] {
-
-        implicit val lrhv  = llr.value
-        implicit val lrhpr = LabelledRead[HPermRow]
-
-        def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-          row match {
-
-            case CSV.Row(
-                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
-                ) if i === id.toString && k === key.toString =>
-              lrhpr read (row, headers) map { hpr =>
-                (hpr.head, (hpr.tail.head, none))
-              }
-
-            case _ =>
-              lrhpr read (row, headers) map { hpr =>
-                (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
-              }
-          }
-      }
+    ): LabelledRead[PermRow] = ???
+    // new LabelledRead[PermRow] {
+    //
+    //   implicit val lrhv  = llr.value
+    //   implicit val lrhpr = LabelledRead[HPermRow]
+    //
+    //   def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
+    //     row match {
+    //
+    //       case CSV.Row(
+    //           NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+    //           ) if i === id.toString && k === key.toString =>
+    //         lrhpr read (row, headers) map { hpr =>
+    //           (hpr.head, (hpr.tail.head, none))
+    //         }
+    //
+    //       case _ =>
+    //         lrhpr read (row, headers) map { hpr =>
+    //           (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
+    //         }
+    //     }
+    // }
 
     /** */
     final protected def deriveCsvToKv(
@@ -349,6 +350,7 @@ trait stores {
     /** */
     def path: Path
 
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final private lazy val appendHandles: EffectStream[FileHandle[EffectType]] = {
 
       import OpenOption._
@@ -428,6 +430,7 @@ trait stores {
   }
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   private sealed abstract case class MemFileValueStore[
       F[_]: Sync: ContextShift,
       V: Eq,
@@ -458,6 +461,7 @@ trait stores {
       with MemFileImplKV[F, K, V, HV]
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def valueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
       v: WithId[V],
       p: String
@@ -483,6 +487,7 @@ trait stores {
   }
 
   /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def keyValueStore[F[_]: Sync: ContextShift, K, V: Eq, HV <: HList](
       kv: WithKey.Aux[K, V],
       p: String

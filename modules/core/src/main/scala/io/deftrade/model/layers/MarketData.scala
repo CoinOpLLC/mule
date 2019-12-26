@@ -196,8 +196,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     /** */
     def description: String = s"""
-          |Quoter buys  ${C1} and sells ${C2} at ${bid}
-          |Quoter sells ${C1} and buys  ${C2} at ${ask}""".stripMargin
+          |Quoter buys  ${C1.toString} and sells ${C2.toString} at ${bid.toString}
+          |Quoter sells ${C1.toString} and buys  ${C2.toString} at ${ask.toString}""".stripMargin
 
     /** */
     private def convert(m1: Mny[C1], rate: MonetaryAmount): Mny[C2] = C2(m1.amount * rate)

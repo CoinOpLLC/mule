@@ -14,8 +14,6 @@ import shapeless.{ HList }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import scala.language.higherKinds
-
 /** */
 trait freestore {
 
@@ -72,12 +70,14 @@ trait freestore {
       new FreeKeyValueStore.Aux[F, K, V, V.Id] {}
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def withIO[K, V](
         V: WithKey.Aux[K, V]
     ): FreeKeyValueStore.Aux[IO, K, V, V.Id] =
       apply(V)
 
     /** TODO: needs work */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def kvsCompiler[F[_]: Sync: ContextShift, K, V, HV <: HList](
         kvs: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] with KeyValueStore[F, K, V, HV]
     ): Command[F, *] ~> kvs.EffectStream =

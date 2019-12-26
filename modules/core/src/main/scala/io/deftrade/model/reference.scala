@@ -396,6 +396,7 @@ package reference {
         (sc andThen bh)(name).mkString
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
       protected def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
         name
           .foldLeft(Seq.empty[Char]) { (b, a) =>
@@ -410,6 +411,7 @@ package reference {
           }
           .reverse
 
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
       protected def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
         name.foldRight(Seq.empty[Char]) { (a, b) =>
           (a, b) match {

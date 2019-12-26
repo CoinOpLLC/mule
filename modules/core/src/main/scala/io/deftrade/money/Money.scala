@@ -101,13 +101,13 @@ object Money {
     def flags = """#,("""
 
     // TODO: this hack won't extend to alt currency
-    def fmt = s"%${flags}.${C.fractionDigits}f"
+    def fmt = s"%${flags}.${C.fractionDigits.toString}f"
 
     def isNegative = N.signum(m.amount) < 0
 
     def sfmt = if (isNegative) fmt else s" $fmt "
 
-    s"${C.code} ${m.amount formatted sfmt}"
+    s"${C.code.toString} ${m.amount formatted sfmt}"
   }
 
   /** Strictly checked input. */

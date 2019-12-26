@@ -28,6 +28,9 @@ trait contracts {
   /** Close as we get to Haskell's `[]`. */
   type LazyList[A] = Stream[Pure, A]
 
+  /** For ease of migration. */
+  val LazyList = Stream
+
   /** Random Variable representation. */
   type RV[A] = LazyList[A]
 
@@ -38,7 +41,10 @@ trait contracts {
       * Calculates a previous slice in a lattice by averaging each adjacent pair of values
       * in the specified slice
       */
-    def prevSlice(slice: RV[Double]): RV[Double] = ???
+    def prevSlice(slice: RV[Double]): RV[Double] = slice match {
+      case LazyList.empty => ???
+      case _              => ???
+    }
 
     /** the name says it all */
     def muhRates(r0: Double, delta: Double): PR[Double] = ???

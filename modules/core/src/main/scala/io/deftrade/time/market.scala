@@ -87,7 +87,9 @@ package market {
 
     val ymwd = List(YEARS, MONTHS, WEEKS, DAYS)
     val rx =
-      s"""\A${(ymwd map (x => s"""(?:(\d+)${x.toString.head})?""")).mkString}\z""".r
+      s"""\\A${(ymwd map { x =>
+        s"""(?:[0-9]+)${x.toString.charAt(0).toString})?"""
+      }).mkString}\\z""".r
 
   }
 

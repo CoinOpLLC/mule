@@ -57,7 +57,7 @@ addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.3")
 /**
   * [source code formatter (scalafmt)](https://github.com/lucidsoftware/neo-sbt-scalafmt)
   */
-addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.15")
+addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.16")
 
 /**
   * [The Official™ scalafmt-sbt plugin](http://scalameta.org/scalafmt/#Installation)
