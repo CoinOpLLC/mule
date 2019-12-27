@@ -267,7 +267,7 @@ trait Accounting { self: ModuleTypes =>
   }
 
   /**
-    * Keys that preserve the balance of a [[Balances.BalanceSheet]].
+    * Keys that preserve the balance of a [[Balances.TrialBalance]].
     *
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.

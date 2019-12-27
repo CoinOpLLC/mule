@@ -5,33 +5,31 @@ package capital
 import time._, money._
 
 import cats.implicits._
-
 import cats.{ Order, Show }
 
-import fs2.{ Pure, Stream }
+import spire.math.Fractional
+import spire.syntax.field._
 
 /**
   * WIP that (sorta) follows the ''Composing Contracts'' work from Peyton Jones and Eber circa 2001.
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
+  *   - [[https://www.lexifi.com/apropos/ LexiFi]] sells a mature implementation of this technology in OCaml (founded by J.C. Eber, who co-authored above papers.)
   *   - Anton van Straaten's [[http://web.archive.org/web/20130814194431/http://contracts.scheming.org/ Haskell implementation]] (highly referenced; no longer maintained)
   *   - Channing Walton's [[https://github.com/channingwalton/scala-contracts scala implementation]] (also not actively maintained)
   *   - [[http://hackage.haskell.org/package/netrium Netrium Haskell implemenation]] (status?)
-  *   - [[https://www.lexifi.com/apropos/ LexiFi]] sells a mature implementation of this technology in OCaml.
   *   - Financial DSLs [[http://www.dslfin.org/resources.html resource page]]
   *
   * TODO: finish off a min viable modelling set for the common instruments
   */
 trait contracts {
 
-  /** Close as we get to Haskell's `[]`. */
-  // type LazyList[A] = Stream[Pure, A]
-
-  /** For ease of migration. */
-  // val LazyList = Stream
-
-  /** Random Variable representation. */
+  /**
+    * Random Variable representation.
+    *
+    * Close as we get to Haskell's `[]`.
+    */
   type RV[A] = LazyList[A]
 
   /** */
@@ -43,8 +41,8 @@ trait contracts {
       */
     def prevSlice(slice: RV[Double]): RV[Double] = slice match {
       case _ if slice.isEmpty     => ???
-      case (h #:: t) if t.isEmpty => ???
-      case (h #:: t)              => ???
+      case (_ #:: t) if t.isEmpty => ???
+      case (_ #:: _)              => ???
     }
 
     /** the name says it all */
@@ -60,7 +58,12 @@ trait contracts {
     */
   sealed abstract case class PR[A] private (unPr: LazyList[RV[A]])
 
-  /** `Value Process` primitives */
+  /**
+  `Value Process` primitives.
+    *
+    * Adapted from the ''How to Write a Financial Contract'' paper
+
+    */
   object PR {
 
     /** not doing intra-day quanting... yet... */
@@ -74,8 +77,28 @@ trait contracts {
       case Obs.Const(a) => bigK(a)
     }
 
+    import Contract._
+
     /** */
-    def eval[N: Financial, C: Currency](c: Context): Contract => PR[N] = c => ???
+    def eval[C: Currency](ctx: Context)(c: Contract): Contract => PR[Double] = {
+
+      // import ctx._
+
+      // closure now has everything it needs: all the free vars are bound
+      def eval: Contract => PR[Double] = {
+        case Zero            => bigK(0.0)
+        case One(c2)         => exch[C](c2)
+        case Give(c)         => -eval(c)
+        case Scale(o, c)     => (PR eval o) * eval(c)
+        case And(c1, c2)     => eval(c1) + eval(c2)
+        case Or(c1, c2)      => eval(c1) max eval(c2)
+        case Cond(o, c1, c2) => cond(PR eval o)(eval(c1))(eval(c2))
+        case When(o, c)      => disc[C](PR eval o, eval(c))
+        case Anytime(o, c)   => snell[C](PR eval o, eval(c))
+        case Until(o, c)     => absorb[C](PR eval o, eval(c))
+      }
+      eval
+    }
 
     /** */
     def take[A](n: Int): PR[A] => PR[A] = ???
@@ -92,7 +115,7 @@ trait contracts {
     /** */
     def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
 
-    /** FIXME: nice try but mentod needs to be made visible - interface? */
+    /**  */
     def date(zdt0: ZonedDateTime): PR[ZonedDateTime] =
       PR(slicesFrom(zdt0))
 
@@ -112,6 +135,48 @@ trait contracts {
           }
       }
 
+    /**
+      * Given a boolean-valued process `cond` , `disc`
+      * transforms the real-valued process `pr`,
+      * expressed in the type parameter `C: Currency`, into another real valued process.
+      * In states where `cond` is true, return `pr`.
+      *
+      * Elsewhere, the result is its "fair" equivalent stochastic value
+      * process in the same `C: Currency`.
+      */
+    def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+    /**
+      * Adapted from the ''How to Write a Financial Contract'' paper:
+      *
+      * Given a boolean-valued proess `cond`, `absorb` transforms the real-valued proess
+      * `pr`, expressed with type parameter C : [[money.Currency]],
+      * into another real-valued process.
+      *
+      * For any state, the result is the expected value of receiving p's value
+      * if the region `cond` will never be true, and receiving zero in the contrary.
+      *
+      * In states where `cond` is true, the result is therefore zero.
+      */
+    def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+    /**
+      * Calculates the Snell envelope of `pr` , under `cond`.
+      * It uses the probability measure
+      * associated with the type parameter [C: Currency].
+      */
+    def snell[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+    /**
+      *
+      * Returns a real-valued process representing the value of one unit of
+      * the `CurrencyLike` value `k2`, expressed in `Currency` C.
+      *
+      * This is simply the process representing
+      * the quoted exchange rate between the curencies.
+      */
+    def exch[C: Currency](k2: CurrencyLike): PR[Double] = ???
+
     /** */
     implicit def prOrder[A]: Order[PR[A]] = ???
 
@@ -121,9 +186,9 @@ trait contracts {
     /**
       * A [[spire.math.Fractional]] `N` means a `Fractional PR[N].
       *
-      * TODO: really?
+      * FIXME: implement!
       */
-    implicit def fractionalPR[N: Fractional]: Fractional[PR[N]] = ???
+    implicit def prFractional[N: Fractional]: Fractional[PR[N]] = ???
   }
 
   /**
@@ -143,7 +208,7 @@ trait contracts {
     * the released Netrium package has the ability to store a single date
     * in the `Model` (and doesn't use that).
     *
-    * Will just support constants for now, using Netrium's basic factoring but not defining
+    * Will just support constants for now, implementing `Obs` as an ADT but not defining
     * or implementing any Contract execution capabilities, which could change because
     *   - a move to Monadic Contract definition
     *   - distributed ledger enabling (see e.g. `Fae`)
@@ -198,8 +263,9 @@ trait contracts {
     sealed abstract case class One(k: CurrencyLike) extends Contract
 
     /** Party acquires `c` multiplied by . */
-    def scale[N: Financial](o: Obs[N], c: Contract): Contract = new Scale(o, c) {}
-    sealed abstract case class Scale[N: Financial](o: Obs[N], c: Contract) extends Contract
+    def scale(o: Obs[Double], c: Contract): Contract = new Scale(o, c) {}
+    // def scale[N: Financial](o: Obs[N], c: Contract): Contract = new Scale(o, c) {}
+    sealed abstract case class Scale(o: Obs[Double], c: Contract) extends Contract
 
     def give(c: Contract): Contract = new Give(c) {}
     sealed abstract case class Give(c: Contract) extends Contract
@@ -224,19 +290,20 @@ trait contracts {
     def cond(o: Obs[Boolean], c1: Contract, c2: Contract): Contract = new Cond(o, c1, c2) {}
     sealed abstract case class Cond(o: Obs[Boolean], c1: Contract, c2: Contract) extends Contract
 
-    /**
-      * Party receives contract computed by `f` from value of `o` labeled by `l`.
-      *
-      * FIXME combine with `scale`
-      */
-    def sample[A](l: Label, o: Obs[A], f: A => Contract): Contract = new Sample(l, o, f) {}
-    sealed abstract case class Sample[A](l: Label, o: Obs[A], f: A => Contract) extends Contract
+    // /**
+    //   * Party receives contract computed by `f` from value of `o` labeled by `l`.
+    //   *
+    //   * FIXME combine with `scale`
+    //   */
+    // def sample[A](l: Label, o: Obs[A], f: A => Contract): Contract = new Sample(l, o, f) {}
+    // sealed abstract case class Sample[A](l: Label, o: Obs[A], f: A => Contract) extends Contract
 
     /** */
     implicit class Ops(val c: Contract) {
 
-      final def scale[N: Financial](o: Obs[N]) = Contract scale (o, c)
-      final def give                           = Contract give c
+      // final def scale[N: Financial](o: Obs[N]) = Contract scale (o, c)
+      final def scale(o: Obs[Double]) = Contract scale (o, c)
+      final def give                  = Contract give c
 
       final def when(o: Obs[Boolean])    = Contract when (o, c)
       final def until(o: Obs[Boolean])   = Contract until (o, c)
@@ -247,11 +314,28 @@ trait contracts {
     }
 
     /**  */
+    def optionally(c: Contract): Contract = c or Zero
+
+    /**  */
+    def buy[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+
+    /**  */
+    def sell[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+
+    /**  */
     object Common {
 
       /**  */
-      def zeroCouponBond[N: Financial, C: Currency](t: ZonedDateTime, x: N) =
-        when(Obs at t, one scale (Obs const x))
+      def zeroCouponBond[N: Financial, C: Currency](maturity: ZonedDateTime, face: N) =
+        when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face)))
+
+      /** */
+      def europeanCall[N: Financial, C: Currency](
+          contract: Contract,
+          strike: Money[N, C],
+          expiry: ZonedDateTime,
+      ): Contract =
+        when(Obs at expiry, optionally(buy(contract, strike)))
     }
   }
 

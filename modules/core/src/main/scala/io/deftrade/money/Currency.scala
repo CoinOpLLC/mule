@@ -42,6 +42,7 @@ sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
   /**
     * Grant of exclusive license to create `Money[N, C]` instances
     * is hearby made to the implicit instance of `Currency[C]`.
+    *
     * (This feels regrettably clever.)
     */
   protected[this] implicit def C: Currency[Type]
