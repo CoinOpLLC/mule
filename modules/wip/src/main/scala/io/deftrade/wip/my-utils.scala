@@ -21,7 +21,7 @@ package wip
   * We are of the opinion that `This is fine.`
   * (For a `utils` collection here.)
   */
-import scala.language.higherKinds
+
 
 import cats.{ Eq, Functor, Key, Monad }
 import cats.syntax.all._

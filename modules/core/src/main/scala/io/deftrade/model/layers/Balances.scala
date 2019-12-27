@@ -36,8 +36,6 @@ import io.circe.Json
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
 // import spire.syntax.field._
 
-import scala.language.higherKinds
-
 /**
   * Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   *

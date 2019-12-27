@@ -31,7 +31,6 @@ import refined.auto._
 import fs2.Stream
 
 import scala.collection.immutable.SortedSet
-import scala.language.higherKinds
 
 /** */
 trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>

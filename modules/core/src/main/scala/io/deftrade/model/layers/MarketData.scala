@@ -32,8 +32,6 @@ import spire.syntax.field._
 import eu.timepit.refined
 import refined.auto._
 
-import scala.language.higherKinds
-
 /** */
 trait MarketData { self: Ledger with ModuleTypes =>
 

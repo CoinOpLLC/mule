@@ -40,8 +40,6 @@ import cormorant.generic.semiauto._
 import cormorant.refined._
 import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
-import scala.language.higherKinds
-
 import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
 
 /**

@@ -31,8 +31,6 @@ import refined.api.Refined
 
 import io.circe.Json
 
-import scala.language.higherKinds
-
 /**
   * Basic transacting.
   *

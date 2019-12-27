@@ -26,10 +26,10 @@ import fs2.{ Pure, Stream }
 trait contracts {
 
   /** Close as we get to Haskell's `[]`. */
-  type LazyList[A] = Stream[Pure, A]
+  // type LazyList[A] = Stream[Pure, A]
 
   /** For ease of migration. */
-  val LazyList = Stream
+  // val LazyList = Stream
 
   /** Random Variable representation. */
   type RV[A] = LazyList[A]
@@ -42,8 +42,9 @@ trait contracts {
       * in the specified slice
       */
     def prevSlice(slice: RV[Double]): RV[Double] = slice match {
-      case LazyList.empty => ???
-      case _              => ???
+      case _ if slice.isEmpty     => ???
+      case (h #:: t) if t.isEmpty => ???
+      case (h #:: t)              => ???
     }
 
     /** the name says it all */
@@ -86,8 +87,7 @@ trait contracts {
     def and: PR[Boolean] => Boolean = ???
 
     /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def bigK[A](a: A): PR[A] = PR((Stream emit (Stream emit a)).repeat)
+    def bigK[A](a: A): PR[A] = PR(LazyList continually (LazyList continually a))
 
     /** */
     def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
@@ -104,12 +104,11 @@ trait contracts {
       pra => PR { pra.unPr map (_ map f) }
 
     /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def lift2[A, B, C](f: (A, B) => C): (PR[A], PR[B]) => PR[C] =
       (pra, prb) =>
         PR {
-          pra.unPr.zipWith(prb.unPr) { (rva, rvb) =>
-            rva.zipWith(rvb)(f)
+          pra.unPr zip prb.unPr map {
+            case (rva, rvb) => rva zip rvb map f.tupled
           }
       }
 
@@ -120,7 +119,7 @@ trait contracts {
     implicit def prShow[A]: Show[PR[A]] = ???
 
     /**
-      * A [[spire.math.Fractional]] `N` means a `Fractional PR[N]``.
+      * A [[spire.math.Fractional]] `N` means a `Fractional PR[N].
       *
       * TODO: really?
       */

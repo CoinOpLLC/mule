@@ -17,7 +17,7 @@
 package io.deftrade
 package wip
 
-import scala.language.higherKinds
+
 // import scala.language.implicitConversions
 
 import cats.{ Eq, Key, Monad, Semigroupal }

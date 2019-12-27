@@ -17,7 +17,7 @@
 package io.deftrade
 package wip
 
-import scala.language.higherKinds
+
 import cats.{ Functor }
 
 object FreeShit {

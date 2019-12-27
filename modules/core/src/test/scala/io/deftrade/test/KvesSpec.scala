@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import scala.language.higherKinds
+
 
 import time._, money._, keyval._, model._, stores._, capital.Instrument, Currency.USD
 

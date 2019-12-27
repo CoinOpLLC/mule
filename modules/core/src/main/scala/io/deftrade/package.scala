@@ -20,12 +20,8 @@ import cats.implicits._
 import cats._
 import cats.kernel.CommutativeGroup
 
-import scala.language.higherKinds
-
 /**
   * All abstract everything only.
-  *
-  * If our best effort isn't good enough, we don't offer it.
   */
 package object deftrade extends deftrade.results {
 
@@ -78,5 +74,4 @@ package object deftrade extends deftrade.results {
     * Handy for development. If you write trading algos, development is basically "forever".
     */
   def assertOrElse(message: String): Boolean => Unit = assert(_, message)
-
 }
