@@ -19,7 +19,7 @@ package model
 package layers
 
 import money._, keyval._
-import capital.Instrument, reference.{ IsMic, Mic }
+import capital.Instrument
 
 import cats.implicits._
 import cats.Monad
@@ -30,6 +30,10 @@ import enumeratum.EnumEntry
 import spire.syntax.field._
 
 import eu.timepit.refined
+import refined.api.Refined
+import refined.string.{ MatchesRegex }
+
+import shapeless.syntax.singleton._
 import refined.auto._
 
 /** */
@@ -253,6 +257,14 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def trade(price: MonetaryAmount, size: Long) = TickData(Tick.Trade, price, size)
   }
 
+  /** */
+  val IsMic = """[A-Z]{3,4}""".witness
+
+  type IsMic = MatchesRegex[IsMic.T]
+
+  /** */
+  type Mic = String Refined IsMic // market venue
+
   /**
     * Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
     *
@@ -293,7 +305,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     * Single effective counterparty: the `Exchange` itself.
-    *   - [[reference.Mic]]s are unique.
+    *   - [[Mic]]s are unique.
     *   - seller for all buyers and vice versa.
     *   - activity recorded in a `contra account`
     */

@@ -23,7 +23,7 @@ import spire.syntax.field._
   *
   * TODO: finish off a min viable modelling set for the common instruments
   */
-trait contracts {
+object contracts {
 
   /**
     * Random Variable representation.

@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.deftrade
 package model
 
-import time._, keyval._, refinements.Label, reference._
+import time._, keyval._, refinements._
 
 import enumeratum.{ CatsEnum, Enum, EnumEntry }
 
@@ -26,7 +25,12 @@ import cats.{ Eq, Show }
 
 import eu.timepit.refined
 import refined.api.Refined
-import refined.boolean.Or
+import refined.api.Validate
+import refined.boolean.{ And, Or }
+import refined.string.{ MatchesRegex }
+import refined.collection.{ NonEmpty }
+
+import shapeless.syntax.singleton._
 
 import io.circe.Json
 
@@ -48,6 +52,61 @@ sealed trait Party extends Serializable {
 object Party extends WithOpaqueKey[Int, Party] {
 
   import refined.auto._
+
+  /** */
+  final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}""".witness
+
+  /** */
+  type MatchesRxSsn = MatchesRxSsn.T
+
+  /** */
+  type IsSsn = MatchesRxSsn And CheckedSsn
+
+  /** */
+  type Ssn = String Refined IsSsn
+
+  /**
+    * Post "Randomization" SSN validation: i.e., cursory only.
+    * See also:
+    * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
+    * https://www.ssa.gov/employer/randomization.html
+    * https://www.ssa.gov/history/ssn/geocard.html
+    */
+  sealed abstract case class CheckedSsn private ()
+
+  /** */
+  object CheckedSsn {
+
+    /** */
+    lazy val instance: CheckedSsn = new CheckedSsn() {}
+
+    /** */
+    implicit def ssnValidate: Validate.Plain[String, CheckedSsn] =
+      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSsn", instance)
+
+    /** */
+    private val predicate: String => Boolean = s => {
+      scala.util.Try {
+        val an :: gn :: sn :: Nil = (s split '-' map (_.toInt)).toList
+        def checkAn               = 0 < an && an != 666 /* sic */ && an < 900
+        checkAn && 0 < gn && 0 < sn
+      } getOrElse false
+    }
+  }
+
+  /**
+    * An `Party` represents a legal (eg corporate, or non-profit) body.
+    * TODO: refine (pun intended) the requirements on US EINs.
+    * TODO: Internationalize with an ADT?!
+    * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
+    */
+  val IsEin = """\d{2}-\d{7}""".witness
+
+  /** */
+  type IsEin = MatchesRegex[IsEin.T]
+
+  /** */
+  type Ein = String Refined IsEin
 
   /** */
   type IsTaxId = IsSsn Or IsEin
@@ -183,4 +242,48 @@ object Party extends WithOpaqueKey[Int, Party] {
     /** */
     lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
   }
+}
+
+/** */
+sealed abstract case class CountryCode(
+    alpha2: Alpha2,
+    alpha3: Alpha3,
+    countryCode: Num3,
+    name: String Refined NonEmpty,
+    regionCode: Option[Num3],
+    subRegionCode: Option[Num3],
+    intermediateRegionCode: Option[Num3],
+    region: VarChar,
+    subRegion: VarChar,
+    intermediateRegion: VarChar,
+    // iso_3166_2: NonEmptyVarChar,
+)
+
+/** */
+object CountryCode extends WithOpaqueKey[Int, CountryCode] {
+
+  def regions: Map[Num3, VarChar]             = ???
+  def intermediateRegions: Map[Num3, VarChar] = ???
+  def subRegions: Map[Num3, VarChar]          = ???
+
+  def apply(alpha2: Alpha2,
+            alpha3: Alpha3,
+            countryCode: Num3,
+            name: String Refined NonEmpty,
+            regionCode: Option[Num3],
+            subRegionCode: Option[Num3],
+            intermediateRegionCode: Option[Num3]): CountryCode =
+    new CountryCode(
+      alpha2,
+      alpha3,
+      countryCode,
+      name,
+      regionCode,
+      subRegionCode,
+      intermediateRegionCode,
+      region = (regions get countryCode).fold(VarChar.empty)(identity),
+      subRegion = (regions get countryCode).fold(VarChar.empty)(identity),
+      intermediateRegion = (regions get countryCode).fold(VarChar.empty)(identity),
+      // s"ISO 3166-2:$alpha2",
+    ) {}
 }

@@ -272,7 +272,7 @@ trait Accounting { self: ModuleTypes =>
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.
     */
-  abstract class SwapKey[K <: AccountingKey] private[model] (
+  sealed abstract class SwapKey[K <: AccountingKey] private[model] (
       val from: Treatment[K],
       val to: Treatment[K]
   ) extends DoubleEntryKey.Aux(from, to)

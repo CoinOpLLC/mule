@@ -20,7 +20,15 @@ import model.layers._
 import model.augments._
 
 /**
-  * Financial types and methods.
+  * Records and computations defining the domain models and services
+  * for '''financial market participants'''.
+  *
+  * What financial market participants? Banks, possibly,
+  * but also Credit Unions, CDFIs, loan funds, CRE funds,
+  * private equity funds, hedge funds, and private capital pools generally.
+  *
+  * Also, the CFO of any ''financially sophisticated'' and/or ''sizeable'' non-financial firm
+  * would be a potential end-client.
   *
   * This package object is where the policy decision to use [[scala.math.BigDecimal]]
   * for [[money.Money]], and [[scala.Double]] for other [[layers.ModuleTypes.Quantity]]s, is made.

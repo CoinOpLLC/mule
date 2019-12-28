@@ -18,10 +18,10 @@ package io.deftrade
 package model
 package layers
 
-import time._, market.Frequency, money._, implicits._
+import time._, money._, implicits._
 
 import cats.implicits._
-import cats.{ Invariant, Monad }
+import cats.{ Invariant }
 import cats.kernel.CommutativeGroup
 import feralcats.instances._
 
@@ -30,8 +30,6 @@ import fs2.{ Pipe, Stream }
 
 import eu.timepit.refined
 import refined.auto._
-
-import io.circe.Json
 
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
 // import spire.syntax.field._

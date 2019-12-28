@@ -19,19 +19,14 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /**
-  *   ==Mandate:==
-  *   Model the monetary and currency conversion use cases typical of
-  *   '''financial market participants''': banks, certainly, but also hedge funds,
-  *   private equity funds, insurance companies, mortgage companies, etc.
-  *
-  *   ==Imperatives:==
-  *   - exploit java Currency support for [[https://en.wikipedia.org/wiki/ISO_4217 ISO 4217]]
-  *   - take some ''inspiration'' from `squants.market`
-  *   - comprehend the facilities provided by other FOSS packages
-  *       - [[https://www.joda.org/joda-money/ Joda Money]] of course
-  *       - [[https://github.com/Appendium/objectlabkit ObjectLabKit]]
+  *   ==Inspiration:==
+  *   - [[https://www.joda.org/joda-money/ Joda Money]] of course
+  *   - `squants.market`
+  *   - [[https://github.com/Appendium/objectlabkit ObjectLabKit]]
   *
   *   ==Implementation:==
+  *   - leverages java Currency support for [[https://en.wikipedia.org/wiki/ISO_4217 ISO 4217]]
+  *       - so JVM dependency
   *   - [[Money]] is a value class type constructor for type parameter `[N: Financial]`
   *   - distinct types for each currency
   *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
@@ -47,6 +42,7 @@ import cats.kernel.CommutativeGroup
   */
 package object money {
 
+  /** TODO: This will break down in corner cases! Review how other projects handle this. */
   implicit def financialCommutativeGroup[MA: Financial]: CommutativeGroup[MA] =
     Financial[MA].commutativeGroup
 

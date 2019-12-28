@@ -7,8 +7,7 @@ import capital.layers._
   * Capital instruments which we are competent to specify and model.
   */
 package object capital
-    extends contracts
-    with PrimaryCapital     // nececssary
+    extends PrimaryCapital  // nececssary
     with VanillaDerivatives // fun
     with Lending // as one does
 // with Fx                 // WIP

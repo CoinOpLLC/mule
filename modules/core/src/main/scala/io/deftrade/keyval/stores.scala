@@ -21,7 +21,6 @@ import implicits._
 
 import cats.implicits._
 import cats.Eq
-import cats.data.NonEmptyList
 import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
