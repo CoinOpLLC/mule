@@ -77,26 +77,25 @@ trait contracts {
       case Obs.Const(a) => bigK(a)
     }
 
-    import Contract._
-
     /** */
-    def eval[C: Currency](ctx: Context)(c: Contract): Contract => PR[Double] = {
+    def eval[C: Currency](pricing: Context.Pricing): Contract => PR[Double] = {
 
-      // import ctx._
+      import Contract._
 
       // closure now has everything it needs: all the free vars are bound
       def eval: Contract => PR[Double] = {
         case Zero            => bigK(0.0)
-        case One(c2)         => exch[C](c2)
+        case One(c2)         => pricing exch [C] c2
         case Give(c)         => -eval(c)
         case Scale(o, c)     => (PR eval o) * eval(c)
         case And(c1, c2)     => eval(c1) + eval(c2)
         case Or(c1, c2)      => eval(c1) max eval(c2)
-        case Cond(o, c1, c2) => cond(PR eval o)(eval(c1))(eval(c2))
-        case When(o, c)      => disc[C](PR eval o, eval(c))
-        case Anytime(o, c)   => snell[C](PR eval o, eval(c))
-        case Until(o, c)     => absorb[C](PR eval o, eval(c))
+        case Cond(o, c1, c2) => PR.cond(PR eval o)(eval(c1))(eval(c2))
+        case When(o, c)      => pricing disc [C] (PR eval o, eval(c))
+        case Anytime(o, c)   => pricing snell [C] (PR eval o, eval(c))
+        case Until(o, c)     => pricing absorb [C] (PR eval o, eval(c))
       }
+
       eval
     }
 
@@ -106,17 +105,17 @@ trait contracts {
     /** */
     def horizon[A]: PR[A] => Int = ???
 
-    /** */
-    def and: PR[Boolean] => Boolean = ???
+    /** idiomatic scala sematics */
+    def forall: PR[Boolean] => Boolean = ???
 
     /** */
     def bigK[A](a: A): PR[A] = PR(LazyList continually (LazyList continually a))
 
     /** */
-    def slicesFrom(zdr: ZonedDateTime): LazyList[RV[ZonedDateTime]] = ???
+    def slicesFrom(zdr: LocalDateTime): LazyList[RV[LocalDateTime]] = ???
 
     /**  */
-    def date(zdt0: ZonedDateTime): PR[ZonedDateTime] =
+    def date(zdt0: LocalDateTime): PR[LocalDateTime] =
       PR(slicesFrom(zdt0))
 
     /** */
@@ -134,48 +133,6 @@ trait contracts {
             case (rva, rvb) => rva zip rvb map f.tupled
           }
       }
-
-    /**
-      * Given a boolean-valued process `cond` , `disc`
-      * transforms the real-valued process `pr`,
-      * expressed in the type parameter `C: Currency`, into another real valued process.
-      * In states where `cond` is true, return `pr`.
-      *
-      * Elsewhere, the result is its "fair" equivalent stochastic value
-      * process in the same `C: Currency`.
-      */
-    def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
-
-    /**
-      * Adapted from the ''How to Write a Financial Contract'' paper:
-      *
-      * Given a boolean-valued proess `cond`, `absorb` transforms the real-valued proess
-      * `pr`, expressed with type parameter C : [[money.Currency]],
-      * into another real-valued process.
-      *
-      * For any state, the result is the expected value of receiving p's value
-      * if the region `cond` will never be true, and receiving zero in the contrary.
-      *
-      * In states where `cond` is true, the result is therefore zero.
-      */
-    def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
-
-    /**
-      * Calculates the Snell envelope of `pr` , under `cond`.
-      * It uses the probability measure
-      * associated with the type parameter [C: Currency].
-      */
-    def snell[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
-
-    /**
-      *
-      * Returns a real-valued process representing the value of one unit of
-      * the `CurrencyLike` value `k2`, expressed in `Currency` C.
-      *
-      * This is simply the process representing
-      * the quoted exchange rate between the curencies.
-      */
-    def exch[C: Currency](k2: CurrencyLike): PR[Double] = ???
 
     /** */
     implicit def prOrder[A]: Order[PR[A]] = ???
@@ -201,7 +158,7 @@ trait contracts {
     * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
     * ''somewhere'' there has to be a function:
     * {{{
-        f: ZonedDateTime => PR[A]
+        f: LocalDateTime => PR[A]
       }}}
     *
     * No examples can be located where processes offset in time are supported;
@@ -220,23 +177,23 @@ trait contracts {
     */
   object Obs {
 
-    /** FIXME implement this in io.deftrade.time please */
-    implicit def FIXME: Order[ZonedDateTime] = ???
+    // /** FIXME implement this in io.deftrade.time please */
+    // implicit def FIXME: Order[LocalDateTime] = ???
 
     /** `const(x)` is an observable that has value x at any time. */
     def const[A](a: A): Obs[A] = new Const(a) {}
     sealed abstract case class Const[A](a: A) extends Obs[A]
 
     /** */
-    def at(zdt: ZonedDateTime): Obs[Boolean] =
-      const(date === const(zdt))
+    def at(ldt: LocalDateTime): Obs[Boolean] =
+      const(date === const(ldt))
 
     /**
       * "The value of the observable date at date t is just t."
       * `date :: Obs Date`
       * `date = Obs (\t -> PR $ timeSlices [t])`
       */
-    def date: Obs[ZonedDateTime] = ???
+    def date: Obs[LocalDateTime] = ???
 
     /** FIXME: is this how we want the interface to look? */
     def wsjPrimeRate(date: LocalDate): Obs[Double] = ???
@@ -326,14 +283,14 @@ trait contracts {
     object Common {
 
       /**  */
-      def zeroCouponBond[N: Financial, C: Currency](maturity: ZonedDateTime, face: N) =
+      def zeroCouponBond[N: Financial, C: Currency](maturity: LocalDateTime, face: N) =
         when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face)))
 
       /** */
       def europeanCall[N: Financial, C: Currency](
           contract: Contract,
           strike: Money[N, C],
-          expiry: ZonedDateTime,
+          expiry: LocalDateTime,
       ): Contract =
         when(Obs at expiry, optionally(buy(contract, strike)))
     }
@@ -345,10 +302,66 @@ trait contracts {
   /**  */
   object Context {
 
-    /**  FIXME: Many other params */
-    case class Pricing(zdt: ZonedDateTime) extends Context
+    /**
+      * Lattice methods for the required stochastic process evaluation.
+      *
+      * Some comments adapted from the ''How to Write a Financial Contract'' paper.
+      *
+      *  FIXME: Many other params; will become an ADT
+      */
+    case class Pricing(ldt: LocalDateTime) extends Context {
 
-    /**  TODO: something */
-    case class Execution() extends Context
+      /**
+        * Discount process.
+        *
+        * Given a boolean-valued process `cond` , `disc`
+        * transforms the real-valued process `pr`,
+        * expressed in the type parameter `C: Currency`, into another real valued process.
+        * In states where `cond` is true, return `pr`.
+        *
+        * Elsewhere, the result is its "fair" equivalent stochastic value
+        * process in the same `C: Currency`.
+        */
+      def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+      /**
+        * Conditions the value of a process on a [[PR]]`[Boolean]`.
+        *
+        * Given a boolean-valued proess `cond`, `absorb` transforms the real-valued proess
+        * `pr`, expressed with type parameter C : [[money.Currency]],
+        * into another real-valued process.
+        *
+        * For any state, the result is the expected value of receiving p's value
+        * if the region `cond` will never be true, and receiving zero in the contrary.
+        *
+        * In states where `cond` is true, the result is therefore zero.
+        */
+      def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+      /**
+        * Calculates the Snell envelope of `pr`, under `cond`.
+        *
+        * Uses the probability measure
+        * associated with the type parameter [C: Currency].
+        */
+      def snell[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+
+      /**
+        * Returns a real-valued process representing the value of one unit of
+        * the `CurrencyLike` value `k2`, expressed in `Currency` C.
+        *
+        * This is simply the process representing
+        * the quoted exchange rate between the curencies.
+        */
+      def exch[C: Currency](k2: CurrencyLike): PR[Double] = ???
+    }
+
+    /**
+      * The difference between "workflow automation" and "smart contracts"
+      * is a matter of degree and perspective.
+      *
+      * FIXME: do something
+      */
+    case class Scheduling() extends Context
   }
 }
