@@ -26,7 +26,8 @@ import cats.kernel.CommutativeGroup
 package object deftrade extends deftrade.results {
 
   /** */
-  type Label = refinements.Label
+  type Label   = refinements.Label
+  type IsLabel = refinements.IsLabel
 
   /**  */
   def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](

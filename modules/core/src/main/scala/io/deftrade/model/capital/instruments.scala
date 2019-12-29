@@ -48,107 +48,9 @@ object xsins {
     * must pass a certain (Luhn) checksum.
     */
   val MatchesRxIsin = """[A-Z]{2}[A-Z0-9]{9}[0-9]""".witness
-
-  /** */
   type MatchesRxIsin = MatchesRegex[MatchesRxIsin.T]
-
-  /** */
-  type IsIsin = MatchesRxIsin And CheckedIsin
-
-  /** */
-  type Isin = String Refined IsIsin
-
-  /** */
-  type IsPsin = MatchesRxIsin And CheckedPsin // sic
-  /** */
-  type Psin = String Refined IsPsin
-
-  /**
-    * How deftrade canonicalizes securities identifiers:
-    * Use `Isin`s where non-isin uses use reserved country codes: {X*, ZZ}
-    *
-    * Universal Security Identifying Number: Usin
-    */
-  type IsUsin = IsIsin Or IsPsin
-
-  /** */
-  type Usin = String Refined IsUsin
-
-  /** */
-  object Usin {
-
-    /**
-      * the least we can do
-      */
-    def from(s: String): Result[Usin] = ???
-
-    /** */
-    def fromIsin(isin: Isin): Isin = ???
-
-    /** */
-    def fromCusip(cusip: Cusip): Isin = ???
-    // def fromSedol(sedol: Sedol): Isin = ???
-
-    /** */
-    def fromUnreg(unreg: Unreg): Psin = ???
-
-    /** */
-    def fromIbrk(ibrk: Ibrk): Psin = ???
-
-    /** */
-    def toIsin(usin: Usin): Result[Isin] = ???
-
-    /** */
-    def toCusip(usin: Usin): Result[Cusip] = ???
-    // def toSedol(usin: Usin): Result[Sedol] = ???
-
-    /** */
-    def toUnreg(usin: Usin): Result[Unreg] = ???
-
-    /** */
-    def toIbrk(usin: Usin): Result[Ibrk] = ???
-  }
-
-  /** */
-  val MatchesRxCusip = """[0-9]{3}[0-9A-Z]{3}[0-9]{3}""".witness
-
-  /** */
-  type MatchesRxCusip = MatchesRegex[MatchesRxCusip.T]
-
-  /** */
-  type IsCusip = MatchesRxCusip And CheckedCusip
-
-  /** */
-  type Cusip = String Refined IsCusip
-
-  /**
-    * `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
-    * `ConId`'s
-    */
-  val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
-
-  /** */
-  type MatchesRxIbrk = MatchesRegex[MatchesRxIbrk.T]
-
-  /** */
-  type IsIbrk = MatchesRxIbrk
-
-  /** */
-  type Ibrk = String Refined IsIbrk
-
-  /**
-    * `Unreg` identifiers represent unregistered securities, numbered by the firm.
-    */
-  val MatchesRxUnreg = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
-
-  /** */
-  type MatchesRxUnreg = MatchesRegex[MatchesRxUnreg.T]
-
-  /** */
-  type IsUnreg = MatchesRxUnreg
-
-  /** */
-  type Unreg = String Refined IsUnreg
+  type IsIsin        = MatchesRxIsin And CheckedIsin
+  type Isin          = String Refined IsIsin
 
   /** */
   sealed abstract case class CheckedIsin()
@@ -188,6 +90,10 @@ object xsins {
   }
 
   /** Pseudo `Isin` matches `Isin` regex, but uses the 9 digit body for proprietary mappings. */
+  type IsPsin = MatchesRxIsin And CheckedPsin // sic
+  type Psin   = String Refined IsPsin
+
+  /**  */
   sealed abstract case class CheckedPsin()
 
   /** */
@@ -212,6 +118,56 @@ object xsins {
       check.sum % 10 === 0
     }
   }
+
+  /**
+    * How deftrade canonicalizes securities identifiers:
+    * Use `Isin`s where non-isin uses use reserved country codes: {X*, ZZ}
+    *
+    * Universal Security Identifying Number: Usin
+    */
+  type IsUsin = IsIsin Or IsPsin
+  type Usin   = String Refined IsUsin
+
+  /** */
+  object Usin {
+
+    /**
+      * the least we can do
+      */
+    def from(s: String): Result[Usin] = ???
+
+    /** */
+    def fromIsin(isin: Isin): Isin = ???
+
+    /** */
+    def fromCusip(cusip: Cusip): Isin = ???
+    // def fromSedol(sedol: Sedol): Isin = ???
+
+    /** */
+    def fromUnreg(unreg: Unreg): Psin = ???
+
+    /** */
+    def fromIbrk(ibrk: Ibrk): Psin = ???
+
+    /** */
+    def toIsin(usin: Usin): Result[Isin] = ???
+
+    /** */
+    def toCusip(usin: Usin): Result[Cusip] = ???
+    // def toSedol(usin: Usin): Result[Sedol] = ???
+
+    /** */
+    def toUnreg(usin: Usin): Result[Unreg] = ???
+
+    /** */
+    def toIbrk(usin: Usin): Result[Ibrk] = ???
+  }
+
+  /** */
+  val MatchesRxCusip = """[0-9]{3}[0-9A-Z]{3}[0-9]{3}""".witness
+  type MatchesRxCusip = MatchesRegex[MatchesRxCusip.T]
+  type IsCusip        = MatchesRxCusip And CheckedCusip
+  type Cusip          = String Refined IsCusip
 
   /**
     * A CUSIP is a nine character string that must match a certain regex, and whose characters
@@ -240,19 +196,30 @@ object xsins {
   }
 
   /**
+    * `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
+    * `ConId`'s
+    */
+  val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
+  type MatchesRxIbrk = MatchesRegex[MatchesRxIbrk.T]
+  type IsIbrk        = MatchesRxIbrk
+  type Ibrk          = String Refined IsIbrk
+
+  /**
+    * `Unreg` identifiers represent unregistered securities, numbered by the firm.
+    */
+  val MatchesRxUnreg = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
+  type MatchesRxUnreg = MatchesRegex[MatchesRxUnreg.T]
+  type IsUnreg        = MatchesRxUnreg
+  type Unreg          = String Refined IsUnreg
+
+  /**
     * `UsBan` identifiers represent bank account numbers in the US
     * TODO: Next up is IBAN
     */
   val MatchesRxUsBan = """\d{8,10}""".witness
-
-  /** */
   type MatchesRxUsBan = MatchesRegex[MatchesRxUsBan.T]
-
-  /** */
-  type IsUsBan = MatchesRxUnreg // And CheckedUsBan
-
-  /** */
-  type UsBan = String Refined IsUsBan
+  type IsUsBan        = MatchesRxUnreg // And CheckedUsBan
+  type UsBan          = String Refined IsUsBan
 
   ////////////////////////////////////////////////
 
@@ -266,6 +233,8 @@ object xsins {
 
 import xsins.{ IsIsin, IsUsin }
 
+import contracts.Contract
+
 /**
   * Models a tradeable thing.
   *
@@ -278,12 +247,20 @@ final case class Instrument(
     symbol: Label,
     issuer: Party.Key,
     currency: CurrencyLike,
+    cols: columns.Columns,
     meta: Json,
 ) {
 
-  /** And by fiat we mean convention... */
+  /** FIXME: revisit this
+    * And by fiat we mean convention... */
   def isLegalTender: Boolean =
     symbol.value === currency.code.value
+
+  /**  */
+  def display: Label = cols.display
+
+  /**  */
+  def contract: Contract = cols.contract
 }
 
 /**
@@ -311,16 +288,30 @@ object Instrument extends WithRefinedKey[String, xsins.IsUsin, Instrument]
 object columns {
 
   /** */
-  sealed trait Tracker { def members: Set[Instrument.Key] }
+  sealed trait Columns extends Product with Serializable {
+    final def display: Label = {
+      val name: String = productPrefix
+      val Right(label) = refined.refineV[IsLabel](name)
+      label
+    }
 
-  /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
-  sealed trait Maturity { def matures: ZonedDateTime }
+    /** */
+    def contract: Contract
+  }
 
   /** */
-  sealed trait Expiry { def expires: ZonedDateTime }
+  sealed trait Tracks { self: Columns =>
+    def members: Set[Instrument.Key]
+  }
+
+  /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
+  sealed trait Maturity extends Columns { def matures: ZonedDateTime }
+
+  /** */
+  sealed trait Expiry extends Columns { def expires: ZonedDateTime }
 
   /** All derivatives (e.g. Futures) are assumed to expire. */
-  sealed trait Derivative extends Expiry { def underlier: WithKey#Key }
+  sealed trait Derivative extends Expiry with Columns { def underlier: WithKey#Key }
 
   /** Everyting with a strike is assumed to expire. */
   sealed trait Strike[N] { self: Derivative =>
@@ -366,16 +357,34 @@ object layers {
     case class Bond(
         override val matures: ZonedDateTime
     ) extends Maturity
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /**
-      * `Bonds` (as opposed to loans) are always issued by corporations, never by natural persons.
+      * `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
       */
     object Bond extends WithRefinedKey[String, IsIsin, Bond]
 
+    /**
+      * `Bills` are always issued by entities, never by natural persons.
+      */
+    object Bill extends WithRefinedKey[String, IsIsin, Bill]
+
     /** */
-    case class TreasurySecurity(
+    case class Bill(
         override val matures: ZonedDateTime
-    ) extends Maturity
+    ) extends Maturity {
+
+      import contracts.Contract.Common.zeroCouponBond
+
+      /** */
+      def contract: Contract =
+        zeroCouponBond[Double, money.Currency.USD](???, ???)
+      // zeroCouponBond(maturity = matures, face = 1.0)
+    }
   }
 
   /**
@@ -393,7 +402,12 @@ object layers {
     /** */
     case class Index(
         override val members: Set[Instrument.Key]
-    ) extends Tracker
+    ) extends Tracks
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     object Index extends WithRefinedKey[String, IsIsin, Index]
@@ -403,6 +417,11 @@ object layers {
         override val expires: ZonedDateTime,
         override val underlier: Instrument.Key
     ) extends Derivative
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     object EtdFuture extends WithRefinedKey[String, IsIsin, EtdFuture]
 
@@ -414,6 +433,11 @@ object layers {
         override val strike: N,
     ) extends Derivative
         with Strike[N]
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** I mean, right? */
     case class EtdFutureOption[N: Financial](
@@ -423,6 +447,11 @@ object layers {
         override val strike: N,
     ) extends Derivative
         with Strike[N]
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     case class EtdIndexOption[N: Financial](
@@ -432,6 +461,11 @@ object layers {
         override val strike: N,
     ) extends Derivative
         with Strike[N]
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
   }
 
   /**
@@ -514,23 +548,35 @@ object layers {
 
     /** */
     case class BulletPayment(
-        instrument: Instrument.Key,
         matures: ZonedDateTime
     ) extends Maturity
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     case class CreditLine(
-        instrument: Instrument.Key,
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1Q
     ) extends Maturity
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     case class AmortizingLoan(
-        instrument: Instrument.Key,
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1M
     ) extends Maturity
+        with Columns {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     case class ConvertibleNote()

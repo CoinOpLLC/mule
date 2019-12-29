@@ -32,17 +32,19 @@ object contracts {
     */
   type RV[A] = LazyList[A]
 
-  /** */
+  /**
+    *
+    */
   object RV {
 
     /**
       * Calculates a previous slice in a lattice by averaging each adjacent pair of values
-      * in the specified slice
+      * in the specified slice.
       */
     def prevSlice(slice: RV[Double]): RV[Double] = slice match {
-      case _ if slice.isEmpty     => ???
-      case (_ #:: t) if t.isEmpty => ???
-      case (_ #:: _)              => ???
+      case _ if slice.isEmpty     => LazyList.empty
+      case (_ #:: t) if t.isEmpty => LazyList.empty
+      case (h #:: t)              => ((h + t(0)) / 2) #:: prevSlice(t)
     }
 
     /** the name says it all */
@@ -59,10 +61,9 @@ object contracts {
   sealed abstract case class PR[A] private (unPr: LazyList[RV[A]])
 
   /**
-  `Value Process` primitives.
+    * `Value Process` primitives.
     *
     * Adapted from the ''How to Write a Financial Contract'' paper
-
     */
   object PR {
 

@@ -89,8 +89,10 @@ object refinements {
 
   }
 
+  type IsLabel = IsVarChar And Trimmed And NonEmpty
+
   /** */
-  type Label = String Refined (IsVarChar And Trimmed And NonEmpty)
+  type Label = String Refined IsLabel
 
   /** Postgres optimizes strings less than this. */
   type IsVarChar126 = MaxSize[W.`126`.T]
