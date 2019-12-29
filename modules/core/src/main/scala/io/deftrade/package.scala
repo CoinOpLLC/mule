@@ -76,3 +76,8 @@ package object deftrade extends deftrade.results {
     */
   def assertOrElse(message: String): Boolean => Unit = assert(_, message)
 }
+
+package deftrade {
+  trait Numéraire
+  object Numéraire
+}

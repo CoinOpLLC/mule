@@ -105,10 +105,10 @@ object ResultV {
   *   - disabling suppressed `Throwable`s from being set, and by
   *   - disabling stack traces from being filled in after construction.
   *
-  * Subclassing `Throwable` for the `Fail` type is "handy"; eg conversion to `Try`
-  * becommes trivial.
+  * Interoperability with [[scala.Option]] and [[scala.util.Try]] is provided.
   *
-  * Interoperability with `scala.Option` and `scala.util.Try` is provided.
+  * (Subclassing `Throwable` for the `Fail` type is "handy"; eg conversion to `Try`
+  * becommes trivial.)
   *
   * About the name: current global usage feels consistent with both ''noun'' and ''verb'' for
   * this word. We exploit the resulting semantic flexibility.

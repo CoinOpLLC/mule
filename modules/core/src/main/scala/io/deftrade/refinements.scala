@@ -94,7 +94,7 @@ object refinements {
   /** */
   type Label = String Refined IsLabel
 
-  /** Postgres optimizes strings less than this. */
+  /** Postgres optimizes strings of this length (and shorter). */
   type IsVarChar126 = MaxSize[W.`126`.T]
 
   /** */
@@ -120,24 +120,19 @@ object refinements {
   */
 object camelsnake { outer =>
 
-  def stripAsciiWs(s: String) = s filterNot (" \n\r\t" contains _)
-
-  def camelToSnake(camelName: String): String  = CamelTo("_")(camelName)
-  def camelToHyphen(camelName: String): String = CamelTo("-")(camelName)
-  def camelToDot(camelName: String): String    = CamelTo(".")(camelName)
-  def camelToWord(camelName: String): String   = CamelTo(" ")(camelName)
+  def camelToSnake(camelName: String): String  = camelTo("_")(camelName)
+  def camelToHyphen(camelName: String): String = camelTo("-")(camelName)
+  def camelToDot(camelName: String): String    = camelTo(".")(camelName)
+  def camelToWord(camelName: String): String   = camelTo(" ")(camelName)
 
   implicit class CamelOps(val camelName: String) extends AnyVal {
-    def camelToSnake: String  = outer.camelToSnake(camelName)
-    def camelToHyphen: String = outer.camelToHyphen(camelName)
-    def camelToDot: String    = outer.camelToDot(camelName)
-    def camelToWord: String   = outer.camelToWord(camelName)
+    def camelToSnake: String  = outer camelToSnake camelName
+    def camelToHyphen: String = outer camelToHyphen camelName
+    def camelToDot: String    = outer camelToDot camelName
+    def camelToWord: String   = outer camelToWord camelName
   }
 
-  object CamelTo {
-
-    val uppers    = 'A' to 'Z'
-    val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
+  object camelTo {
 
     def apply(sep: String)(name: String): String = {
       val osc                        = maybeSepFrom(sep)
@@ -146,8 +141,11 @@ object camelsnake { outer =>
       (sc andThen bh)(name).mkString
     }
 
+    private val uppers    = 'A' to 'Z'
+    private val nonUppers = ('a' to 'z') ++ ('0' to '9') :+ '_' :+ '$'
+
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    protected def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
+    private def splitCaps(sep: Option[Char])(name: String): Seq[Char] =
       name
         .foldLeft(Seq.empty[Char]) { (b, a) =>
           (a, b) match { // yeah just flip your head around, it's easier, trust self
@@ -162,7 +160,7 @@ object camelsnake { outer =>
         .reverse
 
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    protected def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
+    private def bustHumps(sep: Option[Char])(name: Seq[Char]): Seq[Char] =
       name.foldRight(Seq.empty[Char]) { (a, b) =>
         (a, b) match {
           case (c, h +: _) if (nonUppers contains c) && (uppers contains h) =>
@@ -172,7 +170,7 @@ object camelsnake { outer =>
         }
       }
 
-    protected def maybeSepFrom(s: String): Option[Char] = s match {
+    private def maybeSepFrom(s: String): Option[Char] = s match {
       case "_" => Some('_')
       case "-" => Some('-')
       case _   => None

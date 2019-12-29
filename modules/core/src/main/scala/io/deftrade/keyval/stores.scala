@@ -32,12 +32,11 @@ import refined.cats.refTypeOrder
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle }
 
-import io.chrisdavenport.cormorant
-import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
-import cormorant.implicits._
-import cormorant.generic.semiauto._
-import cormorant.refined._
-import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
+import io.chrisdavenport.cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
+import io.chrisdavenport.cormorant.implicits._
+import io.chrisdavenport.cormorant.generic.semiauto._
+import io.chrisdavenport.cormorant.refined._
+import io.chrisdavenport.cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
 

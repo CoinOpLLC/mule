@@ -6,28 +6,29 @@
 
 `mule` wanders and loads new libraries in anticipation of their use.
 
-### Premise: KAPS architecture
-: Primary components of the `datapath`:
-  - `value`s and `compound value`s
-      - self describing (eg XML, JSON)
-      - schema'd (eg Protobuf, GraphQL)
-      - either way: _isomorphism_ (think `bimap`) between wire/persistence format and memory format
-  - `streams` of `values`s
-      - where `stream` is (**at least**) a formal a formal abstraction, eg Kafka or Reactive
-      - moving towards complete encapsulation in an algebra (i.e. Monix, Quill)
+---
 
-  - `collections`s of `value`s, where `collection` is both
-      - a formal abstraction eg a `RowSet`
-      - and an algebra (eg `Monoid`)
+### A Financial Stream Algebra Toolkit  
+
+  - `value`s and `compound value`s
+      - memory-first definitions
+      - ADT basis enables persistence derivation
+
+  - `streams` of `values`s
+      - `fs2.Stream` (memory)
+      - Kafka persistence layer (data in motion)
 
   - `stores`
-      - instances which source and sink `collection`s or `stream`s of `value`s for persistence
+      - source and sink `stream`s of `value`s for persistence
+      - enable traceable evolution of an identified value over time
+      - Postgres (Cockroach) persistence layer (data at rest)
+      - spreadsheet integration via csv file based persistence
 
   - `aggregate entities`
-      - CQRS/ES backed actors
+      - `CQRS/ES` backed computations producing `stream`s of `event`s
+      - can be used to replicate / restore application or session state
 
-
-=== NO WARRANTY ===
+### NO WARRANTY  
 
 >This is free software; see the source for copying conditions.
 There is no warranty, not even for merchantability or fitness

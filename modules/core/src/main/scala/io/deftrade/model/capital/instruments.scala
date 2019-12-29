@@ -41,7 +41,7 @@ import enumeratum.EnumEntry
 import io.circe.Json
 
 /** Security Idenification Numbers (of any kind), modelled as `String Refined IsXsin`. */
-object xsins {
+object keys {
 
   /**
     * An ISIN is a twelve character string that must match a certain regex, and whose characters
@@ -231,7 +231,7 @@ object xsins {
     scala.util.Try apply thunk fold (_ => false, identity)
 }
 
-import xsins.{ IsIsin, IsUsin }
+import keys.{ IsIsin, IsUsin }
 
 import contracts.Contract
 
@@ -242,6 +242,13 @@ import contracts.Contract
   *   - investigate FpML ingestion
   *   - `symbol` implies a unified symbology
   *       - specify how to specify it
+  *   - "columns": rename as "forms" ?!
+  *   - factories for custom `Instruments` (e.g. `SAFEnote`)
+  *
+  *   FIXME: model the remainder: everything is a Contract for money except:
+  *   - Contracts for equity shares (e.g common stock)
+  *   - Contracts for physical delivery of commodities
+  *   - Contracts for Real Estate(?!)
   */
 final case class Instrument(
     symbol: Label,
@@ -282,7 +289,7 @@ final case class Instrument(
   *
   * You will need to be able to walk the graph back in time. `Novation` events connecting `ISIN`s?
   */
-object Instrument extends WithRefinedKey[String, xsins.IsUsin, Instrument]
+object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 
 /** */
 object columns {
