@@ -78,6 +78,45 @@ package object deftrade extends deftrade.results {
 }
 
 package deftrade {
-  trait Numéraire
-  object Numéraire
+
+  import money.Currency
+  import model.capital.Instrument
+
+  /**
+    * How do we price things?
+    *
+    * A formal finance term which, contrary to what one might think, signifies the ''denominator''
+    * for contracts and transactions.
+    */
+  sealed trait Numéraire
+
+  /** */
+  object Numéraire {
+
+    /** non-sealed extension point */
+    trait InCurrency extends Numéraire
+
+    /** */
+    object InCurrency {
+
+      /** */
+      def unapply(n: Numéraire): Option[InCurrency] = n match {
+        case Currency(c) => c.some
+        case _           => none
+      }
+    }
+
+    /** non-sealed extension point */
+    trait InKind extends Numéraire
+
+    /** */
+    object InKind {
+
+      /** */
+      def unapply(n: Numéraire): Option[InKind] = n match {
+        case instrument @ Instrument(_, _, _, _, _) => instrument.some
+        case _                                      => none
+      }
+    }
+  }
 }

@@ -256,7 +256,7 @@ final case class Instrument(
     currency: CurrencyLike,
     cols: columns.Columns,
     meta: Json,
-) {
+) extends Numéraire.InKind {
 
   /** FIXME: revisit this
     * And by fiat we mean convention... */

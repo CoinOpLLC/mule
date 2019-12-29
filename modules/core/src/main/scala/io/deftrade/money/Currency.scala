@@ -34,7 +34,7 @@ import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
   *
   * Implemements the bulk of the functionality, and so, is useful in its own right.
   */
-sealed trait CurrencyLike extends EnumEntry with Serializable { self =>
+sealed trait CurrencyLike extends Numéraire.InCurrency with EnumEntry with Serializable { self =>
 
   /** instance phantom type representing currency */
   type Type
@@ -121,8 +121,6 @@ sealed trait Currency[C] extends CurrencyLike { self =>
   */
 object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
 
-  import cats.implicits._
-
   /**
     * Three letter codes: 26 ^ 3 = 17576
     * over two hundred assigned; several "dead" currencies (not reused)
@@ -138,13 +136,14 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
 
   /**
     * Given a currency (phantom) type, get a `Currency` instance.
-    * TODO: does it buy anything to move to `shapeless.the` ?
     */
-  def apply[C: Currency]: Currency[C] = implicitly
+  def apply[C](implicit C: Currency[C]): Currency[C] = C
 
   /** */
-  def unapply[N: Financial, C: Currency](money: Money[N, C]): Option[(N, Currency[C])] =
-    ((money.amount, Currency[C])).some
+  def unapply(n: Numéraire): Option[CurrencyLike] = n match {
+    case _ if values contains n => ???
+    case _                      => None
+  }
 
   /**
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)

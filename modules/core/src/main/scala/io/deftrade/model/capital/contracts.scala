@@ -86,7 +86,6 @@ object contracts {
       // closure now has everything it needs: all the free vars are bound
       def eval: Contract => PR[Double] = {
         case Zero            => bigK(0.0)
-        case One(c2)         => pricing exch [C] c2
         case Give(c)         => -eval(c)
         case Scale(o, c)     => (PR eval o) * eval(c)
         case And(c1, c2)     => eval(c1) + eval(c2)
@@ -95,6 +94,14 @@ object contracts {
         case When(o, c)      => pricing disc [C] (PR eval o, eval(c))
         case Anytime(o, c)   => pricing snell [C] (PR eval o, eval(c))
         case Until(o, c)     => pricing absorb [C] (PR eval o, eval(c))
+        case One(n) =>
+          n match {
+            case Numéraire.InCurrency(ic) =>
+              ic match {
+                case Currency(c2) => pricing exch [C] c2
+              }
+            case Numéraire.InKind(_) => ???
+          }
       }
 
       eval
@@ -216,9 +223,13 @@ object contracts {
     def zero: Contract = Zero
     case object Zero extends Contract
 
-    /** Party acquires one unit of Currency. FIXME make general for stawks. */
+    /** Party acquires one unit of [[money.Currency]]. */
     def one[C: Currency]: Contract = new One(Currency[C]) {}
-    sealed abstract case class One(k: CurrencyLike) extends Contract
+
+    /** Party acquires one [[Instrument]]. */
+    def one(i: Instrument): Contract = new One(i) {}
+
+    sealed abstract case class One(n: Numéraire) extends Contract
 
     /** Party acquires `c` multiplied by . */
     def scale(o: Obs[Double], c: Contract): Contract = new Scale(o, c) {}
