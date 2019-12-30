@@ -120,11 +120,10 @@ object contracts {
     def bigK[A](a: A): PR[A] = PR(LazyList continually (LazyList continually a))
 
     /** */
-    def slicesFrom(zdr: LocalDateTime): LazyList[RV[LocalDateTime]] = ???
+    def slicesFrom(t: Instant): LazyList[RV[Instant]] = ???
 
     /**  */
-    def date(zdt0: LocalDateTime): PR[LocalDateTime] =
-      PR(slicesFrom(zdt0))
+    def date(t: Instant): PR[Instant] = PR(slicesFrom(t))
 
     /** */
     def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
@@ -166,7 +165,7 @@ object contracts {
     * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
     * ''somewhere'' there has to be a function:
     * {{{
-        f: LocalDateTime => PR[A]
+        f: Instant => PR[A]
       }}}
     *
     * No examples can be located where processes offset in time are supported;
@@ -193,18 +192,15 @@ object contracts {
     sealed abstract case class Const[A](a: A) extends Obs[A]
 
     /** */
-    def at(ldt: LocalDateTime): Obs[Boolean] =
-      const(date === const(ldt))
+    def at(t: Instant): Obs[Boolean] =
+      const(date === const(t))
 
     /**
       * "The value of the observable date at date t is just t."
       * `date :: Obs Date`
       * `date = Obs (\t -> PR $ timeSlices [t])`
       */
-    def date: Obs[LocalDateTime] = ???
-
-    /** FIXME: is this how we want the interface to look? */
-    def wsjPrimeRate(date: LocalDate): Obs[Double] = ???
+    def date: Obs[Instant] = ???
 
     /** */
     implicit def obsOrder[A: Order]: Order[Obs[A]] = ???
@@ -259,14 +255,6 @@ object contracts {
     def cond(o: Obs[Boolean], c1: Contract, c2: Contract): Contract = new Cond(o, c1, c2) {}
     sealed abstract case class Cond(o: Obs[Boolean], c1: Contract, c2: Contract) extends Contract
 
-    // /**
-    //   * Party receives contract computed by `f` from value of `o` labeled by `l`.
-    //   *
-    //   * FIXME combine with `scale`
-    //   */
-    // def sample[A](l: Label, o: Obs[A], f: A => Contract): Contract = new Sample(l, o, f) {}
-    // sealed abstract case class Sample[A](l: Label, o: Obs[A], f: A => Contract) extends Contract
-
     /** */
     implicit class Ops(val c: Contract) {
 
@@ -280,31 +268,6 @@ object contracts {
 
       final def and(c2: Contract) = Contract and (c, c2)
       final def or(c2: Contract)  = Contract or (c, c2)
-    }
-
-    /**  */
-    def optionally(c: Contract): Contract = c or Zero
-
-    /**  */
-    def buy[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
-
-    /**  */
-    def sell[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
-
-    /**  */
-    object Common {
-
-      /**  */
-      def zeroCouponBond[N: Financial, C: Currency](maturity: LocalDateTime, face: N) =
-        when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face)))
-
-      /** */
-      def europeanCall[N: Financial, C: Currency](
-          contract: Contract,
-          strike: Money[N, C],
-          expiry: LocalDateTime,
-      ): Contract =
-        when(Obs at expiry, optionally(buy(contract, strike)))
     }
   }
 
@@ -321,7 +284,7 @@ object contracts {
       *
       *  FIXME: Many other params; will become an ADT
       */
-    case class Pricing(ldt: LocalDateTime) extends Context {
+    case class Pricing(t: Instant) extends Context {
 
       /**
         * Discount process.
@@ -375,5 +338,44 @@ object contracts {
       * FIXME: do something
       */
     case class Scheduling() extends Context
+  }
+
+  /**  */
+  object standard {
+
+    import Contract._
+
+    /**  */
+    def optionally(c: Contract): Contract = c or Zero
+
+    /**  */
+    def buy[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+
+    /**  */
+    def sell[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+
+    /**
+      *   Extremely useful and widely referenced benchmark.
+      *   - date implied by the rest of the `Contract`
+      *   - time series history is necessary for backtests
+      *   - parameter extraction and rate modelling is necessary for pricing
+      *   - a sampling schedule should be produced by the scheduling process
+      */
+    def wsjPrimeRate: Obs[Double] = ???
+
+    /**  */
+    def zeroCouponBond[N: Financial, C: Currency](
+        maturity: Instant,
+        face: N
+    ): Contract =
+      when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face)))
+
+    /** */
+    def europeanCall[N: Financial, C: Currency](
+        contract: Contract,
+        strike: Money[N, C],
+        expiry: Instant,
+    ): Contract =
+      when(Obs at expiry, optionally(buy(contract, strike)))
   }
 }
