@@ -22,7 +22,7 @@ object Version {
 
   val Cormorant  = "0.3.0-M6"
   val Fuiid      = "0.3.0-M5"
-  // val PureConfig = "0.12.0"
+  val PureConfig = "0.12.2"
   val TypesafeConfig = "1.3.3"
 
   val Http4s     = "0.21.0-M4"
@@ -93,18 +93,18 @@ object Deps {
     "io.circe" %% s"circe-$x" % Circe
   }
 
-  // /**
-  //   * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
-  //   */
-  // val pureConfigs = List(
-  //   "pureconfig",
-  //   "pureconfig-enumeratum",
-  //   "pureconfig-fs2",
-  //   "pureconfig-http4s",
-  //   "pureconfig-cats",
-  //   "pureconfig-cats-effect",
-  //   "pureconfig-circe"
-  // ) map (x => "com.github.pureconfig" %% x % PureConfig)
+  /**
+    * @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
+    */
+  val pureConfigs = List(
+    "pureconfig",
+    "pureconfig-enumeratum",
+    "pureconfig-fs2",
+    // "pureconfig-http4s",
+    "pureconfig-cats",
+    "pureconfig-cats-effect",
+    "pureconfig-circe"
+  ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
   val testers = Seq(
     "org.scalatest"              %% "scalatest"                 % ScalaTest,

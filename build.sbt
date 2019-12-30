@@ -52,7 +52,7 @@ lazy val demo = module("demo", "something to run")
   .settings(common)
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++
-      // pureConfigs ++
+      pureConfigs ++
       Seq(opengamma) ++
       httplibs ++
       testers
@@ -64,8 +64,8 @@ lazy val wip = module("wip", "back on my bullshit")
   .settings(common)
   .settings(
     libraryDependencies ++=
-      // pureConfigs ++
-      Seq(opengamma) ++
+      pureConfigs ++
+        Seq(opengamma) ++
         httplibs ++
         testers
   )
