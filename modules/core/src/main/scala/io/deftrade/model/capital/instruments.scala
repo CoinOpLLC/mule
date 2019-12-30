@@ -386,7 +386,7 @@ object layers {
         override val matures: ZonedDateTime
     ) extends Maturity {
 
-      import contracts.Contract.Common.zeroCouponBond
+      import contracts.standard.zeroCouponBond
 
       /** */
       def contract: Contract =
