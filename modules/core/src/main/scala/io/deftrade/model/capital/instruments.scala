@@ -206,8 +206,9 @@ object keys {
 
   /**
     * `Unreg` identifiers represent unregistered securities, numbered by the firm.
+    * TODO: revisit how these are defined.
     */
-  val MatchesRxUnreg = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
+  val MatchesRxUnreg = """\d{8}\d?""".witness
   type MatchesRxUnreg = MatchesRegex[MatchesRxUnreg.T]
   type IsUnreg        = MatchesRxUnreg
   type Unreg          = String Refined IsUnreg

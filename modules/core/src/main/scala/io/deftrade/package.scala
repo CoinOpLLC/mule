@@ -83,10 +83,10 @@ package deftrade {
   import model.capital.Instrument
 
   /**
-    * How do we price things?
+    * The answer to this question: "in what we price things?"
     *
-    * A formal finance term which, contrary to what one might think, signifies the ''denominator''
-    * for contracts and transactions.
+    * `Numéraire` is formal finance term which, contrary to what a naive anglophone might think,
+    * signifies the ''denominator'' for contracts and transactions.
     */
   sealed trait Numéraire
 
