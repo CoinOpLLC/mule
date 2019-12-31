@@ -34,7 +34,7 @@ import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
   *
   * Implemements the bulk of the functionality, and so, is useful in its own right.
   */
-sealed trait CurrencyLike extends Numéraire.InCurrency with EnumEntry with Serializable { self =>
+sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializable { self =>
 
   /** instance phantom type representing currency */
   type Type
@@ -47,12 +47,10 @@ sealed trait CurrencyLike extends Numéraire.InCurrency with EnumEntry with Seri
     */
   protected[this] implicit def C: Currency[Type]
 
-  /**
-    * And the Fed said: ''fiat bux''...
-    */
+  /** Heh. */
   final def fiat[N: Financial](n: N) = Money[N, Type](n)
 
-  /** */
+  /** Usage such as `USD(amount)`. */
   final def apply[N: Financial](n: N) = fiat(n)
 
   /** */

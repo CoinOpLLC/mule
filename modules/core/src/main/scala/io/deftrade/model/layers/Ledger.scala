@@ -91,7 +91,7 @@ trait Ledger { self: ModuleTypes =>
       *
       * Implementation differs, for efficiency.
       */
-    def apply(ps: Position*): Folio = indexAndSum(ps.toList)
+    def apply(ps: Position*): Folio = indexCG(ps.toList)
 
     /** */
     def empty: Folio = Map.empty
@@ -110,7 +110,7 @@ trait Ledger { self: ModuleTypes =>
   object Trade extends WithId[Leg] { // sicc - to be continued
 
     /** */
-    def apply(ps: Leg*): Trade = indexAndSum(ps.toList)
+    def apply(ps: Leg*): Trade = indexCG(ps.toList)
 
     /** */
     def empty: Trade = Map.empty

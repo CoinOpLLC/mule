@@ -44,21 +44,21 @@ import cats.kernel.{ CommutativeGroup, Order }
 final class Money[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
 
   import spire.implicits._
-  import Money.fiat
 
-  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> fiat
+  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> moar
 
-  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount - rhs.amount |> fiat
+  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount - rhs.amount |> moar
 
   def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Money[N, C] =
-    S.to[N](scale) * amount |> fiat
+    S.to[N](scale) * amount |> moar
 
   def /(rhs: Money[N, C])(implicit N: Financial[N]): N = lhs.amount / rhs.amount
 
-  def unary_-(implicit N: Financial[N]): Money[N, C] = -amount |> fiat
+  def unary_-(implicit N: Financial[N]): Money[N, C] = -amount |> moar
 
   override def toString: String = amount.toString
 
+  @inline private def moar(n: N): Money[N, C] = new Money(n)
 }
 
 /**
@@ -66,11 +66,9 @@ final class Money[N, C] private (val amount: N) extends AnyVal with Serializable
   */
 object Money {
 
-  /** `fiat` is the new `unsafe` ;) */
-  private def fiat[N, C](n: N): Money[N, C] = new Money(n)
-
+  /** */
   def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
-    Financial[N].round[C](amount) |> fiat
+    Financial[N].round[C](amount) |> Currency[C].fiat[N]
 
   /** Unpacks into a `(N, C)`. */
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[(N, Currency[C])] =
@@ -91,8 +89,9 @@ object Money {
     Show show (m => format(m))
 
   /** Money is a commutative group under addition. */
-  implicit def moneyCommutativeGroup[N: Financial, C]: CommutativeGroup[Money[N, C]] =
-    Invariant[CommutativeGroup].imap(Financial[N].commutativeGroup)(_ |> fiat[N, C])(_.amount)
+  implicit def moneyCommutativeGroup[N: Financial, C: Currency]: CommutativeGroup[Money[N, C]] =
+    Invariant[CommutativeGroup]
+      .imap(Financial[N].commutativeGroup)(_ |> Currency[C].fiat[N])(_.amount)
 
   /** Stylized output. */
   def format[N, C](m: Money[N, C])(implicit N: Financial[N], C: Currency[C]): String = {

@@ -31,8 +31,6 @@ object contracts {
 
   /**
     * `random variable` representation.
-    *
-    * TODO: Find out where LazyList will run out of gas.
     */
   type RV[A] = LazyList[A]
 
@@ -114,7 +112,7 @@ object contracts {
         case Until(o, c)     => pricing absorb [C] (PR eval o, eval(c))
         case One(n) =>
           n match {
-            case Numéraire.InCurrency(ic) =>
+            case Numéraire.InCoin(ic) =>
               ic match {
                 case Currency(c2) => pricing exch [C] c2
               }

@@ -275,7 +275,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - debit contra account when we "buy shares (units)" (creates negative balance)
     *   - credit that account when settlement happens (zeros out the balance)
     *   - "reverse polarity" when we enter a short position.
-    *   - indexAndSum settled positions for reconcilliation
+    *   - indexCG settled positions for reconcilliation
     */
   sealed trait Market {
     def entity: Party.Key

@@ -17,8 +17,6 @@
 package io
 
 import cats.implicits._
-import cats._
-import cats.kernel.CommutativeGroup
 
 /**
   * All abstract everything only.
@@ -28,39 +26,6 @@ package object deftrade extends deftrade.results {
   /** */
   type Label   = refinements.Label
   type IsLabel = refinements.IsLabel
-
-  /**  */
-  def groupBy[F[_]: Applicative: Foldable: SemigroupK, K, A](
-      as: F[A]
-  )(
-      f: A => K
-  ): Map[K, F[A]] = {
-
-    val SA = SemigroupK[F].algebra[A]
-    import SA.combine
-
-    as.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
-      val key = f(a)
-      val v   = a.pure[F]
-      acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
-    }
-  }
-
-  /**  */
-  def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
-      kvs: F[(K, V)]
-  ): Map[K, F[V]] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs map (_._2))
-    }
-
-  /**  */
-  def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
-      kvs: F[(K, V)]
-  ): Map[K, V] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs foldMap (_._2))
-    }
 
   /**
     * Informs wart remover that the value is intentionally discarded.
@@ -90,17 +55,21 @@ package deftrade {
     */
   sealed trait Numéraire
 
-  /** */
+  /**
+    * There are two ways we can settle the bill...
+    *
+    * ... this (top level) is where we declare the policy decisions about what those ways are.
+    */
   object Numéraire {
 
     /** non-sealed extension point */
-    trait InCurrency extends Numéraire
+    trait InCoin extends Numéraire
 
     /** */
-    object InCurrency {
+    object InCoin {
 
       /** */
-      def unapply(n: Numéraire): Option[InCurrency] = n match {
+      def unapply(n: Numéraire): Option[InCoin] = n match {
         case Currency(c) => c.some
         case _           => none
       }
