@@ -2,7 +2,7 @@ package io.deftrade
 package model
 package capital
 
-import time._, money._
+import time._, money._, implicits._
 
 import cats.implicits._
 import cats.{ Order, Show }
@@ -11,14 +11,18 @@ import spire.math.Fractional
 import spire.syntax.field._
 
 /**
-  * WIP that (sorta) follows the ''Composing Contracts'' work from Peyton Jones and Eber circa 2001.
+  * WIP that (sorta) follows the ''Composing Contracts'' work
+  * by Simon Peyton Jones and Jean-Marc Eber circa 2001.
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
   *   - [[https://www.lexifi.com/apropos/ LexiFi]] sells a mature implementation of this technology in OCaml (founded by J.C. Eber, who co-authored above papers.)
-  *   - Anton van Straaten's [[http://web.archive.org/web/20130814194431/http://contracts.scheming.org/ Haskell implementation]] (highly referenced; no longer maintained)
+  *   - Anton van Straaten's [[http://web.archive.org/web/20130814194431/http://contracts.scheming.org/ Haskell implementation]]
+  *       - highly referenced; no longer maintained
+  *       - see in particular his section ''A note about the original papers''
   *   - Channing Walton's [[https://github.com/channingwalton/scala-contracts scala implementation]] (also not actively maintained)
-  *   - [[http://hackage.haskell.org/package/netrium Netrium Haskell implemenation]] (status?)
+  *   - [[http://netrium.org/ Netrium]]'s open source
+  *   [[http://hackage.haskell.org/package/netrium Haskell implemenation]] (status?)
   *   - Financial DSLs [[http://www.dslfin.org/resources.html resource page]]
   *
   * TODO: finish off a min viable modelling set for the common instruments
@@ -26,14 +30,14 @@ import spire.syntax.field._
 object contracts {
 
   /**
-    * Random Variable representation.
+    * `random variable` representation.
     *
-    * Close as we get to Haskell's `[]`.
+    * TODO: Find out where LazyList will run out of gas.
     */
   type RV[A] = LazyList[A]
 
   /**
-    *
+    * `random variable` primitives
     */
   object RV {
 
@@ -44,34 +48,48 @@ object contracts {
     def prevSlice(slice: RV[Double]): RV[Double] = slice match {
       case _ if slice.isEmpty     => LazyList.empty
       case (_ #:: t) if t.isEmpty => LazyList.empty
-      case (h #:: t)              => ((h + t(0)) / 2) #:: prevSlice(t)
+      case (h #:: th #:: tt)      => (h + th / 2) #:: prevSlice(th #:: tt)
     }
 
-    /** the name says it all */
-    def muhRates(r0: Double, delta: Double): PR[Double] = ???
+    /**
+      * TODO: in the real world, this needs params, no?
+      * TODO: can make some of these tail recursive internally?
+      */
+    def probabilityLattice: LazyList[RV[Double]] = {
 
-    /** TODO: in the real world, this needs params, no? */
-    def probabilityLattice: LazyList[RV[Double]] = ???
+      def pathCounts: LazyList[RV[Int]] = {
+        def paths(ll: LazyList[Int]): LazyList[RV[Int]] = {
+          def zig = 0 #:: ll
+          def zag = ll ++ LazyList(0)
+          ll #:: paths(zig zip zag map (t => t._1 + t._2))
+        }
+        paths(LazyList(1))
+      }
+
+      def probabilities(ps: LazyList[RV[Int]]): LazyList[RV[Double]] = ps match {
+        case h #:: t => (h map (_ / h.sum.toDouble)) #:: probabilities(t)
+      }
+
+      pathCounts |> probabilities
+    }
   }
 
-  /** `Value Process` representation.
-    * FIXME: split this up with a specialization for date and maybe bool and fractional.
-    * defeature `A`
+  /**
+    * `value process` representation
     */
-  sealed abstract case class PR[A] private (unPr: LazyList[RV[A]])
+  final case class PR[A] private (val unPr: LazyList[RV[A]]) extends AnyVal {
+    def take(n: Int)                           = PR take (this, n)
+    def horizon                                = PR horizon this
+    def forall(implicit toBool: A =:= Boolean) = PR forall (toBool liftCo this)
+  }
 
   /**
-    * `Value Process` primitives.
+    * `value process` primitives
     *
-    * Adapted from the ''How to Write a Financial Contract'' paper
+    * Adapted from the ''How to Write a Financial Contract'' paper,
+    * via van Straaten's Haskell implementation.
     */
   object PR {
-
-    /** not doing intra-day quanting... yet... */
-    val timestep = 1.day
-
-    /** */
-    def apply[A](unPr: LazyList[RV[A]]): PR[A] = new PR(unPr) {}
 
     /** */
     def eval[A](o: Obs[A]): PR[A] = o match {
@@ -108,22 +126,34 @@ object contracts {
     }
 
     /** */
-    def take[A](n: Int): PR[A] => PR[A] = ???
-
-    /** */
-    def horizon[A]: PR[A] => Int = ???
-
-    /** idiomatic scala sematics */
-    def forall: PR[Boolean] => Boolean = ???
-
-    /** */
-    def bigK[A](a: A): PR[A] = PR(LazyList continually (LazyList continually a))
+    def bigK[A](a: A): PR[A] =
+      PR(LazyList continually (LazyList continually a))
 
     /** */
     def slicesFrom(t: Instant): LazyList[RV[Instant]] = ???
 
     /**  */
-    def date(t: Instant): PR[Instant] = PR(slicesFrom(t))
+    def date(t: Instant): PR[Instant] =
+      PR(slicesFrom(t))
+
+    /** */
+    def take[A](pr: PR[A], n: Int): PR[A] =
+      PR(pr.unPr take n)
+
+    /**
+      * Only terminates for finite `value process`es.
+      */
+    def horizon[A](pr: PR[A]): Int =
+      pr.unPr.size
+
+    /**
+      * idiomatic scala sematics
+      *
+      * Only terminates for finite value processes.
+      *
+      * @return true if every value in a `value process` is true, false otherwise.
+      */
+    def forall(pr: PR[Boolean]): Boolean = pr.unPr forall (_ forall identity)
 
     /** */
     def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
@@ -140,6 +170,9 @@ object contracts {
             case (rva, rvb) => rva zip rvb map f.tupled
           }
       }
+
+    /** not doing intra-day quanting... yet... */
+    val timestep = 1.day
 
     /** */
     implicit def prOrder[A]: Order[PR[A]] = ???
@@ -159,7 +192,7 @@ object contracts {
     * From van Straaten:
     * > An `Obs`ervable is thus represented as a function from a starting date to a value process. The "time-varying" nature of an observable is captured primarily by the value process itself (PR a); the Date in the function's type is simply used to specify the start date for the resulting value process.
     *
-    * This is true, but we'll follow the approach of [[http://netrium.org/ Netrium]]
+    * This is true, but we'll follow the approach taken by [[http://netrium.org/ Netrium]]
     * (make `Obs` an ADT.)
     *
     * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
@@ -342,6 +375,9 @@ object contracts {
 
   /**  */
   object standard {
+
+    /** the name says it all */
+    def muhRates(r0: Double, delta: Double): PR[Double] = ???
 
     import Contract._
 
