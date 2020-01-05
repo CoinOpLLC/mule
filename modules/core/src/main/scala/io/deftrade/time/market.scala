@@ -17,7 +17,7 @@
 package io.deftrade
 package time
 
-import implicits._, time.work._
+import implicits._, time.work._, keyval._
 
 import scala.collection.immutable.SortedSet
 import cats.implicits._
@@ -190,13 +190,24 @@ package market {
     }
   }
 
-  sealed trait ImmPeriod extends EnumEntry {
-    def indexes: SortedSet[Int] // BitSet // [0], [0,2], [1,3], [0,1,2,3]
+  /**
+  TODO: implement
+  [[http://strata.opengamma.io/apidocs/com/opengamma/strata/basics/schedule/RollConventions.html Roll Conventions]]
+    */
+  sealed trait RollConvention extends EnumEntry with Serializable
+
+  /** */
+  object RollConvetion extends DtEnum[RollConvention] {
+    lazy val values = findValues
   }
 
-  object ImmPeriod {
-    def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
-  }
+  // sealed trait ImmPeriod extends EnumEntry {
+  //   def indexes: SortedSet[Int] // BitSet // [0], [0,2], [1,3], [0,1,2,3]
+  // }
+  //
+  // object ImmPeriod {
+  //   def apply(period: ImmPeriod)(year: Year): SortedSet[LocalDate] = ???
+  // }
 
   // dayOfWeek   getFirstDayOfWeek getMinimalDaysInFirstWeek
   // weekBasedYear   weekOfMonth  weekOfWeekBasedYear   weekOfYear
