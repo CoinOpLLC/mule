@@ -39,21 +39,11 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
   /** instance phantom type representing currency */
   type Type
 
-  /**
-    * Grant of exclusive license to create `Money[N, C]` instances
-    * is hearby made to the implicit instance of `Currency[C]`.
-    *
-    * (This feels regrettably clever.)
-    */
-  protected[this] implicit def C: Currency[Type]
-
-  /** Heh. */
-  final def fiat[N: Financial](n: N) = Money[N, Type](n)
-
   /** Usage such as `USD(amount)`. */
-  final def apply[N: Financial](n: N) = fiat(n)
+  final def apply[N: Financial](amount: N): Money[N, Type] =
+    Money fiat amount
 
-  /** */
+  /** FIXME use `refineV` */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   final def code: Currency.Code = jc.getCurrencyCode.asInstanceOf[Currency.Code]
 
@@ -110,8 +100,6 @@ sealed trait Currency[C] extends CurrencyLike { self =>
 
   /** */
   final type Type = C
-
-  override protected[this] implicit def C: Currency[Type] = self
 }
 
 /**
@@ -147,7 +135,7 @@ object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)
     * standard major currency order via objectlabkit
     * TODO: can we find a reference other than objectlabkit?
-    * This still smells bonkers. If it flies I want to call it the Wall of Types pattern.
+    * This still smells bonkers. If it flies I want to call it the ''Wall of Types'' pattern.
     * nb {{{
     *   import io.deftrade.money.Currency.USD
     * }}}

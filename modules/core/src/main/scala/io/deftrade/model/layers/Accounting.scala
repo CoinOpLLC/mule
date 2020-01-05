@@ -63,7 +63,7 @@ trait Accounting { self: ModuleTypes =>
         def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
           m map {
             case (k, n) =>
-              (k, Currency[C] fiat (Financial[V] to [MonetaryAmount] n))
+              (k, Currency[C] apply (Financial[V] to [MonetaryAmount] n))
           }
       }
     }

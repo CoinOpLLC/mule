@@ -66,9 +66,13 @@ final class Money[N, C] private (val amount: N) extends AnyVal with Serializable
   */
 object Money {
 
+  /** typeclass instance checks not required because public interface checks first */
+  private[money] def fiat[N, C](amount: N): Money[N, C] =
+    new Money(amount)
+
   /** */
   def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
-    Financial[N].round[C](amount) |> Currency[C].fiat[N]
+    Money fiat amount
 
   /** Unpacks into a `(N, C)`. */
   def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[(N, Currency[C])] =
@@ -91,7 +95,7 @@ object Money {
   /** Money is a commutative group under addition. */
   implicit def moneyCommutativeGroup[N: Financial, C: Currency]: CommutativeGroup[Money[N, C]] =
     Invariant[CommutativeGroup]
-      .imap(Financial[N].commutativeGroup)(_ |> Currency[C].fiat[N])(_.amount)
+      .imap(Financial[N].commutativeGroup)(_ |> Currency[C].apply[N])(_.amount)
 
   /** Stylized output. */
   def format[N, C](m: Money[N, C])(implicit N: Financial[N], C: Currency[C]): String = {

@@ -106,7 +106,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def credits: AccountMap[CreditType, CurrencyType] = cs
 
     /** */
-    final def net: Mny[CurrencyType] =
+    final def net(implicit C: Currency[CurrencyType]): Mny[CurrencyType] =
       credits.total - debits.total
   }
 

@@ -336,7 +336,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     /** */
     final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
-      Monad[F] pure (Currency[C] fiat quotedIn(ik).mid)
+      Monad[F] pure (Currency[C] apply quotedIn(ik).mid)
 
     /** */
     final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Mny[C]] =
