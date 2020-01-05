@@ -223,8 +223,8 @@ package object time extends time.api {
     def nano: Int         = i.getNano
     def epochSecond: Long = i.getEpochSecond
 
-    def +(amount: TemporalAmount): InstantOps = i plus amount
-    def -(amount: TemporalAmount): InstantOps = i minus amount
+    def +(amount: TemporalAmount): Instant = i plus amount
+    def -(amount: TemporalAmount): Instant = i minus amount
 
     // override def compare(that: Instant): Int = i compareTo that
   }

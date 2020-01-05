@@ -19,7 +19,6 @@ package time
 
 import implicits._, time.work._, keyval._
 
-import scala.collection.immutable.SortedSet
 import cats.implicits._
 
 import enumeratum._

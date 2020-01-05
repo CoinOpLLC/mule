@@ -17,15 +17,15 @@
 package io.deftrade
 package money
 
-import keyval.CsvEnum
+import keyval.DtEnum
+import enumeratum.EnumEntry
 
 import cats.instances.string._
 import cats.Order
 
 import eu.timepit.refined
+import refined.refineV
 import refined.api.Refined
-
-import enumeratum.{ Enum, EnumEntry }
 
 import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
 
@@ -43,9 +43,12 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
   final def apply[N: Financial](amount: N): Money[N, Type] =
     Money fiat amount
 
-  /** FIXME use `refineV` */
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  final def code: Currency.Code = jc.getCurrencyCode.asInstanceOf[Currency.Code]
+  /** TODO: don't trust, ''test'' all codes in `java.currency` in order to justify this impl */
+  final def code: Currency.Code = {
+
+    val Right(c) = refineV[Currency.IsCode](jc.getCurrencyCode)
+    c
+  }
 
   /** */
   final def numericCode: Int = jc.getNumericCode
@@ -94,18 +97,13 @@ object CurrencyLike {
   implicit lazy val order: Order[CurrencyLike] = Order by { _.code }
 }
 
-/**
-  */
-sealed trait Currency[C] extends CurrencyLike { self =>
-
-  /** */
-  final type Type = C
-}
+/** `Aux` pattern in all but name.  */
+sealed trait Currency[C] extends CurrencyLike { final type Type = C }
 
 /**
   * Some of the more common ISO 4217 currencies.
   */
-object Currency extends Enum[CurrencyLike] with CsvEnum[CurrencyLike] { self =>
+object Currency extends DtEnum[CurrencyLike] { self =>
 
   /**
     * Three letter codes: 26 ^ 3 = 17576

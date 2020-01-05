@@ -20,6 +20,7 @@ package layers
 
 import money._, keyval._
 import capital.Instrument
+import refinements.Label
 
 import cats.implicits._
 import cats.Monad

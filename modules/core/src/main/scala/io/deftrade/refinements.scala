@@ -89,9 +89,10 @@ object refinements {
 
   }
 
+  /** Our `Refined` type naming convention: {{{type XYZ = T Refined IsXYZ}}} */
   type IsLabel = IsVarChar And Trimmed And NonEmpty
 
-  /** */
+  /** A saner `String` (non-empty, bounded, trimmed). */
   type Label = String Refined IsLabel
 
   /** Postgres optimizes strings of this length (and shorter). */

@@ -24,23 +24,17 @@ import cats._
 import cats.kernel.CommutativeGroup
 
 /**
-  * Records and computations defining the domain models and services
-  * for '''financial market participants'''.
+  * Records and computations defining the domain models and services.
   *
-  * What financial market participants? Banks, possibly,
-  * but also Credit Unions, CDFIs, loan funds, CRE funds,
-  * private equity funds, hedge funds, crypto exchanges, and private capital pools generally.
-  *
-  * Also, the CFO of any ''financially sophisticated'' but ''non-financial'' firm is typically
-  * considered a financial market participant by the nature of the transactions they engage in,
-  * particularly if the firm is sizeable.
-  *
-  * This package object is where the policy decision to use [[scala.math.BigDecimal]]
-  * for [[money.Money]], and [[scala.Double]] for other [[layers.ModuleTypes.Quantity]]s, is made.
-  *
-  * Also, here we choose generic tax accounting for entities treated as partnerships.
-  *
+  * This package object is where the policy decision to choose generic tax accounting
+  * for entities treated as partnerships.
   * Different objects, package or otherwise, could make different policy decisions.
+
+  * Also, here is where we bind [[layers.ModuleTypes.MonetaryAmount]] (and thus [[money.Money]])
+  * to [[scala.math.BigDecimal]],
+  * while other [[layers.ModuleTypes.Quantity]]s bind to [[scala.Double]].
+  *
+  * This generic model package serves up the full stack of [[layers]].
   */
 package object model
 /*

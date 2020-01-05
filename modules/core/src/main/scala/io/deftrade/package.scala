@@ -16,16 +16,22 @@
 
 package io
 
-import cats.implicits._
-
 /**
-  * All abstract everything only.
+  * Foundational library for applications serving '''financial market participants'''.
+  *
+  * What financial market participants?
+  *
+  *   - Initial scope: small private equity funds, small hedge funds, family offices, RIAs,
+  *   loan funds, real estate funds, and the like.
+  *
+  *   - Potential scope: banks, credit unions, CDFIs, broker/dealers, crypto exchanges,
+  * and other actors with additional requirements,
+  *
+  * Also, the CFO of any ''financially sophisticated'' but ''non-financial'' firm is typically
+  * considered a financial market participant by the nature of the transactions they engage in.
+  * Applications built on this library might serve such a CFO.
   */
-package object deftrade extends deftrade.results {
-
-  /** */
-  type Label   = refinements.Label
-  type IsLabel = refinements.IsLabel
+package object deftrade extends deftrade.results.mixin {
 
   /**
     * Informs wart remover that the value is intentionally discarded.
@@ -40,52 +46,4 @@ package object deftrade extends deftrade.results {
     * Handy for development. If you write trading algos, development is basically "forever".
     */
   def assertOrElse(message: String): Boolean => Unit = assert(_, message)
-}
-
-package deftrade {
-
-  import money.Currency
-  import model.capital.Instrument
-
-  /**
-    * The answer to this question: "in what we price things?"
-    *
-    * `Numéraire` is formal finance term which, contrary to what a naive anglophone might think,
-    * signifies the ''denominator'' for contracts and transactions.
-    */
-  sealed trait Numéraire
-
-  /**
-    * There are two ways we can settle the bill...
-    *
-    * ... this (top level) is where we declare the policy decisions about what those ways are.
-    */
-  object Numéraire {
-
-    /** non-sealed extension point */
-    trait InCoin extends Numéraire
-
-    /** */
-    object InCoin {
-
-      /** */
-      def unapply(n: Numéraire): Option[InCoin] = n match {
-        case Currency(c) => c.some
-        case _           => none
-      }
-    }
-
-    /** non-sealed extension point */
-    trait InKind extends Numéraire
-
-    /** */
-    object InKind {
-
-      /** */
-      def unapply(n: Numéraire): Option[InKind] = n match {
-        case instrument @ Instrument(_, _, _, _, _) => instrument.some
-        case _                                      => none
-      }
-    }
-  }
 }

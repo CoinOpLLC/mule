@@ -23,26 +23,30 @@ import cats.data.{ EitherT, NonEmptyChain, Validated }
 import scala.util.Try
 
 /** Package mixin. */
-trait results {
+object results {
 
-  /** Fast-fail, invariant. */
-  type Result[T] = Either[Fail, T]
+  /** */
+  trait mixin {
 
-  /** Applicative flavor. */
-  type ResultV[T] = Validated[Fail, T]
+    /** Fast-fail, invariant. */
+    type Result[T] = Either[Fail, T]
 
-  /** Monad transformer flavor. */
-  type ResultT[F[_], T] = EitherT[F, Fail, T]
+    /** Applicative flavor. */
+    type ResultV[T] = Validated[Fail, T]
 
-  /**
-    * Choosing [[https://typelevel.org/cats/datatypes/chain.html Chain]] for our
-    * monoidal [[Fail]] accumulator.
-    */
-  type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
+    /** Monad transformer flavor. */
+    type ResultT[F[_], T] = EitherT[F, Fail, T]
 
-  /** Formats a general `message` from the argument, and records that argument as the `cause`. */
-  private[deftrade] lazy val throw2fail: Throwable => Fail =
-    x => Fail(s"${x.getClass.toString}: ${x.getMessage}", x)
+    /**
+      * Choosing [[https://typelevel.org/cats/datatypes/chain.html Chain]] for our
+      * monoidal [[Fail]] accumulator.
+      */
+    type ResultVnec[T] = Validated[NonEmptyChain[Fail], T]
+
+    /** Formats a general `message` from the argument, and records that argument as the `cause`. */
+    private[deftrade] lazy val throw2fail: Throwable => Fail =
+      x => Fail(s"${x.getClass.toString}: ${x.getMessage}", x)
+  }
 }
 
 /** Impedence matching utilities, basically. */

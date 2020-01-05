@@ -29,6 +29,40 @@ import spire.syntax.field._
   */
 object contracts {
 
+  /** Essentially arbitrary */
+  lazy val tZero: Instant = java.time.Instant.EPOCH
+
+  /** */
+  type TimeSteps = Int
+
+  /** */
+  sealed abstract case class DiscreteTime(step: Int) {
+
+    /** */
+    def instant: Instant
+
+    /** */
+    def series: DiscreteTimeSeries
+
+    /** */
+    final def next: DiscreteTime = series at step + 1
+  }
+
+  /** */
+  sealed abstract case class DiscreteTimeSeries private (t0: Instant, timeStep: Duration) { dts =>
+
+    /** */
+    def at(ts: TimeSteps): DiscreteTime =
+      new DiscreteTime(ts) { def instant = t0 + timeStep * ts.toLong; def series = dts }
+  }
+
+  /** */
+  object DiscreteTimeSeries {
+
+    /** */
+    def apply(t0: Instant): DiscreteTimeSeries = new DiscreteTimeSeries(t0, 24.hours) {}
+  }
+
   /**
     * `random variable` representation.
     */
@@ -56,11 +90,13 @@ object contracts {
     def probabilityLattice: LazyList[RV[Double]] = {
 
       def pathCounts: LazyList[RV[Int]] = {
+
         def paths(ll: LazyList[Int]): LazyList[RV[Int]] = {
           def zig = 0 #:: ll
           def zag = ll ++ LazyList(0)
-          ll #:: paths(zig zip zag map (t => t._1 + t._2))
+          ll #:: paths(zig zip zag map { case (l, r) => l + r })
         }
+
         paths(LazyList(1))
       }
 
@@ -74,6 +110,8 @@ object contracts {
 
   /**
     * `value process` representation
+    *
+    * FIXME: need {{{DiscreteTime => LazyList[RV[A]]}}}
     */
   final case class PR[A] private (val unPr: LazyList[RV[A]]) extends AnyVal {
     def take(n: Int)                           = PR take (this, n)
@@ -128,11 +166,16 @@ object contracts {
       PR(LazyList continually (LazyList continually a))
 
     /** */
-    def slicesFrom(t: Instant): LazyList[RV[Instant]] = ???
+    private def timeSlices(slice: RV[DiscreteTime]): LazyList[RV[DiscreteTime]] = {
+      val (dt #:: _) = slice
+      val nextStep   = dt.step + 1
+      val nextSlice  = LazyList.fill(nextStep + 1)(dt.next)
+      slice #:: timeSlices(nextSlice)
+    }
 
     /**  */
-    def date(t: Instant): PR[Instant] =
-      PR(slicesFrom(t))
+    def date(t: Instant): PR[DiscreteTime] =
+      PR(timeSlices(LazyList(DiscreteTimeSeries(t) at 0)))
 
     /** */
     def take[A](pr: PR[A], n: Int): PR[A] =
@@ -228,10 +271,10 @@ object contracts {
 
     /**
       * "The value of the observable date at date t is just t."
-      * `date :: Obs Date`
-      * `date = Obs (\t -> PR $ timeSlices [t])`
+      *
+      * TODO: define the extended ADT and DSL for `Obs` and `Contract`
       */
-    def date: Obs[Instant] = ???
+    def date: Obs[Instant] = const(tZero)
 
     /** */
     implicit def obsOrder[A: Order]: Order[Obs[A]] = ???

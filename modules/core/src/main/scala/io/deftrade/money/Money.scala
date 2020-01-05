@@ -35,11 +35,14 @@ import cats.kernel.{ CommutativeGroup, Order }
   *
   * and be done?
   *
-  * Because we'd like to add the usual operators directly and without overhead, the use of the
-  * default `Refined` type is precluded: root cause being that a value class cannot wrap another
+  * Because we'd like to add the usual operators directly and (possibly) without overhead,
+  * the use of the default `Refined` type is precluded: a value class cannot wrap another
   * value class.
   *
   * Therefore we make use of the `RefType` and `Validated` classes to integrate with `Refined`.
+  *
+  * TODO: review b/c this is sketchy.
+  * OTOH would be easy to adapt this code to a pure Refined based impl.
   */
 final class Money[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
 
@@ -61,13 +64,11 @@ final class Money[N, C] private (val amount: N) extends AnyVal with Serializable
   @inline private def moar(n: N): Money[N, C] = new Money(n)
 }
 
-/**
-  * `Money[?, C]: Order: Show: CommutativeGroup`
-  */
+/** */
 object Money {
 
   /** typeclass instance checks not required because public interface checks first */
-  private[money] def fiat[N, C](amount: N): Money[N, C] =
+  @inline private[money] def fiat[N, C](amount: N): Money[N, C] =
     new Money(amount)
 
   /** */
@@ -168,5 +169,4 @@ object Money {
   //   */
   // implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
   //   Validate alwaysPassed Currency[P]
-
 }
