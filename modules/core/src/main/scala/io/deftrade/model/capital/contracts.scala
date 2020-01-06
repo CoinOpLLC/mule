@@ -106,6 +106,22 @@ object contracts {
 
       pathCounts |> probabilities
     }
+
+    /**
+      * From the `Composing Contracts` implementation by van Straaten:
+      * > The code for absorb above does not obviously deal
+      * with the expected value mentioned in the spec.
+      * This is because the expected value of each
+      * random variable is implicit in the value process
+      * lattice representation: each node in the lattice is
+      * associated with a probability, and the
+      * expected value at a particular date is simply the sum
+      * of the product of the value at each node
+      * and its associated probability. The following functions
+      * implement this calculation.
+      */
+    def expectedValue(outcomes: RV[Double], probabilities: RV[Double]): Double =
+      outcomes zip probabilities foldMap { case (o, p) => o * p }
   }
 
   /**
@@ -126,6 +142,8 @@ object contracts {
     * via van Straaten's Haskell implementation.
     */
   object PR {
+
+    private[contracts] def apply[A](unPr: LazyList[RV[A]]): PR[A] = new PR(unPr)
 
     /** */
     def eval[A](o: Obs[A]): PR[A] = o match {
@@ -165,17 +183,18 @@ object contracts {
     def bigK[A](a: A): PR[A] =
       PR(LazyList continually (LazyList continually a))
 
-    /** */
-    private def timeSlices(slice: RV[DiscreteTime]): LazyList[RV[DiscreteTime]] = {
-      val (dt #:: _) = slice
-      val nextStep   = dt.step + 1
-      val nextSlice  = LazyList.fill(nextStep + 1)(dt.next)
-      slice #:: timeSlices(nextSlice)
-    }
-
     /**  */
-    def date(t: Instant): PR[DiscreteTime] =
+    def date(t: Instant): PR[DiscreteTime] = {
+
+      def timeSlices(slice: RV[DiscreteTime]): LazyList[RV[DiscreteTime]] = {
+        val (dt #:: _) = slice
+        val nextStep   = dt.step + 1
+        val nextSlice  = LazyList.fill(nextStep + 1)(dt.next)
+        slice #:: timeSlices(nextSlice)
+      }
+
       PR(timeSlices(LazyList(DiscreteTimeSeries(t) at 0)))
+    }
 
     /** */
     def take[A](pr: PR[A], n: Int): PR[A] =
@@ -211,6 +230,10 @@ object contracts {
             case (rva, rvb) => rva zip rvb map f.tupled
           }
       }
+
+    /** */
+    def expectedValue(pr: PR[Double]): LazyList[Double] =
+      pr.unPr zip RV.probabilityLattice map { case (ps, os) => RV.expectedValue(ps, os) }
 
     /** not doing intra-day quanting... yet... */
     val timestep = 1.day
@@ -296,9 +319,8 @@ object contracts {
     /** Party acquires one unit of [[money.Currency]]. */
     def one[C: Currency]: Contract = new One(Currency[C]) {}
 
-    /** Party acquires one [[Instrument]]. */
+    /** Party acquires one unit of [[Instrument]]. */
     def one(i: Instrument): Contract = new One(i) {}
-
     sealed abstract case class One(n: Numéraire) extends Contract
 
     /** Party acquires `c` multiplied by . */
@@ -384,8 +406,19 @@ object contracts {
         * if the region `cond` will never be true, and receiving zero in the contrary.
         *
         * In states where `cond` is true, the result is therefore zero.
+        *
+        * TODO: track down why `C` goes (apparently) unused
         */
-      def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+      def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+        PR(
+          cond.unPr zip pr.unPr map {
+            case (os, ps) =>
+              os zip ps map {
+                case (false, p) => p
+                case _          => 0
+              }
+          }
+        )
 
       /**
         * Calculates the Snell envelope of `pr`, under `cond`.
@@ -397,21 +430,44 @@ object contracts {
 
       /**
         * Returns a real-valued process representing the value of one unit of
-        * the `CurrencyLike` value `k2`, expressed in `Currency` C.
+        * the `CurrencyLike` value `c2`, expressed in `Currency` C.
         *
-        * This is simply the process representing
+        * For (n: CurrencyLike), this is simply the process representing
         * the quoted exchange rate between the curencies.
+        *
+        * For (n: Instrument), this is simply the process representing
+        * the market price of the Instrument, quoted in `Currency[C]`.
+        *
+        * FIXME: implement
         */
-      def exch[C: Currency](k2: CurrencyLike): PR[Double] = ???
+      def exch[C: Currency](n2: Numéraire): PR[Double] = n2 match {
+
+        case Numéraire.InCoin(c2) =>
+          c2 |> discardValue
+          PR bigK Double.NaN // sucks, huh? srsly we should do something
+
+        case Numéraire.InKind(k2) =>
+          k2 |> discardValue
+          PR bigK Double.NaN
+      }
     }
 
     /**
-      * The difference between "workflow automation" and "smart contracts"
-      * is a matter of degree and perspective.
+      * `Contract` evaluation `Context` useful for the construction of
+      * manual `Contract` performance workflow scheduling.
       *
       * FIXME: do something
       */
     case class Scheduling() extends Context
+
+    /**
+      * `Contract` evaluation `Context` predicated on the idea that the
+      * difference between "workflow automation" and "smart contracts"
+      * is a matter of degree and perspective. And counterparty platform integration. (And that.)
+      *
+      * FIXME: do something
+      */
+    case class Performing() extends Context
   }
 
   /**  */
