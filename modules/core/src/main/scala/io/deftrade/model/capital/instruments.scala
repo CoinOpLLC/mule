@@ -259,8 +259,9 @@ final case class Instrument(
     meta: Json,
 ) extends Numéraire.InKind {
 
-  /** FIXME: revisit this
-    * And by fiat we mean convention... */
+  /**
+    *  TODO: revisit this
+    */
   def isLegalTender: Boolean =
     symbol.value === currency.code.value
 

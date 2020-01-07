@@ -29,6 +29,9 @@ import spire.syntax.field._
   */
 object contracts {
 
+  final type LL[A] = LazyList[A]
+  final val LL = LazyList
+
   /** Essentially arbitrary */
   lazy val tZero: Instant = java.time.Instant.EPOCH
 
@@ -281,29 +284,26 @@ object contracts {
     */
   object Obs {
 
-    // /** FIXME implement this in io.deftrade.time please */
-    // implicit def FIXME: Order[LocalDateTime] = ???
-
     /** `const(x)` is an observable that has value x at any time. */
     def const[A](a: A): Obs[A] = new Const(a) {}
     sealed abstract case class Const[A](a: A) extends Obs[A]
 
-    /** */
-    def at(t: Instant): Obs[Boolean] =
-      const(date === const(t))
-
     /**
-      * "The value of the observable date at date t is just t."
-      *
-      * TODO: define the extended ADT and DSL for `Obs` and `Contract`
+      * FIXME: van Straaten uses Obs[Date] and Netrium does not.
+      * This is my best attempt at elucidation. What does this even do? How does
+      * Netrium cope?
       */
-    def date: Obs[Instant] = const(tZero)
+    def at(t: Instant): Obs[Boolean] =
+      const(PR.date(t) === PR.bigK(DiscreteTimeSeries(t) at 0)) // or tZero
 
     /** */
     implicit def obsOrder[A: Order]: Order[Obs[A]] = ???
 
     /** */
     implicit def obsShow[A]: Show[Obs[A]] = ???
+
+    /** */
+    implicit def obsFractional[N: Fractional]: Fractional[Obs[N]] = ???
   }
 
   /** */
@@ -382,18 +382,82 @@ object contracts {
       */
     case class Pricing(t: Instant) extends Context {
 
+      /** Constructs a lattice containing possible interest rates
+        * given a starting rate and an increment per time step.
+        *
+        * FIXME: toy model; need plugin rateModel interface ;)
+        */
+      def rates(rateNow: Double, delta: Double): PR[Double] = {
+
+        def makeRateSlices(rate: Double, n: Int): LazyList[RV[Double]] = {
+
+          def rateSlice = LazyList.tabulate(n) { rate + 2 * _ * delta }
+
+          rateSlice #:: makeRateSlices(rate - delta, n + 1)
+        }
+
+        PR(makeRateSlices(rateNow, 1))
+      }
+
+      /**
+        * FIXME: toy model; need plugin rateModel interface ;)
+        */
+      lazy val rateModels: Map[CurrencyLike, PR[Double]] = Map(
+        Currency.CHF -> rates(1.70, 0.080),
+        Currency.EUR -> rates(1.65, 0.025),
+        Currency.GBP -> rates(1.70, 0.080),
+        Currency.USD -> rates(1.50, 0.150),
+        Currency.JPY -> rates(1.10, 0.250),
+      )
+
+      /**
+        * FIXME: toy model; need plugin rateModel interface ;)
+        */
+      def rateModel[C: Currency]: PR[Double] =
+        rateModels get Currency[C] getOrElse ???
+
       /**
         * Discount process.
         *
         * Given a boolean-valued process `cond` , `disc`
         * transforms the real-valued process `pr`,
         * expressed in the type parameter `C: Currency`, into another real valued process.
+        *
         * In states where `cond` is true, return `pr`.
         *
         * Elsewhere, the result is its "fair" equivalent stochastic value
         * process in the same `C: Currency`.
         */
-      def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+      def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = {
+
+        def calc(bs: LL[RV[Boolean]], ps: LL[RV[Double]], rs: LL[RV[Double]]): LL[RV[Double]] =
+          (bs, ps, rs) match {
+
+            case (predSlice #:: bs, procSlice #:: ps, rateSlice #:: rs) =>
+              if (predSlice forall identity)
+                LL(procSlice)
+              else
+                calc(bs, ps, rs) match {
+
+                  case rest @ nextSlice #:: _ =>
+                    def thisSlice: RV[Double] = {
+
+                      def discSlice =
+                        RV.prevSlice(nextSlice) zip rateSlice map {
+                          case (x, r) => x / (1 + r / 100.0)
+                        }
+
+                      predSlice zip (procSlice zip discSlice) map {
+                        case (b, (p, d)) => if (b) p else d
+                      }
+
+                    }
+                    thisSlice #:: rest
+                }
+          }
+
+        PR(calc(cond.unPr, pr.unPr, rateModel[C].unPr))
+      }
 
       /**
         * Conditions the value of a process on a [[PR]]`[Boolean]`.
@@ -415,7 +479,7 @@ object contracts {
             case (os, ps) =>
               os zip ps map {
                 case (false, p) => p
-                case _          => 0
+                case (true, _)  => 0.0
               }
           }
         )
@@ -438,17 +502,17 @@ object contracts {
         * For (n: Instrument), this is simply the process representing
         * the market price of the Instrument, quoted in `Currency[C]`.
         *
-        * FIXME: implement
+        * FIXME: toy stub; implement for real.
         */
       def exch[C: Currency](n2: Numéraire): PR[Double] = n2 match {
 
         case Numéraire.InCoin(c2) =>
           c2 |> discardValue
-          PR bigK Double.NaN // sucks, huh? srsly we should do something
+          PR bigK 1.618
 
         case Numéraire.InKind(k2) =>
           k2 |> discardValue
-          PR bigK Double.NaN
+          PR bigK 6.18
       }
     }
 
