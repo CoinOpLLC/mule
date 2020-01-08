@@ -194,7 +194,7 @@ trait stores {
     /** */
     final type HRow = HValue
 
-    /**  */
+    /**  FIXME: is this the sorce of the davenport scaladoc prob? */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]]

@@ -51,6 +51,16 @@ object contracts {
     final def next: DiscreteTime = series at step + 1
   }
 
+  /** FIXME: star me kitten */
+  object DiscreteTime {
+
+    /** */
+    implicit def discreteTimeOrder: Order[DiscreteTime] = ???
+
+    /** */
+    implicit def showDiscreteTime: Show[DiscreteTime] = ???
+  }
+
   /** */
   sealed abstract case class DiscreteTimeSeries private (t0: Instant, timeStep: Duration) { dts =>
 
@@ -130,9 +140,9 @@ object contracts {
   /**
     * `value process` representation
     *
-    * FIXME: need {{{DiscreteTime => LazyList[RV[A]]}}}
+    * FIXME: need {{{DiscreteTime => LazyList[RV[A]]}}} somewhere!
     */
-  final case class PR[A] private (val unPr: LazyList[RV[A]]) extends AnyVal {
+  final case class PR[A] private (val rvs: LazyList[RV[A]]) extends AnyVal {
     def take(n: Int)                           = PR take (this, n)
     def horizon                                = PR horizon this
     def forall(implicit toBool: A =:= Boolean) = PR forall (toBool liftCo this)
@@ -146,41 +156,7 @@ object contracts {
     */
   object PR {
 
-    private[contracts] def apply[A](unPr: LazyList[RV[A]]): PR[A] = new PR(unPr)
-
-    /** */
-    def eval[A](o: Obs[A]): PR[A] = o match {
-      case Obs.Const(a) => bigK(a)
-    }
-
-    /** */
-    def eval[C: Currency](pricing: Context.Pricing): Contract => PR[Double] = {
-
-      import Contract._
-
-      // closure now has everything it needs: all the free vars are bound
-      def eval: Contract => PR[Double] = {
-        case Zero            => bigK(0.0)
-        case Give(c)         => -eval(c)
-        case Scale(o, c)     => (PR eval o) * eval(c)
-        case And(c1, c2)     => eval(c1) + eval(c2)
-        case Or(c1, c2)      => eval(c1) max eval(c2)
-        case Cond(o, c1, c2) => PR.cond(PR eval o)(eval(c1))(eval(c2))
-        case When(o, c)      => pricing disc [C] (PR eval o, eval(c))
-        case Anytime(o, c)   => pricing snell [C] (PR eval o, eval(c))
-        case Until(o, c)     => pricing absorb [C] (PR eval o, eval(c))
-        case One(n) =>
-          n match {
-            case Numéraire.InCoin(ic) =>
-              ic match {
-                case Currency(c2) => pricing exch [C] c2
-              }
-            case Numéraire.InKind(_) => ???
-          }
-      }
-
-      eval
-    }
+    private[contracts] def apply[A](rvs: LazyList[RV[A]]): PR[A] = new PR(rvs)
 
     /** */
     def bigK[A](a: A): PR[A] =
@@ -201,13 +177,13 @@ object contracts {
 
     /** */
     def take[A](pr: PR[A], n: Int): PR[A] =
-      PR(pr.unPr take n)
+      PR(pr.rvs take n)
 
     /**
       * Only terminates for finite `value process`es.
       */
     def horizon[A](pr: PR[A]): Int =
-      pr.unPr.size
+      pr.rvs.size
 
     /**
       * idiomatic scala sematics
@@ -216,27 +192,53 @@ object contracts {
       *
       * @return true if every value in a `value process` is true, false otherwise.
       */
-    def forall(pr: PR[Boolean]): Boolean = pr.unPr forall (_ forall identity)
+    def forall(pr: PR[Boolean]): Boolean =
+      pr.rvs forall (_ forall identity)
 
     /** */
     def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
 
     /** */
     def lift[A, B](f: A => B): PR[A] => PR[B] =
-      pra => PR { pra.unPr map (_ map f) }
+      pra => PR { pra.rvs map (_ map f) }
 
     /** */
     def lift2[A, B, C](f: (A, B) => C): (PR[A], PR[B]) => PR[C] =
       (pra, prb) =>
         PR {
-          pra.unPr zip prb.unPr map {
+          pra.rvs zip prb.rvs map {
             case (rva, rvb) => rva zip rvb map f.tupled
           }
       }
 
     /** */
     def expectedValue(pr: PR[Double]): LazyList[Double] =
-      pr.unPr zip RV.probabilityLattice map { case (ps, os) => RV.expectedValue(ps, os) }
+      pr.rvs zip RV.probabilityLattice map { case (ps, os) => RV.expectedValue(ps, os) }
+
+    /**
+      * Conditions the value of a process on a [[PR]]`[Boolean]`.
+      *
+      * Given a boolean-valued process `cond`, `absorb` transforms the real-valued proess
+      * `pr`, expressed with type parameter C : [[money.Currency]],
+      * into another real-valued process.
+      *
+      * For any state, the result is the expected value of receiving p's value
+      * if the region `cond` will never be true, and receiving zero in the contrary.
+      *
+      * In states where `cond` is true, the result is therefore zero.
+      *
+      * TODO: track down why `C` goes (apparently) unused
+      */
+    def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+      PR(
+        cond.rvs zip pr.rvs map {
+          case (os, ps) =>
+            os zip ps map {
+              case (false, p) => p
+              case (true, _)  => 0.0
+            }
+        }
+      )
 
     /** not doing intra-day quanting... yet... */
     val timestep = 1.day
@@ -295,6 +297,11 @@ object contracts {
       */
     def at(t: Instant): Obs[Boolean] =
       const(PR.date(t) === PR.bigK(DiscreteTimeSeries(t) at 0)) // or tZero
+
+    /** */
+    def eval[A](o: Obs[A]): PR[A] = o match {
+      case Obs.Const(a) => PR.bigK(a)
+    }
 
     /** */
     implicit def obsOrder[A: Order]: Order[Obs[A]] = ???
@@ -416,19 +423,11 @@ object contracts {
       def rateModel[C: Currency]: PR[Double] =
         rateModels get Currency[C] getOrElse ???
 
-      /**
-        * Discount process.
-        *
-        * Given a boolean-valued process `cond` , `disc`
-        * transforms the real-valued process `pr`,
-        * expressed in the type parameter `C: Currency`, into another real valued process.
-        *
-        * In states where `cond` is true, return `pr`.
-        *
-        * Elsewhere, the result is its "fair" equivalent stochastic value
-        * process in the same `C: Currency`.
-        */
-      def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = {
+      /** */
+      type BPQ = (Boolean, Double, Double) => Double
+
+      /** */
+      def discount[C: Currency](bpq: BPQ, cond: PR[Boolean], pr: PR[Double]): PR[Double] = {
 
         def calc(bs: LL[RV[Boolean]], ps: LL[RV[Double]], rs: LL[RV[Double]]): LL[RV[Double]] =
           (bs, ps, rs) match {
@@ -448,7 +447,7 @@ object contracts {
                         }
 
                       predSlice zip (procSlice zip discSlice) map {
-                        case (b, (p, d)) => if (b) p else d
+                        case (b, (p, d)) => bpq(b, p, d)
                       }
 
                     }
@@ -456,33 +455,26 @@ object contracts {
                 }
           }
 
-        PR(calc(cond.unPr, pr.unPr, rateModel[C].unPr))
+        PR(calc(cond.rvs, pr.rvs, rateModel[C].rvs))
       }
 
+      private lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
+      private lazy val orMax: BPQ = (b, p, q) => if (b) p else Math.max(p, q)
+
       /**
-        * Conditions the value of a process on a [[PR]]`[Boolean]`.
+        * Discount process.
         *
-        * Given a boolean-valued proess `cond`, `absorb` transforms the real-valued proess
-        * `pr`, expressed with type parameter C : [[money.Currency]],
-        * into another real-valued process.
+        * Given a boolean-valued process `cond` , `disc`
+        * transforms the real-valued process `pr`,
+        * expressed in the type parameter `C: Currency`, into another real valued process.
         *
-        * For any state, the result is the expected value of receiving p's value
-        * if the region `cond` will never be true, and receiving zero in the contrary.
+        * In states where `cond` is true, return `pr`.
         *
-        * In states where `cond` is true, the result is therefore zero.
-        *
-        * TODO: track down why `C` goes (apparently) unused
+        * Elsewhere, the result is its "fair" equivalent stochastic value
+        * process in the same `C: Currency`.
         */
-      def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
-        PR(
-          cond.unPr zip pr.unPr map {
-            case (os, ps) =>
-              os zip ps map {
-                case (false, p) => p
-                case (true, _)  => 0.0
-              }
-          }
-        )
+      def disc[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+        discount(orQ, cond, pr)
 
       /**
         * Calculates the Snell envelope of `pr`, under `cond`.
@@ -490,7 +482,8 @@ object contracts {
         * Uses the probability measure
         * associated with the type parameter [C: Currency].
         */
-      def snell[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] = ???
+      def snell[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+        discount(orMax, cond, pr)
 
       /**
         * Returns a real-valued process representing the value of one unit of
@@ -513,6 +506,53 @@ object contracts {
         case Numéraire.InKind(k2) =>
           k2 |> discardValue
           PR bigK 6.18
+      }
+
+      import Contract._
+
+      /**
+        * Evaluate the `Contract` in the specified [[money.Currency]].
+        */
+      def eval[C: Currency]: Contract => PR[Double] = {
+
+        // just syntactic sugar to remove `C`; the guts read so much cleaner
+        def eval: Contract => PR[Double] = {
+          case Zero            => PR.bigK(0.0)
+          case Give(c)         => -eval(c)
+          case Scale(o, c)     => (Obs eval o) * eval(c)
+          case And(c1, c2)     => eval(c1) + eval(c2)
+          case Or(c1, c2)      => eval(c1) max eval(c2)
+          case Cond(o, c1, c2) => PR.cond(Obs eval o)(eval(c1))(eval(c2))
+          case When(o, c)      => disc(Obs eval o, eval(c))
+          case Anytime(o, c)   => snell(Obs eval o, eval(c))
+          case Until(o, c)     => PR.absorb(Obs eval o, eval(c))
+          case One(n) => // TODO: make this a method
+            n match {
+              case Numéraire.InCoin(ic) =>
+                ic match {
+                  case Currency(c2) => exch(c2)
+                }
+              case Numéraire.InKind(_) => ???
+            }
+        }
+
+        eval
+      }
+    }
+
+    /** */
+    object Pricing {
+
+      /** TODO: refinements on inputs? */
+      case class LatticeModelParams(r: Double, sigma: Double, div: Double, step: Double) {
+
+        import Math.{ exp, sqrt }
+
+        def up: Double   = exp(sigma * sqrt(step))
+        def down: Double = 1.0 / up
+
+        def p: Double = exp((r - div) * step - down) / (up - down) // FIXME singularity no good
+        def q: Double = 1.0 - p
       }
     }
 
@@ -537,19 +577,37 @@ object contracts {
   /**  */
   object standard {
 
-    /** the name says it all */
-    def muhRates(r0: Double, delta: Double): PR[Double] = ???
-
     import Contract._
 
     /**  */
     def optionally(c: Contract): Contract = c or Zero
 
     /**  */
-    def buy[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+    def buy[N: Financial, C: Currency](c: Contract, price: Money[N, C]): Contract =
+      c and give(one scale (Obs const Financial[N].to[Double](price.amount)))
 
     /**  */
-    def sell[N: Financial, C: Currency](c: Contract, amount: Money[N, C]): Contract = ???
+    def sell[N: Financial, C: Currency](c: Contract, price: Money[N, C]): Contract =
+      one scale (Obs const Financial[N].to[Double](price.amount)) and give(c)
+
+    /**  */
+    def zeroCouponBond[N: Financial, C: Currency](
+        maturity: Instant,
+        face: Money[N, C]
+    ): Contract =
+      when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face.amount)))
+
+    /** */
+    def europeanCall[N: Financial, C: Currency](
+        contract: Contract,
+        strike: Money[N, C],
+        expiry: Instant,
+    ): Contract =
+      when(Obs at expiry, optionally(buy(contract, strike)))
+  }
+
+  /** */
+  object observables {
 
     /**
       *   Extremely useful and widely referenced benchmark.
@@ -560,19 +618,5 @@ object contracts {
       */
     def wsjPrimeRate: Obs[Double] = ???
 
-    /**  */
-    def zeroCouponBond[N: Financial, C: Currency](
-        maturity: Instant,
-        face: N
-    ): Contract =
-      when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face)))
-
-    /** */
-    def europeanCall[N: Financial, C: Currency](
-        contract: Contract,
-        strike: Money[N, C],
-        expiry: Instant,
-    ): Contract =
-      when(Obs at expiry, optionally(buy(contract, strike)))
   }
 }

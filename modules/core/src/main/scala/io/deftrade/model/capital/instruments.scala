@@ -365,8 +365,7 @@ object layers {
     /** */
     case class Bond(
         override val matures: ZonedDateTime
-    ) extends Maturity
-        with Columns {
+    ) extends Maturity {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -391,8 +390,7 @@ object layers {
 
       /** */
       def contract: Contract =
-        zeroCouponBond[Double, money.Currency.USD](???, ???)
-      // zeroCouponBond(maturity = matures, face = 1.0)
+        zeroCouponBond(maturity = matures.toInstant, face = money.Currency.USD(1000.0))
     }
   }
 
