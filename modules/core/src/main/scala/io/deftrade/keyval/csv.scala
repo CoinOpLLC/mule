@@ -33,24 +33,26 @@ trait csv {
   import io.chrisdavenport.cormorant.implicits._
 
   /** cormorant csv `Get` */
-  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] = new Get[Money[N, C]] {
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] =
+    new Get[Money[N, C]] {
 
-    /** */
-    def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
-      Money parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
-  }
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
+        Money parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+    }
 
   /** cormorant csv `Put` */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
     stringPut contramap Money.format[N, C]
 
   /** cormorant csv `Get` */
-  implicit def financialGet[N](implicit N: Financial[N]): Get[N] = new Get[N] {
+  implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
+    new Get[N] {
 
-    /** */
-    def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
-      N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
-  }
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
+        N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+    }
 
   /** cormorant csv `Put` */
   implicit def financialPut[N: Financial]: Put[N] =
@@ -72,10 +74,11 @@ trait csv {
   object CsvEnum {
 
     /** Use these methods to create implicits per Enum. */
-    def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] = Get tryOrMessage (
-      field => scala.util.Try { e withName field.x },
-      field => s"Failed to decode Enum: ${e.toString}: Received ${field.toString}"
-    )
+    def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] =
+      Get tryOrMessage (
+        field => scala.util.Try { e withName field.x },
+        field => s"Failed to decode Enum: ${e.toString}: Received ${field.toString}"
+      )
 
     /** */
     def enumPut[E <: EnumEntry]: Put[E] = stringPut contramap (_.toString)
@@ -90,9 +93,9 @@ trait csv {
     implicit val orderInstance: Order[E] = Order by (_.entryName)
 
     /**
-      * TODO:
+      * TODO: is there a better alternative than an explicit downcast?
       * Implementation relies on reasoning about set containment and downcast safety.
-      * Warrents extreme vetting.
+      * Fragile at best.
       */
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def unapply(key: EnumEntry): Option[E] =

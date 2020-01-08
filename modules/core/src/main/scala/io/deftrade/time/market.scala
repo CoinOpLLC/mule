@@ -160,16 +160,16 @@ package market {
     lazy val values = findValues
   }
 
+  /** */
   sealed trait DayCount extends EnumEntry {
     def days(start: LocalDate, end: LocalDate): Int
     def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double
   }
-  //ACT_[360|365|ACT]
-  // CONV_30_360, CONV_360E_[ISDA|IMSA]
+
+  /** */
   object DayCount extends Enum[DayCount] {
 
-    lazy val values = findValues
-
+    /** */
     case object ACT_ACT_ISDA extends DayCount {
       def days(start: LocalDate, end: LocalDate): Int = ???
       def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double =
@@ -183,15 +183,22 @@ package market {
           startYearFraction + wholeYears + endYearFraction
         }
     }
+
+    /** */
     case object CONV_30_360 extends DayCount {
       def days(start: LocalDate, end: LocalDate): Int                               = ???
       def years(start: LocalDate, end: LocalDate)(implicit isWd: IsWorkDay): Double = ???
     }
+
+    // CONV_30_360, CONV_360E_[ISDA|IMSA]
+    // ACT_[360|365|ACT]
+
+    /** */
+    lazy val values = findValues
   }
 
   /**
-  TODO: implement
-  [[http://strata.opengamma.io/apidocs/com/opengamma/strata/basics/schedule/RollConventions.html Roll Conventions]]
+  TODO: [[http://strata.opengamma.io/apidocs/com/opengamma/strata/basics/schedule/RollConventions.html Roll Conventions]].
     */
   sealed trait RollConvention extends EnumEntry with Serializable
 
