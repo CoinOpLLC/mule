@@ -264,7 +264,7 @@ trait api {
       Some((ym.getYear, ym.getMonth))
   }
 
-  import collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
   type ZoneId = java.time.ZoneId
 

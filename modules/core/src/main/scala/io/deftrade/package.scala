@@ -17,7 +17,7 @@
 package io
 
 /**
-  * Foundational library for applications serving '''financial market participants'''.
+  * Foundational toolkit for applications serving '''financial market participants'''.
   *
   * What financial market participants?
   *
@@ -30,6 +30,15 @@ package io
   * Also, the CFO of any ''financially sophisticated'' but ''non-financial'' firm is typically
   * considered a financial market participant by the nature of the transactions they engage in.
   * Applications built on this library might serve such a CFO.
+  *
+  * This toolkit provides the necessary types and methods to specify
+  * `Abstract Algebraic Domain Model`s (AADMs)
+  *   - `Abstract` because the models are mapped to multiple materialized types
+  * via ''natural transformations'' (i.e. multiple interpreters for the same language).
+  *   - `Algebraic` because the models are formally composable according to sound mathematical
+  * rules (for which automated testing can be derived).
+  *   - `Domain Model`s because the abstract algebra aspires to legibility by
+  * the afformentioned ''financial market participants''.
   */
 package object deftrade extends deftrade.results.mixin {
 
