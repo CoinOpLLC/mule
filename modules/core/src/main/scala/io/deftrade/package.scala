@@ -33,9 +33,9 @@ package io
   *
   * This toolkit provides the necessary types and methods to specify
   * `Abstract Algebraic Domain Model`s (AADMs)
-  *   - `Abstract` because the models are mapped to multiple materialized types
+  *   - `Abstract` because models are mapped to multiple materialized types
   * via ''natural transformations'' (i.e. multiple interpreters for the same language).
-  *   - `Algebraic` because the models are formally composable according to sound mathematical
+  *   - `Algebraic` because models are formally composable according to sound mathematical
   * rules (for which automated testing can be derived).
   *   - `Domain Model`s because the abstract algebra aspires to legibility by
   * the afformentioned ''financial market participants''.

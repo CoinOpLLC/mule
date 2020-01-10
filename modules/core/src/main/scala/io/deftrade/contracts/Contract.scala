@@ -1,8 +1,7 @@
 package io.deftrade
-package model
 package contracts
 
-import time._, money._, capital.Instrument
+import time._, money._, model.capital.Instrument
 
 /**  This trait intentionally left blank. */
 sealed trait Contract
@@ -60,7 +59,7 @@ object Contract {
   }
 }
 
-/**  */
+/** Common `Contract` creation primitives. */
 object standard {
 
   import Contract._
@@ -68,7 +67,7 @@ object standard {
   /** Party acquires one unit of [[money.Currency]]. */
   def one[C: Currency]: Contract = one(Currency[C])
 
-  /** Party acquires one unit of [[Instrument]]. */
+  /** Party acquires one unit of [[model.capital.Instrument]]. */
   def one(i: Instrument): Contract = one(i)
 
   /**  */
@@ -96,4 +95,12 @@ object standard {
       expiry: Instant,
   ): Contract =
     when(Obs at expiry, optionally(buy(contract, strike)))
+
+  /** */
+  def americanCall[N: Financial, C: Currency](
+      contract: Contract,
+      strike: Money[N, C],
+      expiry: Instant,
+  ): Contract =
+    anytime(Obs at expiry, optionally(buy(contract, strike)))
 }

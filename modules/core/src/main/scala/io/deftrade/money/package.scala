@@ -19,6 +19,8 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /**
+  * Single-import DSL for monetary expressions.
+  *
   *   ==Inspiration:==
   *   - [[https://www.joda.org/joda-money/ Joda Money]] of course
   *   - `squants.market`

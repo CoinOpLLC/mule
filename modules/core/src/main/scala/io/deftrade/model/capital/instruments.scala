@@ -21,6 +21,7 @@ package capital
 import time.{ ZonedDateTime }
 import time.market.Frequency
 import money.{ CurrencyLike, Financial }
+import contracts.Numéraire
 import keyval._
 import refinements._
 

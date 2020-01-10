@@ -1,5 +1,4 @@
 package io.deftrade
-package model
 package contracts
 
 import implicits._, time._, money._
@@ -10,7 +9,7 @@ import cats.{ Order, Show }
 import spire.syntax.field._
 import spire.math.Fractional
 
-/**  */
+/** [[eval]] lives here. */
 sealed trait Engine {
 
   /**  */

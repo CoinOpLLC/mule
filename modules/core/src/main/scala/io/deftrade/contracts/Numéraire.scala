@@ -1,4 +1,5 @@
 package io.deftrade
+package contracts
 
 import money.Currency
 import model.capital.Instrument

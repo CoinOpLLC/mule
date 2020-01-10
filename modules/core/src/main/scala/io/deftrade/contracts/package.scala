@@ -1,10 +1,9 @@
 package io.deftrade
-package model
 
 /**
   * Contract specification, representation and evaluation,
   * following the ''Composing Contracts'' work
-  * by Simon Peyton Jones and Jean-Marc Eber circa 2001.
+  * by Simon Peyton Jones and Jean-Marc Eber.
   *
   * This is a work in progress.
   *
@@ -19,5 +18,12 @@ package model
   *   [[http://hackage.haskell.org/package/netrium Haskell implemenation]] (status?)
   *   - Financial DSLs [[http://www.dslfin.org/resources.html resource page]]
   *
+  * FAQ:
+  *   - Q: Why isn't this a subpackage of [[model]]?
+  *   - A: `Contract`s are not a map of the terrain. They ''are'' the terrain.
+  *       - execution plan for [[Engine.Scheduling]] (dumb contract execution)
+  *       and [[Engine.Performing]] (smart contract execution)
+  *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] but
+  *       eventually multi-model)
   */
 package object contracts

@@ -24,7 +24,7 @@ import cats._
 import cats.kernel.CommutativeGroup
 
 /**
-  * Records and computations defining the domain models and services.
+  * Records and computations defining domain models and services.
   *
   * This package object is where the policy decision to choose generic tax accounting
   * for entities treated as partnerships.
