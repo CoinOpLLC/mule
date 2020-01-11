@@ -7,7 +7,7 @@ import cats.{ Order, Show }
 
 import spire.math.Fractional
 
-/** `Obs`ervable values which affect Contract evaluation - parameters, essentially. */
+/** `Obs`ervable variables which affect `Contract` evaluation. */
 sealed trait Obs[A]
 
 /**  */

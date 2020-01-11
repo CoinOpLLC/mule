@@ -6,7 +6,7 @@ import time._, money._, model.capital.Instrument
 /**  This trait intentionally left blank. */
 sealed trait Contract
 
-/**  */
+/**  ADT definitions and constructors. */
 object Contract {
 
   /** No rights or obligations: worthless. */
