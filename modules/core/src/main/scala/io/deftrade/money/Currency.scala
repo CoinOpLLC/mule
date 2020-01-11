@@ -136,12 +136,14 @@ object Currency extends DtEnum[CurrencyLike] { self =>
     * TODO: can we find a reference other than objectlabkit?
     * This still smells bonkers. If it flies I want to call it the ''Wall of Types'' pattern.
     * nb {{{
-    *   import io.deftrade.money.Currency.USD
+    *   import io.deftrade.money._
     * }}}
-    * will pull the {{{
+    * will pull ''all'' the {{{
     *   implicit def usd: Currency[USD]
+    *   ...
     * }}}
-    * into scope due to the implicit resolution search path.
+    * into scope due to the implicit resolution search path:
+    * `Currency` is in scope so its companion (this object) is searched for implicits.
     */
   final class EUR private[money] ()
   case object EUR extends Currency[EUR]

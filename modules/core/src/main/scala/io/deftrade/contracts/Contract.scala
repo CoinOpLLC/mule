@@ -6,15 +6,15 @@ import time._, money._, model.capital.Instrument
 /**  This trait intentionally left blank. */
 sealed trait Contract
 
-/**  ADT definitions and constructors. */
+/**  ADT definitions and constructors form the `Contract` specification DSL. */
 object Contract {
 
   /** No rights or obligations: worthless. */
   def zero: Contract = Zero
   case object Zero extends Contract
 
-  /** Party immediately acquires one unit of [[Numéraire]] (typically not invoked directly). */
-  def one(i: Instrument): Contract = new One(i) {}
+  /** Party immediately acquires one unit of `Numéraire` (typically not invoked directly). */
+  def one(n: Numéraire): Contract = new One(n) {}
   sealed abstract case class One(n: Numéraire) extends Contract
 
   /** Party acquires `c` multiplied by . */

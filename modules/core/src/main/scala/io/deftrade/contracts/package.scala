@@ -9,7 +9,7 @@ package io.deftrade
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
-  *   - [[https://www.lexifi.com/apropos/ LexiFi]] sells a mature implementation of this technology in OCaml (founded by J.C. Eber, who co-authored above papers.)
+  *   - [[https://www.lexifi.com/apropos/ LexiFi]] sells a mature implementation of this technology in OCaml (founded by J.M. Eber, who co-authored above papers.)
   *   - Anton van Straaten's [[http://web.archive.org/web/20130814194431/http://contracts.scheming.org/ Haskell implementation]]
   *       - highly referenced; no longer maintained
   *       - see in particular his section ''A note about the original papers''
@@ -20,10 +20,10 @@ package io.deftrade
   *
   * FAQ:
   *   - Q: Why isn't this a subpackage of [[model]]?
-  *   - A: `Contract`s are not a map of the terrain. They ''are'' the terrain.
+  *   - A: [[Contract]]s are not a "map of the terrain". ''They are the terrain.''
   *       - execution plan for [[Engine.Scheduling]] (dumb contract execution)
   *       and [[Engine.Performing]] (smart contract execution)
-  *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] but
-  *       eventually multi-model)
+  *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] to begin, but
+  *       eventually multi-model, including monte-carlo methods for path-dependent `Contract`s.)
   */
-package object contracts
+package object contracts {}

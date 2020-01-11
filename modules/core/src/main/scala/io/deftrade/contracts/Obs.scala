@@ -7,7 +7,12 @@ import cats.{ Order, Show }
 
 import spire.math.Fractional
 
-/** `Obs`ervable variables which affect `Contract` evaluation. */
+/**
+  * `Obs`ervable variables which affect `Contract` evaluation.
+  *
+  * We follow the approach taken by [[http://netrium.org/ Netrium]]
+  * (make `Obs` an GADT.)
+  */
 sealed trait Obs[A]
 
 /**  */
@@ -62,7 +67,7 @@ object observables {
 // for the resulting value process.''
 // *
 // * This is true, but we'll follow the approach taken by [[http://netrium.org/ Netrium]]
-// * (make `Obs` an ADT.)
+// * (make `Obs` an GADT.)
 // * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
 // * ''somewhere'' there has to be a function:
 // * {{{

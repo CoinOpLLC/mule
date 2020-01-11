@@ -29,50 +29,18 @@ object Engine {
     *
     *  TODO: Many other params; may become an ADT
     */
-  sealed abstract case class Pricing[C: Currency](
+  sealed abstract case class Pricing[C](
       t0: Instant,
-      rateModels: Map[CurrencyLike, Pricing.PR[Double]]
+      rateModel: Pricing.PR[Double]
   ) extends Engine {
 
     import Pricing._
-
-    /** Constructs a lattice containing possible interest rates
-      * given a starting rate and an increment per time step.
-      *
-      * FIXME: toy model; need plugin rateModel interface ;)
-      */
-    def rates(rateNow: Double, delta: Double): PR[Double] = {
-
-      def makeRateSlices(rate: Double, n: Int): LL[RV[Double]] = {
-
-        def rateSlice: RV[Double] = LL.iterate(rate)(r => r + 2 * delta) take n
-
-        rateSlice #:: makeRateSlices(rate - delta, n + 1)
-      }
-
-      PR(makeRateSlices(rateNow, 1))
-    }
-
-    // /**
-    //   * FIXME: toy model; need plugin rateModel interface ;)
-    //   */
-    // lazy val rateModels: Map[CurrencyLike, PR[Double]] =
-    //   Map(
-    //     Currency.CHF -> rates(1.70, 0.080),
-    //     Currency.EUR -> rates(1.65, 0.025),
-    //     Currency.GBP -> rates(1.70, 0.080),
-    //     Currency.USD -> rates(1.50, 0.150),
-    //     Currency.JPY -> rates(1.10, 0.250),
-    //   )
-
-    /** */
-    def rateModel: PR[Double] =
-      rateModels get Currency[C] getOrElse ???
+    import Contract._
 
     /**
-      * FIXME: toy model; need plugin rateModel interface ;)
+      * FIXME: toy model; hardwired ;)
       */
-    def discount(bpq: BPQ, compound: Compounding)(
+    protected def discount(bpq: BPQ, compound: Compounding)(
         cond: PR[Boolean],
         pr: PR[Double]
     ): PR[Double] = {
@@ -141,18 +109,17 @@ object Engine {
       *
       * FIXME: toy stub; implement for real.
       */
-    def exch(n2: Numéraire): PR[Double] = n2 match {
+    def exch(n2: Numéraire): PR[Double] =
+      n2 match {
 
-      case Numéraire.InCoin(c2) =>
-        c2 |> discardValue
-        PR bigK 1.618
+        case Numéraire.InCoin(c2) =>
+          c2 |> discardValue
+          PR bigK 1.618
 
-      case Numéraire.InKind(k2) =>
-        k2 |> discardValue
-        PR bigK 6.18
-    }
-
-    import Contract._
+        case Numéraire.InKind(k2) =>
+          k2 |> discardValue
+          PR bigK 6.18
+      }
 
     final type Return = PR[Double]
 
@@ -184,11 +151,31 @@ object Engine {
   /** */
   object Pricing {
 
-    /** */
+    /** This is as close as we get to Haskell's `[]`. */
     type LL[A] = LazyList[A]
 
     /** */
     lazy val LL = LazyList
+
+    /** Essentially arbitrary. TODO: evolve this  */
+    lazy val tZero: Instant = java.time.Instant.EPOCH
+
+    /**
+      *  toy model for simple examples,
+      * adapted from (but not identical to) the one used in the papers
+      */
+    def toy[C: Currency]: Pricing[C] =
+      new Pricing[C](
+        tZero,
+        Currency[C] match {
+          case Currency.CHF => rates(1.70, 0.080)
+          case Currency.EUR => rates(1.65, 0.025)
+          case Currency.GBP => rates(1.70, 0.080)
+          case Currency.USD => rates(1.50, 0.150)
+          case Currency.JPY => rates(1.10, 0.250)
+          case _            => rates(1.967, 0.289) // shut up scala
+        }
+      ) {}
 
     /** */
     type Compounding = Double => Double
@@ -199,11 +186,8 @@ object Engine {
     /** */
     type BPQ = (Boolean, Double, Double) => Double
 
-    lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
-    lazy val orMax: BPQ = (b, p, q) => if (b) p else p max q
-
-    /** Essentially arbitrary. TODO: evolve this  */
-    lazy val tZero: Instant = java.time.Instant.EPOCH
+    private lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
+    private lazy val orMax: BPQ = (b, p, q) => if (b) p else p max q
 
     /** TODO: refinements on inputs? */
     case class LatticeModelParams(r: Double, sigma: Double, div: Double, step: Double) {
@@ -257,14 +241,17 @@ object Engine {
     /** */
     object DiscreteTimeSeries {
 
+      /** not doing intra-day quanting... yet... */
+      val timeStep: Duration = 24.hours // one day
+
       /** */
-      def apply(t0: Instant): DiscreteTimeSeries = new DiscreteTimeSeries(t0, 24.hours) {}
+      def apply(t0: Instant): DiscreteTimeSeries = new DiscreteTimeSeries(t0, timeStep) {}
     }
 
     /**
       * `random variable` representation.
       */
-    type RV[A] = LazyList[A]
+    type RV[A] = LL[A]
 
     /**
       * `random variable` primitives
@@ -278,8 +265,8 @@ object Engine {
         * TODO: `Double Refined [0,1]` would be nice here
         */
       def prevSlice(p: Double)(slice: RV[Double]): RV[Double] = slice match {
-        case _ if slice.isEmpty     => LazyList.empty
-        case (_ #:: t) if t.isEmpty => LazyList.empty
+        case _ if slice.isEmpty     => LL.empty
+        case (_ #:: t) if t.isEmpty => LL.empty
         case (h #:: th #:: tt)      => (h * (1 - p) + th * p) #:: prevSlice(p)(th #:: tt)
       }
 
@@ -287,20 +274,20 @@ object Engine {
         * TODO: in the real world, this needs params, no?
         * TODO: can make some of these tail recursive internally?
         */
-      def probabilityLattice: LazyList[RV[Double]] = {
+      def probabilityLattice: LL[RV[Double]] = {
 
-        def pathCounts: LazyList[RV[Int]] = {
+        def pathCounts: LL[RV[Int]] = {
 
-          def paths(ll: LazyList[Int]): LazyList[RV[Int]] = {
+          def paths(ll: LL[Int]): LL[RV[Int]] = {
             def zig = 0 #:: ll
-            def zag = ll ++ LazyList(0)
+            def zag = ll ++ LL(0)
             ll #:: paths(zig zip zag map { case (l, r) => l + r })
           }
 
-          paths(LazyList(1))
+          paths(LL(1))
         }
 
-        def probabilities(ps: LazyList[RV[Int]]): LazyList[RV[Double]] = ps match {
+        def probabilities(ps: LL[RV[Int]]): LL[RV[Double]] = ps match {
           case h #:: t => (h map (_ / h.sum.toDouble)) #:: probabilities(t)
         }
 
@@ -309,7 +296,7 @@ object Engine {
 
       /**
         * From the `Composing Contracts` implementation by van Straaten:
-        * > The code for absorb above does not obviously deal
+        * ''The code for absorb above does not obviously deal
         * with the expected value mentioned in the spec.
         * This is because the expected value of each
         * random variable is implicit in the value process
@@ -318,7 +305,7 @@ object Engine {
         * expected value at a particular date is simply the sum
         * of the product of the value at each node
         * and its associated probability. The following functions
-        * implement this calculation.
+        * implement this calculation.''
         */
       def expectedValue(outcomes: RV[Double], probabilities: RV[Double]): Double =
         outcomes zip probabilities foldMap { case (o, p) => o * p }
@@ -327,9 +314,9 @@ object Engine {
     /**
       * `value process` representation
       *
-      * FIXME: need {{{DiscreteTime => LazyList[RV[A]]}}} somewhere!
+      * FIXME: need {{{DiscreteTime => LL[RV[A]]}}} somewhere!
       */
-    final case class PR[A] private (val rvs: LazyList[RV[A]]) extends AnyVal {
+    final case class PR[A] private (val rvs: LL[RV[A]]) extends AnyVal {
       def take(n: Int)                           = PR take (this, n)
       def horizon                                = PR horizon this
       def forall(implicit toBool: A =:= Boolean) = PR forall (toBool liftCo this)
@@ -343,23 +330,23 @@ object Engine {
       */
     object PR {
 
-      private[contracts] def apply[A](rvs: LazyList[RV[A]]): PR[A] = new PR(rvs)
+      private[contracts] def apply[A](rvs: LL[RV[A]]): PR[A] = new PR(rvs)
 
       /** */
       def bigK[A](a: A): PR[A] =
-        PR(LazyList continually (LazyList continually a))
+        PR(LL continually (LL continually a))
 
       /**  */
       def date(t: Instant): PR[DiscreteTime] = {
 
-        def timeSlices(slice: RV[DiscreteTime]): LazyList[RV[DiscreteTime]] = {
+        def timeSlices(slice: RV[DiscreteTime]): LL[RV[DiscreteTime]] = {
           val (dt #:: _) = slice
           val nextStep   = dt.step + 1
-          val nextSlice  = LazyList.fill(nextStep + 1)(dt.next)
+          val nextSlice  = LL.fill(nextStep + 1)(dt.next)
           slice #:: timeSlices(nextSlice)
         }
 
-        PR(timeSlices(LazyList(DiscreteTimeSeries(t) at 0)))
+        PR(timeSlices(LL(DiscreteTimeSeries(t) at 0)))
       }
 
       /** */
@@ -399,7 +386,7 @@ object Engine {
         }
 
       /** */
-      def expectedValue(pr: PR[Double]): LazyList[Double] =
+      def expectedValue(pr: PR[Double]): LL[Double] =
         pr.rvs zip RV.probabilityLattice map { case (ps, os) => RV.expectedValue(ps, os) }
 
       /**
@@ -413,10 +400,8 @@ object Engine {
         * if the region `cond` will never be true, and receiving zero in the contrary.
         *
         * In states where `cond` is true, the result is therefore zero.
-        *
-        * TODO: track down why `C` goes (apparently) unused
         */
-      def absorb[C: Currency](cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+      def absorb(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
         PR(
           cond.rvs zip pr.rvs map {
             case (os, ps) =>
@@ -426,9 +411,6 @@ object Engine {
               }
           }
         )
-
-      /** not doing intra-day quanting... yet... */
-      val timestep = 1.day
 
       /** */
       implicit def prOrder[A]: Order[PR[A]] = ???
@@ -444,17 +426,36 @@ object Engine {
       implicit def prFractional[N: Fractional]: Fractional[PR[N]] = ???
     }
 
-    /** */
-    def eval[A](o: Obs[A]): PR[A] = o match {
-      case Obs.Const(a) => PR.bigK(a)
+    /**
+      * Constructs a lattice containing possible interest rates
+      * given a starting rate and an increment per time step.
+      *
+      * FIXME: toy model; hardwired arithmetic
+      */
+    def rates(rateNow: Double, delta: Double): PR[Double] = {
+
+      def makeRateSlices(rate: Double, n: Int): LL[RV[Double]] = {
+
+        def rateSlice: RV[Double] = LL.iterate(rate)(r => r + 2 * delta) take n
+
+        rateSlice #:: makeRateSlices(rate - delta, n + 1)
+      }
+
+      PR(makeRateSlices(rateNow, 1))
     }
+
+    /** */
+    def eval[A](o: Obs[A]): PR[A] =
+      o match {
+        case Obs.Const(a) => PR.bigK(a)
+      }
   }
 
   /**
     * `Contract` evaluation `Engine` useful for the construction of
     * manual `Contract` performance workflow scheduling.
     *
-    * FIXME: do something
+    * FIXME: do something impressive
     */
   sealed abstract case class Scheduling() extends Engine {
 
@@ -473,7 +474,7 @@ object Engine {
     * difference between "workflow automation" and "smart contract execution"
     * is a matter of degree and perspective. And counterparty platform integration. (And that.)
     *
-    * FIXME: implement
+    * FIXME: do something basic
     */
   sealed abstract case class Performing() extends Engine {
 
