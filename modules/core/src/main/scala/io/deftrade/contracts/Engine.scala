@@ -12,7 +12,7 @@ import spire.math.Fractional
 /** [[eval]] lives here. */
 sealed trait Engine {
 
-  /**  */
+  /**  What we get when we [[eval]]uate a [[Contract]]. */
   type Return
 
   /**  */
@@ -23,11 +23,12 @@ sealed trait Engine {
 object Engine {
 
   /**
-    * Lattice methods for the required stochastic process evaluation.
+    * Prices (estimates fair value of) `Contract`s.
     *
-    * Some comments adapted from the ''How to Write a Financial Contract'' paper.
+    * This implementation uses the lattice methods used in the original papers.
     *
-    *  TODO: Many other params; may become an ADT
+    * TODO: refine this model
+    * TODO: expand to other models
     */
   sealed abstract case class Pricing[C](
       t0: Instant,
@@ -37,10 +38,7 @@ object Engine {
     import Pricing._
     import Contract._
 
-    /**
-      * FIXME: toy model; hardwired ;)
-      */
-    protected def discount(bpq: BPQ, compound: Compounding)(
+    private def discount(bpq: BPQ, compound: Compounding)(
         cond: PR[Boolean],
         pr: PR[Double]
     ): PR[Double] = {
@@ -74,7 +72,7 @@ object Engine {
     }
 
     /**
-      * Discount process.
+      * Discounts a process `pr` under `cond`, according to the [[rateModel]].
       *
       * Given a boolean-valued process `cond` , `disc`
       * transforms the real-valued process `pr`,
@@ -89,7 +87,7 @@ object Engine {
       discount(orQ, discrete)(cond, pr)
 
     /**
-      * Calculates the Snell envelope of `pr`, under `cond`.
+      * Calculates the Snell envelope of `pr`, under `cond` according to the [[rateModel]].
       *
       * Uses the probability measure
       * associated with the type parameter [C: Currency].
@@ -121,11 +119,13 @@ object Engine {
           PR bigK 6.18
       }
 
+    /** */
     final type Return = PR[Double]
 
     /**
-      * Evaluate the `Contract` in the specified [[money.Currency]].
-      * TODO: Consider moving `[C: Currency]` outside to the case class.
+      * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
+      * process which represents the distribution of possible `Contract` values a given
+      * number of [[Pricing.TimeSteps]] from [[t0]].
       */
     final def eval: Contract => PR[Double] = {
       case Zero              => PR.bigK(0.0)
@@ -157,37 +157,31 @@ object Engine {
     /** */
     lazy val LL = LazyList
 
-    /** Essentially arbitrary. TODO: evolve this  */
-    lazy val tZero: Instant = java.time.Instant.EPOCH
-
     /**
       *  toy model for simple examples,
       * adapted from (but not identical to) the one used in the papers
       */
     def toy[C: Currency]: Pricing[C] =
       new Pricing[C](
-        tZero,
+        java.time.Instant.EPOCH,
         Currency[C] match {
-          case Currency.CHF => rates(1.70, 0.080)
-          case Currency.EUR => rates(1.65, 0.025)
-          case Currency.GBP => rates(1.70, 0.080)
-          case Currency.USD => rates(1.50, 0.150)
-          case Currency.JPY => rates(1.10, 0.250)
-          case _            => rates(1.967, 0.289) // shut up scala
+          case Currency.CHF => rates(.0170, .00180)
+          case Currency.EUR => rates(.0165, .00025)
+          case Currency.GBP => rates(.0170, .00080)
+          case Currency.USD => rates(.0150, .00150)
+          case Currency.JPY => rates(.0110, .00250)
+          case _            => rates(.01967, .00289) // shut up scala
         }
       ) {}
 
     /** */
     type Compounding = Double => Double
 
-    lazy val discrete: Compounding              = r => (1 + r / 100.0)
-    def contiuous(step: TimeSteps): Compounding = r => Math.exp(r / 100.0) * step
+    /** */
+    lazy val discrete: Compounding = r => (1 + r / 100.0)
 
     /** */
-    type BPQ = (Boolean, Double, Double) => Double
-
-    private lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
-    private lazy val orMax: BPQ = (b, p, q) => if (b) p else p max q
+    def continuous(step: TimeSteps): Compounding = r => Math.exp(r / 100.0) * step
 
     /** TODO: refinements on inputs? */
     case class LatticeModelParams(r: Double, sigma: Double, div: Double, step: Double) {
@@ -313,8 +307,6 @@ object Engine {
 
     /**
       * `value process` representation
-      *
-      * FIXME: need {{{DiscreteTime => LL[RV[A]]}}} somewhere!
       */
     final case class PR[A] private (val rvs: LL[RV[A]]) extends AnyVal {
       def take(n: Int)                           = PR take (this, n)
@@ -449,11 +441,18 @@ object Engine {
       o match {
         case Obs.Const(a) => PR.bigK(a)
       }
+
+    private type BPQ = (Boolean, Double, Double) => Double
+    private lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
+    private lazy val orMax: BPQ = (b, p, q) => if (b) p else p max q
   }
 
   /**
-    * `Contract` evaluation `Engine` useful for the construction of
-    * manual `Contract` performance workflow scheduling.
+    * Manual `Contract` performance workflow scheduling.
+    *
+    * Produces calendar schedules of actions for humans to follow up on:
+    *   - make and expect payments, exercise options, etc.
+    *   - uses automation tools as integrations become available
     *
     * FIXME: do something impressive
     */
@@ -470,9 +469,13 @@ object Engine {
   object Scheduling
 
   /**
-    * `Contract` evaluation `Engine` predicated on the idea that the
+    * Automated `Contract` performance.
+    *
+    * An `Engine` predicated on the idea that the
     * difference between "workflow automation" and "smart contract execution"
-    * is a matter of degree and perspective. And counterparty platform integration. (And that.)
+    * is a matter of degree and perspective.
+    *
+    * And counterparty platform integration. (And that.)
     *
     * FIXME: do something basic
     */
