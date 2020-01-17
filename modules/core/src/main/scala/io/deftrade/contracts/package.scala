@@ -1,11 +1,13 @@
 package io.deftrade
 
+import time._, money._, model.capital.Instrument
+
 /**
   * Contract specification, representation and evaluation,
   * following the ''Composing Contracts'' work
   * by Simon Peyton Jones and Jean-Marc Eber.
   *
-  * This is a work in progress.
+  * A work in progress.
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
@@ -26,4 +28,70 @@ package io.deftrade
   *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] to begin, but
   *       eventually multi-model, including monte-carlo methods for path-dependent `Contract`s.)
   */
-package object contracts {}
+package object contracts extends Contract.primitives {
+
+  /** Party acquires no rights or obligations (nothing). */
+  def zero: Contract = Contract.Zero
+
+  /** Party acquires one unit of [[money.Currency]]. */
+  def one[C: Currency]: Contract = unitOf(Currency[C])
+
+  /** Party acquires one unit of [[model.capital.Instrument]]. */
+  def one(i: Instrument): Contract = unitOf(i)
+
+  /** Party acquires `c` multiplied by `n`. */
+  def scale(n: Obs[Double], c: Contract): Contract = c scale n
+
+  /** Party assumes role of counterparty with respect to `c`. */
+  def give(c: Contract): Contract = c.give
+
+  /** Party will acquire c as soon as `b` is observed `true`.  */
+  def when(b: Obs[Boolean], c: Contract): Contract = c when b
+
+  /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
+  def until(b: Obs[Boolean], c: Contract): Contract = c until b
+
+  /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
+  def anytime(b: Obs[Boolean], c: Contract): Contract = c anytime b
+
+  /** Party immediately receives both `c1` and `c2`. */
+  def and(c1: Contract, c2: Contract): Contract = c1 and c2
+
+  /** Party immediately chooses between `c1` or `c2`. */
+  def or(c1: Contract, c2: Contract): Contract = c1 or c2
+
+  /** If `c` is worth something, take it. */
+  def optionally(c: Contract): Contract = c or zero
+
+  /**  */
+  def buy[N: Financial, C: Currency](c: Contract, price: Money[N, C]): Contract =
+    c and give(one scale (Obs const Financial[N].to[Double](price.amount)))
+
+  /**  */
+  def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
+    // import N._
+    one scale (Obs const N.to[Double](price.amount)) and give(c)
+
+  /**  */
+  def zeroCouponBond[N: Financial, C: Currency](
+      maturity: Instant,
+      face: Money[N, C]
+  ): Contract =
+    when(Obs at maturity, one scale (Obs const Financial[N].to[Double](face.amount)))
+
+  /** */
+  def europeanCall[N: Financial, C: Currency](
+      contract: Contract,
+      strike: Money[N, C],
+      expiry: Instant,
+  ): Contract =
+    when(Obs at expiry, optionally(buy(contract, strike)))
+
+  /** */
+  def americanCall[N: Financial, C: Currency](
+      contract: Contract,
+      strike: Money[N, C],
+      expiry: Instant,
+  ): Contract =
+    anytime(Obs at expiry, optionally(buy(contract, strike)))
+}

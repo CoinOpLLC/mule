@@ -35,32 +35,31 @@ package object market {
 /** Day count conventions, [[Tenor]]s and [[Frequency]]s, etc. */
 package market {
 
+  // commenting out for now - won't need these for a while
+  // /** TODO: use [[Duration]] instead of [[Period]]? */
+  // sealed abstract class CashTenor(
+  //     override val entryName: String,
+  //     pspec: String
+  // ) extends Tenor(pspec)
   //
-
-  /** TODO: use [[Duration]] instead of [[Period]]? */
-  sealed abstract class CashTenor(
-      override val entryName: String,
-      pspec: String
-  ) extends Tenor(pspec)
-
-  object CashTenor extends Enum[CashTenor] {
-
-    case object Spot         extends CashTenor("SP", "P0D")
-    case object SpotNext     extends CashTenor("SN", "P1D")
-    case object Overnight    extends CashTenor("ON", "P1D")
-    case object TomorrowNext extends CashTenor("TN", "P2D")
-
-    lazy val values = findValues
-
-  }
-  // from Objectkitlab - homolog in opengamma?
-  sealed trait SpotLag extends EnumEntry
-  object SpotLag extends Enum[SpotLag] {
-    def values = findValues
-    case object T_0 extends SpotLag
-    case object T_1 extends SpotLag
-    case object T_2 extends SpotLag
-  }
+  // object CashTenor extends Enum[CashTenor] {
+  //
+  //   case object Spot         extends CashTenor("SP", "P0D")
+  //   case object SpotNext     extends CashTenor("SN", "P1D")
+  //   case object Overnight    extends CashTenor("ON", "P1D")
+  //   case object TomorrowNext extends CashTenor("TN", "P2D")
+  //
+  //   lazy val values = findValues
+  //
+  // }
+  // // from Objectkitlab - homolog in opengamma?
+  // sealed trait SpotLag extends EnumEntry
+  // object SpotLag extends Enum[SpotLag] {
+  //   def values = findValues
+  //   case object T_0 extends SpotLag
+  //   case object T_1 extends SpotLag
+  //   case object T_2 extends SpotLag
+  // }
 
   trait ProxiedPeriod extends EnumEntry {
     import ProxiedPeriod._

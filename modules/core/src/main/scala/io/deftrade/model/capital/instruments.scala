@@ -20,7 +20,7 @@ package capital
 
 import time.{ ZonedDateTime }
 import time.market.Frequency
-import money.{ CurrencyLike, Financial }
+import money.{ Currency, CurrencyLike, Financial }
 import contracts.Numéraire
 import keyval._
 import refinements._
@@ -387,11 +387,11 @@ object layers {
         override val matures: ZonedDateTime
     ) extends Maturity {
 
-      import contracts.standard.zeroCouponBond
+      import contracts.zeroCouponBond
 
       /** */
       def contract: Contract =
-        zeroCouponBond(maturity = matures.toInstant, face = money.Currency.USD(1000.0))
+        zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
     }
   }
 

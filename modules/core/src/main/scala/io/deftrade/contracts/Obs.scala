@@ -43,7 +43,7 @@ object Obs {
 
     /** */
     def branch(cTrue: Contract, cFalse: Contract)(implicit toBool: A =:= Boolean): Contract =
-      Contract branch (toBool liftCo o, cTrue, cFalse)
+      contracts branch (toBool liftCo o, cTrue, cFalse)
   }
 }
 

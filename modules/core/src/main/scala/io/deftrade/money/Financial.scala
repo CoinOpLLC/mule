@@ -61,9 +61,6 @@ import spire.math.{ Fractional, Integral, Rational }
   */
 trait Financial[N] extends Fractional[N] { self =>
 
-  /** used by `refined` inferencing */
-  // final implicit def N(implicit ev: scala.Numeric[N]) = ev
-
   /**  */
   implicit def positiveSemigroup: Semigroup[N Refined Positive]
 
@@ -74,6 +71,8 @@ trait Financial[N] extends Fractional[N] { self =>
     * How do we deal with scale and significant digits?
     * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
     * that return `Money`.
+    *
+    * TODO: Revisit this.
     */
   final def round[C](n: N)(implicit C: Currency[C]): N = {
     def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)

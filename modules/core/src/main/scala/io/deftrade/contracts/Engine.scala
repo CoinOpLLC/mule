@@ -35,15 +35,87 @@ object Engine {
       rateModel: Pricing.PR[Double]
   ) extends Engine {
 
-    import Pricing._
-    import Contract._
+    import Pricing._, Contract._, Numéraire._
+
+    /** */
+    final type Return = PR[Double]
+
+    /**
+      * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
+      * process which represents the distribution of possible `Contract` values a given
+      * number of [[Pricing.TimeSteps]] from [[t0]].
+      */
+    final def eval: Contract => PR[Double] = {
+      case Zero              => PR.bigK(0.0)
+      case Give(c)           => -eval(c)
+      case Scale(o, c)       => (Pricing eval o) * eval(c)
+      case And(c1, c2)       => eval(c1) + eval(c2)
+      case Or(c1, c2)        => eval(c1) max eval(c2)
+      case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT))(eval(cF))
+      case When(o, c)        => disc(Pricing eval o, eval(c))
+      case Anytime(o, c)     => snell(Pricing eval o, eval(c))
+      case Until(o, c)       => PR.absorb(Pricing eval o, eval(c))
+      case One(n) =>
+        n match {
+          case InCoin(ic) => ic match { case Currency(c2) => exch(c2) }
+          case InKind(_)  => ???
+        }
+    }
+
+    /**
+      * Discounts a process `pr` under `cond`, according to the [[rateModel]].
+      *
+      * Given a boolean-valued process `cond` , `disc`
+      * transforms the real-valued process `pr`,
+      * expressed in the type parameter `C: Currency`, into another real valued process.
+      *
+      * In states where `cond` is true, return `pr`.
+      *
+      * Elsewhere, the result is its "fair" equivalent stochastic value
+      * process in the same `C: Currency`.
+      */
+    final def disc(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+      discount(orQ, discrete)(cond, pr)
+
+    /**
+      * Calculates the Snell envelope of `pr`, under `cond` according to the [[rateModel]].
+      *
+      * Uses the probability measure
+      * associated with the type parameter [C: Currency].
+      */
+    final def snell(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+      discount(orMax, discrete)(cond, pr)
+
+    /**
+      * Returns a real-valued process representing the value of one unit of
+      * the `CurrencyLike` value `c2`, expressed in `Currency` C.
+      *
+      * For (n: CurrencyLike), this is simply the process representing
+      * the quoted exchange rate between the curencies.
+      *
+      * For (n: Instrument), this is simply the process representing
+      * the market price of the Instrument, quoted in `Currency[C]`.
+      *
+      * FIXME: toy stub; implement for real.
+      */
+    final def exch(n2: Numéraire): PR[Double] =
+      n2 match {
+
+        case Numéraire.InCoin(c2) =>
+          c2 |> discardValue
+          PR bigK 1.618
+
+        case Numéraire.InKind(k2) =>
+          k2 |> discardValue
+          PR bigK 6.18
+      }
 
     private def discount(bpq: BPQ, compound: Compounding)(
         cond: PR[Boolean],
         pr: PR[Double]
     ): PR[Double] = {
 
-      def prevSlice: RV[Double] => RV[Double] = RV.prevSlice(0.5)
+      def prevSlice: RV[Double] => RV[Double] = RV.prevSlice(0.5) // fair coin
 
       def calc(bs: LL[RV[Boolean]], ps: LL[RV[Double]], rs: LL[RV[Double]]): LL[RV[Double]] =
         (bs, ps, rs) match {
@@ -70,82 +142,6 @@ object Engine {
 
       PR(calc(cond.rvs, pr.rvs, rateModel.rvs))
     }
-
-    /**
-      * Discounts a process `pr` under `cond`, according to the [[rateModel]].
-      *
-      * Given a boolean-valued process `cond` , `disc`
-      * transforms the real-valued process `pr`,
-      * expressed in the type parameter `C: Currency`, into another real valued process.
-      *
-      * In states where `cond` is true, return `pr`.
-      *
-      * Elsewhere, the result is its "fair" equivalent stochastic value
-      * process in the same `C: Currency`.
-      */
-    def disc(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
-      discount(orQ, discrete)(cond, pr)
-
-    /**
-      * Calculates the Snell envelope of `pr`, under `cond` according to the [[rateModel]].
-      *
-      * Uses the probability measure
-      * associated with the type parameter [C: Currency].
-      */
-    def snell(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
-      discount(orMax, discrete)(cond, pr)
-
-    /**
-      * Returns a real-valued process representing the value of one unit of
-      * the `CurrencyLike` value `c2`, expressed in `Currency` C.
-      *
-      * For (n: CurrencyLike), this is simply the process representing
-      * the quoted exchange rate between the curencies.
-      *
-      * For (n: Instrument), this is simply the process representing
-      * the market price of the Instrument, quoted in `Currency[C]`.
-      *
-      * FIXME: toy stub; implement for real.
-      */
-    def exch(n2: Numéraire): PR[Double] =
-      n2 match {
-
-        case Numéraire.InCoin(c2) =>
-          c2 |> discardValue
-          PR bigK 1.618
-
-        case Numéraire.InKind(k2) =>
-          k2 |> discardValue
-          PR bigK 6.18
-      }
-
-    /** */
-    final type Return = PR[Double]
-
-    /**
-      * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
-      * process which represents the distribution of possible `Contract` values a given
-      * number of [[Pricing.TimeSteps]] from [[t0]].
-      */
-    final def eval: Contract => PR[Double] = {
-      case Zero              => PR.bigK(0.0)
-      case Give(c)           => -eval(c)
-      case Scale(o, c)       => (Pricing eval o) * eval(c)
-      case And(c1, c2)       => eval(c1) + eval(c2)
-      case Or(c1, c2)        => eval(c1) max eval(c2)
-      case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT))(eval(cF))
-      case When(o, c)        => disc(Pricing eval o, eval(c))
-      case Anytime(o, c)     => snell(Pricing eval o, eval(c))
-      case Until(o, c)       => PR.absorb(Pricing eval o, eval(c))
-      case One(n) => // TODO: make this a method
-        n match {
-          case Numéraire.InCoin(ic) =>
-            ic match {
-              case Currency(c2) => exch(c2)
-            }
-          case Numéraire.InKind(_) => ???
-        }
-    }
   }
 
   /** */
@@ -158,8 +154,7 @@ object Engine {
     lazy val LL = LazyList
 
     /**
-      *  toy model for simple examples,
-      * adapted from (but not identical to) the one used in the papers
+      *  Toy model adapted from (but not identical to) the one used in the papers.
       */
     def toy[C: Currency]: Pricing[C] =
       new Pricing[C](
@@ -170,7 +165,7 @@ object Engine {
           case Currency.GBP => rates(.0170, .00080)
           case Currency.USD => rates(.0150, .00150)
           case Currency.JPY => rates(.0110, .00250)
-          case _            => rates(.01967, .00289) // shut up scala
+          case _            => rates(.01967, .00289) // good enuf for now
         }
       ) {}
 
@@ -362,7 +357,8 @@ object Engine {
         pr.rvs forall (_ forall identity)
 
       /** */
-      def cond[A](yf: PR[Boolean])(zen: PR[A])(elze: PR[A]): PR[A] = ???
+      def cond[A](prB: PR[Boolean])(prT: PR[A])(prF: PR[A]): PR[A] =
+        lift3((b: Boolean, t: A, f: A) => if (b) t else f)(prB, prT, prF)
 
       /** */
       def lift[A, B](f: A => B): PR[A] => PR[B] =
@@ -374,6 +370,16 @@ object Engine {
           PR {
             pra.rvs zip prb.rvs map {
               case (rva, rvb) => rva zip rvb map f.tupled
+            }
+        }
+
+      /** */
+      def lift3[A, B, C, D](f: (A, B, C) => D): (PR[A], PR[B], PR[C]) => PR[D] =
+        (pra, prb, prc) =>
+          PR {
+            pra.rvs zip (prb.rvs zip prc.rvs) map {
+              case (rva, (rvb, rvc)) =>
+                rva zip (rvb zip rvc) map { case (a, (b, c)) => f(a, b, c) }
             }
         }
 

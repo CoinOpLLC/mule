@@ -32,17 +32,7 @@ import refined.api.Refined
 import io.circe.Json
 
 /**
-  * Basic transacting.
-  *
-  * TODO: consider introducing `Mark`ing as a variant of `Pricing`.
-  * A note on `Mark` vs `Price`: as attested generally within the domain of finance,
-  * and specifically as used here: we propose to distinguish between marking and pricing:
-  *   - Marking: what stuff is worth. [[capital.Instrument]]s are marked
-  * with respect to market trading data.
-  *   - Pricing: what stuff ought to be worth. "Fair value", if you will, for various values
-  * of "fair and "value". [[capital.Instrument]]s are priced based on pricing models.
-  * It should also be noted that the sophistication with which marks are extrapolated from market
-  * data creates ambiguities between the two categories in the real world; model mindfully. :|
+  * Support for performing and recording [[Transaction]]s.
   */
 trait Ledger { self: ModuleTypes =>
 
