@@ -18,33 +18,61 @@ sealed trait Obs[A]
 /**  */
 object Obs {
 
-  /** `const(x)` is an observable that has value x at any time. */
-  def const[A](a: A): Obs[A] = new Const(a) {}
+  sealed trait Unary[A] extends Obs[A] { def o: Obs[A] }
+
+  sealed trait Binary[A, B] extends Obs[A] { def oL: Obs[A]; def oR: Obs[A] }
+
   sealed abstract case class Const[A](a: A) extends Obs[A]
 
-  /**
-    * FIXME: van Straaten uses Obs[Date] and Netrium does not.
-    * This is my best attempt at elucidation. What does this even do? How does
-    * Netrium cope?
-    */
-  def at(t: Instant): Obs[Boolean] = ???
+  sealed abstract case class Before(t: Instant)    extends Obs[Boolean]
+  sealed abstract case class OnOrAfter(t: Instant) extends Obs[Boolean]
+
+  sealed abstract case class And(oL: Obs[Boolean], oR: Obs[Boolean])
+      extends Binary[
+        Boolean,
+        Boolean
+      ]
+
+  sealed abstract case class Or(oL: Obs[Boolean], oR: Obs[Boolean]) extends Binary[Boolean, Boolean]
+  sealed abstract case class Not(o: Obs[Boolean])                   extends Unary[Boolean]
+
+  /** `const(x)` is an observable that has value x at any time. */
+  def const[A](a: A): Obs[A] = new Const(a) {}
+
+  /** primitive */
+  def before(t: Instant): Obs[Boolean] = new OnOrAfter(t) {}
+
+  /** primitive */
+  def onOrAfter(t: Instant): Obs[Boolean] = new OnOrAfter(t) {}
+
+  /** derived */
+  def at(t: Instant): Obs[Boolean] =
+    onOrAfter(t) and not(before(t))
+
+  def not(o: Obs[Boolean]): Obs[Boolean] = new Not(o) {}
 
   /** */
-  implicit def obsOrder[A: Order]: Order[Obs[A]] = ???
+  implicit def obsDoubleOrder: Order[Obs[Double]] = ???
+
+  /** */
+  implicit def obsDoubleFractional: Fractional[Obs[Double]] = ???
+
+  /** */
+  implicit class Ops(val oL: Obs[Boolean]) {
+
+    /** FIXME this needs a `Repr` */
+    def branch(cT: Contract, cF: Contract): Contract = ???
+    // contracts branch (toBool liftCo o, cT, cF)
+
+    /** */
+    def and(oR: Obs[Boolean]): Obs[Boolean] = new And(oL, oR) {}
+
+    /** */
+    def or(oR: Obs[Boolean]): Obs[Boolean] = new Or(oL, oR) {}
+  }
 
   /** */
   implicit def obsShow[A]: Show[Obs[A]] = ???
-
-  /** */
-  implicit def obsFractional[N: Fractional]: Fractional[Obs[N]] = ???
-
-  /** */
-  implicit class Ops[A](val o: Obs[A]) {
-
-    /** */
-    def branch(cTrue: Contract, cFalse: Contract)(implicit toBool: A =:= Boolean): Contract =
-      contracts branch (toBool liftCo o, cTrue, cFalse)
-  }
 }
 
 /** Commonly seen observables. */

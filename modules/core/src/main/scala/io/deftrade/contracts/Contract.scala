@@ -4,7 +4,12 @@ package contracts
 /**  This trait intentionally left blank. */
 sealed trait Contract
 
-/**  ADT definitions and constructors form the `Contract` specification DSL. */
+/**
+  * ADT definitions and constructors form the `Contract` specification DSL.
+  *
+  * FIXME: these trees are not lazy. In order to make them lazy, need to move to
+  * `() => A` stored in the case class, and by-name params in the dsl methods.
+  */
 object Contract {
 
   case object Zero                                                               extends Contract
