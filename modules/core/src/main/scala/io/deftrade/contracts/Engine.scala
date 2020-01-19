@@ -47,14 +47,14 @@ object Engine {
       */
     final def eval: Contract => PR[Double] = {
       case Zero              => PR.bigK(0.0)
-      case Give(c)           => -eval(c)
-      case Scale(o, c)       => (Pricing eval o) * eval(c)
-      case And(c1, c2)       => eval(c1) + eval(c2)
-      case Or(c1, c2)        => eval(c1) max eval(c2)
-      case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT))(eval(cF))
-      case When(o, c)        => disc(Pricing eval o, eval(c))
-      case Anytime(o, c)     => snell(Pricing eval o, eval(c))
-      case Until(o, c)       => PR.absorb(Pricing eval o, eval(c))
+      case Give(c)           => -eval(c.value)
+      case Scale(o, c)       => (Pricing eval o) * eval(c.value)
+      case Both(c1, c2)      => eval(c1.value) + eval(c2.value)
+      case Pick(c1, c2)      => eval(c1.value) max eval(c2.value)
+      case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
+      case When(o, c)        => disc(Pricing eval o, eval(c.value))
+      case Anytime(o, c)     => snell(Pricing eval o, eval(c.value))
+      case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
       case One(n) =>
         n match {
           case InCoin(ic) => ic match { case Currency(c2) => exch(c2) }
@@ -446,6 +446,7 @@ object Engine {
     def eval[A](o: Obs[A]): PR[A] =
       o match {
         case Obs.Const(a) => PR.bigK(a)
+        case _            => ???
       }
 
     private type BPQ = (Boolean, Double, Double) => Double

@@ -4,9 +4,7 @@ package contracts
 import time._
 
 import cats.implicits._
-import cats.{ Order, Show }
-
-import spire.math.Fractional
+import cats.{ Show }
 
 /**
   * `Obs`ervable variables which affect `Contract` evaluation.
@@ -24,14 +22,13 @@ object Obs {
   sealed abstract case class Const[A](a: A)                                      extends Obs[A]
   sealed abstract case class Branch[A](oB: Obs[Boolean], oT: Obs[A], oF: Obs[A]) extends Obs[A]
 
-  sealed abstract case class Before(t: Instant)    extends Obs[Boolean]
-  sealed abstract case class OnOrAfter(t: Instant) extends Obs[Boolean]
+  sealed abstract case class Before(t: Instant) extends Obs[Boolean]
+  sealed abstract case class At(t: Instant)     extends Obs[Boolean]
+
+  import Unary.{ Op => UnOp, _ }
 
   /**  */
-  sealed abstract case class Unary[A](
-      op: Unary.Op[A],
-      o: Obs[A]
-  ) extends Obs[A]
+  sealed abstract case class Unary[A](op: UnOp[A], o: Obs[A]) extends Obs[A]
 
   /**  */
   object Unary {
@@ -46,14 +43,11 @@ object Obs {
     case object Exp  extends Op[Double](math exp _)
     case object Log  extends Op[Double](math log _)
   }
-  import Unary._
+
+  import Binary.{ Op => BinOp, _ }
 
   /**  */
-  sealed abstract case class Binary[A, B](
-      op: Binary.Op[A, B],
-      oL: Obs[A],
-      oR: Obs[A]
-  ) extends Obs[B]
+  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Obs[A], oR: Obs[A]) extends Obs[B]
 
   /**  */
   object Binary {
@@ -78,14 +72,13 @@ object Obs {
     case object Min extends Op[Double, Double](_ min _)
     case object Max extends Op[Double, Double](_ max _)
   }
-  import Binary._
 
   /** `const(x)` is an observable that has value x at any time. */
   def const[A](a: A): Obs[A] = new Const(a) {}
 
   /** primitive */
-  def before(t: Instant): Obs[Boolean]    = new OnOrAfter(t) {}
-  def onOrAfter(t: Instant): Obs[Boolean] = new OnOrAfter(t) {}
+  def before(t: Instant): Obs[Boolean] = new Before(t) {}
+  def at(t: Instant): Obs[Boolean]     = new At(t)     {}
 
   def not(o: Obs[Boolean]): Obs[Boolean] = new Unary(Not, o) {}
 
@@ -95,16 +88,15 @@ object Obs {
   def log(o: Obs[Double]): Obs[Double]  = new Unary(Log, o)  {}
 
   /** derived */
-  def at(t: Instant): Obs[Boolean] = onOrAfter(t) and not(before(t))
+  def atOrAfter(t: Instant): Obs[Boolean] = not(before(t))
 
   /** */
   implicit class BooleanOps(val oL: Obs[Boolean]) extends AnyVal {
 
     def unary_! : Obs[Boolean] = not(oL)
 
-    def branch(cT: Contract, cF: Contract): Contract = contracts.branch(oL, cT, cF)
-
-    def branch[A](oT: Obs[A], oF: Obs[A]): Obs[A] = new Branch(oL, oT, oF) {}
+    def branch(cT: => Contract)(cF: => Contract): Contract = contracts.branch(oL)(cT)(cF)
+    def branch[A](oT: => Obs[A])(oF: => Obs[A]): Obs[A]    = new Branch(oL, oT, oF) {}
 
     def and(oR: Obs[Boolean]): Obs[Boolean] = new Binary(And, oL, oR)  {}
     def or(oR: Obs[Boolean]): Obs[Boolean]  = new Binary(Or, oL, oR)   {}
@@ -113,6 +105,8 @@ object Obs {
 
   /** */
   implicit class DoubleOps(val oL: Obs[Double]) extends AnyVal {
+
+    def *(c: => Contract): Contract = contracts.scale(oL)(c)
 
     def unary_! : Obs[Double] = new Unary(Neg, oL) {}
 
