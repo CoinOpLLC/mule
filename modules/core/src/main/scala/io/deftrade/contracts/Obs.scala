@@ -3,6 +3,7 @@ package contracts
 
 import time._
 
+import cats.implicits._
 import cats.{ Order, Show }
 
 import spire.math.Fractional
@@ -12,66 +13,125 @@ import spire.math.Fractional
   *
   * We follow the approach taken by [[http://netrium.org/ Netrium]]
   * (make `Obs` an GADT.)
+  *
+  * TODO: Isn't `Obs[A]` a `Functor`, at least? Would formalizing this simplify anything?
   */
 sealed trait Obs[A]
 
 /**  */
 object Obs {
 
-  sealed trait Unary[A] extends Obs[A] { def o: Obs[A] }
-
-  sealed trait Binary[A, B] extends Obs[A] { def oL: Obs[A]; def oR: Obs[A] }
-
-  sealed abstract case class Const[A](a: A) extends Obs[A]
+  sealed abstract case class Const[A](a: A)                                      extends Obs[A]
+  sealed abstract case class Branch[A](oB: Obs[Boolean], oT: Obs[A], oF: Obs[A]) extends Obs[A]
 
   sealed abstract case class Before(t: Instant)    extends Obs[Boolean]
   sealed abstract case class OnOrAfter(t: Instant) extends Obs[Boolean]
 
-  sealed abstract case class And(oL: Obs[Boolean], oR: Obs[Boolean])
-      extends Binary[
-        Boolean,
-        Boolean
-      ]
+  /**  */
+  sealed abstract case class Unary[A](
+      op: Unary.Op[A],
+      o: Obs[A]
+  ) extends Obs[A]
 
-  sealed abstract case class Or(oL: Obs[Boolean], oR: Obs[Boolean]) extends Binary[Boolean, Boolean]
-  sealed abstract case class Not(o: Obs[Boolean])                   extends Unary[Boolean]
+  /**  */
+  object Unary {
+
+    sealed abstract class Op[A](val f: A => A)
+
+    case object Not extends Op[Boolean](!_)
+
+    case object Neg  extends Op[Double](-_)
+    case object Abs  extends Op[Double](math abs _)
+    case object Sqrt extends Op[Double](math sqrt _)
+    case object Exp  extends Op[Double](math exp _)
+    case object Log  extends Op[Double](math log _)
+  }
+  import Unary._
+
+  /**  */
+  sealed abstract case class Binary[A, B](
+      op: Binary.Op[A, B],
+      oL: Obs[A],
+      oR: Obs[A]
+  ) extends Obs[B]
+
+  /**  */
+  object Binary {
+
+    sealed abstract class Op[A, B](val f: (A, A) => B)
+
+    case object And  extends Op[Boolean, Boolean](_ & _)
+    case object Or   extends Op[Boolean, Boolean](_ | _)
+    case object Xnor extends Op[Boolean, Boolean](_ | _)
+
+    case object Lt  extends Op[Double, Boolean](_ < _)
+    case object Lte extends Op[Double, Boolean](_ <= _)
+    case object Gt  extends Op[Double, Boolean](_ > _)
+    case object Gte extends Op[Double, Boolean](_ >= _)
+    case object Eq  extends Op[Double, Boolean](_ === _)
+    case object Neq extends Op[Double, Boolean](_ =!= _)
+
+    case object Add extends Op[Double, Double](_ + _)
+    case object Sub extends Op[Double, Double](_ - _)
+    case object Mul extends Op[Double, Double](_ * _)
+    case object Div extends Op[Double, Double](_ / _)
+    case object Min extends Op[Double, Double](_ min _)
+    case object Max extends Op[Double, Double](_ max _)
+  }
+  import Binary._
 
   /** `const(x)` is an observable that has value x at any time. */
   def const[A](a: A): Obs[A] = new Const(a) {}
 
   /** primitive */
-  def before(t: Instant): Obs[Boolean] = new OnOrAfter(t) {}
-
-  /** primitive */
+  def before(t: Instant): Obs[Boolean]    = new OnOrAfter(t) {}
   def onOrAfter(t: Instant): Obs[Boolean] = new OnOrAfter(t) {}
 
+  def not(o: Obs[Boolean]): Obs[Boolean] = new Unary(Not, o) {}
+
+  def abs(o: Obs[Double]): Obs[Double]  = new Unary(Abs, o)  {}
+  def sqrt(o: Obs[Double]): Obs[Double] = new Unary(Sqrt, o) {}
+  def exp(o: Obs[Double]): Obs[Double]  = new Unary(Exp, o)  {}
+  def log(o: Obs[Double]): Obs[Double]  = new Unary(Log, o)  {}
+
   /** derived */
-  def at(t: Instant): Obs[Boolean] =
-    onOrAfter(t) and not(before(t))
-
-  def not(o: Obs[Boolean]): Obs[Boolean] = new Not(o) {}
+  def at(t: Instant): Obs[Boolean] = onOrAfter(t) and not(before(t))
 
   /** */
-  implicit def obsDoubleOrder: Order[Obs[Double]] = ???
+  implicit class BooleanOps(val oL: Obs[Boolean]) extends AnyVal {
 
-  /** */
-  implicit def obsDoubleFractional: Fractional[Obs[Double]] = ???
+    def unary_! : Obs[Boolean] = not(oL)
 
-  /** */
-  implicit class Ops(val oL: Obs[Boolean]) {
+    def branch(cT: Contract, cF: Contract): Contract = contracts.branch(oL, cT, cF)
 
-    /** FIXME this needs a `Repr` */
-    def branch(cT: Contract, cF: Contract): Contract = ???
-    // contracts branch (toBool liftCo o, cT, cF)
+    def branch[A](oT: Obs[A], oF: Obs[A]): Obs[A] = new Branch(oL, oT, oF) {}
 
-    /** */
-    def and(oR: Obs[Boolean]): Obs[Boolean] = new And(oL, oR) {}
-
-    /** */
-    def or(oR: Obs[Boolean]): Obs[Boolean] = new Or(oL, oR) {}
+    def and(oR: Obs[Boolean]): Obs[Boolean] = new Binary(And, oL, oR)  {}
+    def or(oR: Obs[Boolean]): Obs[Boolean]  = new Binary(Or, oL, oR)   {}
+    def ===(oR: Obs[Boolean]): Obs[Boolean] = new Binary(Xnor, oL, oR) {}
   }
 
   /** */
+  implicit class DoubleOps(val oL: Obs[Double]) extends AnyVal {
+
+    def unary_! : Obs[Double] = new Unary(Neg, oL) {}
+
+    def <(oR: Obs[Double]): Obs[Boolean]   = new Binary(Lt, oL, oR)  {}
+    def <=(oR: Obs[Double]): Obs[Boolean]  = new Binary(Lte, oL, oR) {}
+    def >(oR: Obs[Double]): Obs[Boolean]   = new Binary(Gt, oL, oR)  {}
+    def >=(oR: Obs[Double]): Obs[Boolean]  = new Binary(Gte, oL, oR) {}
+    def ===(oR: Obs[Double]): Obs[Boolean] = new Binary(Eq, oL, oR)  {}
+    def !==(oR: Obs[Double]): Obs[Boolean] = new Binary(Neq, oL, oR) {}
+
+    def +(oR: Obs[Double]): Obs[Double]   = new Binary(Add, oL, oR) {}
+    def -(oR: Obs[Double]): Obs[Double]   = new Binary(Sub, oL, oR) {}
+    def *(oR: Obs[Double]): Obs[Double]   = new Binary(Mul, oL, oR) {}
+    def /(oR: Obs[Double]): Obs[Double]   = new Binary(Div, oL, oR) {}
+    def min(oR: Obs[Double]): Obs[Double] = new Binary(Min, oL, oR) {}
+    def max(oR: Obs[Double]): Obs[Double] = new Binary(Max, oL, oR) {}
+  }
+
+  /** TODO: this needs pretty printing! */
   implicit def obsShow[A]: Show[Obs[A]] = ???
 }
 
@@ -87,26 +147,3 @@ object observables {
     */
   def wsjPrimeRate: Obs[Double] = ???
 }
-// * From van Straaten:
-// *
-// *  ''An `Obs`ervable is thus represented as a function from a starting date to a value process.
-// The "time-varying" nature of an observable is captured primarily by the value process itself
-// (PR a); the Date in the function's type is simply used to specify the start date
-// for the resulting value process.''
-// *
-// * This is true, but we'll follow the approach taken by [[http://netrium.org/ Netrium]]
-// * (make `Obs` an GADT.)
-// * In order to align processes (`PR[A]`) which are offset in time (think calendar spreads!),
-// * ''somewhere'' there has to be a function:
-// * {{{
-//       f: Instant => PR[A]
-//     }}}
-// *
-// * No examples can be located where processes offset in time are supported;
-// * the released Netrium package has the ability to store a single date
-// * in the `Model` (and doesn't use that).
-// *
-// * Will just support constants for now, implementing `Obs` as an ADT but not defining
-// * or implementing any Contract execution capabilities, which could change because
-// *   - a move to Monadic Contract definition
-// *   - distributed ledger enabling (see e.g. `Fae`)
