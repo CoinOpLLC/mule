@@ -125,10 +125,15 @@ trait Financial[N] extends Fractional[N] { self =>
       Validate fromPredicate (p, t => s"${t.toString} isn't a whole number", IsWhole[I])
     }
   }
+
 }
 
 /**  */
 object Financial {
+
+  implicit class Ops[X](val x: X) extends AnyVal {
+    def to[Y: Financial](implicit X: Financial[X]) = X.to[Y](x)
+  }
 
   /**  */
   object IsUnitInterval {

@@ -1,30 +1,53 @@
 package io.deftrade
 package contracts
 
+import cats.{ Eval, Group }
+
 /**  This trait intentionally left blank. */
 sealed trait Contract
-
-/** */
-sealed abstract case class Lazy[A] private (lr: () => A) { final def value: A = lr() }
-
-/** */
-object Lazy {
-  private final case class Cache[A](ua: () => A) extends (() => A) {
-    lazy val cache: A  = ua()
-    override def apply = cache
-  }
-  def apply[A](a: => A): Lazy[A] = new Lazy(Cache(() => a)) {}
-}
 
 /**
   * ADT definitions and constructors form the `Contract` specification DSL.
   *
-  * FIXME: these trees are not lazy. In order to make them lazy, need to move to
-  * `() => A` stored in the case class, and by-name params in the dsl methods.
+  * Note internally the `Contract` instances are lazy, via [[cats.Eval]].
+  *
+  * Implements the [[cats.Group]] typeclass instance for `Contract`.
   */
 object Contract {
 
-  type LzCon = Lazy[Contract]
+  // /** monadic but just a toy implementation */
+  // private sealed abstract case class Lazy[A] private (thunk: Lazy.Thunk[A]) {
+  //   import Lazy.{ defer, Memo }
+  //   final def map[B](f: A => B): Lazy[B]           = new Lazy(Memo(() => f(thunk()))) {}
+  //   final def flatMap[B](f: A => Lazy[B]): Lazy[B] = defer(f(thunk()))
+  //   final def value: A                             = thunk()
+  // }
+  //
+  // /** implements [[cats.Defer]]`[Lazy]` */
+  // private object Lazy { outer =>
+  //
+  //   import cats.Defer
+  //
+  //   type Thunk[A] = () => A
+  //   final case class Memo[A](thunk: Thunk[A]) extends Thunk[A] {
+  //     lazy val memo: A   = thunk()
+  //     override def apply = memo
+  //   }
+  //
+  //   def later[A](a: => A): Lazy[A] = new Lazy(Memo(() => a)) {}
+  //
+  //   def defer[A](fa: => Lazy[A]) = later(fa.thunk())
+  //
+  //   lazy val lazyDefer: Defer[Lazy] = new Defer[Lazy] {
+  //     def defer[A](fa: => Lazy[A]) = outer defer fa
+  //   }
+  // }
+
+  // type LzCon = Lazy[Contract]
+  // import Lazy.later
+
+  type LzCon = Eval[Contract]
+  import Eval.later
 
   case object Zero                                                         extends Contract
   sealed abstract case class One(n: Numéraire)                             extends Contract
@@ -37,6 +60,13 @@ object Contract {
   sealed abstract case class Pick(c1: LzCon, c2: LzCon)                    extends Contract
   sealed abstract case class Branch(o: Obs[Boolean], cT: LzCon, cF: LzCon) extends Contract
 
+  implicit lazy val contractGroup: Group[Contract] =
+    new Group[Contract] {
+      def empty: Contract                             = contracts.zero
+      def combine(x: Contract, y: Contract): Contract = contracts both (x, y)
+      def inverse(a: Contract): Contract              = contracts give a
+    }
+
   /** Tucked in here so `Contract` can stay `sealed` in source file. */
   trait primitives {
 
@@ -44,28 +74,32 @@ object Contract {
     final def unitOf(base: Numéraire): Contract = new One(base) {}
 
     /** Party acquires `c` multiplied by `n`. */
-    final def scale(n: Obs[Double])(c: => Contract): Contract = new Scale(n, Lazy(c)) {}
+    final def scale(n: Obs[Double])(c: => Contract): Contract = new Scale(n, later(c)) {}
 
     /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`. */
-    final def branch(b: Obs[Boolean])(cT: => Contract)(cF: => Contract): Contract =
-      new Branch(b, Lazy(cT), Lazy(cF)) {}
+    final def branch(b: Obs[Boolean])(
+        cT: => Contract
+    )(
+        cF: => Contract
+    ): Contract =
+      new Branch(b, later(cT), later(cF)) {}
 
     /** Party assumes role of counterparty with respect to `c`. */
-    final def give(c: => Contract): Contract = new Give(Lazy(c)) {}
+    final def give(c: => Contract): Contract = new Give(later(c)) {}
 
     /** Party will acquire c as soon as `b` is observed `true`.  */
-    final def when(b: Obs[Boolean])(c: => Contract): Contract = new When(b, Lazy(c)) {}
+    final def when(b: Obs[Boolean])(c: => Contract): Contract = new When(b, later(c)) {}
 
     /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
-    final def until(b: Obs[Boolean], c: => Contract): Contract = new Until(b, Lazy(c)) {}
+    final def until(b: Obs[Boolean], c: => Contract): Contract = new Until(b, later(c)) {}
 
     /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
-    final def anytime(b: Obs[Boolean])(c: => Contract): Contract = new Anytime(b, Lazy(c)) {}
+    final def anytime(b: Obs[Boolean])(c: => Contract): Contract = new Anytime(b, later(c)) {}
 
     /** Party immediately receives both `c1` and `c2`. */
-    final def both(c1: => Contract, c2: => Contract): Contract = new Both(Lazy(c1), Lazy(c2)) {}
+    final def both(c1: => Contract, c2: => Contract): Contract = new Both(later(c1), later(c2)) {}
 
     /** Party immediately chooses between `c1` or `c2`. */
-    final def pick(c1: => Contract, c2: => Contract): Contract = new Pick(Lazy(c1), Lazy(c2)) {}
+    final def pick(c1: => Contract, c2: => Contract): Contract = new Pick(later(c1), later(c2)) {}
   }
 }

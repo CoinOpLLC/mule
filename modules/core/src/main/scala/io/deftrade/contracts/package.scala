@@ -3,7 +3,7 @@ package io.deftrade
 import time._, money._, model.capital.Instrument
 
 /**
-  * Contract specification, representation and evaluation,
+  * Single import DSL for contract specification, representation and evaluation,
   * following the ''Composing Contracts'' work
   * by Simon Peyton Jones and Jean-Marc Eber.
   *
@@ -30,6 +30,9 @@ import time._, money._, model.capital.Instrument
   */
 package object contracts extends Contract.primitives {
 
+  import Financial.Ops
+  import Obs._
+
   /** Party acquires no rights or obligations (nothing). */
   def zero: Contract = Contract.Zero
 
@@ -44,26 +47,18 @@ package object contracts extends Contract.primitives {
 
   /**  */
   def buy[N: Financial, C: Currency](c: => Contract, price: Money[N, C]): Contract =
-    both(
-      c,
-      give { scale(Obs const Financial[N].to[Double](price.amount)) { one } }
-    )
+    both(c, give { const(price.amount.to[Double]) * one })
 
   /**  */
   def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
-    both(
-      scale(Obs const Financial[N].to[Double](price.amount)) { one },
-      give { c }
-    )
+    both(const(price.amount.to[Double]) * one, give { c })
 
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](
       maturity: Instant,
       face: Money[N, C]
   ): Contract =
-    when(Obs at maturity) {
-      scale(Obs const Financial[N].to[Double](face.amount)) { one }
-    }
+    when(at(maturity)) { const(face.amount.to[Double]) * one }
 
   /** */
   def europeanCall[N: Financial, C: Currency](
@@ -71,9 +66,7 @@ package object contracts extends Contract.primitives {
       strike: Money[N, C],
       expiry: Instant,
   ): Contract =
-    when(Obs at expiry) {
-      optionally(buy(contract, strike))
-    }
+    when(at(expiry)) { optionally(buy(contract, strike)) }
 
   /** */
   def americanCall[N: Financial, C: Currency](
@@ -81,7 +74,5 @@ package object contracts extends Contract.primitives {
       strike: Money[N, C],
       expiry: Instant,
   ): Contract =
-    anytime(Obs before expiry) {
-      optionally(buy(contract, strike))
-    }
+    anytime(before(expiry)) { optionally(buy(contract, strike)) }
 }
