@@ -25,12 +25,12 @@ import cats.data.NonEmptyList
 
 import enumeratum.{ CatsEnum, Enum, EnumEntry }
 
-import io.chrisdavenport.cormorant.{ implicits => _, _ }
+import io.chrisdavenport.cormorant
+import cormorant.{ CSV, Error, Get, Put }
+import cormorant.implicits.stringPut
 
 /** module mixin */
 trait csv {
-
-  import io.chrisdavenport.cormorant.implicits._
 
   /** cormorant csv `Get` */
   implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] =

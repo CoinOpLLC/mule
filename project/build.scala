@@ -125,7 +125,7 @@ object Deps {
     "core",
     "generic",
     "parser",
-    "fs2", // DON'T "FIXME": This is OK because fs2 1.11 is bincompat with 2.0 series... semver l8r
+    "fs2",
     "http4s",
     "refined"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
@@ -133,7 +133,7 @@ object Deps {
   val fs2s = List(
     "co.fs2" %% "fs2-core",
     "co.fs2" %% "fs2-io",
-    "co.fs2" %% "fs2-reactive-streams",
+    // "co.fs2" %% "fs2-reactive-streams",
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
 
