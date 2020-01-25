@@ -12,6 +12,24 @@ sealed trait Contract
   * Note internally the `Contract` instances are lazy, via [[cats.Eval]].
   *
   * Implements the [[cats.Group]] typeclass instance for `Contract`.
+  *
+  * @todo TODO: consider
+  *   - require "consideration" in every contract representing a `Trade`
+  *       - which can be constructed after the fact if need be
+  *   - just like in the real world, there's always ''Good and valuable consideration, the receipt and sufficiency of which is hearby acknowledged''.
+  *   - {{{ object GavcTrasowiha extends Contract /* another Zero */ }}}
+  *   - remember `Contract` forms a `Group` ... roll up a combined `Contract`
+  *   - based on all the trades between two counterparties?
+  *
+  * @todo TODO:
+  * {{{
+  *     // every action taken in the performance of a `Contract` is an `Evolution` of some kind.
+  *     sealed trait Evolution
+  *     case object Novation extends Evolution    // new or ammended contract
+  *     case object Assignment extends Evolution  // new parties
+  *     case object Performance extends Evolution // event driven simplification
+  *     case object Discharge extends Evolution   // do we need this? Better name?
+  * }}}
   */
 object Contract {
 
