@@ -8,7 +8,7 @@ object Version {
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Enumeratum = "1.5.14"
+  val Enumeratum = "1.5.15"
   val Shapeless  = "2.3.3"
   val Refined    = "0.9.10"
 
@@ -125,7 +125,7 @@ object Deps {
     "core",
     "generic",
     "parser",
-    "fs2", // DON'T "FIXME": This is OK because fs2 1.11 is bincompat with 2.0 series... semver l8r
+    "fs2",
     "http4s",
     "refined"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
