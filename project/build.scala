@@ -133,7 +133,7 @@ object Deps {
   val fs2s = List(
     "co.fs2" %% "fs2-core",
     "co.fs2" %% "fs2-io",
-    "co.fs2" %% "fs2-reactive-streams",
+    // "co.fs2" %% "fs2-reactive-streams",
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
 

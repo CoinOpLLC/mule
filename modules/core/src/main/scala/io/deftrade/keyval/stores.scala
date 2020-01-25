@@ -32,11 +32,11 @@ import refined.cats.refTypeOrder
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle }
 
-import io.chrisdavenport.cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
-import io.chrisdavenport.cormorant.implicits._
-import io.chrisdavenport.cormorant.generic.semiauto._
-import io.chrisdavenport.cormorant.refined._
-import io.chrisdavenport.cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
+import io.chrisdavenport.cormorant
+import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
+import cormorant.generic.semiauto._
+// import cormorant.refined._
+import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
 
@@ -89,16 +89,16 @@ trait stores {
     ) extends ModuleTypes {
 
       final override type ValueCompanionType[x] = W[x]
-      final type HValue                         = HV // = lgv.Repr  test / validate / assume ?!?
+      final type HValue                         = HV // === lgv.Repr  test / validate / assume ?!?
       final type EffectType[x]                  = F[x]
       final type ValueType                      = V
 
-      import V.{ validateId, Id, Index, Value }
+      import V.{ Id, Index, Value }
 
       /** Basic in-memory table structure */
       final type Table = Map[Index, Value]
-      final implicit lazy val putId = Put[Id]
-      final implicit lazy val getId = Get[Id]
+      final implicit lazy val putId: Put[Id] = Put[Id]
+      final implicit lazy val getId: Get[Id] = Get[Id]
     }
   }
 
@@ -178,13 +178,11 @@ trait stores {
     * Ctor parameter `V` carries types specific to `type V`.
     * `type Index` mapped to [[WithValue.Id]].
     *
-    * Cormorant CSV integration is accomplished by making these implicit methods
-    * [[writePermRow]], [[readPermRow]], which materialize
+    * Cormorant CSV is integrated by implementing implicit methods
+    * [[writePermRow]], [[readPermRow]], providing access to
     * [[io.chrisdavenport.cormorant.LabelledRead]] and
     * [[io.chrisdavenport.cormorant.LabelledWrite]]
     * instances for the [[WithValue.PermRow]] type for this store.
-    * available to the library.
-    *
     */
   trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
     self: ModuleTypes.Aux[F, WithId, V, HV] =>
@@ -194,13 +192,12 @@ trait stores {
     /** */
     final type HRow = HValue
 
-    /**  FIXME: is this the sorce of the davenport scaladoc prob? */
+    /** */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]]
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
-        implicit val lwhv        = llw.value
         implicit val lwhpr       = LabelledWrite[HPermRow]
         def headers: CSV.Headers = lwhpr.headers
         override def write(pr: PermRow): CSV.Row = pr match {
@@ -215,7 +212,6 @@ trait stores {
         llr: Lazy[LabelledRead[HV]]
     ): LabelledRead[PermRow] =
       new LabelledRead[PermRow] {
-        implicit val lrhv  = llr.value
         implicit val lrhpr = LabelledRead[HPermRow]
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
           lrhpr read (row, headers) map { hpr =>
@@ -275,20 +271,21 @@ trait stores {
         implicit
         llw: Lazy[LabelledWrite[HValue]],
         lputk: Lazy[Put[Key]]
-    ): LabelledWrite[PermRow] = ???
-    // new LabelledWrite[PermRow] {
-    //
-    //   implicit val lwhv  = llw.value
-    //   implicit val lwhpr = LabelledWrite[HPermRow]
-    //   implicit val lwher = LabelledWrite[HEmptyRow]
-    //
-    //   def headers: CSV.Headers = lwhpr.headers
-    //
-    //   def write(pr: PermRow): CSV.Row = pr match {
-    //     case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
-    //     case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
-    //   }
-    // }
+    ): LabelledWrite[PermRow] =
+      new LabelledWrite[PermRow] {
+
+        LabelledWrite[IdField :: HValue] |> discardValue
+
+        implicit val lwhpr = LabelledWrite[HPermRow]
+        implicit val lwher = LabelledWrite[HEmptyRow]
+
+        def headers: CSV.Headers = lwhpr.headers
+
+        def write(pr: PermRow): CSV.Row = pr match {
+          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
+        }
+      }
 
     /** FIXME: reimplement */
     implicit final def readPermRow(

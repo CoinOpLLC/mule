@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+package io.deftrade
+package model
 package feralcats
 
 import cats.kernel.CommutativeGroup
