@@ -21,6 +21,7 @@ import implicits._
 
 import cats.implicits._
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
@@ -142,17 +143,27 @@ trait stores {
       for {
         id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
         _ <- Stream eval F.delay {
-              updateCache(row); id -> row
+              updateCache(row)
+              id -> row
             } through permRowToCSV through appendingSink
       } yield id
 
     /** When writing whole `Map`s, all rows get the same `Id`. */
-    final def appendAll[G[_]: cats.Foldable, K2, V2](
-        rows: G[Row]
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def appendAll[K2, V2](
+        k2v2s: Map[K2, V2]
     )(
         implicit
-        ev: V <:< (K2, V2)
-    ): EffectStream[Id] = ???
+        evRow: (K2, V2) <:< Row
+    ): EffectStream[Id] =
+      for {
+        id  <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+        row <- Stream evals F.delay { evRow liftCo k2v2s.toList }
+        _ <- Stream eval F.delay {
+              updateCache(row)
+              id -> row
+            } through permRowToCSV through appendingSink
+      } yield id
 
     /** */
     protected def readLines: EffectStream[String]
@@ -266,7 +277,7 @@ trait stores {
     /** */
     final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
 
-    /** FIXME: reimplement */
+    /**  */
     implicit final def writePermRow(
         implicit
         llw: Lazy[LabelledWrite[HValue]],
@@ -274,10 +285,9 @@ trait stores {
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
 
-        LabelledWrite[IdField :: HValue] |> discardValue
-
-        implicit val lwhpr = LabelledWrite[HPermRow]
-        implicit val lwher = LabelledWrite[HEmptyRow]
+        private implicit def putk  = lputk.value
+        private implicit val lwhpr = LabelledWrite[HPermRow]
+        private implicit val lwher = LabelledWrite[HEmptyRow]
 
         def headers: CSV.Headers = lwhpr.headers
 
@@ -287,33 +297,35 @@ trait stores {
         }
       }
 
-    /** FIXME: reimplement */
+    /** */
     implicit final def readPermRow(
         implicit
         llr: Lazy[LabelledRead[HV]],
         lgetk: Lazy[Get[Key]]
-    ): LabelledRead[PermRow] = ???
-    // new LabelledRead[PermRow] {
-    //
-    //   implicit val lrhv  = llr.value
-    //   implicit val lrhpr = LabelledRead[HPermRow]
-    //
-    //   def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] =
-    //     row match {
-    //
-    //       case CSV.Row(
-    //           NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
-    //           ) if i === id.toString && k === key.toString =>
-    //         lrhpr read (row, headers) map { hpr =>
-    //           (hpr.head, (hpr.tail.head, none))
-    //         }
-    //
-    //       case _ =>
-    //         lrhpr read (row, headers) map { hpr =>
-    //           (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
-    //         }
-    //     }
-    // }
+    ): LabelledRead[PermRow] =
+      new LabelledRead[PermRow] {
+
+        def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] = {
+
+          implicit val getk  = lgetk.value
+          implicit val lrhpr = LabelledRead[HPermRow]
+
+          row match {
+
+            case CSV.Row(
+                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+                ) if i === id.toString && k === key.toString =>
+              lrhpr read (row, headers) map { hpr =>
+                (hpr.head, (hpr.tail.head, none))
+              }
+
+            case _ =>
+              lrhpr read (row, headers) map { hpr =>
+                (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
+              }
+          }
+        }
+      }
 
     /** */
     final protected def deriveCsvToKv(
