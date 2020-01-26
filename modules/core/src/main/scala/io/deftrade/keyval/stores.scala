@@ -148,22 +148,28 @@ trait stores {
             } through permRowToCSV through appendingSink
       } yield id
 
+    /**  */
+    protected def tableRows: EffectStream[(Index, Value)]
+
+    /**  */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final protected def getMap[K2, V2](x: Index)(implicit evK2V2: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+      tableRows
+        .filter(_._1 == x) // FIXME should be `===` and so Index needs an implicit Order
+        .map(_._2)
+        .fold(Map.empty[K2, V2]) { (rows, row) =>
+          rows + evK2V2(row)
+        }
+
     /** When writing whole `Map`s, all rows get the same `Id`. */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def appendAll[K2, V2](
-        k2v2s: Map[K2, V2]
-    )(
+    final protected def upsertMap[K2, V2](xvs: (Index, Map[K2, V2]))(
         implicit
-        evRow: (K2, V2) <:< Row
-    ): EffectStream[Id] =
+        evValue: (K2, V2) <:< Value
+    ): EffectStream[(Index, Value)] =
       for {
-        id  <- Stream eval F.delay { Id(rawId.getAndIncrement) }
-        row <- Stream evals F.delay { evRow liftCo k2v2s.toList }
-        _ <- Stream eval F.delay {
-              updateCache(row)
-              id -> row
-            } through permRowToCSV through appendingSink
-      } yield id
+        k2v2 <- Stream evals F.delay { evValue liftCo xvs._2.toList }
+      } yield xvs._1 -> k2v2
 
     /** */
     protected def readLines: EffectStream[String]
@@ -180,7 +186,7 @@ trait stores {
     /** */
     protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
 
-    private lazy val rawId = new java.util.concurrent.atomic.AtomicLong(fresh.init().value)
+    protected lazy val rawId = new java.util.concurrent.atomic.AtomicLong(fresh.init().value)
 
     private lazy val fresh: Fresh[Id] = Fresh.zeroBasedIncr
   }
@@ -202,6 +208,19 @@ trait stores {
 
     /** */
     final type HRow = HValue
+
+    final def get[K2, V2](id: Id)(implicit evK2V2: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+      getMap(id)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    final def append[K2, V2](k2v2s: Map[K2, V2])(
+        implicit
+        evValue: (K2, V2) <:< Value
+    ): EffectStream[Id] =
+      for {
+        id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+        _  <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
+      } yield id
 
     /** */
     implicit final def writePermRow(
@@ -266,6 +285,9 @@ trait stores {
     def select(key: Key): EffectStream[Value]
 
     /** */
+    def select[K2, V2](key: Key)(implicit ev: Value <:< (K2, V2)): EffectStream[Map[K2, V2]]
+
+    /** */
     def insert(key: Key, value: Value): EffectStream[Id]
 
     /** */
@@ -276,6 +298,15 @@ trait stores {
 
     /** */
     final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
+
+    /** */
+    final def upsert[K2, V2](key: Key, k2v2s: Map[K2, V2])(
+        implicit ev: (K2, V2) <:< Value
+    ): EffectStream[Id] =
+      for {
+        id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+        _  <- upsertMap(key -> k2v2s).map(id -> _) through permRowToCSV through appendingSink
+      } yield id
 
     /**  */
     implicit final def writePermRow(
@@ -418,6 +449,10 @@ trait stores {
       Stream evals F.delay { table get key }
 
     /** */
+    final def select[K2, V2](key: Key)(implicit ev: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+      getMap(key)
+
+    /** */
     def insert(key: Key, value: Value): EffectStream[Id] =
       (table get key).fold(append(key -> value.some))(_ => Stream.empty)
 
@@ -480,8 +515,10 @@ trait stores {
 
       import V._
 
+      final override protected def tableRows = permRows
+
       /** */
-      override def path = Paths get p
+      final override def path = Paths get p
 
       /** */
       final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
@@ -507,7 +544,12 @@ trait stores {
     new MemFileKeyValueStore(kv) { self =>
 
       /** */
-      override def path = Paths get p
+      final override protected def tableRows = rows collect {
+        case (k, Some(v)) => k -> v
+      }
+
+      /** */
+      final override def path = Paths get p
 
       /** */
       final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveKvToCsv

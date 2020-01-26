@@ -117,14 +117,14 @@ object WithId
 trait WithKey extends WithValue {
 
   /**
-    * So `Foo`s are indexed with `Foo.Key`s
+    * `Foo.Table`s are indexed by `Foo.Key`s
     */
   type Key
 
   /** Known accomplices. */
   val Key: WithKey.KeyCompanion[Key]
 
-  /** Think spreadsheet or relational table, keeping in mind that [[Value]]s are compound. */
+  /** Absence of a `Value` indicates an intent to delete the `Row` indexed by `Key`. */
   final type Row = (Key, Option[Value])
 
   /** */
