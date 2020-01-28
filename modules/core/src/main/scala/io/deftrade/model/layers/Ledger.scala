@@ -91,7 +91,7 @@ trait Ledger { self: ModuleTypes =>
   type Trade = Folio
 
   /**
-    * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.stores]] hold
+    * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.layers.stores]] hold
     * immutable entries.
     *
     * TODO: `Trade` stores should use WithHashId to get the natural reuse of `Trade`s
@@ -247,7 +247,7 @@ trait Ledger { self: ModuleTypes =>
     *     deal in generic instruments with [[capital.Instrument.Key]]s constucted systematically
     *     from Currency names.
     *   - the bank account allocation details are recoverable through the
-    *     [[keyval.stores.KeyValueStore]] for `Folio`s.
+    *     [[keyval.layers.stores.KeyValueStore]] for `Folio`s.
     *
     * TODO: is is possible or desirable to generalize fungability
     * to asset classes other than currencies?

@@ -1,5 +1,6 @@
 package io.deftrade
 package keyval
+package layers
 
 import io.deftrade.implicits._
 
@@ -98,6 +99,3 @@ trait freestore {
       }
   }
 }
-
-/** */
-object freestore extends freestore

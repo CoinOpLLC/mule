@@ -18,6 +18,7 @@ package io.deftrade
 
 import cats.implicits._
 import cats.{ Show }
+import keyval.layers._
 
 import shapeless.syntax.singleton._
 
@@ -25,33 +26,39 @@ import eu.timepit.refined
 import refined.api.Refined
 
 /**
+  * Derived types and implicit methods for the persistence and caching of
+  * domain `value types` (typically case classes),
+  * with complementary key value store algebras and implementations.
+  *
   * Defines a
   * [[https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration]]
-  * scheme* for enriching domain value types (typically case classes) with additional
-  * types and implicit methods useful for persistence and caching.
-  *
+  * system for:
   *   - `id`s: opaque Long based `id` (with `Order` instances)
   *   - `key`s: identifiers (including opaque identifiers)
   * with `Order`, and `Show` typeclass instances
   *   - `value`s: value class typeclass instances (`Eq`, `Hash` and `Show`).
   *   - etc.
   *
-  * This shall be the law: A `type Foo` may not depend upon the type of the `key` for `Foo`s.
+  * ''Convention'': A `type Foo` may not depend upon the type of the `key` for `Foo`s.
+  *
   * Point being: there will be no `id: Id` fields within domain objects; these will be carried
   * separately (e.g. `key`s in an in-memory [[scala.collection.Map]] and will not depend in any way on the domain
-  * value objects. However, foreign keys which reference other domain value types are permitted.
+  * value objects.
   *
-  * This package provides `key` and `id` implementations which abide the law given above.
+  * However, foreign keys which reference other domain value types are permitted.
+  *
+  * This package provides `key` and `id` implementations which '''enforce''' the
+  * convention given above.
   *   - aliasing `Refined` as an opaque key for a collection of a given type of values
-  *   - assinging the `Value` type to be the phantom type parameter for the Refined type constructor
+  *   - assinging the `Value` type to be the `phantom type` parameter
+  * for the `Refined` type constructor
   *   - providing the `Key` types and instances as companion base classes.
   *
   * Further, the package supports the instantiaton of the scheme by
   *   - providing a `Row` type `(Key, Value)`
-  *   - providing a `Table` type (`Map[Key, Value]`) (see [[stores]])
-  *   - providing implicit derivations for [[csv]] file readers and writers of `Row`s and `Table`s.
-  *
-  * *,, it's just a scheme because calling it a "schema" is far too grand,,
+  *   - providing a `Table` type (`Map[Key, Value]`) (see [[layers.stores]])
+  *   - providing implicit derivations for [[layers.csv]] file readers and writers of `Row`s and `Table`s,
+  * enabling spreadsheet integration.
   *
   * TODO: consider explicitly separating the structural items (keys and links between keys)
   * from the descriptive attributes, as with
@@ -61,8 +68,8 @@ import refined.api.Refined
   *   - A: "Real business keys only change when the business changes!"
   *   - same goes for those essential, universal, canonical attributes
   *   - everything else is `meta: Json`
-  *     - which can be stored / indexed as binary in Mongo and Postgres
-  *     - which can be projected through lenses (optics) to create Satellite views.
+  *      - which can be stored / indexed as binary in e.g. Mongo and Postgres
+  *      - which can be projected to create Satellite views.
   */
 package object keyval extends stores with freestore with csv {
 

@@ -19,7 +19,7 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /**
-  * Single-import DSL for monetary expressions.
+  * Single-import DSL for monetary expressions, including currency support.
   *
   *   ==Inspiration:==
   *   - [[https://www.joda.org/joda-money/ Joda Money]] of course

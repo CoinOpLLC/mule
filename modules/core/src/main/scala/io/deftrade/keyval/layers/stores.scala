@@ -16,6 +16,7 @@
 
 package io.deftrade
 package keyval
+package layers
 
 import implicits._
 
@@ -567,5 +568,3 @@ trait stores {
     }
   }
 }
-
-object stores extends stores
