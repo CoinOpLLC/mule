@@ -163,7 +163,9 @@ trait stores {
 
     /** When writing whole `Map`s, all rows get the same `Id`. */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final protected def upsertMap[K2, V2](xvs: (Index, Map[K2, V2]))(
+    final protected def upsertMap[K2, V2](
+        xvs: (Index, Map[K2, V2])
+    )(
         implicit
         evValue: (K2, V2) <:< Value
     ): EffectStream[(Index, Value)] =
@@ -300,12 +302,16 @@ trait stores {
     final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def upsert[K2, V2](key: Key, k2v2s: Map[K2, V2])(
         implicit ev: (K2, V2) <:< Value
     ): EffectStream[Id] =
       for {
-        id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
-        _  <- upsertMap(key -> k2v2s).map(id -> _) through permRowToCSV through appendingSink
+        id  <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+        kkv <- upsertMap(key -> k2v2s)
+        _ <- Stream eval F.delay(id -> (kkv._1 -> (kkv._2.some))) through
+              permRowToCSV through
+              appendingSink
       } yield id
 
     /**  */
@@ -543,6 +549,8 @@ trait stores {
   ): Result[KeyValueStore[F, K, V, HV]] = Result safe {
     new MemFileKeyValueStore(kv) { self =>
 
+      import V._
+
       /** */
       final override protected def tableRows = rows collect {
         case (k, Some(v)) => k -> v
@@ -552,10 +560,10 @@ trait stores {
       final override def path = Paths get p
 
       /** */
-      final lazy val permRowToCSV: Pipe[EffectType, V.PermRow, String] = deriveKvToCsv
+      final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveKvToCsv
 
       /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, Result[V.PermRow]] = deriveCsvToKv
+      final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
     }
   }
 }
