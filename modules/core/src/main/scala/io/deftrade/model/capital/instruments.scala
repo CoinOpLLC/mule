@@ -20,7 +20,7 @@ package capital
 
 import time.{ ZonedDateTime }
 import time.market.Frequency
-import money.{ Currency, CurrencyLike, Financial }
+import money._
 import contracts.Numéraire
 import keyval._
 import refinements._
@@ -28,6 +28,8 @@ import refinements._
 import cats.implicits._
 // import cats.syntax.eq._
 // import cats.instances.string._
+import cats.effect.Sync
+import fs2.Stream
 
 import shapeless.syntax.singleton._
 
@@ -290,7 +292,9 @@ final case class Instrument(
   * }}}
   * you end up with one investment in HPQ!
   *
-  * You will need to be able to walk the graph back in time. `Novation` events connecting `ISIN`s?
+  * You will need to be able to walk the graph back in time.
+  *
+  * TODO: `Instrument` evolution as `Contract` `Novation`. (events connecting `ISIN`s?S)
   */
 object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
 

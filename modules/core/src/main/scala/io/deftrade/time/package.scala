@@ -21,8 +21,8 @@ import java.time.{ temporal => jtt }
 import jtt._
 
 /**
-  * Single-import package providing ideomatic bindings for java.time,
-  * with support for work calendar and day count convention.
+  * Ideomatic bindings for [[java.time]],
+  * supporting [[work]] calendar and [[market]] day count conventions.
   *
   * The following `java.time` classes are imported and enhanced:
   *

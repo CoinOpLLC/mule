@@ -34,10 +34,93 @@ import io.circe.Json
 /**
   * Support for performing and recording [[Transaction]]s.
   */
-trait Ledger { self: ModuleTypes =>
+trait Ledger { module: ModuleTypes =>
 
   /** nb this is where fresh key policy is decided for the ledger */
   final def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
+
+  /**  */
+  sealed trait Pricer {
+    type Thing
+    type CurrencyTag
+    // type MonetaryAmount
+    type EffectType[_]
+    val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
+    implicit val C: Currency[CurrencyTag]
+    // implicit val N: Financial[MonetaryAmount]
+    implicit val F: Sync[EffectType]
+  }
+
+  /**
+    * TODO: The three different kinds of `Pricer`, listed in order of abstraction (most to least):
+    *
+    *   - `Model`: reports a ''fair value'' modelled price
+    *     - may depend on `market data` for callibration
+    *     - therefore limited by accuracy (in practice)
+    *   - `Mark`: reports the current ''mark to market'' price
+    *     - may depend on a `model` for interpolation to thinly traded / untraded assets...
+    *     - therefore extensible to all assets (theoretically)
+    *   - `Book`: the price we paid for the asset
+    *     - only covers the assets we own(ed).
+    */
+  object Pricer {
+
+    /** This version of Aux is called the ''untitled fois gras patttern''. */
+    abstract class Aux[F[_]: Sync, T, C: Currency](
+        override val price: T => Stream[F, Mny[C]]
+    )(
+        implicit
+        final override val C: Currency[C],
+        // implicit override val N: Financial[N],
+        final override val F: Sync[F]
+    ) extends Pricer {
+      final type Thing       = T
+      final type CurrencyTag = C
+      // final type MonetaryAmound = N
+      final type EffectType[x] = F[x]
+    }
+  }
+
+  /** Price data per unit of instrument. */
+  sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
+      final override val price: Instrument.Key => Stream[F, Mny[C]]
+  ) extends Pricer.Aux[F, Instrument.Key, C](price)
+
+  /** */
+  object InstrumentPricer {
+
+    /** */
+    def apply[F[_], C: Currency: InstrumentPricer[F, *]]: InstrumentPricer[F, C] = implicitly
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def apply[F[_]: Sync, C: Currency](
+        price: Instrument.Key => Stream[F, Mny[C]]
+    ): InstrumentPricer[F, C] =
+      new InstrumentPricer(price) {}
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def empty[F[_]: Sync, C: Currency]: InstrumentPricer[F, C] =
+      new InstrumentPricer(
+        _ => Stream.empty[F]
+      ) {}
+
+    /**
+      * TODO: Looks like `InstrumentPricer` is a [[cats.Monoid]]
+      * Not commutative: price given by `a` (if given) has precedence.
+      *
+      * A two element search path of `InstrumentPricer`s, basically.
+      */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def combine[F[_]: Sync, C: Currency](
+        a: InstrumentPricer[F, C],
+        b: InstrumentPricer[F, C]
+    ): InstrumentPricer[F, C] =
+      InstrumentPricer { instrument =>
+        (a price instrument) ++ (b price instrument) take 1
+      }
+  }
 
   /**
     * How much of a given [[capital.Instrument]] is held.
@@ -47,7 +130,33 @@ trait Ledger { self: ModuleTypes =>
   type Position = (Instrument.Key, Quantity)
 
   /** placeholder */
-  object Position
+  object Position {
+
+    /**  Enables volume discounts or other quantity-specific pricing. */
+    sealed abstract case class Pricer[F[_]: Sync, C: Currency](
+        final override val price: Position => Stream[F, Mny[C]]
+    ) extends module.Pricer.Aux[F, Position, C](price)
+
+    /** */
+    object Pricer {
+
+      /** Summon a pricer for a given currency. */
+      def apply[F[_], C: Currency: Pricer[F, *]]: Pricer[F, C] = implicitly
+
+      /** */
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
+      def apply[F[_]: Sync, C: Currency](price: Position => Stream[F, Mny[C]]): Pricer[F, C] =
+        new Pricer(price) {}
+
+      /** Create a pricer from a pricing function. */
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
+      implicit def default[F[_]: Sync, C: Currency: InstrumentPricer[F, *]]: Pricer[F, C] =
+        apply {
+          case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
+        }
+    }
+
+  }
 
   /** A [[Position]] in motion. */
   type Leg = Position
@@ -104,131 +213,40 @@ trait Ledger { self: ModuleTypes =>
 
     /** */
     def empty: Trade = Map.empty
-  }
 
-  /**  */
-  sealed trait Pricer {
-    type Thing
-    type CurrencyTag
-    type EffectType[_]
-    val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
-    implicit val C: Currency[CurrencyTag]
-    implicit val F: Sync[EffectType]
-  }
+    /**
+      * Enables package deals, or portfolio valuation informed by covariance,
+      * or other holistic methodology.
+      */
+    sealed abstract case class Pricer[F[_]: Sync, C: Currency](
+        final override val price: Trade => Stream[F, Mny[C]]
+    ) extends module.Pricer.Aux[F, Trade, C](price)
 
-  /**
-    * The three different kinds of `Pricer`, listed in order of abstraction (most to least):
-    *
-    *   - `Model`: reports a ''fair value'' modelled price
-    *     - may depend on `market data` for callibration
-    *     - therefore limited by accuracy (in practice)
-    *   - `Mark`: reports the current ''mark to market'' price
-    *     - may depend on a `model` for interpolation to thinly traded / untraded assets...
-    *     - therefore extensible to all assets (theoretically)
-    *   - `Book`: the price we paid for the asset
-    *     - only covers the assets we own(ed).
-    *
-    * FIXME: implement this
-    */
-  object Pricer {
+    /**    */
+    object Pricer {
 
-    /** I call this the untitled fois gras patttern. */
-    abstract class Aux[F[_]: Sync, T, C: Currency](
-        override val price: T => Stream[F, Mny[C]]
-    )(
-        implicit
-        final override val C: Currency[C],
-        final override val F: Sync[F]
-    ) extends Pricer {
-      final type Thing         = T
-      final type CurrencyTag   = C
-      final type EffectType[x] = F[x]
+      /** Summon a pricer for a given currency. */
+      def apply[F[_], C: Currency: Pricer[F, *]]: Pricer[F, C] = implicitly
+
+      /** */
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
+      def apply[F[_]: Sync, C: Currency](
+          price: Trade => Stream[F, Mny[C]]
+      ): Pricer[F, C] =
+        new Pricer(price) {}
+
+      /** Create a pricer from a pricing function. */
+      @SuppressWarnings(Array("org.wartremover.warts.Any"))
+      implicit def default[F[_]: Sync, C: Currency: Leg.Pricer[F, *]]: Pricer[F, C] =
+        Pricer { trade =>
+          val lp = Leg.Pricer[F, C]
+          val prices = for {
+            leg   <- Stream evals (Sync[F] delay trade.toList)
+            price <- lp price leg
+          } yield price
+          prices foldMap identity
+        }
     }
-  }
-
-  /** Price data per unit of instrument. */
-  sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
-      final override val price: Instrument.Key => Stream[F, Mny[C]]
-  ) extends Pricer.Aux[F, Instrument.Key, C](price)
-
-  /** */
-  object InstrumentPricer {
-
-    /** */
-    def apply[F[_], C: Currency: InstrumentPricer[F, *]]: InstrumentPricer[F, C] = implicitly
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def apply[F[_]: Sync, C: Currency](
-        price: Instrument.Key => Stream[F, Mny[C]]
-    ): InstrumentPricer[F, C] =
-      new InstrumentPricer(price) {}
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def combine[F[_]: Sync, C: Currency](
-        a: InstrumentPricer[F, C],
-        b: InstrumentPricer[F, C]
-    ): InstrumentPricer[F, C] = // FIXME this code is lazy and not in a good way
-      apply(instrument => (a price instrument) ++ (b price instrument) take 1)
-  }
-
-  /**  Enables volume discounts or other quantity-specific pricing. */
-  sealed abstract case class LegPricer[F[_]: Sync, C: Currency](
-      final override val price: Leg => Stream[F, Mny[C]]
-  ) extends Pricer.Aux[F, Leg, C](price)
-
-  /** */
-  object LegPricer {
-
-    /** Summon a pricer for a given currency. */
-    def apply[F[_], C: Currency: LegPricer[F, *]]: LegPricer[F, C] = implicitly
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def apply[F[_]: Sync, C: Currency](price: Leg => Stream[F, Mny[C]]): LegPricer[F, C] =
-      new LegPricer(price) {}
-
-    /** Create a pricer from a pricing function. */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def default[F[_]: Sync, C: Currency: InstrumentPricer[F, *]]: LegPricer[F, C] =
-      apply {
-        case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
-      }
-  }
-
-  /**
-    * Enables package deals, or portfolio valuation informed by covariance,
-    * or other holistic methodology.
-    */
-  sealed abstract case class TradePricer[F[_]: Sync, C: Currency](
-      final override val price: Trade => Stream[F, Mny[C]]
-  ) extends Pricer.Aux[F, Trade, C](price)
-
-  /**    */
-  object TradePricer {
-
-    /** Summon a pricer for a given currency. */
-    def apply[F[_], C: Currency: TradePricer[F, *]]: TradePricer[F, C] = implicitly
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def apply[F[_]: Sync, C: Currency](
-        price: Trade => Stream[F, Mny[C]]
-    ): TradePricer[F, C] =
-      new TradePricer(price) {}
-
-    /** Create a pricer from a pricing function. */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def default[F[_]: Sync, C: Currency: LegPricer[F, *]]: TradePricer[F, C] =
-      TradePricer { trade =>
-        val lp = LegPricer[F, C]
-        val prices = for {
-          leg   <- Stream evals (Sync[F] delay trade.toList)
-          price <- lp price leg
-        } yield price
-        prices foldMap identity
-      }
   }
 
   /**
@@ -249,8 +267,10 @@ trait Ledger { self: ModuleTypes =>
     *   - the bank account allocation details are recoverable through the
     *     [[keyval.layers.stores.KeyValueStore]] for `Folio`s.
     *
+    * FIXME: need `PricedTrade => Trade` function.
+    *
     * TODO: is is possible or desirable to generalize fungability
-    * to asset classes other than currencies?
+    * to asset classes other than currencies
     */
   sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C]) {
 
@@ -282,11 +302,11 @@ trait Ledger { self: ModuleTypes =>
   object PricedTrade {
 
     /**  */
-    def of[F[_]: Sync, C: Currency: TradePricer[F, *]](
+    def of[F[_]: Sync, C: Currency: Trade.Pricer[F, *]](
         trade: Trade
     ): Stream[F, PricedTrade[C]] =
       for {
-        amount <- TradePricer[F, C] price trade
+        amount <- Trade.Pricer[F, C] price trade
       } yield new PricedTrade[C](trade, amount) {}
   }
 
@@ -337,10 +357,9 @@ trait Ledger { self: ModuleTypes =>
   object Meta extends WithRefinedKey[String, IsSha256, Meta]
 
   /**
-    * Model as pure value classes, because `Transaction`s don't make sense
-    * as anything but immutable.
+    * Because `Transaction`s are immutable, we model them as pure value classes
     *
-    * Useful invariant: No `Transaction` is created except within the context
+    * No `Transaction` is created except within the context
     * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
     */
   object Transaction extends WithId[Transaction] {
