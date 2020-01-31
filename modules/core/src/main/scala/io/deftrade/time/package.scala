@@ -22,7 +22,7 @@ import jtt._
 
 /**
   * Ideomatic bindings for [[java.time]],
-  * supporting [[work]] calendar and [[market]] day count conventions.
+  * supporting [[work]] calendar and [[market]] day count conventions.``
   *
   * The following `java.time` classes are imported and enhanced:
   *

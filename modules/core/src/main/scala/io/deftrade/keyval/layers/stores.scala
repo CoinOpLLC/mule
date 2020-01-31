@@ -318,14 +318,13 @@ trait stores {
     /**  */
     implicit final def writePermRow(
         implicit
-        llw: Lazy[LabelledWrite[HValue]],
-        lputk: Lazy[Put[Key]]
+        llw: LabelledWrite[HValue],
+        putk: Put[Key]
     ): LabelledWrite[PermRow] =
       new LabelledWrite[PermRow] {
 
-        private implicit def putk  = lputk.value
-        private implicit val lwhpr = LabelledWrite[HPermRow]
-        private implicit val lwher = LabelledWrite[HEmptyRow]
+        private val lwhpr = LabelledWrite[HPermRow]
+        private val lwher = LabelledWrite[HEmptyRow]
 
         def headers: CSV.Headers = lwhpr.headers
 
@@ -338,15 +337,14 @@ trait stores {
     /** */
     implicit final def readPermRow(
         implicit
-        llr: Lazy[LabelledRead[HV]],
-        lgetk: Lazy[Get[Key]]
+        llr: LabelledRead[HV],
+        getk: Get[Key]
     ): LabelledRead[PermRow] =
       new LabelledRead[PermRow] {
 
         def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, PermRow] = {
 
-          implicit val getk  = lgetk.value
-          implicit val lrhpr = LabelledRead[HPermRow]
+          val lrhpr = LabelledRead[HPermRow]
 
           row match {
 
@@ -370,17 +368,25 @@ trait stores {
         implicit
         llr: Lazy[LabelledRead[HV]],
         lgetk: Lazy[Get[Key]]
-    ): Pipe[EffectType, String, Result[PermRow]] =
+    ): Pipe[EffectType, String, Result[PermRow]] = {
+      implicit def lrhv = llr.value
+      implicit def getk = lgetk.value
       readLabelledCompleteSafe[F, PermRow] andThen
         (_ map (_ leftMap errorToFail))
+    }
 
     /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final protected def deriveKvToCsv(
         implicit
         llw: Lazy[LabelledWrite[HV]],
         lputk: Lazy[Put[Key]]
-    ): Pipe[EffectType, PermRow, String] =
-      writeLabelled[F, PermRow](printer)
+    ): Pipe[EffectType, PermRow, String] = {
+
+      implicit def lwhv: LabelledWrite[HV] = llw.value
+      implicit def putk: Put[Key]          = lputk.value
+      writeLabelled(printer)
+    }
   }
 
   /** */

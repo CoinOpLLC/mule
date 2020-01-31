@@ -71,7 +71,7 @@ import refined.api.Refined
   *      - which can be stored / indexed as binary in e.g. Mongo and Postgres
   *      - which can be projected to create Satellite views.
   */
-package object keyval extends stores with freestore with csv {
+package object keyval extends stores with csv {
 
   /** Just an alias.  */
   type OpaqueKey[K, V] = Refined[K, V]

@@ -7,7 +7,7 @@ import cats.implicits._
 import cats.syntax.eq._ // FIXME: don't understand why this works, or is necessary
 
 import org.scalatest._
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import org.scalatestplus.scalacheck // .ScalaCheckDrivenPropertyChecks
 
 class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 

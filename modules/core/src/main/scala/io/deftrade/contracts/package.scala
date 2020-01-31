@@ -1,13 +1,11 @@
 package io.deftrade
 
-import time._, money._, model.capital.Instrument
+import money._, model.capital.Instrument
 
 /**
   * Single import DSL for contract specification, representation and evaluation,
   * following the ''Composing Contracts'' work
   * by Simon Peyton Jones and Jean-Marc Eber.
-  *
-  * A work in progress.
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
@@ -23,6 +21,8 @@ import time._, money._, model.capital.Instrument
   * FAQ:
   *   - Q: Why isn't this a subpackage of [[model]]?
   *   - A: [[Contract]]s are not a "map of the terrain". ''They are the terrain.''
+  *       - captures the `operational semantics` of the `Contract` in a language (eDSL) that
+  *       is reviewable by the parties to the `Contract`.
   *       - execution plan for [[Engine.Scheduling]] (dumb contract execution)
   *       and [[Engine.Performing]] (smart contract execution)
   *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] to begin, but
@@ -42,8 +42,14 @@ package object contracts extends Contract.primitives {
   /** Party acquires one unit of [[model.capital.Instrument]]. */
   def one(i: Instrument): Contract = unitOf(i)
 
+  /** */
+  def allOf(cs: LazyList[Contract]): Contract = cs.fold(zero) { both(_, _) }
+
+  /** */
+  def bestOf(cs: LazyList[Contract]): Contract = cs.fold(zero) { pick(_, _) }
+
   /** If `c` is worth something, take it. */
-  def optionally(c: Contract): Contract = pick(c, zero)
+  def optionally(c: => Contract): Contract = pick(c, zero)
 
   /**  */
   def buy[N: Financial, C: Currency](c: => Contract, price: Money[N, C]): Contract =
@@ -52,27 +58,4 @@ package object contracts extends Contract.primitives {
   /**  */
   def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
     both(const(price.amount.to[Double]) * one, give { c })
-
-  /**  */
-  def zeroCouponBond[N: Financial, C: Currency](
-      maturity: Instant,
-      face: Money[N, C]
-  ): Contract =
-    when(at(maturity)) { const(face.amount.to[Double]) * one }
-
-  /** */
-  def europeanCall[N: Financial, C: Currency](
-      contract: Contract,
-      strike: Money[N, C],
-      expiry: Instant,
-  ): Contract =
-    when(at(expiry)) { optionally(buy(contract, strike)) }
-
-  /** */
-  def americanCall[N: Financial, C: Currency](
-      contract: Contract,
-      strike: Money[N, C],
-      expiry: Instant,
-  ): Contract =
-    anytime(before(expiry)) { optionally(buy(contract, strike)) }
 }

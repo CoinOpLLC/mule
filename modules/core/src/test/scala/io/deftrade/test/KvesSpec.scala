@@ -1,9 +1,7 @@
 package io.deftrade
 package test
 
-
-
-import time._, money._, keyval._, model._, stores._, capital.Instrument, Currency.USD
+import time._, money._, keyval._, model._, capital.Instrument, Currency.USD
 
 import enumeratum._
 
@@ -35,7 +33,7 @@ import org.scalacheck.ScalacheckShapeless._
 sealed trait Nut extends EnumEntry with Serializable
 
 /** All the nuts I could think of. */
-object Nut extends Enum[Nut] with CsvEnum[Nut] {
+object Nut extends DtEnum[Nut] {
 
   case object Peanut     extends Nut
   case object Hazelnut   extends Nut
@@ -52,18 +50,18 @@ object Nut extends Enum[Nut] with CsvEnum[Nut] {
 
 object minviablethingie {
 
-  final case class Foo(d: Double, s: String Refined NonEmpty, b: Boolean)
+  sealed abstract case class Foo(d: Double, s: String Refined NonEmpty, b: Boolean)
 
   object Foo extends WithOpaqueKey[Long, Foo] {
     def mk(s: String Refined NonEmpty): Foo =
-      Foo(
+      new Foo(
         s = s,
         d = s.value.length / 17.0,
         b = s.value.isEmpty || ((s.value.head.toInt % 2) == 0)
-      )
+      ) {}
   }
 
-  final case class Bar(fk: Foo.Key)
+  final case class Bar(nut: Nut, fk: Foo.Key)
   object Bar extends WithOpaqueKey[Long, Bar]
 
 }
@@ -82,7 +80,7 @@ object xaction {
     def apply(ssn: Ssn, name: NonEmptyString): Entity = new Entity(ssn, name) {}
   }
 
-  sealed abstract case class Xaction[N: Financial, C: Currency](
+  sealed abstract case class Invoice[N: Financial, C: Currency](
       asOf: Instant,
       from: Entity.Key,
       to: Entity.Key,
@@ -90,7 +88,7 @@ object xaction {
       memo: String
   )
 
-  object Xaction extends WithOpaqueKey[Long, Xaction[BigDecimal, Currency.USD]]
+  object Invoice extends WithOpaqueKey[Long, Invoice[BigDecimal, Currency.USD]]
 }
 
 class KvesSpec extends FlatSpec {
