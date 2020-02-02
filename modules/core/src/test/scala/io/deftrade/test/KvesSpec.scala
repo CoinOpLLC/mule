@@ -57,7 +57,7 @@ import Arbitrary.arbitrary
 
 object currencies {
 
-  implicit def arbitraryMny[C: Currency]: Arbitrary[Mny[C]] =
+  implicit def arbitraryMny[C: Currency]: Arbitrary[Money[C]] =
     Arbitrary {
       import Financial.Ops
       val fiat = Currency[C]
@@ -67,11 +67,11 @@ object currencies {
       } yield fiat(amount.to[model.MonetaryAmount])
     }
 
-  type Dollar = Mny[Currency.USD]
+  type Dollar = Money[Currency.USD]
   lazy val Dollar                                  = Currency.USD
   def dollar(amount: model.MonetaryAmount): Dollar = Dollar(amount)
 
-  type Euro = Mny[Currency.EUR]
+  type Euro = Money[Currency.EUR]
   lazy val Euro                                = Currency.EUR
   def euro(amount: model.MonetaryAmount): Euro = Euro(amount)
 }
@@ -132,7 +132,7 @@ object mvt {
       Arbitrary {
         for {
           uuid   <- arbitrary[UUID]
-          amount <- arbitrary[Mny[USD]]
+          amount <- arbitrary[Money[USD]]
         } yield Zorp(uuid, amount)
       }
   }

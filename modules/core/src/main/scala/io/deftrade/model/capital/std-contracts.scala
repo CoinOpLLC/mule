@@ -15,14 +15,14 @@ object std {
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](
       maturity: Instant,
-      face: Money[N, C]
+      face: Mny[N, C]
   ): Contract =
     when(at(maturity)) { const(face.amount.to[Double]) * one }
 
   /** */
   def europeanCall[N: Financial, C: Currency](
       contract: => Contract,
-      strike: Money[N, C],
+      strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
     when(at(expiry)) { optionally(buy(contract, strike)) }
@@ -30,7 +30,7 @@ object std {
   /** */
   def americanCall[N: Financial, C: Currency](
       contract: => Contract,
-      strike: Money[N, C],
+      strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
     anytime(before(expiry)) { optionally(buy(contract, strike)) }

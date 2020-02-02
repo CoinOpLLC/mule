@@ -52,10 +52,10 @@ package object contracts extends Contract.primitives {
   def optionally(c: => Contract): Contract = pick(c, zero)
 
   /**  */
-  def buy[N: Financial, C: Currency](c: => Contract, price: Money[N, C]): Contract =
+  def buy[N: Financial, C: Currency](c: => Contract, price: Mny[N, C]): Contract =
     both(c, give { const(price.amount.to[Double]) * one })
 
   /**  */
-  def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
+  def sell[N, C: Currency](c: Contract, price: Mny[N, C])(implicit N: Financial[N]): Contract =
     both(const(price.amount.to[Double]) * one, give { c })
 }

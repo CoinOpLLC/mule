@@ -30,7 +30,7 @@ import cats.kernel.{ CommutativeGroup, Order }
   *
   * So why can't we just say
   * {{{
-  *   type  Money[N, C] = Refined[N, C]
+  *   type  Mny[N, C] = Refined[N, C]
   * }}}
   *
   * and be done?
@@ -44,62 +44,62 @@ import cats.kernel.{ CommutativeGroup, Order }
   * TODO: review b/c this is sketchy.
   * OTOH would be easy to adapt this code to a pure Refined based impl.
   */
-final class Money[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
+final class Mny[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
 
   import spire.implicits._
 
-  def +(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount + rhs.amount |> moar
+  def +(rhs: Mny[N, C])(implicit N: Financial[N]): Mny[N, C] = lhs.amount + rhs.amount |> moar
 
-  def -(rhs: Money[N, C])(implicit N: Financial[N]): Money[N, C] = lhs.amount - rhs.amount |> moar
+  def -(rhs: Mny[N, C])(implicit N: Financial[N]): Mny[N, C] = lhs.amount - rhs.amount |> moar
 
-  def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Money[N, C] =
+  def *[S](scale: S)(implicit N: Financial[N], S: Financial[S]): Mny[N, C] =
     S.to[N](scale) * amount |> moar
 
-  def /(rhs: Money[N, C])(implicit N: Financial[N]): N = lhs.amount / rhs.amount
+  def /(rhs: Mny[N, C])(implicit N: Financial[N]): N = lhs.amount / rhs.amount
 
-  def unary_-(implicit N: Financial[N]): Money[N, C] = -amount |> moar
+  def unary_-(implicit N: Financial[N]): Mny[N, C] = -amount |> moar
 
   override def toString: String = amount.toString
 
-  @inline private def moar(n: N): Money[N, C] = new Money(n)
+  @inline private def moar(n: N): Mny[N, C] = new Mny(n)
 }
 
 /** */
-object Money {
+object Mny {
 
   /** typeclass instance checks not required because public interface checks first */
-  @inline private[money] def fiat[N, C](amount: N): Money[N, C] =
-    new Money(amount)
+  @inline private[money] def fiat[N, C](amount: N): Mny[N, C] =
+    new Mny(amount)
 
   /** */
-  def apply[N: Financial, C: Currency](amount: N): Money[N, C] =
-    Money fiat amount
+  def apply[N: Financial, C: Currency](amount: N): Mny[N, C] =
+    Mny fiat amount
 
   /** Unpacks into a `(N, C)`. */
-  def unapply[N: Financial, C: Currency](m: Money[N, C]): Option[(N, Currency[C])] =
+  def unapply[N: Financial, C: Currency](m: Mny[N, C]): Option[(N, Currency[C])] =
     (m.amount, Currency[C]).some
 
   /** */
-  implicit def moneyOrder[N: Financial, C]: Order[Money[N, C]] =
+  implicit def moneyOrder[N: Financial, C]: Order[Mny[N, C]] =
     Order by (_.amount)
 
   /**
     * A Show implementation which uses [[format]].
     *
-    * `toString` is limited by the decision to use value class for [[Money]].
-    * But we can implement Show[Money[N, C]] for all the N and C we care about.
+    * `toString` is limited by the decision to use value class for [[Mny]].
+    * But we can implement Show[Mny[N, C]] for all the N and C we care about.
     * The Currency[_] instance is legit necessary for proper formatting.
     */
-  implicit def moneyShow[N: Financial, C: Currency]: Show[Money[N, C]] =
+  implicit def moneyShow[N: Financial, C: Currency]: Show[Mny[N, C]] =
     Show show (m => format(m))
 
-  /** Money is a commutative group under addition. */
-  implicit def moneyCommutativeGroup[N: Financial, C: Currency]: CommutativeGroup[Money[N, C]] =
+  /** Mny is a commutative group under addition. */
+  implicit def moneyCommutativeGroup[N: Financial, C: Currency]: CommutativeGroup[Mny[N, C]] =
     Invariant[CommutativeGroup]
       .imap(Financial[N].commutativeGroup)(_ |> Currency[C].apply[N])(_.amount)
 
   /** Stylized output. */
-  def format[N, C](m: Money[N, C])(implicit N: Financial[N], C: Currency[C]): String = {
+  def format[N, C](m: Mny[N, C])(implicit N: Financial[N], C: Currency[C]): String = {
 
     // decimal-separator, grouping-separators, parens-for-negative
     def flags = """#,("""
@@ -115,7 +115,7 @@ object Money {
   }
 
   /** Strictly checked input. */
-  def parse[N, C](x: String)(implicit N: Financial[N], C: Currency[C]): Result[Money[N, C]] = {
+  def parse[N, C](x: String)(implicit N: Financial[N], C: Currency[C]): Result[Mny[N, C]] = {
     import spire.syntax.field._
     import N.one
     def ccy  = (x take 3).toUpperCase
@@ -133,15 +133,15 @@ object Money {
   // import eu.timepit.refined
   // import refined.api.{ RefType, Validate }
   // /**
-  //   * Typeclass instance which integrates [[Money]] with the
+  //   * Typeclass instance which integrates [[Mny]] with the
   //   * [[https://github.com/fthomas/refined Refined]] library.
   //   */
-  // implicit lazy val refinedRefType: RefType[Money] =
-  //   new RefType[Money] {
+  // implicit lazy val refinedRefType: RefType[Mny] =
+  //   new RefType[Mny] {
   //
-  //     private type F[T, P] = Money[T, P]
+  //     private type F[T, P] = Mny[T, P]
   //
-  //     def unsafeWrap[T, P](t: T): F[T, P] = new Money[T, P](t)
+  //     def unsafeWrap[T, P](t: T): F[T, P] = new Mny[T, P](t)
   //
   //     def unwrap[T](tp: F[T, _]): T = tp.amount
   //
@@ -155,17 +155,17 @@ object Money {
   //   *
   //   * why not the following, which seems more obvious?
   //   * {{{
-  //   * implicit object refinedRefType extends RefType[Money] { ... }
+  //   * implicit object refinedRefType extends RefType[Mny] { ... }
   //   * }}}
   //   *
   //   * because:
   //   *
-  //   * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Money[T,P]
+  //   * bridge generated for member method unsafeWrap: [T, P](t: T)io.deftrade.money.Mny[T,P]
   //   * in object refinedRefType
   //   * which overrides method unsafeWrap: [T, P](t: T)F[T,P] in trait RefType
   //   * clashes with definition of the member itself;
   //   * both have erased type (t: Object)Object
-  //   *     def unsafeWrap[T, P](t: T): Money[T, P] = new Money(t)
+  //   *     def unsafeWrap[T, P](t: T): Mny[T, P] = new Mny(t)
   //   */
   // implicit def refinedValidate[T: Financial, P: Currency]: Validate[T, P] =
   //   Validate alwaysPassed Currency[P]

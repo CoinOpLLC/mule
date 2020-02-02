@@ -34,17 +34,17 @@ import cormorant.implicits.stringPut
 trait csv {
 
   /** cormorant csv `Get` */
-  implicit def moneyGet[N: Financial, C: Currency]: Get[Money[N, C]] =
-    new Get[Money[N, C]] {
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
+    new Get[Mny[N, C]] {
 
       /** */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, Money[N, C]] =
-        Money parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
+        Mny parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
     }
 
   /** cormorant csv `Put` */
-  implicit def moneyPut[N: Financial, C: Currency]: Put[Money[N, C]] =
-    stringPut contramap Money.format[N, C]
+  implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
+    stringPut contramap Mny.format[N, C]
 
   /** cormorant csv `Get` */
   implicit def financialGet[N](implicit N: Financial[N]): Get[N] =

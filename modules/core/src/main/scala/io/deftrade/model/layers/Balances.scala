@@ -106,7 +106,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def credits: AccountMap[CreditType, CurrencyType] = cs
 
     /** */
-    final def net(implicit C: Currency[CurrencyType]): Mny[CurrencyType] =
+    final def net(implicit C: Currency[CurrencyType]): Money[CurrencyType] =
       credits.total - debits.total
   }
 
@@ -122,7 +122,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     * There are exactly two transformations of a `TrialBalance`
-    * and an `amount: Mny[C]` which result in another legal `TrialBalance`:
+    * and an `amount: Money[C]` which result in another legal `TrialBalance`:
     *   - grow (shrink) balance by amount
     *   - constant balance; swap amount between keys within debits (credits)
     *
@@ -136,7 +136,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /** */
     final def updated(
         keys: DebitCreditKey[Debit, Credit],
-        amount: Mny[C]
+        amount: Money[C]
     )(
         implicit C: Currency[C]
     ): TrialBalance[C] =
@@ -148,7 +148,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /** */
     final def swapped[T <: AccountingKey](
         keys: SwapKey[T],
-        amount: Mny[C]
+        amount: Money[C]
     )(
         implicit C: Currency[C]
     ): TrialBalance[C] = {
@@ -235,7 +235,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    * Follow the `Money`.
+    * Follow the `Mny`.
     * - Operations
     * - Investment
     * - Financing

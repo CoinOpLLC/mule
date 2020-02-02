@@ -45,7 +45,7 @@ trait Ledger { module: ModuleTypes =>
     type CurrencyTag
     // type MonetaryAmount
     type EffectType[_]
-    val price: Thing => Stream[EffectType, Mny[CurrencyTag]]
+    val price: Thing => Stream[EffectType, Money[CurrencyTag]]
     implicit val C: Currency[CurrencyTag]
     // implicit val N: Financial[MonetaryAmount]
     implicit val F: Sync[EffectType]
@@ -67,7 +67,7 @@ trait Ledger { module: ModuleTypes =>
 
     /** This version of Aux is called the ''untitled fois gras patttern''. */
     abstract class Aux[F[_]: Sync, T, C: Currency](
-        override val price: T => Stream[F, Mny[C]]
+        override val price: T => Stream[F, Money[C]]
     )(
         implicit
         final override val C: Currency[C],
@@ -83,7 +83,7 @@ trait Ledger { module: ModuleTypes =>
 
   /** Price data per unit of instrument. */
   sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
-      final override val price: Instrument.Key => Stream[F, Mny[C]]
+      final override val price: Instrument.Key => Stream[F, Money[C]]
   ) extends Pricer.Aux[F, Instrument.Key, C](price)
 
   /** */
@@ -95,7 +95,7 @@ trait Ledger { module: ModuleTypes =>
     /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def apply[F[_]: Sync, C: Currency](
-        price: Instrument.Key => Stream[F, Mny[C]]
+        price: Instrument.Key => Stream[F, Money[C]]
     ): InstrumentPricer[F, C] =
       new InstrumentPricer(price) {}
 
@@ -134,7 +134,7 @@ trait Ledger { module: ModuleTypes =>
 
     /**  Enables volume discounts or other quantity-specific pricing. */
     sealed abstract case class Pricer[F[_]: Sync, C: Currency](
-        final override val price: Position => Stream[F, Mny[C]]
+        final override val price: Position => Stream[F, Money[C]]
     ) extends module.Pricer.Aux[F, Position, C](price)
 
     /** */
@@ -145,7 +145,7 @@ trait Ledger { module: ModuleTypes =>
 
       /** */
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
-      def apply[F[_]: Sync, C: Currency](price: Position => Stream[F, Mny[C]]): Pricer[F, C] =
+      def apply[F[_]: Sync, C: Currency](price: Position => Stream[F, Money[C]]): Pricer[F, C] =
         new Pricer(price) {}
 
       /** Create a pricer from a pricing function. */
@@ -219,7 +219,7 @@ trait Ledger { module: ModuleTypes =>
       * or other holistic methodology.
       */
     sealed abstract case class Pricer[F[_]: Sync, C: Currency](
-        final override val price: Trade => Stream[F, Mny[C]]
+        final override val price: Trade => Stream[F, Money[C]]
     ) extends module.Pricer.Aux[F, Trade, C](price)
 
     /**    */
@@ -231,7 +231,7 @@ trait Ledger { module: ModuleTypes =>
       /** */
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
       def apply[F[_]: Sync, C: Currency](
-          price: Trade => Stream[F, Mny[C]]
+          price: Trade => Stream[F, Money[C]]
       ): Pricer[F, C] =
         new Pricer(price) {}
 
@@ -272,7 +272,7 @@ trait Ledger { module: ModuleTypes =>
     * TODO: is is possible or desirable to generalize fungability
     * to asset classes other than currencies
     */
-  sealed abstract case class PricedTrade[C](trade: Trade, amount: Mny[C]) {
+  sealed abstract case class PricedTrade[C](trade: Trade, amount: Money[C]) {
 
     /**
       * @return `Stream` effect will effectively subtract amount from the `against` folio
@@ -286,7 +286,7 @@ trait Ledger { module: ModuleTypes =>
         against: Folio.Key
     )(
         trade: Trade,
-        amount: Mny[C]
+        amount: Money[C]
     )(
         implicit
         C: Currency[C]

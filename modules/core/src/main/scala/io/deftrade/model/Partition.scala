@@ -103,8 +103,8 @@ sealed trait PartitionLike {
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def priced[C: Currency](
-      amount: Money[Value, C]
-  ): Map[Key, Money[Value, C]] = (kvs map (amount * _.value)).toSortedMap
+      amount: Mny[Value, C]
+  ): Map[Key, Mny[Value, C]] = (kvs map (amount * _.value)).toSortedMap
 
   /** */
   def total: RefinedValue

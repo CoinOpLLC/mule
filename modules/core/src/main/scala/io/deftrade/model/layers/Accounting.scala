@@ -124,8 +124,8 @@ trait Accounting { self: ModuleTypes =>
   val Equity: DtEnum[_ <: Equity]
 
   /** instantiate double entry key module with appropriate monetary amount type */
-  /** Mapping accounting keys to [[money.Money]]. */
-  final type AccountMap[A <: AccountingKey, C] = Map[A, Mny[C]]
+  /** Mapping accounting keys to [[money.Mny]]. */
+  final type AccountMap[A <: AccountingKey, C] = Map[A, Money[C]]
 
   /** */
   object AccountMap {
@@ -171,7 +171,7 @@ trait Accounting { self: ModuleTypes =>
     def less: AssetType
 
     /** */
-    final def net[C: Currency](assets: Assets[C]): Mny[C] =
+    final def net[C: Currency](assets: Assets[C]): Money[C] =
       assets(gross) - assets(less)
   }
 
@@ -252,7 +252,7 @@ trait Accounting { self: ModuleTypes =>
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[D <: Debit, C <: Credit, CCY: Currency](
         ks: DebitCreditKey[D, C],
-        amount: Mny[CCY]
+        amount: Money[CCY]
     ): (AccountMap[D, CCY], AccountMap[C, CCY]) =
       (
         (ks.debits.kvs map (amount * _.value)).toSortedMap,
@@ -284,7 +284,7 @@ trait Accounting { self: ModuleTypes =>
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[K <: AccountingKey, C: Currency](
         ks: SwapKey[K],
-        amount: Mny[C]
+        amount: Money[C]
     ): AccountMap[K, C] = {
       def from = (ks.from.kvs map (-amount * _.value)).toSortedMap
       def to   = (ks.to.kvs map (amount * _.value)).toSortedMap
@@ -309,7 +309,7 @@ trait Accounting { self: ModuleTypes =>
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[D <: Debit, CCY: Currency](
         ks: DebitSwapKey[D],
-        amount: Mny[CCY]
+        amount: Money[CCY]
     ): (AccountMap[D, CCY], AccountMap[D, CCY]) =
       (
         (ks.from.kvs map (amount * _.value)).toSortedMap,
@@ -336,7 +336,7 @@ trait Accounting { self: ModuleTypes =>
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[C <: Credit, CCY: Currency](
         ks: CreditSwapKey[C],
-        amount: Mny[CCY]
+        amount: Money[CCY]
     ): (AccountMap[C, CCY], AccountMap[C, CCY]) =
       (
         (ks.from.kvs map (amount * _.value)).toSortedMap,

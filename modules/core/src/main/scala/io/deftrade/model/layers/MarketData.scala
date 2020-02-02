@@ -183,16 +183,16 @@ trait MarketData { self: Ledger with ModuleTypes =>
     import Q._
 
     /** */
-    @inline def buy(m1: Mny[C1]): Mny[C2] = convert(m1, ask)
+    @inline def buy(m1: Money[C1]): Money[C2] = convert(m1, ask)
 
     /** */
-    @inline def sell(m1: Mny[C1]): Mny[C2] = convert(m1, bid)
+    @inline def sell(m1: Money[C1]): Money[C2] = convert(m1, bid)
 
     /** */
-    @inline def apply(m1: Mny[C1]): Mny[C2] = convert(m1, mid)
+    @inline def apply(m1: Money[C1]): Money[C2] = convert(m1, mid)
 
     /** */
-    def quote: (Mny[C2], Mny[C2]) = {
+    def quote: (Money[C2], Money[C2]) = {
       val single = C1(MonetaryAmount.one)
       (buy(single), sell(single))
     }
@@ -203,7 +203,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
           |Quoter sells ${C1.toString} and buys  ${C2.toString} at ${ask.toString}""".stripMargin
 
     /** */
-    private def convert(m1: Mny[C1], rate: MonetaryAmount): Mny[C2] = C2(m1.amount * rate)
+    private def convert(m1: Money[C1], rate: MonetaryAmount): Money[C2] = C2(m1.amount * rate)
   }
 
   /** */
@@ -336,11 +336,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
 
     /** */
-    final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Mny[C]] =
+    final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Money[C]] =
       Monad[F] pure (Currency[C] apply quotedIn(ik).mid)
 
     /** */
-    final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Mny[C]] =
+    final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Money[C]] =
       leg match {
         case (security, quantity) => quote[F, C](security) map (_ * quantity)
       }
@@ -350,7 +350,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       *
       * TODO: this is so minimal as to be of questionable viablity... but is correct
       */
-    def quoteTrade[F[_]: Monad, C: Currency](trade: Trade): F[Mny[C]] =
+    def quoteTrade[F[_]: Monad, C: Currency](trade: Trade): F[Money[C]] =
       trade.toList foldMapM quoteLeg[F, C]
   }
 

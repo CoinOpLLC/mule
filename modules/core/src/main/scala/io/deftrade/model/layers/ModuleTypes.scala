@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import money.{ Financial, Money }
+import money.{ Financial, Mny }
 
 /**
   * Module level abstract quantities and monetary amounts, which may be distinct types.
@@ -27,7 +27,7 @@ import money.{ Financial, Money }
   * where [[MonetaryAmount]] and [[Quantity]]
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
-  * Modules parameterized like this may create `Money[MA, C] <=> (MI, Q)` codecs via a table of
+  * Modules parameterized like this may create `Mny[MA, C] <=> (MI, Q)` codecs via a table of
   * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
   *
@@ -47,7 +47,7 @@ trait ModuleTypes {
   implicit val MonetaryAmount: Financial[MonetaryAmount]
 
   /** */
-  final type Mny[C] = Money[MonetaryAmount, C]
+  final type Money[C] = Mny[MonetaryAmount, C]
 }
 
 /** */

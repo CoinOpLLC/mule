@@ -22,14 +22,14 @@ import cats.kernel.CommutativeGroup
   * Single-import DSL for monetary expressions, including currency support.
   *
   *   ==Inspiration:==
-  *   - [[https://www.joda.org/joda-money/ Joda Money]] of course
+  *   - [[https://www.joda.org/joda-money/ Joda Mny]] of course
   *   - `squants.market`
   *   - [[https://github.com/Appendium/objectlabkit ObjectLabKit]]
   *
   *   ==Implementation:==
   *   - leverages java Currency support for [[https://en.wikipedia.org/wiki/ISO_4217 ISO 4217]]
   *       - so JVM dependency
-  *   - [[Money]] is a value class type constructor for type parameter `[N: Financial]`
+  *   - [[Mny]] is a value class type constructor for type parameter `[N: Financial]`
   *   - distinct types for each currency
   *       - summon implicit [[Currency]]`[C`] typeclass instance given a currency type `C`
   *   - abstract over currencies for single implicit `cats.CommutativeGroup` function

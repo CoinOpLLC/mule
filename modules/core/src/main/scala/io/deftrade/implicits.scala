@@ -49,13 +49,13 @@ object implicits {
 
     /**
       * Works for any [[money.Financial]] amount or quantity,
-      * or for [[money.Money]] of any [[money.Currency]].
+      * or for [[money.Mny]] of any [[money.Currency]].
       */
     def getWithZero(k: K)(implicit V: CommutativeGroup[V]): V = (m get k).fold(V.empty)(identity)
 
     /**
       * Totals values for any [[money.Financial]] amount or quantity,
-      * or for [[money.Money]] of any [[money.Currency]].
+      * or for [[money.Mny]] of any [[money.Currency]].
       */
     def total(implicit V: CommutativeGroup[V]): V = m.map(_._2).fold(V.empty)(V.combine)
 

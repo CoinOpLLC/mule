@@ -41,8 +41,8 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
   type Type
 
   /** Usage such as `USD(amount)`. */
-  final def apply[N: Financial](amount: N): Money[N, Type] =
-    Money fiat amount
+  final def apply[N: Financial](amount: N): Mny[N, Type] =
+    Mny fiat amount
 
   /** TODO: don't trust, ''test'' all codes in `java.currency` in order to justify this impl */
   final def code: Currency.Code = {

@@ -70,7 +70,7 @@ trait Financial[N] extends Fractional[N] { self =>
   /**
     * How do we deal with scale and significant digits?
     * Simple rule: the left operand scale is "sticky" for those methods {+, -, *}
-    * that return `Money`.
+    * that return `Mny`.
     *
     * TODO: Revisit this.
     */

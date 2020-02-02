@@ -94,7 +94,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         new Order(instant, market, trade, Currency[C], none) {}
 
       /** */
-      def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Mny[C]): Order =
+      def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Money[C]): Order =
         new Order(instant, market, trade, Currency[C], limit.amount.some) {}
     }
 
