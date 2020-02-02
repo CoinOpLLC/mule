@@ -136,15 +136,6 @@ object Financial {
   }
 
   /**  */
-  object IsUnitInterval {
-    import _root_.shapeless.nat.{ _0, _1 }
-    type `(0,1)` = Interval.Open[_0, _1]
-    type `[0,1)` = Interval.ClosedOpen[_0, _1]
-    type `(0,1]` = Interval.OpenClosed[_0, _1]
-    type `[0,1]` = Interval.Closed[_0, _1]
-  }
-
-  /**  */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
   implicit object DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {

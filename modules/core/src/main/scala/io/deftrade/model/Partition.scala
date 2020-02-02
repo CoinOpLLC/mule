@@ -17,7 +17,7 @@
 package io.deftrade
 package model
 
-import implicits._, money._
+import implicits._, money._, refinements.IsUnitInterval
 
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
@@ -38,7 +38,7 @@ import scala.collection.immutable.SortedMap
 object PartitionLike {
 
   /** */
-  final type IsNormalized = Financial.IsUnitInterval.`(0,1]`
+  final type IsNormalized = IsUnitInterval.`(0,1]`
 
   /** */
   final type IsPositive = refined.numeric.Positive
@@ -240,7 +240,7 @@ object Partition {
   * (Not to be confused with Scala Unit.)
   */
 sealed abstract case class UnitPartition[K, V] private (
-    final override val kvs: NonEmptyMap[K, V Refined Financial.IsUnitInterval.`(0,1]`]
+    final override val kvs: NonEmptyMap[K, V Refined IsUnitInterval.`(0,1]`]
 )(
     implicit
     final override val K: cats.Order[K],

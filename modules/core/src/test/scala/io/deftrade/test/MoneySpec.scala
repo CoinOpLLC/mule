@@ -1,10 +1,13 @@
 package io.deftrade
 package money
 
-import org.scalatest.{ FlatSpec, PropSpec }
+import implicits._
+
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class MoneySpec extends FlatSpec {
+class MoneySpec extends AnyFlatSpec {
 
   import cats.syntax.show._
   import cats.syntax.order.{ catsSyntaxOrder, catsSyntaxPartialOrder }
@@ -18,14 +21,12 @@ class MoneySpec extends FlatSpec {
     val eur20 = 20.0 |> eurF
     val e20   = EUR(20.00)
 
-    cats.kernel.Order[Money[Double, USD]]
-
     assert(eur20 === e20)
 
     assert(eur20 * 2.0 > e20)
     assert(eur20 + eur20 > e20)
 
-    type Dollar = Money[Double, USD] // phantom type per `Currency`
+    type Dollar = model.Mny[USD] // phantom type per `Currency`
 
     val d20: Dollar = USD(20.00)
     val d21: Dollar = USD(21.00)
@@ -35,7 +36,6 @@ class MoneySpec extends FlatSpec {
     assert((d20 max d21) === d21)
 
     def funge[C](den: Currency[C]): Money[Double, C] = den(19.47)
-    // def funge[C[?] <: Currency[?]](den: Moneta[C]): C[Double] = den(19.47)
 
     assert(USD(19.47) === funge(USD))
 
@@ -47,20 +47,20 @@ class MoneySpec extends FlatSpec {
     assert(buck.show === "USD  1.00 ")
     assert((-buck).show === "USD (1.00)")
 
-    import pricing._
+    import model._
 
-    implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn.Spread(1.23, 1.22)
+    implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn(1.12, 1.13)
 
-    lazy val eurusd = EUR / USD
+    lazy val eurusd: Rate[EUR, USD] = EUR / USD
 
     val dollarsRequired: Dollar = eurusd buy EUR(100.0)
     val dollarsReceived: Dollar = eurusd sell EUR(100.0)
 
     assert(dollarsReceived < dollarsRequired)
-
   }
 }
-class MoneyPropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
+
+class MoneyPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
 // with TableDrivenPropertyChecks {
   property("unit is as unit does") {
     forAll { ewie: Unit =>

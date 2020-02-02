@@ -129,7 +129,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     ): QuotedIn[A, C2] = apply(amount, amount)
 
     /**
-      * Inverse quotes are particular to Forex.
+      * Inverse quotes are peculiar to `forex`.
       */
     implicit def inverseQuote[C1: Currency, C2: Currency](
         implicit Q: C1 QuotedIn C2
@@ -147,7 +147,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       }
 
     /**
-      * Cross quotes are particular to Forex.
+      * Cross quotes are also peculiar to `forex`.
       */
     implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
         Q1X: C1 QuotedIn CX,
@@ -215,7 +215,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   }
 
   /** */
-  implicit class CurrencyOps[C: Currency](C: C) {
+  implicit class CurrencyOps[C: Currency](C: Currency[C]) {
 
     /**
       * Exchange `Rate` factory. Implicit context provides pricing.

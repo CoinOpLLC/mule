@@ -7,28 +7,32 @@ import cats.implicits._
 import cats.{ Show }
 
 /**
-  * `Obs`ervable variables which affect `Contract` evaluation.
+  * `Observable`ervable variables which affect `Contract` evaluation.
   *
   * We follow the approach taken by [[http://netrium.org/ Netrium]]
-  * (make `Obs` an GADT.)
+  * (make `Observable` an GADT.)
   *
-  * TODO: Isn't `Obs[A]` a `Functor`, at least? Would formalizing this simplify anything?
+  * TODO: Isn't `Observable[A]` a `Functor`, at least? Would formalizing this simplify anything?
   */
-sealed trait Obs[A]
+sealed trait Observable[A]
 
 /**  */
-object Obs {
+object Observable {
 
-  sealed abstract case class Const[A](a: A)                                      extends Obs[A]
-  sealed abstract case class Branch[A](oB: Obs[Boolean], oT: Obs[A], oF: Obs[A]) extends Obs[A]
+  sealed abstract case class Const[A](a: A) extends Observable[A]
+  sealed abstract case class Branch[A](
+      oB: Observable[Boolean],
+      oT: Observable[A],
+      oF: Observable[A]
+  ) extends Observable[A]
 
-  sealed abstract case class Before(t: Instant) extends Obs[Boolean]
-  sealed abstract case class At(t: Instant)     extends Obs[Boolean]
+  sealed abstract case class Before(t: Instant) extends Observable[Boolean]
+  sealed abstract case class At(t: Instant)     extends Observable[Boolean]
 
   import Unary.{ Op => UnOp, _ }
 
   /**  */
-  sealed abstract case class Unary[A](op: UnOp[A], o: Obs[A]) extends Obs[A]
+  sealed abstract case class Unary[A](op: UnOp[A], o: Observable[A]) extends Observable[A]
 
   /**  */
   object Unary {
@@ -47,7 +51,7 @@ object Obs {
   import Binary.{ Op => BinOp, _ }
 
   /**  */
-  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Obs[A], oR: Obs[A]) extends Obs[B]
+  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Observable[A], oR: Observable[A]) extends Observable[B]
 
   /**  */
   object Binary {
@@ -74,59 +78,59 @@ object Obs {
   }
 
   /** `const(x)` is an observable that has value x at any time. */
-  def const[A](a: A): Obs[A] = new Const(a) {}
+  def const[A](a: A): Observable[A] = new Const(a) {}
 
   /** primitive */
-  def before(t: Instant): Obs[Boolean] = new Before(t) {}
-  def at(t: Instant): Obs[Boolean]     = new At(t)     {}
+  def before(t: Instant): Observable[Boolean] = new Before(t) {}
+  def at(t: Instant): Observable[Boolean]     = new At(t)     {}
 
-  def not(o: Obs[Boolean]): Obs[Boolean] = new Unary(Not, o) {}
+  def not(o: Observable[Boolean]): Observable[Boolean] = new Unary(Not, o) {}
 
-  def abs(o: Obs[Double]): Obs[Double]  = new Unary(Abs, o)  {}
-  def sqrt(o: Obs[Double]): Obs[Double] = new Unary(Sqrt, o) {}
-  def exp(o: Obs[Double]): Obs[Double]  = new Unary(Exp, o)  {}
-  def log(o: Obs[Double]): Obs[Double]  = new Unary(Log, o)  {}
+  def abs(o: Observable[Double]): Observable[Double]  = new Unary(Abs, o)  {}
+  def sqrt(o: Observable[Double]): Observable[Double] = new Unary(Sqrt, o) {}
+  def exp(o: Observable[Double]): Observable[Double]  = new Unary(Exp, o)  {}
+  def log(o: Observable[Double]): Observable[Double]  = new Unary(Log, o)  {}
 
   /** derived */
-  def atOrAfter(t: Instant): Obs[Boolean] = not(before(t))
+  def atOrAfter(t: Instant): Observable[Boolean] = not(before(t))
 
   /** */
-  implicit class BooleanOps(val oL: Obs[Boolean]) extends AnyVal {
+  implicit class BooleanOps(val oL: Observable[Boolean]) extends AnyVal {
 
-    def unary_! : Obs[Boolean] = not(oL)
+    def unary_! : Observable[Boolean] = not(oL)
 
-    def branch(cT: => Contract)(cF: => Contract): Contract = contracts.branch(oL)(cT)(cF)
-    def branch[A](oT: => Obs[A])(oF: => Obs[A]): Obs[A]    = new Branch(oL, oT, oF) {}
+    def branch(cT: => Contract)(cF: => Contract): Contract                   = contracts.branch(oL)(cT)(cF)
+    def branch[A](oT: => Observable[A])(oF: => Observable[A]): Observable[A] = new Branch(oL, oT, oF) {}
 
-    def and(oR: Obs[Boolean]): Obs[Boolean] = new Binary(And, oL, oR)  {}
-    def or(oR: Obs[Boolean]): Obs[Boolean]  = new Binary(Or, oL, oR)   {}
-    def ===(oR: Obs[Boolean]): Obs[Boolean] = new Binary(Xnor, oL, oR) {}
+    def and(oR: Observable[Boolean]): Observable[Boolean] = new Binary(And, oL, oR)  {}
+    def or(oR: Observable[Boolean]): Observable[Boolean]  = new Binary(Or, oL, oR)   {}
+    def ===(oR: Observable[Boolean]): Observable[Boolean] = new Binary(Xnor, oL, oR) {}
   }
 
   /** */
-  implicit class DoubleOps(val oL: Obs[Double]) extends AnyVal {
+  implicit class DoubleOps(val oL: Observable[Double]) extends AnyVal {
 
     def *(c: => Contract): Contract = contracts.scale(oL)(c)
 
-    def unary_! : Obs[Double] = new Unary(Neg, oL) {}
+    def unary_! : Observable[Double] = new Unary(Neg, oL) {}
 
-    def <(oR: Obs[Double]): Obs[Boolean]   = new Binary(Lt, oL, oR)  {}
-    def <=(oR: Obs[Double]): Obs[Boolean]  = new Binary(Lte, oL, oR) {}
-    def >(oR: Obs[Double]): Obs[Boolean]   = new Binary(Gt, oL, oR)  {}
-    def >=(oR: Obs[Double]): Obs[Boolean]  = new Binary(Gte, oL, oR) {}
-    def ===(oR: Obs[Double]): Obs[Boolean] = new Binary(Eq, oL, oR)  {}
-    def !==(oR: Obs[Double]): Obs[Boolean] = new Binary(Neq, oL, oR) {}
+    def <(oR: Observable[Double]): Observable[Boolean]   = new Binary(Lt, oL, oR)  {}
+    def <=(oR: Observable[Double]): Observable[Boolean]  = new Binary(Lte, oL, oR) {}
+    def >(oR: Observable[Double]): Observable[Boolean]   = new Binary(Gt, oL, oR)  {}
+    def >=(oR: Observable[Double]): Observable[Boolean]  = new Binary(Gte, oL, oR) {}
+    def ===(oR: Observable[Double]): Observable[Boolean] = new Binary(Eq, oL, oR)  {}
+    def !==(oR: Observable[Double]): Observable[Boolean] = new Binary(Neq, oL, oR) {}
 
-    def +(oR: Obs[Double]): Obs[Double]   = new Binary(Add, oL, oR) {}
-    def -(oR: Obs[Double]): Obs[Double]   = new Binary(Sub, oL, oR) {}
-    def *(oR: Obs[Double]): Obs[Double]   = new Binary(Mul, oL, oR) {}
-    def /(oR: Obs[Double]): Obs[Double]   = new Binary(Div, oL, oR) {}
-    def min(oR: Obs[Double]): Obs[Double] = new Binary(Min, oL, oR) {}
-    def max(oR: Obs[Double]): Obs[Double] = new Binary(Max, oL, oR) {}
+    def +(oR: Observable[Double]): Observable[Double]   = new Binary(Add, oL, oR) {}
+    def -(oR: Observable[Double]): Observable[Double]   = new Binary(Sub, oL, oR) {}
+    def *(oR: Observable[Double]): Observable[Double]   = new Binary(Mul, oL, oR) {}
+    def /(oR: Observable[Double]): Observable[Double]   = new Binary(Div, oL, oR) {}
+    def min(oR: Observable[Double]): Observable[Double] = new Binary(Min, oL, oR) {}
+    def max(oR: Observable[Double]): Observable[Double] = new Binary(Max, oL, oR) {}
   }
 
   /** TODO: this needs pretty printing! */
-  implicit def obsShow[A]: Show[Obs[A]] = ???
+  implicit def obsShow[A]: Show[Observable[A]] = ???
 }
 
 /** Commonly seen observables. */
@@ -139,5 +143,5 @@ object observables {
     *   - parameter extraction and rate modelling is necessary for pricing
     *   - a sampling schedule should be produced by the scheduling process
     */
-  def wsjPrimeRate: Obs[Double] = ???
+  def wsjPrimeRate: Observable[Double] = ???
 }

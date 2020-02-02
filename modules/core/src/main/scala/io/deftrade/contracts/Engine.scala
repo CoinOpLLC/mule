@@ -443,10 +443,10 @@ object Engine {
     }
 
     /** */
-    def eval[A](o: Obs[A]): PR[A] =
+    def eval[A](o: Observable[A]): PR[A] =
       o match {
-        case Obs.Const(a) => PR.bigK(a)
-        case _            => ???
+        case Observable.Const(a) => PR.bigK(a)
+        case _                   => ???
       }
 
     private type BPQ = (Boolean, Double, Double) => Double

@@ -31,7 +31,7 @@ import money._, model.capital.Instrument
 package object contracts extends Contract.primitives {
 
   import Financial.Ops
-  import Obs._
+  import Observable._
 
   /** Party acquires no rights or obligations (nothing). */
   def zero: Contract = Contract.Zero

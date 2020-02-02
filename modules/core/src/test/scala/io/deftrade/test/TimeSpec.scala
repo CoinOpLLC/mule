@@ -1,13 +1,17 @@
 package io.deftrade
 package test
 
-import io.deftrade.time._
+import io.deftrade._
+
+import implicits._, time._
+import java.time.Month
+import java.time.temporal.ChronoUnit, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
 
 import cats.implicits._
 import cats.syntax.eq._ // FIXME: don't understand why this works, or is necessary
 
 import org.scalatest._
-import org.scalatestplus.scalacheck // .ScalaCheckDrivenPropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
@@ -32,14 +36,10 @@ class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyC
 
 class TimeSpec extends FlatSpec with Matchers {
 
-  import io.deftrade.time._
-  import java.time.Month
-  import java.time.temporal.ChronoUnit, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
-
   "j8 date/time factory methods" should "work" in {
 
     // java.time.Duration
-    assert(minutes(20) - minutes(10) == minutes(10))
+    assert(minutes(20) - minutes(10) === minutes(10))
     assert(seconds(10) + seconds(10) == seconds(20))
     assert(duration(Minutes)(20) / 5 == duration(ChronoUnit.MINUTES)(4))
     assert(duration(Hours)(10) * 5 == duration(ChronoUnit.HOURS)(50))
@@ -56,44 +56,9 @@ class TimeSpec extends FlatSpec with Matchers {
     assert(localDate(2015, Month.JANUARY, 1) + months(2) == localDate(2015, Month.MARCH, 1))
     assert(localDate(2015, Month.MARCH, 1) - months(2) == localDate(2015, Month.JANUARY, 1))
   }
-
-  "domain Order stuff" should "work" in {
-    // import cats.{ Eq, Monoid }
-    // import model._
-
-    // val o1 = Order.legacy(555.550001, 78345)
-    // val o2 = Order.legacy(168.020660, 186283)
-
-    // val o12 = o1 |+| o2
-    //
-    // // assert(o12 == Order.legacy(BigDecimal(723.570661), 264628))
-    //
-    // val m1   = Map(1337 -> o1)
-    // val m1_a = Map(1337 -> o2)
-    // // val m2   = Map(4958 -> Order.legacy(666.880033, 123456))
-    // val mmm = m1 |+| m1_a |+| m2
-    // assert(
-    //   mmm === Map(
-    //     4958 -> Order.legacy(666.880033, 123456),
-    //     1337 -> Order.legacy(723.570661, 264628)
-    //   )
-    // )
-
-  }
 }
 
-class TimePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
-// with TableDrivenPropertyChecks {
-  // import org.scalacheck.Gen._
-  // import java.time._
-  // property("same as it ever was") {
-  //   forAll { (ldt: LocalDateTime) =>
-  //     whenever(true) {
-  //       assert(ldt === ldt)
-  //     }
-  //   }
-  // }
-}
+class TimePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {}
 
 class CamelCasePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
   import io.deftrade.camelsnake._
@@ -122,8 +87,8 @@ class CamelCasePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
   property("CamelCase: test impl against gold standard") {
     forAll { s: String =>
       whenever(true) {
-        assert(CamelTo("")(s) === s)
-        assert(CamelTo("•")(s) === goldCamelTo("•")(s))
+        assert(camelTo("")(s) === s)
+        assert(camelTo("•")(s) === goldCamelTo("•")(s))
       }
     }
   }

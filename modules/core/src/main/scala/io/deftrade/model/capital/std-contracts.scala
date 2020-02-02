@@ -10,7 +10,7 @@ import time._, money._, contracts._
 object std {
 
   import Financial.Ops
-  import Obs._
+  import Observable._
 
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](

@@ -67,16 +67,16 @@ object Contract {
   type LzCon = Eval[Contract]
   import Eval.later
 
-  case object Zero                                                         extends Contract
-  sealed abstract case class One(n: Numéraire)                             extends Contract
-  sealed abstract case class Scale(o: Obs[Double], c: LzCon)               extends Contract
-  sealed abstract case class Give(c: LzCon)                                extends Contract
-  sealed abstract case class When(o: Obs[Boolean], c: LzCon)               extends Contract
-  sealed abstract case class Until(o: Obs[Boolean], c: LzCon)              extends Contract
-  sealed abstract case class Anytime(o: Obs[Boolean], c: LzCon)            extends Contract
-  sealed abstract case class Both(c1: LzCon, c2: LzCon)                    extends Contract
-  sealed abstract case class Pick(c1: LzCon, c2: LzCon)                    extends Contract
-  sealed abstract case class Branch(o: Obs[Boolean], cT: LzCon, cF: LzCon) extends Contract
+  case object Zero                                                                extends Contract
+  sealed abstract case class One(n: Numéraire)                                    extends Contract
+  sealed abstract case class Scale(o: Observable[Double], c: LzCon)               extends Contract
+  sealed abstract case class Give(c: LzCon)                                       extends Contract
+  sealed abstract case class When(o: Observable[Boolean], c: LzCon)               extends Contract
+  sealed abstract case class Until(o: Observable[Boolean], c: LzCon)              extends Contract
+  sealed abstract case class Anytime(o: Observable[Boolean], c: LzCon)            extends Contract
+  sealed abstract case class Both(c1: LzCon, c2: LzCon)                           extends Contract
+  sealed abstract case class Pick(c1: LzCon, c2: LzCon)                           extends Contract
+  sealed abstract case class Branch(o: Observable[Boolean], cT: LzCon, cF: LzCon) extends Contract
 
   implicit lazy val contractGroup: Group[Contract] =
     new Group[Contract] {
@@ -92,10 +92,10 @@ object Contract {
     final def unitOf(base: Numéraire): Contract = new One(base) {}
 
     /** Party acquires `c` multiplied by `n`. */
-    final def scale(n: Obs[Double])(c: => Contract): Contract = new Scale(n, later(c)) {}
+    final def scale(n: Observable[Double])(c: => Contract): Contract = new Scale(n, later(c)) {}
 
     /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`. */
-    final def branch(b: Obs[Boolean])(
+    final def branch(b: Observable[Boolean])(
         cT: => Contract
     )(
         cF: => Contract
@@ -106,13 +106,13 @@ object Contract {
     final def give(c: => Contract): Contract = new Give(later(c)) {}
 
     /** Party will acquire c as soon as `b` is observed `true`.  */
-    final def when(b: Obs[Boolean])(c: => Contract): Contract = new When(b, later(c)) {}
+    final def when(b: Observable[Boolean])(c: => Contract): Contract = new When(b, later(c)) {}
 
     /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
-    final def until(b: Obs[Boolean], c: => Contract): Contract = new Until(b, later(c)) {}
+    final def until(b: Observable[Boolean], c: => Contract): Contract = new Until(b, later(c)) {}
 
     /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
-    final def anytime(b: Obs[Boolean])(c: => Contract): Contract = new Anytime(b, later(c)) {}
+    final def anytime(b: Observable[Boolean])(c: => Contract): Contract = new Anytime(b, later(c)) {}
 
     /** Party immediately receives both `c1` and `c2`. */
     final def both(c1: => Contract, c2: => Contract): Contract = new Both(later(c1), later(c2)) {}

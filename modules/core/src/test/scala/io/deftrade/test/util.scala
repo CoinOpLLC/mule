@@ -5,7 +5,18 @@ object console {
     try run(t)
     finally Thread sleep zzz
 }
+
 package object test {
+
+  val isins = List(
+    "US0378331005",
+    "US0373831005",
+    "U50378331005",
+    "US03378331005",
+    "AU0000XVGZA3",
+    "AU0000VXGZA3",
+    "FR0000988040"
+  )
 
   // from http://splasho.com/upgoer5/
   // @formatter:off
