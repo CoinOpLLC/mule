@@ -1,80 +1,31 @@
 package io.deftrade
 package test
 
-import implicits._, time._, money._, keyval._, model._
-import Currency.{ EUR, USD }
-
-import enumeratum._
+import time._, money._, keyval._, model._
+import Currency.{ USD }
 
 import cats.implicits._
 
 import eu.timepit.refined
-import refined.{ refineMV, refineV }
+import refined.{ refineV }
 import refined.api.{ Refined }
 import refined.collection.NonEmpty
 import refined.numeric._
 import refined.auto._
 
-import io.chrisdavenport.cormorant
-import cormorant._
-import cormorant.generic.auto._
-import cormorant.parser._
-import cormorant.refined._
-import cormorant.implicits._
+// import io.chrisdavenport.cormorant
+// import cormorant._
+// import cormorant.generic.auto._
+// import cormorant.parser._
+// import cormorant.refined._
+// import cormorant.implicits._
 
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
-
-object Jt8Gen {
-  import time._
-  def durationGen: Gen[Duration]                           = ???
-  def finiteDurationGen(range: Duration): Gen[Duration]    = ???
-  def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
-}
-
-/** Nuts exist in the test package. Make of that what you will. */
-sealed trait Nut extends EnumEntry with Serializable
-
-/** Deez are maybe the nuts you are looking for. */
-object Nut extends DtEnum[Nut] {
-
-  case object Peanut     extends Nut
-  case object Hazelnut   extends Nut
-  case object Almond     extends Nut
-  case object Cashew     extends Nut
-  case object Walnut     extends Nut
-  case object Pecan      extends Nut
-  case object Pistaschio extends Nut
-  case object Brazil     extends Nut
-
-  lazy val values = findValues
-}
-
 import Arbitrary.arbitrary
-
-object currencies {
-
-  implicit def arbitraryMny[C: Currency]: Arbitrary[Money[C]] =
-    Arbitrary {
-      import Financial.Ops
-      val fiat = Currency[C]
-
-      for {
-        amount <- arbitrary[Double]
-      } yield fiat(amount.to[model.MonetaryAmount])
-    }
-
-  type Dollar = Money[Currency.USD]
-  lazy val Dollar                                  = Currency.USD
-  def dollar(amount: model.MonetaryAmount): Dollar = Dollar(amount)
-
-  type Euro = Money[Currency.EUR]
-  lazy val Euro                                = Currency.EUR
-  def euro(amount: model.MonetaryAmount): Euro = Euro(amount)
-}
 
 object mvt {
 
@@ -99,7 +50,6 @@ object mvt {
         ) {}
     }
 
-    import Arbitrary.arbitrary
     implicit def arbitraryFoo: Arbitrary[Foo] =
       Arbitrary {
         for {
@@ -124,7 +74,7 @@ object mvt {
   final case class Zorp(
       uuid: UUID,
       // z: Instant,
-      amount: Dollar,
+      amount: Dollars,
   )
 
   object Zorp extends WithId[Zorp] {
@@ -141,7 +91,7 @@ object mvt {
   implicitly[Arbitrary[Bar]]
   implicitly[Arbitrary[UUID]]
   // implicitly[Arbitrary[Instant]]
-  implicitly[Arbitrary[Dollar]]
+  implicitly[Arbitrary[Dollars]]
   implicitly[Arbitrary[Zorp]]
 }
 
@@ -159,7 +109,7 @@ object invoices {
       quantity: Int Refined Positive,
       from: Party.Key,
       to: Party.Key,
-      amount: Dollar,
+      amount: Dollars,
       memo: String Refined NonEmpty
   )
 
@@ -176,7 +126,7 @@ object invoices {
 
       val Right(quantity) = refineV[Positive](jars min 1)
       val Right(memo)     = refineV[NonEmpty](s"special instructions: $instructions")
-      val amount          = dollar(total)
+      val amount          = dollars(total)
 
       new Invoice(asOf = instant, nut, quantity, from, to, amount, memo) {}
     }

@@ -1,7 +1,7 @@
 package io.deftrade
-package money
+package test
 
-import implicits._, model._
+import implicits._, money._, model._
 import Currency.{ EUR, USD }
 
 import cats.syntax.show._
@@ -13,8 +13,9 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class MoneySpec extends AnyFlatSpec {
 
-  type Dollars = Money[USD]
-  type Euros   = Money[EUR]
+  import currencies._
+
+  implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn(bid = 1.1245, ask = 1.1250)
 
   "Mny" should "be created via fiat `Currency`s" in {
 
@@ -40,21 +41,17 @@ class MoneySpec extends AnyFlatSpec {
     assert((-buck).show === "USD (1.00)")
 
     val d20: Dollars = USD(20.00)
-    val d21: Dollars = USD(21.00)
+    val d21: Dollars = dollars(22.00) - buck
 
     assert(d20 !== d21)
     assert(d20 < d21)
     assert((d20 max d21) === d21)
   }
 
-  "Money" should "be exchangeable with entropy" in {
+  "Money" should "model market based Currency exchange (forex)" in {
 
-    implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn(bid = 1.12, ask = 1.13)
-
-    lazy val eurusd: Rate[EUR, USD] = EUR / USD
-
-    val euro5C: Euros = EUR(500.0)
-
+    val euro5C: Euros   = EUR(500.0)
+    val eurusd          = EUR / USD
     val dollarsPaid     = eurusd buy euro5C
     val dollarsReceived = eurusd sell euro5C
 
@@ -63,7 +60,6 @@ class MoneySpec extends AnyFlatSpec {
 }
 
 class MoneyPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
-// with TableDrivenPropertyChecks {
   property("unit is as unit does") {
     forAll { ewie: Unit =>
       assert(ewie === (()))
@@ -72,8 +68,7 @@ class MoneyPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   property("doubles gonna double") {
     forAll { xs: List[Double] =>
       whenever(xs.nonEmpty) {
-        import scala.language.postfixOps
-        assert(math.sqrt(xs map (x => x * x) sum) >= 0)
+        assert(math.sqrt((xs map (x => x * x)).sum) >= 0)
       }
     }
   }

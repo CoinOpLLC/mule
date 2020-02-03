@@ -122,4 +122,60 @@ package object test {
 
 }
 
-package test {}
+package test {
+
+  import money._, keyval._, model._
+  import Currency.{ EUR, USD }
+
+  import enumeratum._
+
+  import org.scalacheck._
+  import org.scalacheck.ScalacheckShapeless._
+  import Arbitrary.arbitrary
+
+  object Jt8Gen {
+    import time._
+    def durationGen: Gen[Duration]                           = ???
+    def finiteDurationGen(range: Duration): Gen[Duration]    = ???
+    def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
+  }
+
+  /** Nuts exist in the test package. Make of that what you will. */
+  sealed trait Nut extends EnumEntry with Serializable
+
+  /** Deez are maybe the nuts you are looking for. */
+  object Nut extends DtEnum[Nut] {
+
+    case object Peanut     extends Nut
+    case object Hazelnut   extends Nut
+    case object Almond     extends Nut
+    case object Cashew     extends Nut
+    case object Walnut     extends Nut
+    case object Pecan      extends Nut
+    case object Pistaschio extends Nut
+    case object Brazil     extends Nut
+
+    lazy val values = findValues
+  }
+
+  object currencies {
+
+    implicit def arbitraryMny[C: Currency]: Arbitrary[Money[C]] =
+      Arbitrary {
+        import Financial.Ops
+        val fiat = Currency[C]
+
+        for {
+          amount <- arbitrary[Double]
+        } yield fiat(amount.to[model.MonetaryAmount])
+      }
+
+    type Dollars = Money[USD]
+    lazy val Dollars                                   = USD
+    def dollars(amount: model.MonetaryAmount): Dollars = Dollars(amount)
+
+    type Euros = Money[EUR]
+    lazy val Euros                                 = EUR
+    def euros(amount: model.MonetaryAmount): Euros = Euros(amount)
+  }
+}
