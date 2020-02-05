@@ -278,13 +278,13 @@ trait IRS1065 { self: ModuleTypes with Accounting =>
       }
 
     /** */
-    case object MakeProduct extends SingleDebitSwapKey(Cash, Inventories)
+    case object MakeProduct extends SingleDebitSwapKey(Asset.Cash, Inventories)
 
     /** */
-    case object ReceiveProductPayment extends SingleDebitSwapKey(AccountsReceivable, Cash)
+    case object ReceiveProductPayment extends SingleDebitSwapKey(AccountsReceivable, Asset.Cash)
 
     /** */
-    case object BuyInstrument extends SingleDebitSwapKey(OtherInvestments, Cash)
+    case object BuyInstrument extends SingleDebitSwapKey(OtherInvestments, Asset.Cash)
   }
 
   /** */

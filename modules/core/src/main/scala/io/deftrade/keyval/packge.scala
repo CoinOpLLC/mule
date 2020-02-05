@@ -27,7 +27,7 @@ import refined.api.Refined
 
 /**
   * Derived types and implicit methods for the persistence and caching of
-  * domain `value types` (typically case classes),
+  * domain value types (typically case classes),
   * with complementary key value store algebras and implementations.
   *
   * Defines a
@@ -39,37 +39,42 @@ import refined.api.Refined
   *   - `value`s: value class typeclass instances (`Eq`, `Hash` and `Show`).
   *   - etc.
   *
-  * ''Convention'': A `type Foo` may not depend upon the type of the `key` for `Foo`s.
+  * '''Convention''': A `type Foo` may not depend upon the type of the `key` for `Foo`s.
   *
-  * Point being: there will be no `id: Id` fields within domain objects; these will be carried
-  * separately (e.g. `key`s in an in-memory [[scala.collection.Map]] and will not depend in any way on the domain
-  * value objects.
+  * Point being: there will be no `id: Id` fields within domain types; these will be carried
+  * separately (e.g. `key`s in an in-memory [[scala.collection.Map]])
+  * and will not depend in any way on the domain value types.
   *
-  * However, foreign keys which reference other domain value types are permitted.
+  * However, foreign keys which reference other domain value types are permitted within value types.
   *
-  * This package provides `key` and `id` implementations which '''enforce''' the
+  * This package provides `key` and `id` implementations which abide the
   * convention given above.
   *   - aliasing `Refined` as an opaque key for a collection of a given type of values
   *   - assinging the `Value` type to be the `phantom type` parameter
   * for the `Refined` type constructor
   *   - providing the `Key` types and instances as companion base classes.
-  *
-  * Further, the package supports the instantiaton of the scheme by
   *   - providing a `Row` type `(Key, Value)`
-  *   - providing a `Table` type (`Map[Key, Value]`) (see [[layers.stores]])
-  *   - providing implicit derivations for [[layers.csv]] file readers and writers of `Row`s and `Table`s,
-  * enabling spreadsheet integration.
+  *   - providing implementations of [[layers.stores]] with implicit derivations
+  *   for [[layers.csv]] file readers and writers of `Row`s,
+  *   thereby enabling spreadsheet integration.
   *
-  * TODO: consider explicitly separating the structural items (keys and links between keys)
-  * from the descriptive attributes, as with
-  * [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling.
-  *
+  * So what goes in value types? Business keys and essential attributes.
   *   - Q: What is a "business key?"
   *   - A: "Real business keys only change when the business changes!"
-  *   - same goes for those essential, universal, canonical attributes
+  *   - Dito those essential, universal, canonical attributes
   *   - everything else is `meta: Json`
-  *      - which can be stored / indexed as binary in e.g. Mongo and Postgres
+  *      - which can be stored / indexed as binary in Mongo and Postgres
   *      - which can be projected to create Satellite views.
+  *   - TODO: consider explicitly separating the structural items (keys and links between keys)
+  *   from the descriptive attributes, as with
+  *   [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling.
+  *
+  * TODO: snapshots
+  *
+  * TODO: enhance the in-memory aspect of the `stores`.
+  *
+  * TODO: Postgres and Kafka integration
+  *
   */
 package object keyval extends stores with csv {
 

@@ -42,7 +42,7 @@ import io.circe.Json
   */
 sealed trait Party extends Serializable {
   def name: Label
-  def taxId: Party.TaxId
+  def taxId: Tax.Id
   def meta: Json
 }
 
@@ -51,93 +51,11 @@ sealed trait Party extends Serializable {
   */
 object Party extends WithOpaqueKey[Int, Party] {
 
-  import refined.auto._
+  /** */
+  implicit def eqParty = Eq.fromUniversalEquals[Party]
 
   /** */
-  final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}""".witness
-
-  /** */
-  type MatchesRxSsn = MatchesRxSsn.T
-
-  /** */
-  type IsSsn = MatchesRxSsn And CheckedSsn
-
-  /** */
-  type Ssn = String Refined IsSsn
-
-  /**
-    * Post "Randomization" SSN validation: i.e., cursory only.
-    * See also:
-    * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
-    * https://www.ssa.gov/employer/randomization.html
-    * https://www.ssa.gov/history/ssn/geocard.html
-    */
-  sealed abstract case class CheckedSsn private ()
-
-  /** */
-  object CheckedSsn {
-
-    /** */
-    lazy val instance: CheckedSsn = new CheckedSsn() {}
-
-    /** */
-    implicit def ssnValidate: Validate.Plain[String, CheckedSsn] =
-      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSsn", instance)
-
-    /** */
-    private val predicate: String => Boolean = s => {
-      scala.util.Try {
-        val an :: gn :: sn :: Nil = (s split '-' map (_.toInt)).toList
-        def checkAn               = 0 < an && an != 666 /* sic */ && an < 900
-        checkAn && 0 < gn && 0 < sn
-      } getOrElse false
-    }
-  }
-
-  /**
-    * An `Party` represents a legal (eg corporate, or non-profit) body.
-    * TODO: refine (pun intended) the requirements on US EINs.
-    * TODO: Internationalize with an ADT?!
-    * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
-    */
-  val IsEin = """\d{2}-\d{7}""".witness
-
-  /** */
-  type IsEin = MatchesRegex[IsEin.T]
-
-  /** */
-  type Ein = String Refined IsEin
-
-  /** */
-  type IsTaxId = IsSsn Or IsEin
-
-  /** */
-  type TaxId = String Refined IsTaxId
-
-  /**
-    *`NaturalPerson`s are people. Also, `NaturalPerson`s are `Party`s.
-    */
-  final case class NaturalPerson(
-      name: Label,
-      ssn: Ssn,
-      dob: LocalDate,
-      meta: Json
-  ) extends Party {
-    def taxId = ssn
-  }
-
-  /**
-    * `Corporation`s are `Party`s too!
-    */
-  final case class Corporation(name: Label, ein: Ein, meta: Json) extends Party {
-    def taxId = ein
-  }
-
-  /** */
-  implicit def eqEntity = Eq.fromUniversalEquals[Party]
-
-  /** */
-  implicit def showEntity = Show.show[Party] {
+  implicit def showParty = Show.show[Party] {
     _.toString // this can evolve!
   }
 
@@ -151,8 +69,6 @@ object Party extends WithOpaqueKey[Int, Party] {
 
   /**
     * Enumerated `Role`s.
-    * Note: this enum is not dependant on the type parameter and so may be hoisted up.
-    * Actually a primitive, in other words.
     */
   object Role extends Enum[Role] with CatsEnum[Role] {
 
@@ -160,7 +76,7 @@ object Party extends WithOpaqueKey[Int, Party] {
     object NonPrincipal {
 
       /**
-        * A test for all `Role`s _other_ than `Princple`.
+        * A test for all `Role`s ''other than'' `Princple`.
         */
       def unapply(role: Role): Option[Role] = role match {
         case Principal                        => none
@@ -169,10 +85,7 @@ object Party extends WithOpaqueKey[Int, Party] {
     }
 
     /**
-      *
-      * There is _always_ a distinguished [[Role]], the `Principal`.
-      *
-      * The [[Party]] which is the market participant
+      * That [[Party]] which is the market participant
       * responsible for establishing the [[layers.Accounts.Account]].
       *
       * Semantics for `Principal` are conditioned on the status of account, for examples:
@@ -180,34 +93,26 @@ object Party extends WithOpaqueKey[Int, Party] {
       * - responsible party for a liability
       * - shareholder for equity
       * - business unit chief for revenue and expenses
+      *
+      * `Principal`s have authority to add or remove [[Agent]]s.
+      *  A `Princple` is their own `Agent` unless otherwise specified.
       */
     case object Principal extends Role
 
     /**
       * The primary delegate selected by a `Principal`.
-      * Also, simply, the `Party`(s) whose names are listed on the `Account`,
-      * and the primary point of contact for the `Account`.
       *
-      * `Agents` have authortity to initiate `Transactions` which establish or remove `Position`s
-      * from the `Ledger`.
-      *
-      * By convention a `Princple` is their own `Agent` unless otherwise specified.
+      * `Agents` have authortity to add or remove [[Manager]]s.
+      * An `Agent` is their own `Manager` unless otherwise specified.
       */
     case object Agent extends Role
 
     /**
       * The primary delegate selected by the `Agent`.
       * `Party`(s) with responsibility for, and authority over,
-      * the disposition of assets in the `Account`.
+      * the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions
+      * which will result in `Transaction`s settling to the `Account`.
       *
-      * In particular, `Manager`s may initiate `Transaction`s which will settle to the `Ledger`,
-      * so long as the `Position`s are already entered in the `Ledger` - i.e. the `Instrument` is
-      * known to be tradeable on the ledger.
-      *
-      * (All publicly listed and traded assets are treated as tradeable on the `Ledger`
-      * by convention.)
-      *
-      * An `Agent` is their own `Manager` unless otherwise specified.
       */
     case object Manager extends Role
 
@@ -242,6 +147,92 @@ object Party extends WithOpaqueKey[Int, Party] {
     /** */
     lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
   }
+}
+
+import refined.auto._
+
+/**
+  * `NaturalPerson`s are `Party`s.
+  */
+final case class NaturalPerson(
+    name: Label,
+    ssn: Tax.Ssn,
+    dob: LocalDate,
+    meta: Json
+) extends Party {
+  def taxId = ssn
+}
+
+/**  */
+final case class Entity(name: Label, ein: Tax.Ein, meta: Json) extends Party {
+  def taxId = ein
+}
+
+object Tax {
+
+  import refined.auto._
+
+  /** */
+  final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}""".witness
+
+  /** */
+  type MatchesRxSsn = MatchesRxSsn.T
+
+  /**
+    * Post [[https://www.ssa.gov/employer/randomization.html Randomization]]
+    * SSN validation: i.e., cursory only.
+    *
+    * @see:
+    * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
+    * https://www.ssa.gov/history/ssn/geocard.html
+    */
+  type IsSsn = MatchesRxSsn And CheckedSsn
+
+  /** */
+  type Ssn = String Refined IsSsn
+
+  /** */
+  sealed abstract case class CheckedSsn private ()
+
+  /** */
+  object CheckedSsn {
+
+    /** */
+    lazy val instance: CheckedSsn = new CheckedSsn() {}
+
+    /** */
+    implicit def ssnValidate: Validate.Plain[String, CheckedSsn] =
+      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSsn", instance)
+
+    /** */
+    private val predicate: String => Boolean = s => {
+      scala.util.Try {
+        val an :: gn :: sn :: Nil = (s split '-' map (_.toInt)).toList
+        def checkAn               = 0 < an && an != 666 /* sic */ && an < 900
+        checkAn && 0 < gn && 0 < sn
+      } getOrElse false
+    }
+  }
+
+  /**
+    * An `Party` represents a legal (eg corporate, or non-profit) body.
+    *
+    * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
+    */
+  val IsEin = """\d{2}-\d{7}""".witness
+
+  /** */
+  type IsEin = MatchesRegex[IsEin.T]
+
+  /** */
+  type Ein = String Refined IsEin
+
+  /** */
+  type IsId = IsSsn Or IsEin
+
+  /** */
+  type Id = String Refined IsId
+
 }
 
 /** */

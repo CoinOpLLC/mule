@@ -5,18 +5,21 @@ import time._, money._, keyval._, model._
 import Currency.{ USD }
 
 import cats.implicits._
+import cats.effect.{ ContextShift, IO }
 
 import eu.timepit.refined
 import refined.{ refineV }
 import refined.api.{ Refined }
 import refined.auto._
 
-// import io.chrisdavenport.cormorant
-// import cormorant._
-// import cormorant.generic.auto._
-// import cormorant.parser._
-// import cormorant.refined._
-// import cormorant.implicits._
+import shapeless.labelled._
+
+import io.chrisdavenport.cormorant
+import cormorant._
+import cormorant.generic.auto._
+import cormorant.parser._
+import cormorant.refined._
+import cormorant.implicits._
 
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -32,7 +35,14 @@ object mvt {
   import refinements.{ IsLabel, IsUnitInterval, Label }
   import IsUnitInterval._
 
-  type UnitInterval = Double Refined `[0,1)`
+  /** */
+  sealed abstract case class Foo(
+      nut: Nut,
+      factor: Double Refined `[0,1)`,
+      label: Label,
+      bar: Bar.Key,
+      zorp: Zorp.Id
+  )
 
   object Foo extends WithOpaqueKey[Long, Foo] {
     def mk(nut: Nut, s: String): Foo = refineV[IsLabel](s) match {
@@ -53,16 +63,8 @@ object mvt {
       }
   }
 
-  /** */
-  sealed abstract case class Foo(
-      nut: Nut,
-      factor: UnitInterval,
-      label: Label,
-      bar: Bar.Key,
-      zorp: Zorp.Id
-  )
-
   final case class Bar(i: Int, d: Double, b: Boolean, l: Long, x: BigDecimal, c: Char)
+
   object Bar extends WithOpaqueKey[Long, Bar]
 
   final case class Zorp(
@@ -84,16 +86,37 @@ object mvt {
   }
 }
 
+class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
+  import mvt._
+  property("some property about Foo") {
+
+    forAll { foo: Foo =>
+      // Ensure foo has the required property
+    }
+
+    forAll { bar: Bar =>
+      // Ensure foo has the required property
+    }
+
+    forAll { zorp: Zorp =>
+      // Ensure foo has the required property
+    }
+  }
+}
+
 /** */
-// object Repos extends WithOpaqueKey[Long, OMS[Id]] {
-//
-//   /** */
-//   type LegalEntities = Party.Table
-//
-//   /** */
-//   implicit def w00t: Fresh[Party.Key] = ??? // to compile duh
-//   /** */
-//   object LegalEntities extends SimplePointInTimeRepository[_root_.cats.Id, Party.Key, Party]
+object stores {
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
+
+  import mvt.Bar
+
+  /** */
+  val res = keyValueStore[IO] of (Bar, "target/bars.csv")
+  // val res = keyValueStore[IO] of (Party, "target/parties.csv")
+}
 //
 //   /**
 //     * `CashInstruments`:
@@ -175,15 +198,3 @@ object mvt {
 //
 //   /** */
 //   object Executions extends MemAppendableRepository[_root_.cats.Id, Execution.Key, Execution]
-// }
-
-class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
-  import mvt._
-  property("some property about Foo") {
-    implicitly[Arbitrary[Zorp]]
-    implicitly[Arbitrary[Bar]]
-    forAll { foo: Foo =>
-      // Ensure foo has the required property
-    }
-  }
-}

@@ -123,6 +123,15 @@ trait Accounting { self: ModuleTypes =>
   trait Equity extends Liability
   val Equity: DtEnum[_ <: Equity]
 
+  /** Legal tender, immediately available funds (payable on demand). */
+  sealed trait Cash extends Asset
+  object Cash extends DtEnum[Cash] {
+    case object Physical   extends Cash
+    case object Deposit    extends Cash
+    case object StableCoin extends Cash
+    lazy val values = findValues
+  }
+
   /** instantiate double entry key module with appropriate monetary amount type */
   /** Mapping accounting keys to [[money.Mny]]. */
   final type AccountMap[A <: AccountingKey, C] = Map[A, Money[C]]
@@ -157,6 +166,9 @@ trait Accounting { self: ModuleTypes =>
 
   /** Revenues net of Expenses */
   final type Incomes[C] = AccountMap[Income, C]
+
+  /** TODO: Name needs work. */
+  final type Cashes[C] = AccountMap[Cash, C]
 
   /** */
   sealed trait Nettable extends EnumEntry with Serializable {

@@ -452,8 +452,7 @@ trait stores {
         WithKey.Aux[K, *],
         V,
         HV
-      ] {
-    self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
+      ] { self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
     import V._
 
@@ -543,34 +542,42 @@ trait stores {
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def keyValueStore[F[_]: Sync: ContextShift, K, V: Eq, HV <: HList](
-      kv: WithKey.Aux[K, V],
-      p: String
-  )(
-      implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]],
-      lgetk: Lazy[Get[K]],
-      lputk: Lazy[Put[K]]
-  ): Result[KeyValueStore[F, K, V, HV]] = Result safe {
-    new MemFileKeyValueStore(kv) { self =>
+  sealed abstract class Yerf[F[_]: Sync: ContextShift] {
 
-      import V._
+    /** */
+    def of[K, V: Eq, HV <: HList](
+        kv: WithKey.Aux[K, V],
+        p: String
+    )(
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]],
+        lgetk: Lazy[Get[K]],
+        lputk: Lazy[Put[K]]
+    ): Result[KeyValueStore[F, K, V, HV]] = Result safe {
+      new MemFileKeyValueStore(kv) { self =>
 
-      /** */
-      final override protected def tableRows = rows collect {
-        case (k, Some(v)) => k -> v
+        import V._
+
+        /** */
+        final override protected def tableRows = rows collect {
+          case (k, Some(v)) => k -> v
+        }
+
+        /** */
+        final override def path = Paths get p
+
+        /** */
+        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveKvToCsv
+
+        /** */
+        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
       }
-
-      /** */
-      final override def path = Paths get p
-
-      /** */
-      final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveKvToCsv
-
-      /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
     }
   }
+
+  /** */
+  def keyValueStore[F[_]: Sync: ContextShift]: Yerf[F] = new Yerf[F] {}
+
 }
