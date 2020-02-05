@@ -1,5 +1,7 @@
 package io.deftrade
 
+import eu.timepit.refined
+
 object console {
   def slowrun[T, R](t: T)(run: T => R, zzz: Long = 100L): R =
     try run(t)
@@ -127,17 +129,37 @@ package test {
   import money._, keyval._, model._
   import Currency.{ EUR, USD }
 
+  import cats.implicits._
+
   import enumeratum._
+
+  import refined.refineV
+  import refined.api.Refined
+  import refined.collection.NonEmpty
+  import refined.numeric._
 
   import org.scalacheck._
   import org.scalacheck.ScalacheckShapeless._
   import Arbitrary.arbitrary
 
   object Jt8Gen {
+
     import time._
+
     def durationGen: Gen[Duration]                           = ???
     def finiteDurationGen(range: Duration): Gen[Duration]    = ???
     def localDateTimeInPeriod(p: Period): Gen[LocalDateTime] = ???
+
+    lazy val start                    = java.time.Instant.EPOCH
+    lazy val end                      = ((start atZone ZoneIdZ) + 100.years).toInstant
+    lazy val oneHundredYearsOfSeconds = end.toEpochMilli / 1000
+
+    implicit def arbitraryInstantE10: Arbitrary[Instant] =
+      Arbitrary {
+        for {
+          secs <- Gen.chooseNum(0L, oneHundredYearsOfSeconds)
+        } yield java.time.Instant.ofEpochSecond(secs)
+      }
   }
 
   /** Nuts exist in the test package. Make of that what you will. */
@@ -177,5 +199,41 @@ package test {
     type Euros = Money[EUR]
     lazy val Euros                                 = EUR
     def euros(amount: model.MonetaryAmount): Euros = Euros(amount)
+  }
+
+  object invoices {
+
+    import time._, keyval._
+
+    import currencies._
+
+    sealed abstract case class Invoice(
+        asOf: Instant,
+        nut: Nut,
+        quantity: Int Refined Positive,
+        from: Party.Key,
+        to: Party.Key,
+        amount: Dollars,
+        memo: String Refined NonEmpty
+    )
+
+    object Invoice extends WithOpaqueKey[Long, Invoice] {
+
+      def mk(
+          nut: Nut,
+          jars: Int,
+          from: Party.Key,
+          to: Party.Key,
+          total: Double,
+          instructions: String = ""
+      ): Invoice = {
+
+        val Right(quantity) = refineV[Positive](jars min 1)
+        val Right(memo)     = refineV[NonEmpty](s"special instructions: $instructions")
+        val amount          = dollars(total)
+
+        new Invoice(asOf = instant, nut, quantity, from, to, amount, memo) {}
+      }
+    }
   }
 }

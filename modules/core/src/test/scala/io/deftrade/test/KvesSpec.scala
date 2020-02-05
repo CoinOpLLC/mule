@@ -9,8 +9,6 @@ import cats.implicits._
 import eu.timepit.refined
 import refined.{ refineV }
 import refined.api.{ Refined }
-import refined.collection.NonEmpty
-import refined.numeric._
 import refined.auto._
 
 // import io.chrisdavenport.cormorant
@@ -38,16 +36,12 @@ object mvt {
 
   object Foo extends WithOpaqueKey[Long, Foo] {
     def mk(nut: Nut, s: String): Foo = refineV[IsLabel](s) match {
-      case Left(_) => mk(nut, "baseline")
+      case Left(bad) => mk(nut, s"badlabel: [${bad take 100}]")
       case Right(label) =>
         val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
-        new Foo(
-          nut,
-          factor,
-          label,
-          Bar.Key.reserved,
-          Zorp.Id(42)
-        ) {}
+        val Right(bar)    = Bar.Key(555L)
+        val zorp          = Zorp.Id(42)
+        new Foo(nut, factor, label, bar, zorp) {}
     }
 
     implicit def arbitraryFoo: Arbitrary[Foo] =
@@ -73,63 +67,20 @@ object mvt {
 
   final case class Zorp(
       uuid: UUID,
-      // z: Instant,
+      z: Instant,
       amount: Dollars,
   )
 
   object Zorp extends WithId[Zorp] {
+    import Jt8Gen._
     implicit def arbitraryZorp: Arbitrary[Zorp] =
       Arbitrary {
         for {
           uuid   <- arbitrary[UUID]
+          z      <- arbitrary[Instant]
           amount <- arbitrary[Money[USD]]
-        } yield Zorp(uuid, amount)
+        } yield Zorp(uuid, z, amount)
       }
-  }
-
-  implicitly[Arbitrary[Foo]]
-  implicitly[Arbitrary[Bar]]
-  implicitly[Arbitrary[UUID]]
-  // implicitly[Arbitrary[Instant]]
-  implicitly[Arbitrary[Dollars]]
-  implicitly[Arbitrary[Zorp]]
-}
-
-object invoices {
-
-  import currencies._
-
-  sealed trait Base
-  case class BaseIntString(i: Int, s: String)         extends Base
-  case class BaseDoubleBoolean(d: Double, b: Boolean) extends Base
-
-  sealed abstract case class Invoice(
-      asOf: Instant,
-      nut: Nut,
-      quantity: Int Refined Positive,
-      from: Party.Key,
-      to: Party.Key,
-      amount: Dollars,
-      memo: String Refined NonEmpty
-  )
-
-  object Invoice extends WithOpaqueKey[Long, Invoice] {
-
-    def mk(
-        nut: Nut,
-        jars: Int,
-        from: Party.Key,
-        to: Party.Key,
-        total: Double,
-        instructions: String = ""
-    ): Invoice = {
-
-      val Right(quantity) = refineV[Positive](jars min 1)
-      val Right(memo)     = refineV[NonEmpty](s"special instructions: $instructions")
-      val amount          = dollars(total)
-
-      new Invoice(asOf = instant, nut, quantity, from, to, amount, memo) {}
-    }
   }
 }
 
@@ -229,6 +180,8 @@ object invoices {
 class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   import mvt._
   property("some property about Foo") {
+    implicitly[Arbitrary[Zorp]]
+    implicitly[Arbitrary[Bar]]
     forAll { foo: Foo =>
       // Ensure foo has the required property
     }

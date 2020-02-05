@@ -58,7 +58,5 @@ object implicits {
       * or for [[money.Mny]] of any [[money.Currency]].
       */
     def total(implicit V: CommutativeGroup[V]): V = m.map(_._2).fold(V.empty)(V.combine)
-
   }
-
 }

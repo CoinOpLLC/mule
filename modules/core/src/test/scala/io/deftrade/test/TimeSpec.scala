@@ -10,10 +10,12 @@ import java.time.temporal.ChronoUnit, ChronoUnit.{ HOURS => Hours, MINUTES => Mi
 import cats.implicits._
 import cats.syntax.eq._ // FIXME: don't understand why this works, or is necessary
 
-import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.propspec.AnyPropSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
+class TimeFlatSpec extends AnyFlatSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
   "time" should "move forward" in {
     val today = localDateTime
@@ -34,7 +36,7 @@ class TimeFlatSpec extends FlatSpec with Matchers with ScalaCheckDrivenPropertyC
   }
 }
 
-class TimeSpec extends FlatSpec with Matchers {
+class TimeSpec extends AnyFlatSpec with Matchers {
 
   "j8 date/time factory methods" should "work" in {
 
@@ -58,9 +60,9 @@ class TimeSpec extends FlatSpec with Matchers {
   }
 }
 
-class TimePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {}
+class TimePropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {}
 
-class CamelCasePropSpec extends PropSpec with ScalaCheckDrivenPropertyChecks {
+class CamelCasePropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   import io.deftrade.camelsnake._
 
   // Our Gold standard (for testing): yet another take on an old fav:

@@ -17,10 +17,10 @@
 package io.deftrade
 package keyval
 
-// import cats.implicits._
 import cats.{ Eq, Order }
 
 import eu.timepit.refined
+import refined.refineV
 import refined.api.{ Min, Refined, Validate }
 
 import spire.implicits._
@@ -152,11 +152,17 @@ object WithKey {
   /** Companion mez class for `Refined` key types. */
   abstract class RefinedKeyCompanion[K: Order, P] extends KeyCompanion[Refined[K, P]] {
 
-    /** */
-    implicit def order = Order[Refined[K, P]]
+    import cats.implicits._
 
     /** */
-    // def apply(k: K): Refined[K, P] = Refined unsafeApply k
+    def apply(k: K)(implicit ev: Validate[K, P]): Result[Refined[K, P]] =
+      refineV[P](k) leftMap Fail.fromString
+
+    /** for testability */
+    def unsafe(k: K): Refined[K, P] = Refined unsafeApply k
+
+    /** */
+    implicit def order = Order[Refined[K, P]]
 
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
