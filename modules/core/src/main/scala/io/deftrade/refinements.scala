@@ -121,7 +121,6 @@ object refinements {
     type `(0,1]` = Interval.OpenClosed[_0, _1]
     type `[0,1]` = Interval.Closed[_0, _1]
   }
-
 }
 
 /**

@@ -4,6 +4,8 @@ resolvers += Resolver.sonatypeRepo("releases")
 
 // addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0")
 
+// addCompilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch)
+
 scalafmtOnCompile in ThisBuild := true // all projects
 
 import Deps._
@@ -36,10 +38,11 @@ def module(id: String, d: String) =
 
 lazy val core = module(
   "core",
-  """foundational finance value objects and functions:
-    | - time, money
-    | - key-value reposistories
+  """foundational finance value types and functions:
+    | - time and money dsl
     | - core finance domain model
+    | - composable contract dsl and eval
+    | - key-value store algebras / implementations / bridges
     |""".stripMargin
 ).settings(common)
   .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))

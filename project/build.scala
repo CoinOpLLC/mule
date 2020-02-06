@@ -10,7 +10,7 @@ object Version {
 
   val Enumeratum = "1.5.15"
   val Shapeless  = "2.3.3"
-  val Refined    = "0.9.10"
+  val Refined    = "0.9.12"
 
   val Cats       = "2.1.0"
   val Kittens    = "2.0.0"
@@ -109,7 +109,7 @@ object Deps {
   val testers = Seq(
     "org.scalatest"              %% "scalatest"                 % ScalaTest,
     "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
-        
+
     "org.scalatestplus" %% "scalacheck-1-14" % "3.1.0.1",
 
     "eu.timepit"                 %% "refined-scalacheck"        % Refined,

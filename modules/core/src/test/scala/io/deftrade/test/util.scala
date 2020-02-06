@@ -8,7 +8,14 @@ object console {
     finally Thread sleep zzz
 }
 
+object label {
+  import refinements.Label
+
+}
+
 package object test {
+
+  val greek = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω " + 'ς'
 
   val isins = List(
     "US0378331005",
@@ -122,6 +129,9 @@ package object test {
   )
   // @formatter:on
 
+  // https://hipsum.co/?paras=5&type=hipster-latin
+  val loremHipster =
+    """Street art gluten-free green juice, keffiyeh dolor venmo palo santo listicle. Beard trust fund readymade cray messenger bag, typewriter glossier. 3 wolf moon cornhole iPhone organic crucifix, mlkshk knausgaard ex minim kale chips. Pok pok microdosing polaroid, single-origin coffee ugh hell of dolore pariatur deserunt waistcoat magna yuccie snackwave. Tbh kickstarter aliqua, XOXO hot chicken nulla cornhole ethical iPhone direct trade yuccie. Everyday carry kogi sunt synth hot chicken keffiyeh thundercats. Yuccie lumbersexual freegan, typewriter pickled aliquip reprehenderit iceland jean shorts narwhal distillery single-origin coffee. Reprehenderit godard edison bulb, chartreuse meggings cray truffaut. Humblebrag occaecat qui shoreditch celiac mixtape proident sed laborum pug letterpress nostrud. Snackwave ut squid, helvetica fam cupidatat ut labore readymade esse ethical succulents. Pour-over intelligentsia pug lo-fi listicle. Whatever disrupt beard, consequat in kinfolk nulla squid quinoa aliqua mustache nisi freegan chillwave. Yuccie semiotics culpa tbh consectetur yr incididunt lo-fi snackwave vice quis portland deep v forage. Heirloom helvetica trust fund cronut, tempor tumeric chartreuse. Crucifix sriracha subway tile lomo selfies letterpress. Labore consectetur jianbing taiyaki. Cardigan live-edge dolore irony vegan. Cray photo booth voluptate commodo, meh vegan mixtape nulla tattooed qui kitsch try-hard disrupt. Cold-pressed hashtag laborum, drinking vinegar pitchfork biodiesel marfa. Deep v eiusmod truffaut man braid brooklyn. Gentrify incididunt veniam occaecat mustache synth iPhone affogato art party truffaut laborum elit culpa aliqua. Brooklyn copper mug prism chillwave keytar godard aute blue bottle direct trade PBR&B blog 8-bit locavore truffaut. Migas esse umami, occaecat la croix quis selfies microdosing shaman pitchfork shoreditch meggings wolf gastropub. Kombucha chartreuse health goth, cronut anim viral deserunt bushwick seitan taiyaki kitsch portland. Prism disrupt dolore do art party, cliche helvetica offal tilde af. Craft beer mollit bushwick seitan dreamcatcher lomo, narwhal health goth vaporware. Id irony coloring book magna tilde synth tattooed, messenger bag post-ironic. Duis vape forage offal drinking vinegar, lo-fi vinyl bitters squid everyday carry VHS. Four dollar toast affogato pickled shaman fugiat ex. Authentic photo booth edison bulb pickled pariatur do single-origin coffee. Asymmetrical fashion axe raclette etsy sriracha williamsburg succulents, tumeric laborum leggings selfies ennui messenger bag tumblr et."""
 }
 
 package test {

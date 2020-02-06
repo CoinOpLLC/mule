@@ -157,7 +157,7 @@ import refined.auto._
 final case class NaturalPerson(
     name: Label,
     ssn: Tax.Ssn,
-    dob: LocalDate,
+    // dob: LocalDate,
     meta: Json
 ) extends Party {
   def taxId = ssn

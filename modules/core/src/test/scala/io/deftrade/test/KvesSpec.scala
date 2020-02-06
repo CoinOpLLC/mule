@@ -11,6 +11,7 @@ import eu.timepit.refined
 import refined.{ refineV }
 import refined.api.{ Refined }
 import refined.auto._
+import refined.scalacheck.any._
 
 import shapeless.labelled._
 
@@ -63,9 +64,19 @@ object mvt {
       }
   }
 
-  final case class Bar(i: Int, d: Double, b: Boolean, l: Long, x: BigDecimal, c: Char)
+  // final case class Bar(i: Int, d: Double, b: Boolean, l: Long, x: BigDecimal, c: Char)
+  sealed abstract case class Bar(label: Label)
 
-  object Bar extends WithOpaqueKey[Long, Bar]
+  object Bar extends WithOpaqueKey[Long, Bar] {
+    def apply(label: Label): Bar = new Bar(label) {}
+
+    implicit def arbitraryBar: Arbitrary[Bar] =
+      Arbitrary {
+        for {
+          label <- arbitrary[Label]
+        } yield Bar(label)
+      }
+  }
 
   final case class Zorp(
       uuid: UUID,
@@ -91,15 +102,15 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   property("some property about Foo") {
 
     forAll { foo: Foo =>
-      // Ensure foo has the required property
+      println(foo)
     }
 
     forAll { bar: Bar =>
-      // Ensure foo has the required property
+      println(bar)
     }
 
     forAll { zorp: Zorp =>
-      // Ensure foo has the required property
+      println(zorp)
     }
   }
 }
