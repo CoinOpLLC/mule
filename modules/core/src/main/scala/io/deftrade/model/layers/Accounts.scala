@@ -26,14 +26,14 @@ trait Accounts { self: Ledger with ModuleTypes =>
     * @param nonPrincipals N.b. the signature and what it implies:
     *
     *   - a total function returning a `NonEmptySet`
-    *   - implies that all non-Princple [[Role]]s must be filled with at least one [[Entity]].
+    *   - implies that all non-Princple [[Role]]s must be filled with at least one [[Party]].
     *
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[Party.Key, Quantity],
-      nonPrincipals: Party.Role => NonEmptySet[Party.Key]
+      nonPrincipals: Role => NonEmptySet[Party.Key]
   ) {
-    import Party.{ Key, Role }
+    import Party.Key
 
     /** */
     lazy val roles: NonEmptyMap[Role, NonEmptySet[Key]] =
@@ -70,7 +70,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   object Roster {
 
-    import Party.{ Key, Role }
+    import Party.Key
 
     /**
       * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
