@@ -212,9 +212,14 @@ trait stores {
     /** */
     final type HRow = HValue
 
+    /** */
     final def get[K2, V2](id: Id)(implicit evK2V2: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
       getMap(id)
 
+    /** */
+    final def put(v: V): EffectStream[Id] = append(v)
+
+    /** */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def append[K2, V2](k2v2s: Map[K2, V2])(
         implicit
@@ -390,7 +395,7 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, V, HV] {
+  trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, V, HV] {
     self: ModuleTypes.Aux[F, W, V, HV] =>
 
     /** */
@@ -446,7 +451,7 @@ trait stores {
   }
 
   /** */
-  private trait MemFileImplKV[F[_], K, V, HV <: HList]
+  trait MemFileImplKV[F[_], K, V, HV <: HList]
       extends MemFileImplV[
         F,
         WithKey.Aux[K, *],
@@ -483,7 +488,7 @@ trait stores {
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  private sealed abstract case class MemFileValueStore[
+  sealed abstract case class MemFileValueStore[
       F[_]: Sync: ContextShift,
       V: Eq,
       HV <: HList
@@ -498,7 +503,7 @@ trait stores {
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  private sealed abstract case class MemFileKeyValueStore[
+  sealed abstract case class MemFileKeyValueStore[
       F[_]: Sync: ContextShift,
       K,
       V: Eq,
@@ -512,42 +517,66 @@ trait stores {
       with KeyValueStore[F, K, V, HV]
       with MemFileImplKV[F, K, V, HV]
 
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  def valueStore[F[_]: Sync: ContextShift]: FVS[F] = new FVS[F] {}
+
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def valueStore[F[_]: Sync: ContextShift, V: Eq, HV <: HList](
-      v: WithId[V],
-      p: String
-  )(
-      implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]
-  ): Result[ValueStore[F, V, HV]] = Result safe {
-    new MemFileValueStore(v) {
+  sealed abstract class FVS[F[_]: Sync: ContextShift] {
 
-      import V._
-
-      final override protected def tableRows = permRows
-
-      /** */
-      final override def path = Paths get p
-
-      /** */
-      final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
-
-      /** */
-      final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
-    }
+    /** */
+    def at(p: String): FVSP[F] = new FVSP(p) {}
   }
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class Yerf[F[_]: Sync: ContextShift] {
+  sealed abstract class FVSP[F[_]: Sync: ContextShift](p: String) {
+
+    /** */
+    def of[V: Eq, HV <: HList](
+        v: WithId[V],
+    )(
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[MemFileValueStore[F, V, HV]] = Result safe {
+      new MemFileValueStore(v) {
+
+        import V._
+
+        final override protected def tableRows = permRows
+
+        /** */
+        final override def path = Paths get p
+
+        /** */
+        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
+
+        /** */
+        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+      }
+    }
+  }
+
+  /** */
+  def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FKVS[F[_]: Sync: ContextShift] {
+
+    /** */
+    def at(p: String): FKVSP[F] = new FKVSP(p) {}
+  }
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FKVSP[F[_]: Sync: ContextShift](p: String) {
 
     /** */
     def of[K, V: Eq, HV <: HList](
-        kv: WithKey.Aux[K, V],
-        p: String
+        kv: WithKey.Aux[K, V]
     )(
         implicit
         lgv: LabelledGeneric.Aux[V, HV],
@@ -555,7 +584,7 @@ trait stores {
         llw: Lazy[LabelledWrite[HV]],
         lgetk: Lazy[Get[K]],
         lputk: Lazy[Put[K]]
-    ): Result[KeyValueStore[F, K, V, HV]] = Result safe {
+    ): Result[MemFileKeyValueStore[F, K, V, HV]] = Result safe {
       new MemFileKeyValueStore(kv) { self =>
 
         import V._
@@ -576,8 +605,4 @@ trait stores {
       }
     }
   }
-
-  /** */
-  def keyValueStore[F[_]: Sync: ContextShift]: Yerf[F] = new Yerf[F] {}
-
 }

@@ -7,6 +7,8 @@ import Currency.{ USD }
 import cats.implicits._
 import cats.effect.{ ContextShift, IO }
 
+import fs2.Stream
+
 import eu.timepit.refined
 import refined.{ refineV }
 import refined.api.{ Refined }
@@ -29,15 +31,18 @@ import org.scalacheck._
 import org.scalacheck.ScalacheckShapeless._
 import Arbitrary.arbitrary
 
+import currencies._
+import java.util.UUID
+import refinements.{ IsLabel, IsUnitInterval, Label }
+import IsUnitInterval._
+import scala.concurrent.ExecutionContext.Implicits.global
+
 object mvt {
 
-  import currencies._
-  import java.util.UUID
-  import refinements.{ IsLabel, IsUnitInterval, Label }
-  import IsUnitInterval._
+  implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
 
   /** */
-  sealed abstract case class Foo(
+  final case class Foo private (
       nut: Nut,
       factor: Double Refined `[0,1)`,
       label: Label,
@@ -46,25 +51,19 @@ object mvt {
   )
 
   object Foo extends WithOpaqueKey[Long, Foo] {
-    def mk(nut: Nut, s: String): Foo = refineV[IsLabel](s) match {
-      case Left(bad) => mk(nut, s"badlabel: [${bad take 100}]")
-      case Right(label) =>
-        val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
-        val Right(bar)    = Bar.Key(555L)
-        val zorp          = Zorp.Id(42)
-        new Foo(nut, factor, label, bar, zorp) {}
-    }
-
-    implicit def arbitraryFoo: Arbitrary[Foo] =
-      Arbitrary {
-        for {
-          nut <- arbitrary[Nut]
-          str <- arbitrary[String]
-        } yield mk(nut, str)
+    def mk(nut: Nut, s: String, zorp: Zorp): Stream[IO, Foo] =
+      refineV[IsLabel](s) match {
+        case Left(bad) => mk(nut, s"badlabel: [${bad take 72}]", zorp)
+        case Right(label) =>
+          val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
+          val Right(bar)    = Bar.Key(555L)
+          for (zid <- zorpii put zorp) yield Foo(nut, factor, label, bar, zid)
       }
   }
 
-  // final case class Bar(i: Int, d: Double, b: Boolean, l: Long, x: BigDecimal, c: Char)
+  lazy val foos = keyValueStore[IO] at "target/foos.csv" of Foo
+
+  /** */
   sealed abstract case class Bar(label: Label)
 
   object Bar extends WithOpaqueKey[Long, Bar] {
@@ -78,27 +77,48 @@ object mvt {
       }
   }
 
+  lazy val bars = keyValueStore[IO] at "target/bars.csv" of Bar
+
+  /** */
   final case class Zorp(
       uuid: UUID,
       z: Instant,
       amount: Dollars,
   )
 
-  object Zorp extends WithId[Zorp] {
-    import Jt8Gen._
-    implicit def arbitraryZorp: Arbitrary[Zorp] =
-      Arbitrary {
-        for {
-          uuid   <- arbitrary[UUID]
-          z      <- arbitrary[Instant]
-          amount <- arbitrary[Money[USD]]
-        } yield Zorp(uuid, z, amount)
-      }
-  }
+  object Zorp extends WithId[Zorp]
+
+  lazy val zorpii = (valueStore[IO] at "target/zorpii.csv" of Zorp).fold(_ => ???, identity)
+}
+
+object arbitraryMvt {
+
+  import Jt8Gen._
+  import mvt._
+
+  implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
+    Arbitrary {
+      for {
+        nut  <- arbitrary[Nut]
+        str  <- arbitrary[String]
+        zorp <- arbitrary[Zorp]
+      } yield Foo mk (nut, str, zorp)
+    }
+
+  implicit def arbitraryZorp: Arbitrary[Zorp] =
+    Arbitrary {
+      for {
+        uuid   <- arbitrary[UUID]
+        z      <- arbitrary[Instant]
+        amount <- arbitrary[Money[USD]]
+      } yield Zorp(uuid, z, amount)
+    }
 }
 
 class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   import mvt._
+  import arbitraryMvt.arbitraryZorp
+
   property("some property about Foo") {
 
     forAll { foo: Foo =>
@@ -113,20 +133,6 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
       println(zorp)
     }
   }
-}
-
-/** */
-object stores {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
-
-  import mvt.Bar
-
-  /** */
-  val res = keyValueStore[IO] of (Bar, "target/bars.csv")
-  // val res = keyValueStore[IO] of (Party, "target/parties.csv")
 }
 //
 //   /**
