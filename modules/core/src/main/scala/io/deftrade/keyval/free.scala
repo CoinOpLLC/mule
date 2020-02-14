@@ -19,7 +19,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 sealed abstract class Command[F[_], A]
 
 /** */
-object Command
+object Command {}
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -33,14 +33,17 @@ sealed abstract class FreeKeyValueStore {
 
   type Value
 
+  sealed abstract class Rd extends Command[EffectType, Value]
+  sealed abstract class Wr extends Command[EffectType, Id]
+
   /** */
   final type FreeCommand[A] = Free[Command[EffectType, *], A]
 
-  sealed case class Get(key: Key)               extends Command[EffectType, Value]
-  sealed case class Let(key: Key, value: Value) extends Command[EffectType, Id]
-  sealed case class Set(key: Key, value: Value) extends Command[EffectType, Id]
-  sealed case class Put(key: Key, value: Value) extends Command[EffectType, Id]
-  sealed case class Del(key: Key)               extends Command[EffectType, Id] // (sic)
+  case class Get(key: Key)               extends Command[EffectType, Value]
+  case class Let(key: Key, value: Value) extends Command[EffectType, Id]
+  case class Set(key: Key, value: Value) extends Command[EffectType, Id]
+  case class Put(key: Key, value: Value) extends Command[EffectType, Id]
+  case class Del(key: Key)               extends Command[EffectType, Id] // (sic)
 
   final def get(key: Key): FreeCommand[Value]            = Get(key)        |> liftF
   final def let(key: Key, value: Value): FreeCommand[Id] = Let(key, value) |> liftF
@@ -94,7 +97,7 @@ object FreeKeyValueStore {
         case Set(k, v) => kvs update (k, v)
         case Put(k, v) => kvs upsert (k, v)
         case Del(k)    => kvs delete k
-        // case _         => ??? // FIXME: why not exhaustive match?
+        case wut       => wut |> discardValue; ??? // FIXME: why not exhaustive match?
       }
     }
 }

@@ -15,12 +15,8 @@ import refined.api.{ Refined }
 import refined.auto._
 import refined.scalacheck.any._
 
-import shapeless.labelled._
-
 import io.chrisdavenport.cormorant
-import cormorant._
 import cormorant.generic.auto._
-import cormorant.parser._
 import cormorant.refined._
 import cormorant.implicits._
 
@@ -77,8 +73,6 @@ object mvt {
       }
   }
 
-  lazy val bars = keyValueStore[IO] at "target/bars.csv" of Bar
-
   /** */
   final case class Zorp(
       uuid: UUID,
@@ -119,6 +113,8 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   import mvt._
   import arbitraryMvt.arbitraryZorp
 
+  lazy val Right(bars) = keyValueStore[IO] at "target/bars.csv" of Bar
+
   property("some property about Foo") {
 
     forAll { foo: Foo =>
@@ -126,7 +122,9 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
     }
 
     forAll { bar: Bar =>
-      println(bar)
+      val key = Bar.Key unsafe bar.hashCode.toLong
+      val id  = bars upsert (key, bar)
+      println(id -> (key -> bar))
     }
 
     forAll { zorp: Zorp =>

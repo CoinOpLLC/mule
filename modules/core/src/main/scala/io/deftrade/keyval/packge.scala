@@ -16,14 +16,32 @@
 
 package io.deftrade
 
+import money._
+
 import cats.implicits._
 import cats.{ Show }
-import keyval.layers._
+import cats.data.{ NonEmptyList }
+import cats.effect.{ ContextShift, Sync }
+
+import cats.Eq
+import cats.data.NonEmptyList
+import cats.effect.{ ContextShift, Sync }
+
+import shapeless.{ HList, LabelledGeneric, Lazy }
+// import shapeless.labelled._
 
 import shapeless.syntax.singleton._
 
 import eu.timepit.refined
 import refined.api.Refined
+import fs2.{ text, Pipe }
+
+import io.chrisdavenport.cormorant
+import cormorant.implicits.stringPut
+import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
+// import cormorant.refined._
+
+import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
 
 /**
   * Derived types and implicit methods for the persistence and caching of
@@ -76,7 +94,7 @@ import refined.api.Refined
   * TODO: Postgres and Kafka integration
   *
   */
-package object keyval extends stores with csv {
+package object keyval {
 
   /** Just an alias.  */
   type OpaqueKey[K, V] = Refined[K, V]
@@ -103,4 +121,129 @@ package object keyval extends stores with csv {
     * [[Key]] column type literal witness - same purpose as [[id]].
     */
   private[keyval] final implicit val key = Symbol("key").witness
+
+  private[keyval] lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
+
+  /**  */
+  private[keyval] def printer: Printer = Printer.default
+
+  /** cormorant csv `Get` */
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
+    new Get[Mny[N, C]] {
+
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
+        Mny parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+    }
+
+  /** cormorant csv `Put` */
+  implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
+    stringPut contramap Mny.format[N, C]
+
+  /** cormorant csv `Get` */
+  implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
+    new Get[N] {
+
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
+        N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+    }
+
+  /** cormorant csv `Put` */
+  implicit def financialPut[N: Financial]: Put[N] =
+    stringPut contramap (Financial[N] toString _)
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  def valueStore[F[_]: Sync: ContextShift]: FVS[F] = new FVS[F] {}
+
+  /** */
+  def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
+}
+
+package keyval {
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FVS[F[_]: Sync: ContextShift] {
+
+    /** */
+    def at(p: String): FVSP[F] = new FVSP(p) {}
+  }
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FVSP[F[_]: Sync: ContextShift](p: String) {
+
+    /** */
+    def of[V: Eq, HV <: HList](
+        v: WithId[V],
+    )(
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[MemFileValueStore[F, V, HV]] = Result safe {
+      new MemFileValueStore(v) {
+
+        import V._
+
+        final override protected def tableRows = permRows
+
+        /** */
+        final override def path = Paths get p
+
+        /** */
+        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
+
+        /** */
+        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+      }
+    }
+  }
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FKVS[F[_]: Sync: ContextShift] {
+
+    /** */
+    def at(p: String): FKVSP[F] = new FKVSP(p) {}
+  }
+
+  /** */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  sealed abstract class FKVSP[F[_]: Sync: ContextShift](p: String) {
+
+    /** */
+    def of[K, V: Eq, HV <: HList](
+        kv: WithKey.Aux[K, V]
+    )(
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]],
+        lgetk: Lazy[Get[K]],
+        lputk: Lazy[Put[K]]
+    ): Result[MemFileKeyValueStore[F, K, V, HV]] = Result safe {
+      new MemFileKeyValueStore(kv) { self =>
+
+        import V._
+
+        /** */
+        final override protected def tableRows = rows collect {
+          case (k, Some(v)) => k -> v
+        }
+
+        /** */
+        final override def path = Paths get p
+
+        /** */
+        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveKvToCsv
+
+        /** */
+        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
+      }
+    }
+  }
+
 }
