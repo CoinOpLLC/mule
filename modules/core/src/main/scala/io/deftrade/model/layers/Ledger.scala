@@ -200,8 +200,7 @@ trait Ledger { module: ModuleTypes =>
   type Trade = Folio
 
   /**
-    * In contrast to a [[Folio]] store, [[Trade]] [[io.deftrade.keyval.layers.stores]] hold
-    * immutable entries.
+    * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     *
     * TODO: `Trade` stores should use WithHashId to get the natural reuse of `Trade`s
     * and minimization of store size.
@@ -265,7 +264,7 @@ trait Ledger { module: ModuleTypes =>
     *     deal in generic instruments with [[capital.Instrument.Key]]s constucted systematically
     *     from Currency names.
     *   - the bank account allocation details are recoverable through the
-    *     [[keyval.layers.stores.KeyValueStore]] for `Folio`s.
+    *     [[keyval.KeyValueStore]] for `Folio`s.
     *
     * FIXME: need `PricedTrade => Trade` function.
     *

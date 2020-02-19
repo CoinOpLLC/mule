@@ -34,14 +34,14 @@ import shapeless.syntax.singleton._
 
 import eu.timepit.refined
 import refined.api.Refined
-import fs2.{ text, Pipe }
+import fs2.{ Pipe }
 
 import io.chrisdavenport.cormorant
 import cormorant.implicits.stringPut
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
 // import cormorant.refined._
 
-import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
+import java.nio.file.{ Paths }
 
 /**
   * Derived types and implicit methods for the persistence and caching of
@@ -72,9 +72,8 @@ import java.nio.file.{ Path, Paths, StandardOpenOption => OpenOption }
   * for the `Refined` type constructor
   *   - providing the `Key` types and instances as companion base classes.
   *   - providing a `Row` type `(Key, Value)`
-  *   - providing implementations of [[layers.stores]] with implicit derivations
-  *   for [[layers.csv]] file readers and writers of `Row`s,
-  *   thereby enabling spreadsheet integration.
+  *   - providing implementations of `store`a with implicit derivations
+  *   for csv file readers and writers of `Row`s, thereby enabling spreadsheet integration.
   *
   * So what goes in value types? Business keys and essential attributes.
   *   - Q: What is a "business key?"
