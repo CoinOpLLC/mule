@@ -44,9 +44,10 @@ object refinements {
   private def alpha = "[A-Z]"
   private def num   = "[0-9]"
 
-  private def witnesseth[T](t: T) = { val tv = t; tv.witness }
-  private def patRep(pat: String)(n: Int Refined Positive) =
-    s"""$pat{${n.toString}}""" |> witnesseth
+  private def patRep(pat: String)(n: Int Refined Positive) = {
+    val r = s"""$pat{${n.toString}}"""
+    r.witness
+  }
 
   /** */
   val Alpha2 = patRep(alpha)(2)

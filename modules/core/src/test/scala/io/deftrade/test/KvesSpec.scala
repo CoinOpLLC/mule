@@ -47,14 +47,11 @@ object mvt {
   )
 
   object Foo extends WithOpaqueKey[Long, Foo] {
-    def mk(nut: Nut, s: String, zorp: Zorp): Stream[IO, Foo] =
-      refineV[IsLabel](s) match {
-        case Left(bad) => mk(nut, s"badlabel: [${bad take 72}]", zorp)
-        case Right(label) =>
-          val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
-          val Right(bar)    = Bar.Key(555L)
-          for (zid <- zorpii put zorp) yield Foo(nut, factor, label, bar, zid)
-      }
+    def mk(nut: Nut, label: Label, zorp: Zorp): Stream[IO, Foo] = {
+      val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
+      val Right(bar)    = Bar.Key(555L)
+      for (zid <- zorpii put zorp) yield Foo(nut, factor, label, bar, zid)
+    }
   }
 
   lazy val foos = keyValueStore[IO] at "target/foos.csv" of Foo
@@ -93,10 +90,10 @@ object arbitraryMvt {
   implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
     Arbitrary {
       for {
-        nut  <- arbitrary[Nut]
-        str  <- arbitrary[String]
-        zorp <- arbitrary[Zorp]
-      } yield Foo mk (nut, str, zorp)
+        nut   <- arbitrary[Nut]
+        label <- arbitrary[Label]
+        zorp  <- arbitrary[Zorp]
+      } yield Foo mk (nut, label, zorp)
     }
 
   implicit def arbitraryZorp: Arbitrary[Zorp] =

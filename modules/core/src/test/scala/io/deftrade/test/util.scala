@@ -1,6 +1,23 @@
 package io.deftrade
 
+import money._, keyval._, model._, refinements._
+import Currency.{ EUR, USD }
+
+import cats.implicits._
+
+import enumeratum._
+
 import eu.timepit.refined
+import refined.refineV
+import refined.api.Refined
+import refined.collection.NonEmpty
+import refined.numeric._
+import refined.auto._
+
+import org.scalacheck._
+import org.scalacheck.cats.implicits._
+import org.scalacheck.ScalacheckShapeless._
+import Arbitrary.arbitrary
 
 object console {
   def slowrun[T, R](t: T)(run: T => R, zzz: Long = 100L): R =
@@ -8,14 +25,23 @@ object console {
     finally Thread sleep zzz
 }
 
-object label {
-  import refinements.Label
-
-}
-
 package object test {
 
-  val greek = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω " + 'ς'
+  implicit def arbitraryLabel: Arbitrary[Label] =
+    Arbitrary {
+      for {
+        s <- Gen oneOf tenHundredWords
+        t <- Gen oneOf tenHundredWords
+        u <- Gen oneOf greek
+        v <- Gen oneOf greek
+      } yield refineV[IsLabel](s"$s${t.reverse.capitalize}-$u$v") getOrElse error
+    }
+
+  def continually[A](xs: Seq[A]): Arbitrary[LazyList[A]] =
+    Arbitrary { LazyList.continually(Gen oneOf xs).sequence }
+
+  val error: Label = """error"""
+  val greek        = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω " + 'ς'
 
   val isins = List(
     "US0378331005",
@@ -136,22 +162,6 @@ package object test {
 
 package test {
 
-  import money._, keyval._, model._
-  import Currency.{ EUR, USD }
-
-  import cats.implicits._
-
-  import enumeratum._
-
-  import refined.refineV
-  import refined.api.Refined
-  import refined.collection.NonEmpty
-  import refined.numeric._
-
-  import org.scalacheck._
-  import org.scalacheck.ScalacheckShapeless._
-  import Arbitrary.arbitrary
-
   object Jt8Gen {
 
     import time._
@@ -172,10 +182,10 @@ package test {
       }
   }
 
-  /** Nuts exist in the test package. Make of that what you will. */
+  /**  */
   sealed trait Nut extends EnumEntry with Serializable
 
-  /** Deez are maybe the nuts you are looking for. */
+  /**  */
   object Nut extends DtEnum[Nut] {
 
     case object Peanut     extends Nut
