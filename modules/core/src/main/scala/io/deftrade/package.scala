@@ -22,21 +22,16 @@ package io
   * What financial market participants?
   *
   *   - Initial scope: small private equity funds, small hedge funds, family offices, RIAs,
-  *   loan funds, real estate funds, and the like.
+  *   loan funds, real estate funds, ad-hoc seed venture funds, etc.
   *
   *   - Potential scope: banks, credit unions, CDFIs, broker/dealers, crypto exchanges,
-  * and other actors with additional requirements,
-  *
-  * Also, the CFO of any ''financially sophisticated'' but ''non-financial'' firm is typically
-  * considered a financial market participant by the nature of the transactions they engage in.
-  * Applications built on this library might serve such a CFO.
+  * and other actors with additional requirements.
   *
   * This toolkit provides the necessary types and methods to specify
-  * `Abstract Algebraic Domain Model`s (AADMs)
+  * `Abstract Algebraic Domain Model`s
   *   - `Abstract` because models are mapped to multiple materialized types
   * via ''natural transformations'' (i.e. multiple interpreters for the same language).
-  *   - `Algebraic` because models are formally composable according to sound mathematical
-  * rules (for which automated testing can be derived).
+  *   - `Algebraic` because models are formally composable
   *   - `Domain Model`s because the abstract algebra aspires to legibility by
   * the afformentioned ''financial market participants''.
   */

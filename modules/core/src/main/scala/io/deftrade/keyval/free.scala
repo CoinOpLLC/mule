@@ -1,6 +1,5 @@
 package io.deftrade
 package keyval
-package layers
 
 import io.deftrade.implicits._
 

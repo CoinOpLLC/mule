@@ -61,37 +61,3 @@ class TimeSpec extends AnyFlatSpec with Matchers {
 }
 
 class TimePropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {}
-
-class CamelCasePropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
-  import io.deftrade.camelsnake._
-
-  // Our Gold standard (for testing): yet another take on an old fav:
-  // https://github.com/lift/framework/search?utf8=%E2%9C%93&q=%22def+snakify%22
-
-  // splits off strings of capital letters leaving one...
-  val rx1 = """([A-Z]+)([A-Z][a-z])""".r
-
-  // splits transition from lower -> upper case
-  val rx2 = """([a-z\d])([A-Z])""".r
-
-  def delimit(rx: scala.util.matching.Regex)(s: String): String = rx replaceAllIn (s, "$1•$2")
-
-  def goldCamelTo(sep: String)(name: String): String =
-    (name |> delimit(rx1) |> delimit(rx2)) split "•" mkString sep
-
-  property("CamelCase: verify the gold standard") {
-    forAll { s: String =>
-      whenever(true) {
-        assert(goldCamelTo("")(s) === s)
-      }
-    }
-  }
-  property("CamelCase: test impl against gold standard") {
-    forAll { s: String =>
-      whenever(true) {
-        assert(camelTo("")(s) === s)
-        assert(camelTo("•")(s) === goldCamelTo("•")(s))
-      }
-    }
-  }
-}

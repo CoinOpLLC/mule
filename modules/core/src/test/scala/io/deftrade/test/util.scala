@@ -32,16 +32,16 @@ package object test {
       for {
         s <- Gen oneOf tenHundredWords
         t <- Gen oneOf tenHundredWords
-        u <- Gen oneOf greek
-        v <- Gen oneOf greek
+        u <- Gen oneOf (0 until greek.size by 2) map greek
+        v <- Gen oneOf (1 until greek.size by 2) map greek
       } yield refineV[IsLabel](s"$s${t.reverse.capitalize}-$u$v") getOrElse error
     }
 
   def continually[A](xs: Seq[A]): Arbitrary[LazyList[A]] =
-    Arbitrary { LazyList.continually(Gen oneOf xs).sequence }
+    Arbitrary { deftrade.infiniteLazyList(Gen oneOf xs) }
 
-  val error: Label = """error"""
-  val greek        = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω " + 'ς'
+  val error: Label = "error"
+  val greek        = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω"
 
   val isins = List(
     "US0378331005",

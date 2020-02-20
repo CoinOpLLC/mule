@@ -83,7 +83,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
 
     /**
-      * Splits partition equally among [[Party.Role.Principal]]s.
+      * Splits partition equally among [[Role.Principal]]s.
       */
     def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
 

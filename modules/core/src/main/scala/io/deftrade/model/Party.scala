@@ -38,10 +38,12 @@ import io.circe.Json
 import Party.Tax
 
 /**
-  * Models real world actors under the aegis of, and registered with, real world
+  * Models financial market participants.
+  *
+  * Presumed real world actors under the aegis of, and registered with, real world
   * justistictions.
   *
-  * Small step towards privacy by design: [[Party.TaxId]]'s are not used as keys.
+  * Small step towards privacy by design: `Tax.Id`'s are not used as `Key`s.
   */
 sealed trait Party extends Product with Serializable {
   def name: Label
@@ -90,9 +92,8 @@ object Party extends WithOpaqueKey[Int, Party] {
       * Post [[https://www.ssa.gov/employer/randomization.html Randomization]]
       * SSN validation: i.e., cursory only.
       *
-      * @see:
-      * https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs
-      * https://www.ssa.gov/history/ssn/geocard.html
+      * [[https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs SSN validation]]
+      * [[https://www.ssa.gov/history/ssn/geocard.html SSN geocard]]
       */
     type IsSsn = MatchesRxSsn And CheckedSsn
 

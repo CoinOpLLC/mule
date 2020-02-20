@@ -79,7 +79,7 @@ object mvt {
 
   object Zorp extends WithId[Zorp]
 
-  lazy val zorpii = (valueStore[IO] at "target/zorpii.csv" of Zorp).fold(_ => ???, identity)
+  lazy val Right(zorpii) = valueStore[IO] at "target/zorpii.csv" of Zorp
 }
 
 object arbitraryMvt {

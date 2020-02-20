@@ -23,7 +23,6 @@ import time._, money._, implicits._
 import cats.implicits._
 import cats.{ Invariant }
 import cats.kernel.CommutativeGroup
-import feralcats.instances._
 
 import cats.effect.Sync
 import fs2.{ Pipe, Stream }

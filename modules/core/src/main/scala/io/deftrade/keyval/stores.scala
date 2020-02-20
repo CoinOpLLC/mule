@@ -384,7 +384,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
 }
 
 /** */
-trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, V, HV] {
+protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, V, HV] {
   self: ModuleTypes.Aux[F, W, V, HV] =>
 
   /** */
@@ -440,7 +440,7 @@ trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Store[F, W, 
 }
 
 /** */
-trait MemFileImplKV[F[_], K, V, HV <: HList]
+protected trait MemFileImplKV[F[_], K, V, HV <: HList]
     extends MemFileImplV[
       F,
       WithKey.Aux[K, *],
@@ -477,7 +477,7 @@ trait MemFileImplKV[F[_], K, V, HV <: HList]
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract case class MemFileValueStore[
+protected abstract case class MemFileValueStore[
     F[_]: Sync: ContextShift,
     V: Eq,
     HV <: HList
@@ -492,7 +492,7 @@ abstract case class MemFileValueStore[
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract case class MemFileKeyValueStore[
+protected abstract case class MemFileKeyValueStore[
     F[_]: Sync: ContextShift,
     K,
     V: Eq,

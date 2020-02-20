@@ -94,4 +94,7 @@ package object model
     groupBy(kvs)(_._1) map {
       case (k, kvs) => (k, kvs foldMap (_._2))
     }
+
+  implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
+    new MapCommutativeGroup[K, V]
 }
