@@ -199,9 +199,9 @@ object keys {
   ////////////////////////////////////////////////
 
   // https://en.wikipedia.org/wiki/Luhn_algorithm
-  private[model] def luhn(digit: Int, idx: Int): Int =
+  private[deftrade] def luhn(digit: Int, idx: Int): Int =
     if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10
 
-  private[model] def failsafe(thunk: => Boolean): Boolean =
+  private[deftrade] def failsafe(thunk: => Boolean): Boolean =
     scala.util.Try apply thunk fold (_ => false, identity)
 }

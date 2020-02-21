@@ -27,6 +27,8 @@ object console {
 
 package object test {
 
+  import deftrade.infiniteLazyList
+
   implicit def arbitraryLabel: Arbitrary[Label] =
     Arbitrary {
       for {
@@ -37,17 +39,20 @@ package object test {
       } yield refineV[IsLabel](s"$s${t.reverse.capitalize}-$u$v") getOrElse error
     }
 
-  def continually[A](xs: Seq[A]): Arbitrary[LazyList[A]] =
-    Arbitrary { deftrade.infiniteLazyList(Gen oneOf xs) }
+  def continuallyOneOf[A](xs: Seq[A]): Arbitrary[LazyList[A]] =
+    Arbitrary { infiniteLazyList(Gen oneOf xs) }
+
+  implicit def arbitraryLazyList[A](implicit A: Arbitrary[A]): Arbitrary[LazyList[A]] =
+    Arbitrary { infiniteLazyList(A.arbitrary) }
 
   val error: Label = "error"
   val greek        = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω"
 
   val isins = List(
+    "USQ6188CAA47",
     "US0378331005",
     "US0373831005",
     "U50378331005",
-    "US03378331005",
     "AU0000XVGZA3",
     "AU0000VXGZA3",
     "FR0000988040"
