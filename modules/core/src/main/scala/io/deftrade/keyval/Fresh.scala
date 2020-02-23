@@ -17,8 +17,12 @@
 package io.deftrade
 package keyval
 
+import refinements.{ IsSha256, Sha256 }
+
 import spire.math.Integral
 import spire.syntax.field._
+
+import java.security.MessageDigest
 
 /** */
 sealed abstract case class Fresh[K](init: () => K, next: K => K)
@@ -45,5 +49,33 @@ object Fresh {
     val K = Integral[K]; import K._
 
     Fresh(OpaqueKey(zero), key => OpaqueKey(key.value + one))
+  }
+}
+
+import eu.timepit.refined.refineV
+
+sealed abstract case class Phresh[K, V](next: (K, V) => K)
+
+object Phresh {
+
+  def apply[K, V](next: (K, V) => K): Phresh[K, V] = new Phresh(next) {}
+
+  /**
+    * TODO:
+    *   - hybrid (binary key, text value)... is this what we want?
+    *   - Sha256 will have to print out as Base64... hash that?
+    *   - do we need `String Refined IsSha256AsBase64`
+    *   - threading: single threaded per instance - is this ok?
+    */
+  def sha256[V]: Phresh[Sha256, V] = {
+    val md = MessageDigest getInstance "SHA-256"
+    new Phresh[Sha256, V](
+      (j, v) => {
+        md update j.value
+        md update v.toString.getBytes("UTF-8")
+        val Right(sha) = refineV[IsSha256](md.digest())
+        sha
+      }
+    ) {}
   }
 }

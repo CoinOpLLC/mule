@@ -7,7 +7,7 @@ import cats.implicits._
 import cats.{ Show }
 
 /**
-  * `Observable`ervable variables which affect `Contract` evaluation.
+  * `Observable` values which affect [[Contract]] evaluation.
   *
   * We follow the approach taken by [[http://netrium.org/ Netrium]]
   * (make `Observable` an GADT.)

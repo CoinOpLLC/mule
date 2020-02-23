@@ -18,10 +18,13 @@ package io.deftrade
 
 import implicits._
 
+import cats.implicits._
+
 import eu.timepit.refined
 import refined.api.Refined
-import refined.W
+import refined.{ refineV, W }
 import refined.boolean.And
+import refined.generic.Equal
 import refined.collection.{ MaxSize, NonEmpty, Size }
 import refined.numeric.{ Interval, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
@@ -85,9 +88,7 @@ object refinements {
   /** */
   object VarChar {
     import refined.auto._
-
     val empty: VarChar = ""
-
   }
 
   /** Our `Refined` type naming convention: {{{type XYZ = T Refined IsXYZ}}} */
@@ -109,10 +110,23 @@ object refinements {
   type VarChar255 = String Refined IsVarChar255
 
   /** */
-  type IsSha256 = Size[W.`32`.T]
+  type IsSha256 = Size[Equal[W.`32`.T]]
 
   /** */
   type Sha256 = Array[Byte] Refined IsSha256
+
+  /** */
+  object Sha256 {
+    import java.util.Base64
+    def toBase64(sha: Sha256): String = Base64.getUrlEncoder encodeToString sha.value
+    def fromBase64(b64: String): Result[Sha256] =
+      refineV[IsSha256](Base64.getUrlDecoder decode b64) leftMap Fail.fromString
+  }
+
+  /** */
+  implicit class ShaOps(val sha: Sha256) {
+    def toBase64: String = Sha256 toBase64 sha
+  }
 
   /**  */
   object IsUnitInterval {
