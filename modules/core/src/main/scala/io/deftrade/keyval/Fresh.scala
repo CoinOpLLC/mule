@@ -52,11 +52,17 @@ object Fresh {
   }
 }
 
-import eu.timepit.refined.refineV
+import eu.timepit.refined
+import refined.refineV
+import refined.api.Validate
 
 sealed abstract case class Phresh[K, V](next: (K, V) => K)
 
+import scodec.bits.ByteVector
 object Phresh {
+
+  /** FIXME need a strategy which comprehends the b58 strings as well */
+  implicit def validateSha256: Validate.Plain[ByteVector, IsSha256] = ???
 
   def apply[K, V](next: (K, V) => K): Phresh[K, V] = new Phresh(next) {}
 
@@ -68,12 +74,13 @@ object Phresh {
     *   - threading: single threaded per instance - is this ok?
     */
   def sha256[V]: Phresh[Sha256, V] = {
+
     val md = MessageDigest getInstance "SHA-256"
     new Phresh[Sha256, V](
       (j, v) => {
-        md update j.value
-        md update v.toString.getBytes("UTF-8")
-        val Right(sha) = refineV[IsSha256](md.digest())
+        md update j.value.toArray
+        md update (v.toString getBytes "UTF-8")
+        val Right(sha) = refineV[IsSha256](ByteVector(md.digest()))
         sha
       }
     ) {}

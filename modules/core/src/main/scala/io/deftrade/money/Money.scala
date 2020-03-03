@@ -41,8 +41,8 @@ import cats.kernel.{ CommutativeGroup, Order }
   *
   * Therefore we make use of the `RefType` and `Validated` classes to integrate with `Refined`.
   *
-  * TODO: review b/c this is sketchy.
-  * OTOH would be easy to adapt this code to a pure Refined based impl.
+  * TODO: review b/c this is arguably sketchy.
+  * OTOH: would be easy to adapt this code to a pure Refined based impl.
   */
 final class Mny[N, C] private (val amount: N) extends AnyVal with Serializable { lhs =>
 
