@@ -27,7 +27,9 @@ import cats.effect.Sync
 import fs2.Stream
 
 import eu.timepit.refined
-import refined.api.Refined
+import refined.refineV
+
+import scodec.bits.ByteVector
 
 import io.circe.Json
 
@@ -363,8 +365,10 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId[Transaction] {
 
+    import Phresh._
+
     /** */
-    private val hackSha256: Sha256 = Refined unsafeApply (0 until 256 / 8 map (_.toByte)).toArray
+    private val Right(hackSha256) = refineV[IsSha256](ByteVector((0 until 256 / 8).map(_.toByte)))
 
     /** */
     final type MetaSha = Meta => Sha256
