@@ -19,7 +19,7 @@ package io.deftrade
 import cats.implicits._
 
 import eu.timepit.refined
-import refined.api.{ Refined }
+import refined.api.{ Refined, Validate }
 import refined.{ refineV, W }
 import refined.boolean.And
 import refined.generic.Equal
@@ -36,8 +36,6 @@ import scala.language.existentials
 
 /**
   * A palette of domain specific refined types.
-  *
-  * Prêt à porter, batteries included, your metaphore here (civil pull requests considered).
   */
 object refinements {
 
@@ -110,16 +108,29 @@ object refinements {
   type VarChar255 = String Refined IsVarChar255
 
   /** */
-  type IsSha256 = Size[Equal[W.`32`.T]]
+  sealed abstract case class IsSha256()
+
+  object IsSha256 {
+
+    lazy val instance: IsSha256 = new IsSha256() {}
+
+    implicit def isSha256Validate: Validate.Plain[String, IsSha256] =
+      Validate fromPredicate (predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
+
+    def predicate(s: String): Boolean = failsafe {
+      val Some(bs) = ByteVector fromBase58 s
+      bs.size === 32
+    }
+  }
 
   /** */
-  type Sha256 = ByteVector Refined IsSha256
+  type Sha256 = String Refined IsSha256
 
   /** FIXME */
   /** */
   object Sha256 {
-    // def fromBase58(b58: String): Result[Sha256] =
-    //   refineV[IsSha256](ByteVector fromValidBase58 b58) leftMap Fail.fromString
+    def toByteVector(sha: Sha256)             = ByteVector fromValidBase58 sha.value
+    def toByteArray(sha: Sha256): Array[Byte] = toByteVector(sha).toArray
   }
 
   /**  */
@@ -130,4 +141,8 @@ object refinements {
     type `(0,1]` = Interval.OpenClosed[_0, _1]
     type `[0,1]` = Interval.Closed[_0, _1]
   }
+
+  /**  */
+  private[deftrade] def failsafe(thunk: => Boolean): Boolean =
+    scala.util.Try apply thunk fold (_ => false, identity)
 }

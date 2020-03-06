@@ -17,71 +17,55 @@
 package io.deftrade
 package keyval
 
-import refinements.{ IsSha256, Sha256 }
+import refinements.{ Sha256 }
 
 import spire.math.Integral
 import spire.syntax.field._
 
-import java.security.MessageDigest
+import eu.timepit.refined
+import refined.api.{ Refined }
+import scodec.bits.ByteVector
 
-/** */
-sealed abstract case class Fresh[K](init: () => K, next: K => K)
+import java.security.MessageDigest
 
 /**
   * Defines how to create a fresh '''globally unique''' key which
   * is suitable to be persisted.
   */
+sealed abstract case class Fresh[K, V](next: (K, V) => K)
+
 object Fresh {
-
-  /** */
-  def apply[K](init: => K, next: K => K): Fresh[K] = new Fresh(() => init, next) {}
-
-  /** */
-  def apply[K](implicit K: Fresh[K]) = K
 
   /**
     * Equivalent to `autoincrement` or `serial` from SQL.
     *
     * TODO: PRNG version.
     */
-  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P]] = {
+  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P], P] = {
 
     val K = Integral[K]; import K._
 
-    Fresh(OpaqueKey(zero), key => OpaqueKey(key.value + one))
+    apply { (key, ph) =>
+      OpaqueKey(key.value + one)
+    }
   }
-}
 
-import eu.timepit.refined
-import refined.refineV
-import refined.api.Validate
-
-sealed abstract case class Phresh[K, V](next: (K, V) => K)
-
-import scodec.bits.ByteVector
-object Phresh {
-
-  /** FIXME need a strategy which comprehends the b58 strings as well */
-  implicit def validateSha256: Validate.Plain[ByteVector, IsSha256] = ???
-
-  def apply[K, V](next: (K, V) => K): Phresh[K, V] = new Phresh(next) {}
+  def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
   /**
+    * The use of unsafeApply here is canonical: this is literally the definition of the type.
+    *
     * TODO:
-    *   - hybrid (binary key, text value)... is this what we want?
-    *   - Sha256 will have to print out as Base64... hash that?
-    *   - do we need `String Refined IsSha256AsBase64`
     *   - threading: single threaded per instance - is this ok?
     */
-  def sha256[V]: Phresh[Sha256, V] = {
+  def sha256[V]: Fresh[Sha256, V] = {
 
     val md = MessageDigest getInstance "SHA-256"
-    new Phresh[Sha256, V](
+    new Fresh[Sha256, V](
       (j, v) => {
-        md update j.value.toArray
+        md update (Sha256 toByteArray j)
         md update (v.toString getBytes "UTF-8")
-        val Right(sha) = refineV[IsSha256](ByteVector(md.digest()))
-        sha
+        Refined unsafeApply ByteVector(md.digest()).toBase58
       }
     ) {}
   }

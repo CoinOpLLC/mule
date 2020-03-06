@@ -2,6 +2,8 @@ package io.deftrade
 package model
 package capital
 
+import refinements.failsafe
+
 import cats.implicits._
 
 import shapeless.syntax.singleton._
@@ -201,7 +203,4 @@ object keys {
   // https://en.wikipedia.org/wiki/Luhn_algorithm
   private[deftrade] def luhn(digit: Int, idx: Int): Int =
     if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10
-
-  private[deftrade] def failsafe(thunk: => Boolean): Boolean =
-    scala.util.Try apply thunk fold (_ => false, identity)
 }

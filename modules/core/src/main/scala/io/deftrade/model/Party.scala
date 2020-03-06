@@ -33,8 +33,6 @@ import refined.auto._
 
 import shapeless.syntax.singleton._
 
-import io.circe.Json
-
 import Party.Tax
 
 /**
@@ -48,7 +46,7 @@ import Party.Tax
 sealed trait Party extends Product with Serializable {
   def name: Label
   def taxId: Tax.Id
-  def meta: Json
+  def meta: Meta
 }
 
 /**
@@ -61,7 +59,7 @@ object Party extends WithOpaqueKey[Int, Party] {
   }
 
   /** TODO: this is sketchy and probably not needed */
-  def apply(name: Label, taxId: Tax.Id, meta: Json)(
+  def apply(name: Label, taxId: Tax.Id, meta: Meta)(
       implicit
       vssn: Validate[String, Tax.IsSsn],
       vein: Validate[String, Tax.IsEin],
@@ -159,7 +157,7 @@ object Party extends WithOpaqueKey[Int, Party] {
 final case class NaturalPerson(
     name: Label,
     ssn: Tax.Ssn,
-    meta: Json
+    meta: Meta
 ) extends Party {
   def taxId = ssn
 }
@@ -168,7 +166,7 @@ final case class NaturalPerson(
 object NaturalPerson extends WithOpaqueKey[Int, NaturalPerson]
 
 /**  */
-final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Json) extends Party {
+final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta) extends Party {
   def taxId = ein
 }
 
