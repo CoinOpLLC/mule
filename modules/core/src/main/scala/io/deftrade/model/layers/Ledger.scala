@@ -400,7 +400,14 @@ trait Ledger { module: ModuleTypes =>
     ): Stream[F, Transaction] =
       for {
         id <- trade |> record
-      } yield Transaction(from, to, id, meta |> digest)
+      } yield Transaction(
+        from, to, id,
+        meta |> digest // FIXME broken
+      )
+      // instead of Sha256, use Meta.Id
+      // commit meta and get id before comitting xaction
+      // same with trade
+      // these can happen concurrently  
 
     // /** TODO: investigate kittens for this. */
     // implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
