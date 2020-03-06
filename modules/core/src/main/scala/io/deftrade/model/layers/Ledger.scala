@@ -27,19 +27,14 @@ import cats.effect.Sync
 import fs2.Stream
 
 import eu.timepit.refined
-import refined.refineV
+import refined.api.Refined
 
 import scodec.bits.ByteVector
-
-import io.circe.Json
 
 /**
   * Support for performing and recording [[Transaction]]s.
   */
 trait Ledger { module: ModuleTypes =>
-
-  /** nb this is where fresh key policy is decided for the ledger */
-  final def defaultFresh: Fresh[Folio.Key] = Fresh.zeroBasedIncr
 
   /**  */
   sealed trait Pricer {
@@ -339,9 +334,6 @@ trait Ledger { module: ModuleTypes =>
       metaHash: Sha256
   )
 
-  /** f'rinstance */
-  type Meta = Json
-
   import refinements.IsSha256
 
   /**
@@ -351,9 +343,6 @@ trait Ledger { module: ModuleTypes =>
     * a `Meta` key value store containing the value, you have access to the value itself.
     *
     * Note this value is effectively unforgeable / self validating.
-    *
-    * FIXME String should be byte string.
-    * FIXME `WithHashId` should be a thing.
     */
   object Meta extends WithRefinedKey[String, IsSha256, Meta]
 
@@ -365,11 +354,6 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId[Transaction] {
 
-    import Phresh._
-
-    /** */
-    private val Right(hackSha256) = refineV[IsSha256](ByteVector((0 until 256 / 8).map(_.toByte)))
-
     /** */
     final type MetaSha = Meta => Sha256
 
@@ -379,7 +363,11 @@ trait Ledger { module: ModuleTypes =>
     /**
       * Digester. FIXME: actually implement
       */
-    def digest: MetaSha = _ => hackSha256
+    def digest: MetaSha =
+      json =>
+        Refined unsafeApply ByteVector(
+          json.noSpacesSortKeys getBytes "UTF-8"
+        ).digest("SHA-256").toBase58
 
     /**       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -388,7 +376,7 @@ trait Ledger { module: ModuleTypes =>
         to: Folio.Key,
         instrument: Instrument.Key,
         amount: Quantity,
-        meta: Json
+        meta: Meta
     ): Stream[F, Transaction] = multi(record)(from, to, Trade(instrument -> amount), meta)
 
     /**       */
@@ -396,7 +384,7 @@ trait Ledger { module: ModuleTypes =>
         from: Folio.Key,
         to: Folio.Key,
         trade: Trade,
-        meta: Json
+        meta: Meta
     ): Stream[F, Transaction] =
       for {
         id <- trade |> record

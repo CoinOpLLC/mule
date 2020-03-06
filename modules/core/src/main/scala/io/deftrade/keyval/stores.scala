@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import implicits._
+import implicits._, refinements.Sha256
 
 import cats.implicits._
 import cats.Eq
@@ -134,7 +134,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append(row: Row): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+      id <- Stream eval F.delay { Id(fukkingfixme) }
       _ <- Stream eval F.delay {
             updateCache(row)
             id -> row
@@ -181,9 +181,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   /** */
   protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
 
-  protected lazy val rawId = new java.util.concurrent.atomic.AtomicLong(fresh.init().value)
-
-  private lazy val fresh: Fresh[Id] = Fresh.zeroBasedIncr
+  protected var fukkingfixme: Long = ???
 }
 
 /**
@@ -218,7 +216,7 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
       evValue: (K2, V2) <:< Value
   ): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+      id <- Stream eval F.delay { Id(fukkingfixme) }
       _  <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
     } yield id
 
@@ -302,7 +300,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
       implicit ev: (K2, V2) <:< Value
   ): EffectStream[Id] =
     for {
-      id  <- Stream eval F.delay { Id(rawId.getAndIncrement) }
+      id  <- Stream eval F.delay { Id(fukkingfixme) }
       kkv <- upsertMap(key -> k2v2s)
       _ <- Stream eval F.delay(id -> (kkv._1 -> (kkv._2.some))) through
             permRowToCSV through

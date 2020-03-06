@@ -17,7 +17,7 @@ object Version {
   val CatsEffect = "2.0.0"
 
   val Spire = "0.17.0-M1"
-  val Circe = "0.12.1"
+  val Circe = "0.13.0"
   val Fs2   = "2.1.0"
 
   val Cormorant  = "0.3.0-M6"
@@ -83,12 +83,12 @@ object Deps {
 
   val circeii = Seq(
     "core",
-    // "generic",
-    // "parser",
-    // "shapes",
-    // "scodec",
+    "generic",
+    "parser",
+    "shapes",
+    "scodec",
     "refined",
-    "java8",
+    // "java8",
   ) map { x =>
     "io.circe" %% s"circe-$x" % Circe
   }
@@ -162,7 +162,7 @@ object Deps {
       kittens,
       spire,
       shapeless,
-    ) ++ fs2s ++ cormorants ++ fuiids
+    ) ++ fs2s ++ cormorants ++ fuiids ++ circeii
 
   lazy val misclibs =
     List(

@@ -36,6 +36,8 @@ import eu.timepit.refined
 import refined.api.Refined
 import fs2.{ Pipe }
 
+import io.circe.Json
+
 import io.chrisdavenport.cormorant
 import cormorant.implicits.stringPut
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
@@ -79,7 +81,8 @@ import java.nio.file.{ Paths }
   *   - Q: What is a "business key?"
   *   - A: "Real business keys only change when the business changes!"
   *   - Dito those essential, universal, canonical attributes
-  *   - everything else is `meta: Json`
+  *   - everything else is `meta: Meta`
+  *   - as a start: `type Meta = io.cice.Json`
   *      - which can be stored / indexed as binary in Mongo and Postgres
   *      - which can be projected to create Satellite views.
   *   - TODO: consider explicitly separating the structural items (keys and links between keys)
@@ -158,6 +161,8 @@ package object keyval {
 
   /** */
   def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
+
+  type Meta = Json
 }
 
 package keyval {

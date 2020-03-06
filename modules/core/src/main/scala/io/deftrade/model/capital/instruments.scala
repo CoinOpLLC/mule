@@ -26,8 +26,6 @@ import enumeratum.EnumEntry
 
 import eu.timepit.refined
 
-import io.circe.Json
-
 import keys.{ IsIsin, IsUsin }
 
 /**
@@ -50,7 +48,7 @@ final case class Instrument(
     issuer: Party.Key,
     currency: CurrencyLike,
     cols: columns.Columns,
-    meta: Json,
+    meta: Meta,
 ) extends Numéraire.InKind {
 
   /**
