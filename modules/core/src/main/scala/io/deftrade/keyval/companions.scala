@@ -17,6 +17,8 @@
 package io.deftrade
 package keyval
 
+import refinements.Sha256
+
 import cats.{ Eq, Order }
 
 import eu.timepit.refined
@@ -52,20 +54,14 @@ protected sealed trait WithValue {
   /** */
   type Value
 
-  /** TODO: this is sketchy */
-  implicit lazy val eqValue: Eq[Value] = Eq.fromUniversalEquals[Value]
-
-  /** */
-  // implicit lazy val showValue: Show[V] = cats.derived.semi.show
-
   /** A permanent identifier (eg auto-increment in a db col) */
-  final type Id = OpaqueKey[Long, Value]
+  final type Id = Sha256
 
   /**  */
   object Id {
 
     /**  */
-    private[deftrade] def apply(raw: Long): Id = OpaqueKey(raw)
+    // private[deftrade] def apply(raw: Long): Id = OpaqueKey(raw)
   }
 
   /**

@@ -33,6 +33,8 @@ import refined.cats.refTypeOrder
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle, ReadCursor, WriteCursor }
 
+import scodec.bits.ByteVector
+
 import io.chrisdavenport.cormorant
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Put }
 import cormorant.generic.semiauto._
@@ -134,7 +136,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append(row: Row): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { Id(fukkingfixme) }
+      id <- Stream eval F.delay { prev }
       _ <- Stream eval F.delay {
             updateCache(row)
             id -> row
@@ -181,7 +183,9 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   /** */
   protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
 
-  protected var fukkingfixme: Long = ???
+  protected var prev: Id = ???
+
+  protected lazy val fresh: Fresh[Id, Row] = Fresh.sha256[Row]
 }
 
 /**
@@ -213,11 +217,17 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append[K2, V2](k2v2s: Map[K2, V2])(
       implicit
-      evValue: (K2, V2) <:< Value
+      evValue: (K2, V2) <:< V
   ): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { Id(fukkingfixme) }
-      _  <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
+      id <- Stream eval F.delay {
+             fresh.nextAll(
+               prev,
+               k2v2s.headOption.fold(???)(evValue),
+               (k2v2s drop 1).toList.map(evValue): _*
+             )
+           }
+      _ <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
     } yield id
 
   /** */
@@ -260,8 +270,7 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   final protected def deriveVToCsv(
       implicit
       llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[EffectType, PermRow, String] =
-    writeLabelled(printer)
+  ): Pipe[EffectType, PermRow, String] = writeLabelled(printer)
 }
 
 /**  */
@@ -300,7 +309,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
       implicit ev: (K2, V2) <:< Value
   ): EffectStream[Id] =
     for {
-      id  <- Stream eval F.delay { Id(fukkingfixme) }
+      id  <- Stream eval F.delay { prev }
       kkv <- upsertMap(key -> k2v2s)
       _ <- Stream eval F.delay(id -> (kkv._1 -> (kkv._2.some))) through
             permRowToCSV through

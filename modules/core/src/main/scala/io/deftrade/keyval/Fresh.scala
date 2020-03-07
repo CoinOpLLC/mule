@@ -32,9 +32,15 @@ import java.security.MessageDigest
   * Defines how to create a fresh '''globally unique''' key which
   * is suitable to be persisted.
   */
-sealed abstract case class Fresh[K, V](next: (K, V) => K)
+sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
+  def nextAll(j: K, v: V, vs: V*): K =
+    vs.foldLeft(next(j, v))(next)
+}
 
 object Fresh {
+
+  /** */
+  def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
   /**
     * Equivalent to `autoincrement` or `serial` from SQL.
@@ -50,13 +56,8 @@ object Fresh {
     }
   }
 
-  def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
-
   /**
     * The use of unsafeApply here is canonical: this is literally the definition of the type.
-    *
-    * TODO:
-    *   - threading: single threaded per instance - is this ok?
     */
   def sha256[V]: Fresh[Sha256, V] = {
 

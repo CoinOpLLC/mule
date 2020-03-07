@@ -38,13 +38,23 @@ trait Ledger { module: ModuleTypes =>
 
   /**  */
   sealed trait Pricer {
+
+    /**  */
     type Thing
+
+    /**  */
     type CurrencyTag
-    // type MonetaryAmount
+
+    /**  */
     type EffectType[_]
+
+    /**  */
     val price: Thing => Stream[EffectType, Money[CurrencyTag]]
+
+    /**  */
     implicit val C: Currency[CurrencyTag]
-    // implicit val N: Financial[MonetaryAmount]
+
+    /**  */
     implicit val F: Sync[EffectType]
   }
 
@@ -68,12 +78,10 @@ trait Ledger { module: ModuleTypes =>
     )(
         implicit
         final override val C: Currency[C],
-        // implicit override val N: Financial[N],
         final override val F: Sync[F]
     ) extends Pricer {
-      final type Thing       = T
-      final type CurrencyTag = C
-      // final type MonetaryAmound = N
+      final type Thing         = T
+      final type CurrencyTag   = C
       final type EffectType[x] = F[x]
     }
   }
@@ -126,7 +134,7 @@ trait Ledger { module: ModuleTypes =>
     */
   type Position = (Instrument.Key, Quantity)
 
-  /** placeholder */
+  /** */
   object Position {
 
     /**  Enables volume discounts or other quantity-specific pricing. */
@@ -388,14 +396,17 @@ trait Ledger { module: ModuleTypes =>
     ): Stream[F, Transaction] =
       for {
         id <- trade |> record
-      } yield Transaction(
-        from, to, id,
-        meta |> digest // FIXME broken
-      )
-      // instead of Sha256, use Meta.Id
-      // commit meta and get id before comitting xaction
-      // same with trade
-      // these can happen concurrently  
+      } yield
+        Transaction(
+          from,
+          to,
+          id,
+          meta |> digest // FIXME broken
+        )
+    // instead of Sha256, use Meta.Id
+    // commit meta and get id before comitting xaction
+    // same with trade
+    // these can happen concurrently
 
     // /** TODO: investigate kittens for this. */
     // implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
