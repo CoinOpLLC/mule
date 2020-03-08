@@ -136,7 +136,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append(row: Row): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { prev }
+      id <- Stream eval F.delay { prev = fresh.next(prev, row); prev }
       _ <- Stream eval F.delay {
             updateCache(row)
             id -> row

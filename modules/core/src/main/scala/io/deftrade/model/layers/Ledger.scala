@@ -160,7 +160,6 @@ trait Ledger { module: ModuleTypes =>
           case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
         }
     }
-
   }
 
   /** A [[Position]] in motion. */
@@ -335,11 +334,11 @@ trait Ledger { module: ModuleTypes =>
     * Store the '''cryptographic hash''' of whatever metadata there is.
     */
   sealed abstract case class Transaction private (
-      recordedAt: Instant,
+      at: Instant,
       from: Folio.Key,
       to: Folio.Key,
       trade: Trade.Id,
-      metaHash: Sha256
+      meta: Meta.Id
   )
 
   import refinements.IsSha256
@@ -352,7 +351,18 @@ trait Ledger { module: ModuleTypes =>
     *
     * Note this value is effectively unforgeable / self validating.
     */
-  object Meta extends WithRefinedKey[String, IsSha256, Meta]
+  object Meta extends WithId[Meta] {
+
+    /**
+      * FIXME: this needs to go in Fresh as an optional kind of `Id` (for json only)
+      * TODO: this is fragile at best and arguably very questionable. Evolve this.
+      */
+    def digest: Meta => Meta.Id =
+      json =>
+        Refined unsafeApply ByteVector(
+          json.noSpacesSortKeys getBytes "UTF-8"
+        ).digest("SHA-256").toBase58
+  }
 
   /**
     * Because `Transaction`s are immutable, we model them as pure value classes
@@ -362,24 +372,12 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId[Transaction] {
 
-    /** */
-    final type MetaSha = Meta => Sha256
+    private def apply(from: Folio.Key, to: Folio.Key, rc: Trade.Id, meta: Meta.Id): Transaction =
+      new Transaction(instant, from, to, rc, meta) {}
 
-    private def apply(from: Folio.Key, to: Folio.Key, rc: Trade.Id, metaHash: Sha256): Transaction =
-      new Transaction(instant, from, to, rc, metaHash) {}
-
-    /**
-      * Digester. FIXME: actually implement
-      */
-    def digest: MetaSha =
-      json =>
-        Refined unsafeApply ByteVector(
-          json.noSpacesSortKeys getBytes "UTF-8"
-        ).digest("SHA-256").toBase58
-
-    /**       */
+    /**  */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def single[F[_]: Sync](record: Trade => Stream[F, Trade.Id])(
+    def single[F[_]: Sync](record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)])(
         from: Folio.Key,
         to: Folio.Key,
         instrument: Instrument.Key,
@@ -387,28 +385,15 @@ trait Ledger { module: ModuleTypes =>
         meta: Meta
     ): Stream[F, Transaction] = multi(record)(from, to, Trade(instrument -> amount), meta)
 
-    /**       */
-    def multi[F[_]: Sync](record: Trade => Stream[F, Trade.Id])(
+    /**   */
+    def multi[F[_]: Sync](record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)])(
         from: Folio.Key,
         to: Folio.Key,
         trade: Trade,
         meta: Meta
     ): Stream[F, Transaction] =
       for {
-        id <- trade |> record
-      } yield
-        Transaction(
-          from,
-          to,
-          id,
-          meta |> digest // FIXME broken
-        )
-    // instead of Sha256, use Meta.Id
-    // commit meta and get id before comitting xaction
-    // same with trade
-    // these can happen concurrently
-
-    // /** TODO: investigate kittens for this. */
-    // implicit def hash: Hash[Transaction] = Hash.fromUniversalHashCode[Transaction]
+        ids <- record(trade, meta)
+      } yield Transaction(from, to, ids._1, ids._2)
   }
 }

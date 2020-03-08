@@ -48,7 +48,7 @@ final case class Instrument(
     issuer: Party.Key,
     currency: CurrencyLike,
     cols: columns.Columns,
-    meta: Meta,
+    meta: Meta.Id,
 ) extends Numéraire.InKind {
 
   /**

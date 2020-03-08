@@ -31,8 +31,9 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[Party.Key, Quantity],
-      nonPrincipals: Role => NonEmptySet[Party.Key]
+      nonPrincipals: Map[Role, NonEmptySet[Party.Key]]
   ) {
+
     import Party.Key
 
     /** */
@@ -44,24 +45,16 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /** */
     def withAgent(agent: Key): Roster =
-      Roster unsafe (
-        principals,
-        role =>
-          role match {
-            case Role.Agent => NonEmptySet one agent
-            case np         => nonPrincipals(np)
-        }
+      Roster(
+        principals = principals,
+        nonPrincipals = nonPrincipals + (Role.Agent -> NonEmptySet.one(agent))
       )
 
     /** */
     def withAuditor(auditor: Party.Key): Roster =
-      Roster unsafe (
-        principals,
-        role =>
-          role match {
-            case Role.Auditor => NonEmptySet one auditor
-            case np           => nonPrincipals(np)
-        }
+      Roster(
+        principals = principals,
+        nonPrincipals = nonPrincipals + (Role.Auditor -> NonEmptySet.one(auditor))
       )
   }
 
@@ -72,14 +65,22 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import Party.Key
 
+    private[deftrade] def apply(
+        principals: UnitPartition[Party.Key, Quantity],
+        nonPrincipals: Map[Role, NonEmptySet[Party.Key]]
+    ): Roster =
+      new Roster(principals, nonPrincipals) {}
+
     /**
       * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
       * regardless of their share of the principle pie
       */
-    def forPrinciples(principles: UnitPartition[Key, Quantity]): Roster =
-      unsafe(
-        principles,
-        _ => NonEmptySet(principles.keys.head, principles.keys.tail)
+    def forPrinciples(principals: UnitPartition[Key, Quantity]): Roster =
+      apply(
+        principals,
+        nonPrincipals = Map.empty withDefault { _ =>
+          NonEmptySet(principals.keys.head, principals.keys.tail)
+        }
       )
 
     /**
@@ -89,21 +90,18 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /** */
     def single(entity: Key): Roster =
-      unsafe(
+      apply(
         principals = UnitPartition single entity,
-        nonPrincipals = _ => NonEmptySet one entity
+        nonPrincipals = Map.empty withDefault { _ =>
+          NonEmptySet one entity
+        }
       )
-
-    private def unsafe(
-        principals: UnitPartition[Key, Quantity],
-        nonPrincipals: Role => NonEmptySet[Key]
-    ): Roster = new Roster(principals, nonPrincipals) {}
   }
 
   /**
     * Predicate defining a very conventional looking account numbering scheme.
     */
-  type IsAccountNo = Interval.Closed[W.`100000100100L`.T, W.`999999999999L`.T]
+  type IsAccountNo = Interval.Closed[W.`100000100108L`.T, W.`999999999999L`.T]
 
   /**
     * `Account`s consist of:
