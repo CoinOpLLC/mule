@@ -108,7 +108,11 @@ trait Accounts { self: Ledger with ModuleTypes =>
     *   - a `Roster`: who gets to do what, and who are the beneficial owners.
     *   - a `Folio` (list of instruments and their quantities)
     */
-  sealed abstract case class Account(roster: Roster, folioKey: Folio.Key)
+  sealed abstract case class Account(
+      roster: Roster,
+      settled: Folio.Key,
+      // unsettled: Folio.Key,
+  )
 
   /**
     * Accounts are modelled as long lived entities that can evolve over time.

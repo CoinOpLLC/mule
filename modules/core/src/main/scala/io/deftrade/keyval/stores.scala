@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import implicits._, refinements.Sha256
+import implicits._, refinements.IsSha256
 
 import cats.implicits._
 import cats.Eq
@@ -28,6 +28,7 @@ import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import eu.timepit.refined
+import refined.api.Refined
 import refined.cats.refTypeOrder
 
 import fs2.{ text, Pipe, Stream }
@@ -183,8 +184,11 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   /** */
   protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
 
-  protected var prev: Id = ???
+  /** FIXME obviously... this works, not obvously, that's the problem */
+  protected var prev: Id =
+    Refined unsafeApply [String, IsSha256] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
 
+  /** */
   protected lazy val fresh: Fresh[Id, Row] = Fresh.sha256[Row]
 }
 

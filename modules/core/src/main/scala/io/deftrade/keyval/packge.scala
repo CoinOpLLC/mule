@@ -162,6 +162,7 @@ package object keyval {
   /** */
   def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
 
+  /** TODO: revisit */
   type Meta = Json
 }
 

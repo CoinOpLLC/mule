@@ -21,7 +21,8 @@ import keyval.DtEnum, contracts.Numéraire
 
 import enumeratum.EnumEntry
 
-import cats.instances.string._
+import cats.implicits._
+// import cats.instances.string._
 import cats.Order
 
 import eu.timepit.refined
@@ -124,10 +125,11 @@ object Currency extends DtEnum[CurrencyLike] { self =>
     */
   def apply[C](implicit C: Currency[C]): Currency[C] = C
 
-  /** */
+  /**
+    */
   def unapply(n: Numéraire): Option[CurrencyLike] = n match {
-    case _ if values contains n => ???
-    case _                      => None
+    case c: CurrencyLike if values contains c => Some(c)
+    case _                                    => None
   }
 
   /**

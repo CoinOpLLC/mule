@@ -18,8 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import implicits._, time._, money._, keyval._, capital._
-import refinements.Sha256
+import time._, money._, keyval._, capital._
 
 import cats.implicits._
 
@@ -112,10 +111,11 @@ trait Ledger { module: ModuleTypes =>
       ) {}
 
     /**
+      * @return an `InstrumentPricer` which be functions as a two element search path
+      * of `InstrumentPricer`s.
+      *
       * TODO: Looks like `InstrumentPricer` is a [[cats.Monoid]]
       * Not commutative: price given by `a` (if given) has precedence.
-      *
-      * A two element search path of `InstrumentPricer`s, basically.
       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def combine[F[_]: Sync, C: Currency](
@@ -278,6 +278,8 @@ trait Ledger { module: ModuleTypes =>
   sealed abstract case class PricedTrade[C](trade: Trade, amount: Money[C]) {
 
     /**
+      * FIXME: this belongs at a higher level but it's proven valuable to work through here.
+      *
       * @return `Stream` effect will effectively subtract amount from the `against` folio
       *   via a "coin selection" algo (allocating across multi bank accts)
       * - creates a complete, "paid" trade with a single unified, universal, anonymous,
@@ -286,19 +288,27 @@ trait Ledger { module: ModuleTypes =>
       *   creating a [[Transaction]].
       */
     final def paid[F[_]: Sync](
-        against: Folio.Key
+        recordTrade: Trade => Stream[F, Trade.Id],
+        cashPositions: Currency[C] => Folio.Key => Stream[F, List[Position]],
+        payCash: Folio.Key => Position => Stream[F, Folio.Id]
     )(
-        trade: Trade,
-        amount: Money[C]
+        drawAgainst: Folio.Key
     )(
         implicit
-        C: Currency[C]
-    ): Stream[F, Result[Trade.Id]] =
+        C: Currency[C],
+        F: Sync[F]
+    ): Stream[F, Result[Trade.Id]] = {
       // find legal tender of right currency in folio
-      // pos balance after subtraction of amount?
-      // yes: subtract amount
-      // no: subtract balance and recurse
-      ???
+      val ret = for {
+        t         <- recordTrade(trade)
+        cps       <- cashPositions(C)(drawAgainst)
+        h         <- Stream eval F.delay(cps: _*)
+        receiptId <- payCash(drawAgainst)(h)
+      } yield Result(t.some) // (h._1, h._2 - amount)
+      ret // FIXME this is wrong, just checking compilation`
+    } // pos balance after subtraction of amount?
+    // yes: subtract amount
+    // no: subtract balance and recurse
   }
 
   /** */
@@ -340,8 +350,6 @@ trait Ledger { module: ModuleTypes =>
       trade: Trade.Id,
       meta: Meta.Id
   )
-
-  import refinements.IsSha256
 
   /**
     * The Meta store is content-addressed: entries are indexed with their own Sha256.
