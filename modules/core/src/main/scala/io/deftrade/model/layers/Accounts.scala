@@ -13,6 +13,9 @@ import refined.W
 import refined.numeric.Interval
 import refined.cats.refTypeOrder
 
+/**
+  * Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
+  */
 trait Accounts { self: Ledger with ModuleTypes =>
 
   /**

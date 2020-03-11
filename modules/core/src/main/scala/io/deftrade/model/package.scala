@@ -78,17 +78,17 @@ package object model
       acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
     }
   }
-
+  //
+  // /**  */
+  // def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
+  //     kvs: F[(K, V)]
+  // ): Map[K, F[V]] =
+  //   groupBy(kvs)(_._1) map {
+  //     case (k, kvs) => (k, kvs map (_._2))
+  //   }
+  //
   /**  */
-  def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
-      kvs: F[(K, V)]
-  ): Map[K, F[V]] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs map (_._2))
-    }
-
-  /**  */
-  def indexCG[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
+  def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
       kvs: F[(K, V)]
   ): Map[K, V] =
     groupBy(kvs)(_._1) map {

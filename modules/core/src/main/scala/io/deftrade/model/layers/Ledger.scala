@@ -31,7 +31,7 @@ import refined.api.Refined
 import scodec.bits.ByteVector
 
 /**
-  * Support for performing and recording [[Transaction]]s.
+  * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
 trait Ledger { module: ModuleTypes =>
 
@@ -194,7 +194,7 @@ trait Ledger { module: ModuleTypes =>
       *
       * Implementation differs, for efficiency.
       */
-    def apply(ps: Position*): Folio = indexCG(ps.toList)
+    def apply(ps: Position*): Folio = indexAndSum(ps.toList)
 
     /** */
     def empty: Folio = Map.empty
@@ -205,14 +205,11 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
-    *
-    * TODO: `Trade` stores should use WithHashId to get the natural reuse of `Trade`s
-    * and minimization of store size.
     */
-  object Trade extends WithId[Leg] { // sicc - to be continued
+  object Trade extends WithId[Leg] { // (sic)
 
     /** */
-    def apply(ps: Leg*): Trade = indexCG(ps.toList)
+    def apply(ps: Leg*): Trade = indexAndSum(ps.toList)
 
     /** */
     def empty: Trade = Map.empty
@@ -287,6 +284,7 @@ trait Ledger { module: ModuleTypes =>
       * - records that `Trade` in its store and returns the id, which is ready-to-use in
       *   creating a [[Transaction]].
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def paid[F[_]: Sync](
         recordTrade: Trade => Stream[F, Trade.Id],
         cashPositions: Currency[C] => Folio.Key => Stream[F, List[Position]],
@@ -302,7 +300,7 @@ trait Ledger { module: ModuleTypes =>
       val ret = for {
         t         <- recordTrade(trade)
         cps       <- cashPositions(C)(drawAgainst)
-        h         <- Stream eval F.delay(cps: _*)
+        h         <- Stream evals (F delay cps)
         receiptId <- payCash(drawAgainst)(h)
       } yield Result(t.some) // (h._1, h._2 - amount)
       ret // FIXME this is wrong, just checking compilation`

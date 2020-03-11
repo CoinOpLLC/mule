@@ -4,8 +4,7 @@ import money._, model.capital.Instrument
 
 /**
   * Single import DSL for contract specification, representation and evaluation,
-  * following the ''Composing Contracts'' work
-  * by Simon Peyton Jones and Jean-Marc Eber.
+  * capturing the operational semantics of contract performance.
   *
   * References:
   *   - Papers at [[https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/ Microsoft Resarch]]
@@ -18,15 +17,17 @@ import money._, model.capital.Instrument
   *   [[http://hackage.haskell.org/package/netrium Haskell implemenation]] (status?)
   *   - Financial DSLs [[http://www.dslfin.org/resources.html resource page]]
   *
-  * FAQ:
-  *   - Q: Why isn't this a subpackage of [[model]]?
-  *   - A: [[Contract]]s are not a "map of the terrain". ''They are the terrain.''
-  *       - captures the `operational semantics` of the `Contract` in a language (eDSL) that
-  *       is reviewable by the parties to the `Contract`.
-  *       - execution plan for [[Engine.Scheduling]] (dumb contract execution)
-  *       and [[Engine.Performing]] (smart contract execution)
-  *       - reference for all modes of analysis (e.g. [[Engine.Pricing]] to begin, but
-  *       eventually multi-model, including monte-carlo methods for path-dependent `Contract`s.)
+  *   Note: [[Contract]]s are not a "map of the terrain". ''They are the terrain.''
+  *
+  *   A `Contract` unifies all modes of performance and analysis:
+  *       - captures the `operational semantics` of contract performance
+  *       in a language (eDSL) that is reviewable by the parties to the `Contract`.
+  *       - guides workflow plan generation for manual contract execution via [[Engine.Scheduling]]
+  *       - supports smart contract execution via [[Engine.Performing]]
+  *       - provides the reference for all modes of analysis
+  *           - [[Engine.Pricing]] to begin
+  *           - monte-carlo methods for path-dependent `Contract`s (later)
+  *           - others
   */
 package object contracts extends Contract.primitives {
 
