@@ -20,10 +20,9 @@ import cats.implicits._
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.{ refineV, W }
+import refined.{ W }
 import refined.boolean.And
-import refined.generic.Equal
-import refined.collection.{ MaxSize, NonEmpty, Size }
+import refined.collection.{ MaxSize, NonEmpty }
 import refined.numeric.{ Interval, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
 // import refined.api.Validate

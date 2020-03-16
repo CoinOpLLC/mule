@@ -19,7 +19,7 @@ package keyval
 
 import refinements.Sha256
 
-import cats.{ Eq, Order }
+import cats.{ Order }
 
 import eu.timepit.refined
 import refined.refineV
@@ -56,13 +56,6 @@ protected sealed trait WithValue {
 
   /** A permanent identifier (eg auto-increment in a db col) */
   final type Id = Sha256
-
-  /**  */
-  object Id {
-
-    /**  */
-    // private[deftrade] def apply(raw: Long): Id = OpaqueKey(raw)
-  }
 
   /**
     * Think spreadsheet or relational table,
@@ -166,6 +159,12 @@ object WithKey {
 }
 
 /**
+  * Companion base class which defines a key as a `Refined`
+  * type, parameterized with the value type we are indexing.
+  */
+abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
+
+/**
   * Phantom type used to tag the key, which has type K as its underlying representation.
   * This can either be a trivial tag which encodes the independance of a key from the record
   * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
@@ -175,12 +174,6 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P],
   /** */
   object Key extends WithKey.RefinedKeyCompanion[K, P]
 }
-
-/**
-  * Companion base class which defines a key as a `Refined`
-  * type, parameterized with the value type we are indexing.
-  */
-abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
 
 // /** */
 // sealed abstract case class Key[K] private (k: K)
