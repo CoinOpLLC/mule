@@ -5,6 +5,7 @@ import implicits._, time._, money._
 
 import cats.implicits._
 import cats.{ Order, Show }
+import cats.evidence._
 
 import spire.syntax.field._
 import spire.math.Fractional
@@ -306,7 +307,7 @@ object Engine {
     final case class PR[A] private (val rvs: LL[RV[A]]) extends AnyVal {
       def take(n: Int)                           = PR take (this, n)
       def horizon                                = PR horizon this
-      def forall(implicit toBool: A =:= Boolean) = PR forall (toBool liftCo this)
+      def forall(implicit isBool: A === Boolean) = PR forall (isBool substitute this)
     }
 
     /**

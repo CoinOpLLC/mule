@@ -20,9 +20,9 @@ object Version {
   val Circe = "0.13.0"
   val Fs2   = "2.1.0"
 
-  val Cormorant  = "0.3.0-M6"
-  val Fuiid      = "0.3.0-M5"
-  val PureConfig = "0.12.2"
+  val Cormorant  = "0.3.0"
+  val Fuiid      = "0.3.0"
+  val PureConfig = "0.12.3"
   val TypesafeConfig = "1.3.3"
 
   val Http4s     = "0.21.0-M4"

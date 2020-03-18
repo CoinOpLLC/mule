@@ -76,7 +76,7 @@ object Result {
   /** Trivial; for completeness. */
   def toOption[T](result: Result[T]): Option[T] = result.toOption
 
-  /** Made trivial because `Fail <:< Throwable`. */
+  /** Made trivial because `Fail <~< Throwable`. */
   def toTry[T](result: Result[T]): Try[T] = result.toTry
 
   /** */

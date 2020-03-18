@@ -20,6 +20,7 @@ package time
 import implicits._
 
 import cats.{ Hash, Order, Show }
+import cats.evidence._
 
 import java.time._ // leave this be
 import java.time.chrono.{ ChronoLocalDate, ChronoLocalDateTime, Chronology }
@@ -293,7 +294,7 @@ trait api {
   abstract class FormatShowHashOrder[CTA <: TemporalAccessor, TA <: TemporalAccessor with Comparable[CTA]](
       val formatter: DateTimeFormatter,
       tq: TemporalAccessor => TA
-  )(implicit ev: TA <:< CTA)
+  )(implicit asCTA: TA <~< CTA)
       extends Show[TA] {
 
     override def show(x: TA): String = formatter format x
@@ -301,8 +302,7 @@ trait api {
     def parse(s: String): Result[TA] = Result safe tq(formatter parse s)
 
     def hash(x: TA): Int           = x.hashCode
-    def compare(x: TA, y: TA): Int = x compareTo y
-
+    def compare(x: TA, y: TA): Int = x compareTo (asCTA coerce y)
   }
 
   implicit lazy val shoLocalDate =

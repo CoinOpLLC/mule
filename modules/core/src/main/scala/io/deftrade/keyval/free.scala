@@ -7,6 +7,7 @@ import cats.{ ~> }
 import cats.arrow.FunctionK
 import cats.free.Free
 import cats.free.Free.liftF
+import cats.evidence._
 
 import cats.effect.{ ContextShift, IO, Sync }
 
@@ -50,7 +51,7 @@ sealed abstract class FreeKeyValueStore {
   final def put(key: Key, value: Value): FreeCommand[Id] = Put(key, value) |> liftF
   final def del(key: Key): FreeCommand[Id]               = Del(key)        |> liftF
 
-  final def getMap[K2, V2](key: Key)(implicit ev: Value <:< (K2, V2)): FreeCommand[Map[K2, V2]] =
+  final def getMap[K2, V2](key: Key)(implicit ev: Value <~< (K2, V2)): FreeCommand[Map[K2, V2]] =
     ???
 }
 

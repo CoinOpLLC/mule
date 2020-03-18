@@ -22,6 +22,8 @@ import implicits._, refinements.IsSha256
 import cats.implicits._
 import cats.Eq
 import cats.data.NonEmptyList
+import cats.evidence._
+
 import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
@@ -149,12 +151,12 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   /**  */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def getMap[K2, V2](x: Index)(implicit evK2V2: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+  final protected def getMap[K2, V2](x: Index)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
     tableRows
       .filter(_._1 == x) // FIXME should be `===` and so Index needs an implicit Order
       .map(_._2)
       .fold(Map.empty[K2, V2]) { (rows, row) =>
-        rows + evK2V2(row)
+        rows + (asK2V2 coerce row)
       }
 
   /** When writing whole `Map`s, all rows get the same `Id`. */
@@ -163,10 +165,10 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
       xvs: (Index, Map[K2, V2])
   )(
       implicit
-      evValue: (K2, V2) <:< Value
+      asValue: (K2, V2) <~< Value
   ): EffectStream[(Index, Value)] =
     for {
-      k2v2 <- Stream evals F.delay { evValue liftCo xvs._2.toList }
+      k2v2 <- Stream evals F.delay { xvs._2.toList map (asValue coerce _) }
     } yield xvs._1 -> k2v2
 
   /** */
@@ -189,7 +191,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
     Refined unsafeApply [String, IsSha256] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
 
   /** */
-  protected lazy val fresh: Fresh[Id, Row] = Fresh.sha256[Row]
+  protected def fresh: Fresh[Id, Row]
 }
 
 /**
@@ -211,7 +213,7 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   final type HRow = HValue
 
   /** */
-  final def get[K2, V2](id: Id)(implicit evK2V2: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+  final def get[K2, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
     getMap(id)
 
   /** */
@@ -221,14 +223,14 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append[K2, V2](k2v2s: Map[K2, V2])(
       implicit
-      evValue: (K2, V2) <:< V
+      asValue: (K2, V2) <~< V
   ): EffectStream[Id] =
     for {
       id <- Stream eval F.delay {
              fresh.nextAll(
                prev,
-               k2v2s.headOption.fold(???)(evValue),
-               (k2v2s drop 1).toList.map(evValue): _*
+               k2v2s.headOption.fold(???)(asValue.coerce),
+               (k2v2s drop 1).toList.map(asValue.coerce): _*
              )
            }
       _ <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
@@ -293,7 +295,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
   def select(key: Key): EffectStream[Value]
 
   /** */
-  def select[K2, V2](key: Key)(implicit ev: Value <:< (K2, V2)): EffectStream[Map[K2, V2]]
+  def select[K2, V2](key: Key)(implicit ev: Value <~< (K2, V2)): EffectStream[Map[K2, V2]]
 
   /** */
   def insert(key: Key, value: Value): EffectStream[Id]
@@ -310,7 +312,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def upsert[K2, V2](key: Key, k2v2s: Map[K2, V2])(
-      implicit ev: (K2, V2) <:< Value
+      implicit ev: (K2, V2) <~< Value
   ): EffectStream[Id] =
     for {
       id  <- Stream eval F.delay { prev }
@@ -466,7 +468,7 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
     Stream evals F.delay { table get key }
 
   /** */
-  final def select[K2, V2](key: Key)(implicit ev: Value <:< (K2, V2)): EffectStream[Map[K2, V2]] =
+  final def select[K2, V2](key: Key)(implicit ev: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
     getMap(key)
 
   /** */

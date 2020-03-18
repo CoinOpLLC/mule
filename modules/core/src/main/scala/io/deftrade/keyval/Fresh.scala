@@ -19,12 +19,16 @@ package keyval
 
 import refinements.{ Sha256 }
 
+import cats.evidence._
+
 import spire.math.Integral
 import spire.syntax.field._
 
 import eu.timepit.refined
 import refined.api.{ Refined }
 import scodec.bits.ByteVector
+
+import io.circe.Json
 
 import java.security.MessageDigest
 
@@ -43,9 +47,25 @@ object Fresh {
   def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
   /**
-    * Equivalent to `autoincrement` or `serial` from SQL.
+    * Canonical Json digest.
     *
-    * TODO: PRNG version.
+    * TODO: This is a very questionable way to do "canonical".
+    * Evolve this.
+    */
+  def digestJson: Json => Sha256 =
+    json =>
+      Refined unsafeApply ByteVector(
+        json.noSpacesSortKeys getBytes "UTF-8"
+      ).digest("SHA-256").toBase58
+
+  /** Simple content-addressed `Id` generation using secure hash (`sha`). */
+  def shaFetch[V](implicit asJson: V <~< Json): Fresh[Sha256, V] =
+    apply { (j, v) =>
+      digestJson(asJson coerce v)
+    }
+
+  /**
+    * Equivalent to `autoincrement` or `serial` from SQL.
     */
   def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P], P] = {
 
@@ -56,10 +76,8 @@ object Fresh {
     }
   }
 
-  /**
-    * The use of unsafeApply here is canonical: this is literally the definition of the type.
-    */
-  def sha256[V]: Fresh[Sha256, V] = {
+  /** Stitch the previous `Id` into the `sha` for the next `Id`. */
+  def shaStitch[V]: Fresh[Sha256, V] = {
 
     val md = MessageDigest getInstance "SHA-256"
     new Fresh[Sha256, V](

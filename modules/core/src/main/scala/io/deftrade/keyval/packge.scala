@@ -203,6 +203,9 @@ package keyval {
 
         /** */
         final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+
+        /** */
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaStitch[Row]
       }
     }
   }
@@ -247,8 +250,10 @@ package keyval {
 
         /** */
         final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
+
+        /** */
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaStitch[Row]
       }
     }
   }
-
 }

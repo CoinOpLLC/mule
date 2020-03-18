@@ -357,18 +357,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Note this value is effectively unforgeable / self validating.
     */
-  object Meta extends WithId[Meta] {
-
-    /**
-      * FIXME: this needs to go in Fresh as an optional kind of `Id` (for json only)
-      * TODO: this is fragile at best and arguably very questionable. Evolve this.
-      */
-    def digest: Meta => Meta.Id =
-      json =>
-        Refined unsafeApply ByteVector(
-          json.noSpacesSortKeys getBytes "UTF-8"
-        ).digest("SHA-256").toBase58
-  }
+  object Meta extends WithId[Meta]
 
   /**
     * Because `Transaction`s are immutable, we model them as pure value classes
