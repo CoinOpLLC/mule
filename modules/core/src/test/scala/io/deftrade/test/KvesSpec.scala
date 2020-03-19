@@ -1,10 +1,13 @@
 package io.deftrade
 package test
 
-import time._, money._, keyval._, model._
+import implicits._
+import time._, money._, keyval._ // , model._
 import Currency.{ USD }
 
+import cats.{ Eq, Hash, Order, Show }
 import cats.implicits._
+import cats.derived._
 import cats.effect.{ ContextShift, IO }
 
 import fs2.Stream
@@ -12,6 +15,7 @@ import fs2.Stream
 import eu.timepit.refined
 import refined.{ refineV }
 import refined.api.{ Refined }
+import refined.cats._
 import refined.auto._
 import refined.scalacheck.any._
 
@@ -19,6 +23,9 @@ import io.chrisdavenport.cormorant
 import cormorant.generic.auto._
 import cormorant.refined._
 import cormorant.implicits._
+
+import io.chrisdavenport.fuuid
+import fuuid.FUUID
 
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -28,10 +35,11 @@ import org.scalacheck.ScalacheckShapeless._
 import Arbitrary.arbitrary
 
 import currencies._
-import java.util.UUID
 import refinements.{ IsLabel, IsUnitInterval, Label }
 import IsUnitInterval._
 import scala.concurrent.ExecutionContext.Implicits.global
+
+import java.util.UUID
 
 object mvt {
 
@@ -43,10 +51,16 @@ object mvt {
       factor: Double Refined `[0,1)`,
       label: Label,
       bar: Bar.Key,
-      zorp: Zorp.Id
+      zorp: Zorp.Id,
   )
 
+  /** */
   object Foo extends WithOpaqueKey[Long, Foo] {
+
+    implicit def fooEq: Eq[Foo]     = { import auto.eq._; semi.eq }
+    implicit def fooShow: Show[Foo] = { import auto.show._; semi.show }
+
+    /** */
     def mk(nut: Nut, label: Label, zorp: Zorp): Stream[IO, Foo] = {
       val Right(factor) = refineV[`[0,1)`](label.value.length / 128.0)
       val Right(bar)    = Bar.Key(555L)
@@ -54,12 +68,14 @@ object mvt {
     }
   }
 
+  /** */
   lazy val foos = keyValueStore[IO] at "target/foos.csv" of Foo
 
   /** */
   sealed abstract case class Bar(label: Label)
 
   object Bar extends WithOpaqueKey[Long, Bar] {
+
     def apply(label: Label): Bar = new Bar(label) {}
 
     implicit def arbitraryBar: Arbitrary[Bar] =
@@ -68,21 +84,31 @@ object mvt {
           label <- arbitrary[Label]
         } yield Bar(label)
       }
+
+    implicit def barEq: Eq[Bar]     = { import auto.eq._; semi.eq }
+    implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  /** */
+  /** FIXME fuu */
   final case class Zorp(
-      uuid: UUID,
+      fuu: FUUID,
       z: Instant,
       amount: Dollars,
   )
 
-  object Zorp extends WithId[Zorp]
+  /** */
+  object Zorp extends WithId[Zorp] {
+
+    implicit def zorpEq: Eq[Zorp]     = { import auto.eq._; semi.eq }
+    implicit def zorpShow: Show[Zorp] = { import auto.show._; semi.show }
+  }
 
   lazy val Right(zorpii) = valueStore[IO] at "target/zorpii.csv" of Zorp
 }
 
 object arbitraryMvt {
+
+  import model.Money
 
   import Jt8Gen._
   import mvt._
@@ -102,7 +128,7 @@ object arbitraryMvt {
         uuid   <- arbitrary[UUID]
         z      <- arbitrary[Instant]
         amount <- arbitrary[Money[USD]]
-      } yield Zorp(uuid, z, amount)
+      } yield Zorp(FUUID fromUUID uuid, z, amount)
     }
 }
 
@@ -112,18 +138,19 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
 
   lazy val Right(bars) = keyValueStore[IO] at "target/bars.csv" of Bar
 
-  property("some property about Foo") {
+  property("some property") {
 
-    forAll { foo: Foo =>
-      println(foo)
-    }
+    // forAll { foo: Foo =>
+    //   // println(foo)
+    //   true
+    // }
 
-    forAll { bar: Bar =>
-      val key = Bar.Key unsafe bar.hashCode.toLong
-      val id  = bars upsert (key, bar)
-      println(id -> (key -> bar))
-    }
-
+    // forAll { bar: Bar =>
+    //   val key = Bar.Key unsafe bar.hashCode.toLong
+    //   val id  = bars upsert (key, bar)
+    //   println(id -> (key -> bar))
+    // }
+    //
     forAll { zorp: Zorp =>
       println(zorp)
     }

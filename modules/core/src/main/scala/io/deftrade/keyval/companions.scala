@@ -27,6 +27,8 @@ import refined.api.{ Min, Refined, Validate }
 
 import spire.implicits._
 
+import io.chrisdavenport.fuuid.FUUID
+
 import shapeless.labelled._
 
 /** */
@@ -175,23 +177,17 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P],
   object Key extends WithKey.RefinedKeyCompanion[K, P]
 }
 
-// /** */
-// sealed abstract case class Key[K] private (k: K)
-//
-// /** */
-// object Key {
-//
-//   /** */
-//   def apply[K](k: K): Key[K] = new Key(k) {}
-// }
-//
-// /** When you want a case class as a `Key`. */
-// abstract class WithAdtKey[K: Order, V] extends WithKey.Aux[Key[K], V] {
-//
-//   /** */
-//   object Key extends WithKey.KeyCompanion[Key] {
-//
-//     /** */
-//     override implicit def order: Order[Key] = Order by (_.k)
-//   }
-// }
+/**
+  * Companion supplying a [[java.util.UUID]] as `Key`.
+  *
+  * Note we use [[io.chirsdavenport.fuuid.FUUID]] to (functionally) wrap the `UUID`.
+  */
+abstract class WithUuidKey[V] extends WithKey.Aux[FUUID, V] {
+
+  /** */
+  object Key extends WithKey.KeyCompanion[FUUID] {
+
+    /** */
+    implicit def order = Order[FUUID]
+  }
+}

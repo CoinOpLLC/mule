@@ -47,24 +47,6 @@ object Fresh {
   def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
   /**
-    * Canonical Json digest.
-    *
-    * TODO: This is a very questionable way to do "canonical".
-    * Evolve this.
-    */
-  def digestJson: Json => Sha256 =
-    json =>
-      Refined unsafeApply ByteVector(
-        json.noSpacesSortKeys getBytes "UTF-8"
-      ).digest("SHA-256").toBase58
-
-  /** Simple content-addressed `Id` generation using secure hash (`sha`). */
-  def shaFetch[V](implicit asJson: V <~< Json): Fresh[Sha256, V] =
-    apply { (j, v) =>
-      digestJson(asJson coerce v)
-    }
-
-  /**
     * Equivalent to `autoincrement` or `serial` from SQL.
     */
   def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P], P] = {
@@ -75,6 +57,20 @@ object Fresh {
       OpaqueKey(key.value + one)
     }
   }
+
+  /**
+    * Simple content-addressed `Id` generation using secure hash (`sha`) on a
+    * canonical Json object.
+    *
+    * TODO: This is a very questionable way to do "canonical".
+    * Evolve this.
+    */
+  def shaFetchJson: Fresh[Sha256, Json] =
+    apply { (_, json) =>
+      Refined unsafeApply ByteVector(
+        json.noSpacesSortKeys getBytes "UTF-8"
+      ).digest("SHA-256").toBase58
+    }
 
   /** Stitch the previous `Id` into the `sha` for the next `Id`. */
   def shaStitch[V]: Fresh[Sha256, V] = {

@@ -43,6 +43,9 @@ import cormorant.implicits.stringPut
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
 // import cormorant.refined._
 
+import io.chrisdavenport.fuuid
+import fuuid.FUUID
+
 import java.nio.file.{ Paths }
 
 /**
@@ -129,7 +132,23 @@ package object keyval {
   /**  */
   private[keyval] def printer: Printer = Printer.default
 
-  /** cormorant csv `Get` */
+  /** */
+  private val decodeFailureFromThrowable: Throwable => Error.DecodeFailure =
+    fail => Error.DecodeFailure(NonEmptyList one fail.toString)
+
+  /** */
+  implicit def fuuidGet: Get[FUUID] =
+    new Get[FUUID] {
+
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, FUUID] =
+        FUUID fromString field.x leftMap decodeFailureFromThrowable
+    }
+
+  implicit def fuuidPut: Put[FUUID] =
+    stringPut contramap (_.show)
+
+  /** */
   implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
     new Get[Mny[N, C]] {
 
@@ -138,11 +157,11 @@ package object keyval {
         Mny parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
     }
 
-  /** cormorant csv `Put` */
+  /** */
   implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
     stringPut contramap Mny.format[N, C]
 
-  /** cormorant csv `Get` */
+  /** */
   implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
     new Get[N] {
 
