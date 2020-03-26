@@ -10,7 +10,7 @@ object Version {
 
   val Enumeratum = "1.5.15"
   val Shapeless  = "2.3.3"
-  val Refined    = "0.9.12"
+  val Refined    = "0.9.13"
 
   val Cats       = "2.1.0"
   val Kittens    = "2.0.0"
@@ -128,9 +128,9 @@ object Deps {
     "core",
     "generic",
     "parser",
+    "refined",
     "fs2",
-    "http4s",
-    "refined"
+    "http4s"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
 
   val fs2s = List(

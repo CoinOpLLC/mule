@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import implicits._, refinements.IsSha256
+import implicits._, refinements.IsSha
 
 import cats.implicits._
 import cats.Eq
@@ -188,7 +188,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
-    Refined unsafeApply [String, IsSha256] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
+    Refined unsafeApply [String, IsSha] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
 
   /** */
   protected def fresh: Fresh[Id, Row]

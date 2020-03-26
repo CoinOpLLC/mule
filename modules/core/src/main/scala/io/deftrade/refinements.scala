@@ -20,9 +20,8 @@ import cats.implicits._
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
-import refined.{ W }
 import refined.boolean.And
-import refined.collection.{ MaxSize, NonEmpty }
+import refined.collection.{ Forall, MaxSize, MinSize }
 import refined.numeric.{ Interval, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
 // import refined.api.Validate
@@ -75,9 +74,10 @@ object refinements {
 
   /**
     * RDB friendly `String`s that are born usable as is.
-    * Defaults to Postgres, which is the shorter limit (126)
+    * Postgres optimizes strings of length 126 (and shorter).
+    * FIXME: account for `UTF-8` encoding
     */
-  type IsVarChar = IsVarChar126
+  type IsVarChar = MaxSize[126]
 
   /** */
   type VarChar = String Refined IsVarChar
@@ -89,31 +89,35 @@ object refinements {
   }
 
   /** Our `Refined` type naming convention: {{{type XYZ = T Refined IsXYZ}}} */
-  type IsLabel = IsVarChar And Trimmed And NonEmpty
+  type IsLabel = MinSize[3] And MaxSize[100] And Trimmed
 
   /** A saner `String` (non-empty, bounded, trimmed). */
   type Label = String Refined IsLabel
 
-  /** Postgres optimizes strings of this length (and shorter). */
-  type IsVarChar126 = MaxSize[W.`126`.T]
+  /** Non-whitespace, non control block ASCII */
+  type IsAscii28 = MinSize[3] And MaxSize[28] And Forall[Interval.Closed['!', '~']]
+
+  /**
+    * A short, pure ASCII, all printable, no whitespace `Label`.
+    *
+    * Note that a size limit of 28 and a Base58 encoding is (just) sufficient
+    * to represent a SHA-1 value (160 bit).
+    *
+    * {{{
+    * scala> ((scodec.bits.BitVector fromValidBin "1" * 160).toBase58).size
+    * res0: Int = 28
+    * }}}
+    */
+  type Ascii28 = String Refined IsAscii28
 
   /** */
-  type VarChar126 = String Refined IsVarChar126
+  sealed abstract case class IsSha()
 
-  /** Typical SQL */
-  type IsVarChar255 = MaxSize[W.`255`.T]
+  object IsSha {
 
-  /** */
-  type VarChar255 = String Refined IsVarChar255
+    lazy val instance: IsSha = new IsSha() {}
 
-  /** */
-  sealed abstract case class IsSha256()
-
-  object IsSha256 {
-
-    lazy val instance: IsSha256 = new IsSha256() {}
-
-    implicit def isSha256Validate: Validate.Plain[String, IsSha256] =
+    implicit def isSha256Validate: Validate.Plain[String, IsSha] =
       Validate fromPredicate (predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
 
     def predicate(s: String): Boolean = failsafe {
@@ -123,13 +127,16 @@ object refinements {
   }
 
   /** */
-  type Sha256 = String Refined IsSha256
+  type Sha = String Refined IsSha
 
-  /** FIXME */
   /** */
-  object Sha256 {
-    def toByteVector(sha: Sha256)             = ByteVector fromValidBase58 sha.value
-    def toByteArray(sha: Sha256): Array[Byte] = toByteVector(sha).toArray
+  object Sha {
+
+    /** Chosen project-wide (for now) */
+    val Algo = "SHA-256"
+
+    /** */
+    def toByteVector(sha: Sha) = ByteVector fromValidBase58 sha.value
   }
 
   /**  */

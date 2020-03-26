@@ -28,7 +28,6 @@ import refined.refineV
 import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
 import refined.string.{ MatchesRegex }
-import refined.collection.{ NonEmpty }
 import refined.auto._
 
 import shapeless.syntax.singleton._
@@ -46,7 +45,7 @@ import Party.Tax
 sealed trait Party extends Product with Serializable {
   def name: Label
   def taxId: Tax.Id
-  def meta: Meta
+  def meta: Meta.Id
 }
 
 /**
@@ -59,7 +58,7 @@ object Party extends WithOpaqueKey[Int, Party] {
   }
 
   /** TODO: this is sketchy and probably not needed */
-  def apply(name: Label, taxId: Tax.Id, meta: Meta)(
+  def apply(name: Label, taxId: Tax.Id, meta: Meta.Id)(
       implicit
       vssn: Validate[String, Tax.IsSsn],
       vein: Validate[String, Tax.IsEin],
@@ -157,7 +156,7 @@ object Party extends WithOpaqueKey[Int, Party] {
 final case class NaturalPerson(
     name: Label,
     ssn: Tax.Ssn,
-    meta: Meta
+    meta: Meta.Id
 ) extends Party {
   def taxId = ssn
 }
@@ -166,7 +165,7 @@ final case class NaturalPerson(
 object NaturalPerson extends WithOpaqueKey[Int, NaturalPerson]
 
 /**  */
-final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta) extends Party {
+final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta.Id) extends Party {
   def taxId = ein
 }
 
@@ -260,48 +259,4 @@ object Role extends Enum[Role] with CatsEnum[Role] {
 
   /** */
   lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
-}
-
-/** */
-sealed abstract case class CountryCode(
-    alpha2: Alpha2,
-    alpha3: Alpha3,
-    countryCode: Num3,
-    name: String Refined NonEmpty,
-    regionCode: Option[Num3],
-    subRegionCode: Option[Num3],
-    intermediateRegionCode: Option[Num3],
-    region: VarChar,
-    subRegion: VarChar,
-    intermediateRegion: VarChar,
-    // iso_3166_2: NonEmptyVarChar,
-)
-
-/** */
-object CountryCode extends WithOpaqueKey[Int, CountryCode] {
-
-  def regions: Map[Num3, VarChar]             = ???
-  def intermediateRegions: Map[Num3, VarChar] = ???
-  def subRegions: Map[Num3, VarChar]          = ???
-
-  def apply(alpha2: Alpha2,
-            alpha3: Alpha3,
-            countryCode: Num3,
-            name: String Refined NonEmpty,
-            regionCode: Option[Num3],
-            subRegionCode: Option[Num3],
-            intermediateRegionCode: Option[Num3]): CountryCode =
-    new CountryCode(
-      alpha2,
-      alpha3,
-      countryCode,
-      name,
-      regionCode,
-      subRegionCode,
-      intermediateRegionCode,
-      region = (regions get countryCode).fold(VarChar.empty)(identity),
-      subRegion = (regions get countryCode).fold(VarChar.empty)(identity),
-      intermediateRegion = (regions get countryCode).fold(VarChar.empty)(identity),
-      // s"ISO 3166-2:$alpha2",
-    ) {}
 }

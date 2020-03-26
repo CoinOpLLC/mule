@@ -17,9 +17,7 @@
 package io.deftrade
 package keyval
 
-import refinements.{ Sha256 }
-
-import cats.evidence._
+import refinements.{ Sha }
 
 import spire.math.Integral
 import spire.syntax.field._
@@ -59,28 +57,30 @@ object Fresh {
   }
 
   /**
-    * Simple content-addressed `Id` generation using secure hash (`sha`) on a
+    * Simple content-addressed `Id` generation using secure hash (`Sha`) on a
     * canonical Json object.
     *
-    * TODO: This is a very questionable way to do "canonical".
+    * TODO: "noSpacesSortKeys" is a very impoverished notion of "canonical".
     * Evolve this.
     */
-  def shaFetchJson: Fresh[Sha256, Json] =
+  def shaContentAddress: Fresh[Sha, Json] =
     apply { (_, json) =>
-      Refined unsafeApply ByteVector(
-        json.noSpacesSortKeys getBytes "UTF-8"
-      ).digest("SHA-256").toBase58
+      Refined unsafeApply (
+        ByteVector(
+          json.noSpacesSortKeys getBytes "UTF-8"
+        ) digest Sha.Algo
+      ).toBase58
     }
 
   /** Stitch the previous `Id` into the `sha` for the next `Id`. */
-  def shaStitch[V]: Fresh[Sha256, V] = {
+  def shaChain[V]: Fresh[Sha, V] = {
 
-    val md = MessageDigest getInstance "SHA-256"
-    new Fresh[Sha256, V](
+    val md = MessageDigest getInstance Sha.Algo
+    new Fresh[Sha, V](
       (j, v) => {
-        md update (Sha256 toByteArray j)
+        md update (Sha toByteVector j).toArray
         md update (v.toString getBytes "UTF-8")
-        Refined unsafeApply ByteVector(md.digest()).toBase58
+        Refined unsafeApply ByteVector(md.digest).toBase58
       }
     ) {}
   }

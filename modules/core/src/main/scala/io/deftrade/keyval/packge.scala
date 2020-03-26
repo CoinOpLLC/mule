@@ -170,9 +170,24 @@ package object keyval {
         N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
     }
 
-  /** cormorant csv `Put` */
+  /** */
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
+
+  /** */
+  implicit lazy val jsonGet: Get[Json] =
+    new Get[Json] {
+
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Json] = ???
+      // Base58 => bytes => String(bytes) => Json (via parse)
+      // N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+    }
+
+  /**  */
+  implicit lazy val jsonPut: Put[Json] = ???
+  // Json => String canonical print (no spaces, sort keys - centralize!)
+  // String => ByteVector (UFT-8) => String (Base58)
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -181,13 +196,13 @@ package object keyval {
   /** */
   def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
 
-  /** TODO: revisit */
+  /** TODO: revisit once some data is gathered */
   type Meta = Json
 }
 
 package keyval {
 
-  /** */
+  /** dsl for value stores: `at` clause */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed abstract class FVS[F[_]: Sync: ContextShift] {
 
@@ -195,12 +210,12 @@ package keyval {
     def at(p: String): FVSP[F] = new FVSP(p) {}
   }
 
-  /** */
+  /** dsl for value stores: `of` clause */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed abstract class FVSP[F[_]: Sync: ContextShift](p: String) {
 
     /** */
-    def of[V: Eq, HV <: HList](
+    def ofChained[V: Eq, HV <: HList](
         v: WithId[V],
     )(
         implicit
@@ -224,12 +239,42 @@ package keyval {
         final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
 
         /** */
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaStitch[Row]
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+      }
+    }
+
+    /** */
+    def ofContentAddressed[V: Eq, HV <: HList](
+        v: WithId[V],
+    )(
+        implicit
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[MemFileValueStore[F, V, HV]] = Result safe {
+      new MemFileValueStore(v) {
+
+        import V._
+
+        final override protected def tableRows = permRows
+
+        /** */
+        final override def path = Paths get p
+
+        /** */
+        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
+
+        /** */
+        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+
+        /** FIXME implementation is wrong */
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+        // final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaContentAddress
       }
     }
   }
 
-  /** */
+  /** dsl for key value stores: `of` clause */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed abstract class FKVS[F[_]: Sync: ContextShift] {
 
@@ -237,12 +282,12 @@ package keyval {
     def at(p: String): FKVSP[F] = new FKVSP(p) {}
   }
 
-  /** */
+  /** dsl for key value stores: `of` clause */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed abstract class FKVSP[F[_]: Sync: ContextShift](p: String) {
 
     /** */
-    def of[K, V: Eq, HV <: HList](
+    def ofChained[K, V: Eq, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(
         implicit
@@ -271,7 +316,7 @@ package keyval {
         final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
 
         /** */
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaStitch[Row]
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
       }
     }
   }

@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import refinements.Sha256
+import refinements.Sha
 
 import cats.{ Order }
 
@@ -57,7 +57,7 @@ protected sealed trait WithValue {
   type Value
 
   /** A permanent identifier (eg auto-increment in a db col) */
-  final type Id = Sha256
+  final type Id = Sha
 
   /**
     * Think spreadsheet or relational table,
@@ -182,7 +182,7 @@ abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P],
   *
   * Note we use [[io.chirsdavenport.fuuid.FUUID]] to (functionally) wrap the `UUID`.
   */
-abstract class WithUuidKey[V] extends WithKey.Aux[FUUID, V] {
+abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 
   /** */
   object Key extends WithKey.KeyCompanion[FUUID] {

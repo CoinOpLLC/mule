@@ -85,7 +85,7 @@ final case class Instrument(
   *
   * TODO: `Instrument` evolution as `Contract` `Novation`. (events connecting `ISIN`s?S)
   */
-object Instrument extends WithRefinedKey[String, IsUsin, Instrument]
+object Instrument extends WithRefinedKey[String, IsAscii28, Instrument]
 
 /** */
 object columns {
