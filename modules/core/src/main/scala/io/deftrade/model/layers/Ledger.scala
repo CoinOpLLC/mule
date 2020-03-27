@@ -22,13 +22,12 @@ import time._, money._, keyval._, capital._
 
 import cats.implicits._
 
+import cats.{ Eq, Show }
+import cats.derived.{ auto, semi }
 import cats.effect.Sync
 import fs2.Stream
 
-import eu.timepit.refined
-import refined.api.Refined
-
-import scodec.bits.ByteVector
+import io.circe.Json
 
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
@@ -350,6 +349,13 @@ trait Ledger { module: ModuleTypes =>
   )
 
   /**
+    * All metadata is `json`.
+    *
+    * We can encode and decode `ADT`s from `json`, so the mapping is universal.
+    */
+  sealed abstract case class Meta private (meta: Json)
+
+  /**
     * The Meta store is content-addressed: entries are indexed with their own Sha.
     *
     * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
@@ -357,7 +363,12 @@ trait Ledger { module: ModuleTypes =>
     *
     * Note this value is effectively unforgeable / self validating.
     */
-  object Meta extends WithId[Meta]
+  object Meta extends WithId[Meta] {
+    def apply(meta: Json): Meta      = new Meta(meta) {}
+    implicit def metaEq: Eq[Meta]    = { import auto.eq._; semi.eq }
+    implicit def fooShow: Show[Meta] = { import auto.show._; semi.show }
+
+  }
 
   /**
     * Because `Transaction`s are immutable, we model them as pure value classes

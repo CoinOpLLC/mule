@@ -2,7 +2,7 @@ package io.deftrade
 package test
 
 import implicits._
-import time._, money._, keyval._
+import time._, money._, keyval._, model.Meta
 import Currency.{ USD }
 
 import cats.{ Eq, Hash, Order, Show }
@@ -17,7 +17,7 @@ import refined.{ refineMV, refineV }
 import refined.api.{ Refined }
 import refined.cats._
 import refined.auto._
-import refined.scalacheck.any._
+// import refined.scalacheck.any._
 
 import io.chrisdavenport.cormorant
 import cormorant.generic.auto._
@@ -41,7 +41,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 // import io.circe.Json
 
-import java.util.UUID
+// import java.util.UUID
 
 object mvt {
 
@@ -50,64 +50,51 @@ object mvt {
   /**
     *
     */
-  final case class Foo private (
-      label: Label,
+  sealed abstract case class Foo private (
       nut: Nut,
-      factor: Double Refined `[0,1)`,
-      bar: Bar.Id,
-      zorp: Zorp.Key,
+      bk: Bar.Key,
+      mi: Meta.Id,
+      label: Label,
+      r: Double Refined `[0,1)`,
   )
 
   /** */
   object Foo extends WithRefinedKey[String, IsLabel, Foo] {
 
     implicit def fooEq: Eq[Foo]     = { import auto.eq._; semi.eq }
-    implicit def fooShow: Show[Foo] = { import auto.show._; semi.show }
+    implicit def fooShow: Show[Foo] = Show show (_.label.value)
+
+    def apply(nut: Nut, bk: Bar.Key, mi: Meta.Id, label: Label, r: Double Refined `[0,1)`): Foo =
+      new Foo(nut, bk, mi, label, r) {}
 
     /** */
-    def mk(nut: Nut, bar: Bar, zorp: Zorp): Stream[IO, Foo] = {
-      val Right(factor) =
-        refineV[`[0,1)`](zorp.show.size / (zorp.show.size + bar.show.size).toDouble)
+    def mk(nut: Nut, bar: Bar, meta: Meta): Stream[IO, Foo] = {
+      val Right(r) =
+        refineV[`[0,1)`](bar.show.size / (bar.show.size + meta.show.size).toDouble)
       for {
-        zk <- Stream eval FUUIDGen[IO].random
-        bi <- bars append bar
-        _  <- zorpii insert (zk, zorp)
+        bk <- Stream eval FUUIDGen[IO].random
+        mi <- metas append meta
+        _  <- bars insert (bk, bar)
       } yield {
-        val Right(label) = refineV[IsLabel](s"${nut.show}::${zk.show}")
-        Foo(label, nut, factor, bi, zk)
+        val Right(label) = refineV[IsLabel](s"${nut.show}::${bk.show}:${mi.show}")
+        new Foo(nut, bk, mi, label, r) {}
       }
     }
   }
 
   /** */
-  lazy val Right(foos) = keyValueStore[IO] at "target/foos.csv" ofChained Foo
-
-  final case class Bar(meta: Meta)
-
-  object Bar extends WithId[Bar] {
-    implicit def barEq: Eq[Bar]     = { import auto.eq._; semi.eq }
-    implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
-  }
-
-  /**
-    *
-    */
-  lazy val Right(bars) = valueStore[IO] at "target/bars.csv" ofContentAddressed Bar
+  final case class Bar(z: Instant, amount: Dollars)
 
   /** */
-  final case class Zorp(
-      z: Instant,
-      amount: Dollars,
-  )
+  object Bar extends WithFuuidKey[Bar] {
 
-  /** */
-  object Zorp extends WithFuuidKey[Zorp] {
-
-    implicit def zorpEq: Eq[Zorp]     = { import auto.eq._; semi.eq }
-    implicit def zorpShow: Show[Zorp] = { import auto.show._; semi.show }
+    implicit def zorpEq: Eq[Bar]     = { import auto.eq._; semi.eq }
+    implicit def zorpShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  lazy val Right(zorpii) = keyValueStore[IO] at "target/zorpii.csv" ofChained Zorp
+  lazy val Right(foos)  = keyValueStore[IO] at "target/foos.csv" ofChained Foo
+  lazy val Right(bars)  = keyValueStore[IO] at "target/bars.csv" ofChained Bar
+  lazy val Right(metas) = valueStore[IO] at "target/metas.csv" ofContentAddressed Meta
 }
 
 object arbitraryMvt {
@@ -119,40 +106,34 @@ object arbitraryMvt {
 
   implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
     Arbitrary {
-      def bar: Bar = ???
+      def meta: Meta = ???
       for {
-        nut  <- arbitrary[Nut]
-        zorp <- arbitrary[Zorp]
-      } yield Foo mk (nut, bar, zorp)
+        nut <- arbitrary[Nut]
+        bar <- arbitrary[Bar]
+      } yield Foo mk (nut, bar, meta)
     }
 
-  implicit def arbitraryZorp: Arbitrary[Zorp] =
+  implicit def arbitraryBar: Arbitrary[Bar] =
     Arbitrary {
       for {
-        // uuid   <- arbitrary[UUID]
         z      <- arbitrary[Instant]
         amount <- arbitrary[Money[USD]]
-      } yield
-        Zorp(
-          // FUUID fromUUID uuid,
-          z,
-          amount
-        )
+      } yield Bar(z, amount)
     }
 }
 
 class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
   import mvt._
-  import arbitraryMvt.arbitraryZorp
+  import arbitraryMvt.arbitraryBar
 
   property("some property") {
 
-    //   forAll { zorp: Zorp =>
-    //     println(zorp)
+    //   forAll { bar: Bar =>
+    //     println(bar)
     //   }
     //
-    //   forAll { bar: Bar =>
-    //     val key = Bar.Key unsafe bar.hashCode.toLong
+    //   forAll { bar: Meta =>
+    //     val key = Meta.Key unsafe bar.hashCode.toLong
     //     val id  = bars upsert (key, bar)
     //     println(id -> (key -> bar))
     //   }
