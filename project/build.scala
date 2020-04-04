@@ -87,8 +87,8 @@ object Deps {
     "parser",
     "shapes",
     "scodec",
+    "literal",
     "refined",
-    // "java8",
   ) map { x =>
     "io.circe" %% s"circe-$x" % Circe
   }
@@ -100,10 +100,11 @@ object Deps {
     "pureconfig",
     "pureconfig-enumeratum",
     "pureconfig-fs2",
-    // "pureconfig-http4s",
+    "pureconfig-http4s",
     "pureconfig-cats",
     "pureconfig-cats-effect",
-    "pureconfig-circe"
+    "pureconfig-circe",
+    "pureconfig-yaml",
   ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
   val testers = Seq(
@@ -115,12 +116,13 @@ object Deps {
     "eu.timepit"                 %% "refined-scalacheck"        % Refined,
     "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
+    "io.circe"                   %% "circe-testing"             % Circe,
   ) map (_ % Test)
 
   val fuiids = List(
     "fuuid", // core
-    "fuuid-circe" // Circe integration
-    // "fuuid-http4s", // Http4s integration
+    "fuuid-circe", // Circe integration
+    "fuuid-http4s", // Http4s integration
     // "fuuid-doobie" // Doobie integration
   ) map (x => "io.chrisdavenport" %% s"$x" % Fuiid)
 

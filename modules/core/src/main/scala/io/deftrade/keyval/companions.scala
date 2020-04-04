@@ -19,7 +19,8 @@ package keyval
 
 import refinements.Sha
 
-import cats.{ Order }
+import cats.implicits._
+import cats.{ Order, Show }
 
 import eu.timepit.refined
 import refined.refineV
@@ -35,13 +36,13 @@ import shapeless.labelled._
 object OpaqueKey {
 
   /** */
-  private[keyval] def apply[K: Order, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
+  private[keyval] def apply[K: Order: Show, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
 
   /** */
-  def unsafe[K: Order, V](k: K): OpaqueKey[K, V] = apply(k)
+  def unsafe[K: Order: Show, V](k: K): OpaqueKey[K, V] = apply(k)
 
-  /** */
-  implicit def validate[K: Order, V]: Validate[K, V] = Validate alwaysPassed (())
+  /** FIXME questionable */
+  implicit def validate[K: Order: Show, V]: Validate[K, V] = Validate alwaysPassed (())
 }
 
 /**
@@ -141,9 +142,7 @@ object WithKey {
   }
 
   /** Companion mez class for `Refined` key types. */
-  abstract class RefinedKeyCompanion[K: Order, P] extends KeyCompanion[Refined[K, P]] {
-
-    import cats.implicits._
+  abstract class RefinedKeyCompanion[K: Order: Show, P] extends KeyCompanion[Refined[K, P]] {
 
     /** */
     def apply(k: K)(implicit ev: Validate[K, P]): Result[Refined[K, P]] =
@@ -153,7 +152,12 @@ object WithKey {
     def unsafe(k: K): Refined[K, P] = Refined unsafeApply k
 
     /** */
-    implicit def order = Order[Refined[K, P]]
+    override implicit def order = Order[Refined[K, P]]
+
+    import refined.cats._ // FIXME: why?
+
+    /** nb `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
+    implicit def show = Show[Refined[K, P]]
 
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
@@ -164,14 +168,14 @@ object WithKey {
   * Companion base class which defines a key as a `Refined`
   * type, parameterized with the value type we are indexing.
   */
-abstract class WithOpaqueKey[K: Order, V] extends WithRefinedKey[K, V, V]
+abstract class WithOpaqueKey[K: Order: Show, V] extends WithRefinedKey[K, V, V]
 
 /**
   * Phantom type used to tag the key, which has type K as its underlying representation.
   * This can either be a trivial tag which encodes the independance of a key from the record
   * that it indexes, or, some other kind of constraint (i.e. a `Predicate`).
   */
-abstract class WithRefinedKey[K: Order, P, V] extends WithKey.Aux[Refined[K, P], V] {
+abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
   /** */
   object Key extends WithKey.RefinedKeyCompanion[K, P]

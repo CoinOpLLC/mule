@@ -25,6 +25,10 @@ import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semi }
 import cats.effect.Sync
+
+import eu.timepit.refined
+import refined.cats._
+
 import fs2.Stream
 
 import io.circe.Json
@@ -185,7 +189,7 @@ trait Ledger { module: ModuleTypes =>
     *   (Folio.Key, Instrument.Key, Quantity)
     * }}}
     */
-  object Folio extends WithOpaqueKey[Long, Position] { // sicc hacc
+  object Folio extends WithFuuidKey[Position] { // sicc hacc
 
     /**
       * Conceptually, lifts all the [[Position]]s into `Map`s,
@@ -349,28 +353,6 @@ trait Ledger { module: ModuleTypes =>
   )
 
   /**
-    * All metadata is `json`.
-    *
-    * We can encode and decode `ADT`s from `json`, so the mapping is universal.
-    */
-  sealed abstract case class Meta private (meta: Json)
-
-  /**
-    * The Meta store is content-addressed: entries are indexed with their own Sha.
-    *
-    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
-    * a `Meta` key value store containing the value, you have access to the value itself.
-    *
-    * Note this value is effectively unforgeable / self validating.
-    */
-  object Meta extends WithId[Meta] {
-    def apply(meta: Json): Meta      = new Meta(meta) {}
-    implicit def metaEq: Eq[Meta]    = { import auto.eq._; semi.eq }
-    implicit def fooShow: Show[Meta] = { import auto.show._; semi.show }
-
-  }
-
-  /**
     * Because `Transaction`s are immutable, we model them as pure value classes
     *
     * No `Transaction` is created except within the context
@@ -378,7 +360,13 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId[Transaction] {
 
-    private def apply(from: Folio.Key, to: Folio.Key, rc: Trade.Id, meta: Meta.Id): Transaction =
+    private def apply(
+        instant: Instant,
+        from: Folio.Key,
+        to: Folio.Key,
+        rc: Trade.Id,
+        meta: Meta.Id
+    ): Transaction =
       new Transaction(instant, from, to, rc, meta) {}
 
     /**  */
@@ -400,6 +388,39 @@ trait Ledger { module: ModuleTypes =>
     ): Stream[F, Transaction] =
       for {
         ids <- record(trade, meta)
-      } yield Transaction(from, to, ids._1, ids._2)
+      } yield Transaction(instant, from, to, ids._1, ids._2)
+
+    /** */
+    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semi.eq }
+
+    /** */
+    implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
+  }
+
+  /**
+    * All metadata is `json`.
+    *
+    * We can encode and decode `ADT`s from `json`, so the mapping is universal.
+    */
+  sealed abstract case class Meta private (meta: Json)
+
+  /**
+    * The Meta store is content-addressed: entries are indexed with their own Sha.
+    *
+    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
+    * a `Meta` key value store containing the value, you have access to the value itself.
+    *
+    * Note this value is effectively unforgeable / self validating.
+    */
+  object Meta extends WithId[Meta] {
+
+    /** */
+    def apply(meta: Json): Meta = new Meta(meta) {}
+
+    /** */
+    implicit def metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
+
+    /** */
+    implicit def metaShow: Show[Meta] = { import auto.show._; semi.show }
   }
 }

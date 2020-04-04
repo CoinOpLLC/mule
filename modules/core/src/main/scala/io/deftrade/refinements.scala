@@ -94,21 +94,13 @@ object refinements {
   /** A saner `String` (non-empty, bounded, trimmed). */
   type Label = String Refined IsLabel
 
-  /** Non-whitespace, non control block ASCII */
-  type IsAscii28 = MinSize[3] And MaxSize[28] And Forall[Interval.Closed['!', '~']]
+  /** Non-whitespace, non control block, non-empty ASCII string of bounded length. */
+  type IsAscii24 = MinSize[3] And MaxSize[24] And Forall[Interval.Closed['!', '~']]
 
   /**
     * A short, pure ASCII, all printable, no whitespace `Label`.
-    *
-    * Note that a size limit of 28 and a Base58 encoding is (just) sufficient
-    * to represent a SHA-1 value (160 bit).
-    *
-    * {{{
-    * scala> ((scodec.bits.BitVector fromValidBin "1" * 160).toBase58).size
-    * res0: Int = 28
-    * }}}
     */
-  type Ascii28 = String Refined IsAscii28
+  type Ascii24 = String Refined IsAscii24
 
   /** */
   sealed abstract case class IsSha()

@@ -85,9 +85,9 @@ import java.nio.file.{ Paths }
   *   - A: "Real business keys only change when the business changes!"
   *   - Dito those essential, universal, canonical attributes
   *   - everything else is `meta: Meta`
-  *   - as a start: `type Meta = io.cice.Json`
+  *   - `Meta` encapsulates `io.cice.Json`
   *      - which can be stored / indexed as binary in Mongo and Postgres
-  *      - which can be projected to create Satellite views.
+  *      - which can be projected to create `satellite views`.
   *   - TODO: consider explicitly separating the structural items (keys and links between keys)
   *   from the descriptive attributes, as with
   *   [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling.
@@ -103,16 +103,6 @@ package object keyval {
 
   /** Just an alias.  */
   type OpaqueKey[K, V] = Refined[K, V]
-
-  // /** nb `Order` is inferred for _all_ `OpaqueKey[K: Order, V]` (unquallified for V) */
-  // implicit def orderOpaqueKey[K: Order, V]: Order[OpaqueKey[K, V]] = Order by (_.value)
-
-  /** nb `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
-  implicit def showOpaqueKey[K: Show, V]: Show[OpaqueKey[K, V]] =
-    Show show (k => s"k=${k.value.show}")
-
-  // FIXME: hash seems broken for even the simplest cases... doing someghing wrong? ;)
-  // implicit def hashOpaqueKey[K, V]: Hash[OpaqueKey[K, V]] = cats.derived.semi.hash
 
   /**
     * The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
@@ -145,6 +135,7 @@ package object keyval {
         FUUID fromString field.x leftMap decodeFailureFromThrowable
     }
 
+  /** */
   implicit def fuuidPut: Put[FUUID] =
     stringPut contramap (_.show)
 
@@ -212,7 +203,7 @@ package keyval {
   sealed abstract class FVSP[F[_]: Sync: ContextShift](p: String) {
 
     /** */
-    def ofChained[V: Eq, HV <: HList](
+    def ofChainAddressed[V: Eq, HV <: HList](
         v: WithId[V],
     )(
         implicit
@@ -284,7 +275,7 @@ package keyval {
   sealed abstract class FKVSP[F[_]: Sync: ContextShift](p: String) {
 
     /** */
-    def ofChained[K, V: Eq, HV <: HList](
+    def ofChainAddressed[K, V: Eq, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(
         implicit

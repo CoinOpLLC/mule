@@ -2,7 +2,7 @@ package io.deftrade
 package test
 
 import implicits._
-import time._, money._, keyval._, model.Meta
+import time._, money._, keyval._
 import Currency.{ USD }
 
 import cats.{ Eq, Hash, Order, Show }
@@ -10,7 +10,7 @@ import cats.implicits._
 import cats.derived._
 import cats.effect.{ ContextShift, IO }
 
-import fs2.Stream
+import fs2.{ Pipe, Stream }
 
 import eu.timepit.refined
 import refined.{ refineMV, refineV }
@@ -21,7 +21,6 @@ import refined.auto._
 
 import io.chrisdavenport.cormorant
 import cormorant.generic.auto._
-import cormorant.refined._
 import cormorant.implicits._
 
 import io.chrisdavenport.fuuid
@@ -45,6 +44,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object mvt {
 
+  import cormorant.refined._
+
+  import model.Meta
+
   implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
 
   /**
@@ -53,9 +56,9 @@ object mvt {
   sealed abstract case class Foo private (
       nut: Nut,
       bk: Bar.Key,
-      mi: Meta.Id,
       label: Label,
       r: Double Refined `[0,1)`,
+      mi: Meta.Id
   )
 
   /** */
@@ -64,8 +67,8 @@ object mvt {
     implicit def fooEq: Eq[Foo]     = { import auto.eq._; semi.eq }
     implicit def fooShow: Show[Foo] = Show show (_.label.value)
 
-    def apply(nut: Nut, bk: Bar.Key, mi: Meta.Id, label: Label, r: Double Refined `[0,1)`): Foo =
-      new Foo(nut, bk, mi, label, r) {}
+    def apply(nut: Nut, bk: Bar.Key, label: Label, r: Double Refined `[0,1)`, mi: Meta.Id): Foo =
+      new Foo(nut, bk, label, r, mi) {}
 
     /** */
     def mk(nut: Nut, bar: Bar, meta: Meta): Stream[IO, Foo] = {
@@ -77,49 +80,101 @@ object mvt {
         _  <- bars insert (bk, bar)
       } yield {
         val Right(label) = refineV[IsLabel](s"${nut.show}::${bk.show}:${mi.show}")
-        new Foo(nut, bk, mi, label, r) {}
+        Foo(nut, bk, label, r, mi)
       }
     }
+
+    /** FIXME factor this shyte with applicative and zip and whatnot */
+    def mkPipe(
+        nuts: Stream[IO, Nut],
+        bars: Stream[IO, Bar],
+        metas: Stream[IO, Meta]
+    ): Stream[IO, Foo] =
+      for {
+        nut  <- nuts
+        bar  <- bars
+        meta <- metas
+        foo  <- mk(nut, bar, meta)
+      } yield foo
   }
 
-  /** */
-  final case class Bar(z: Instant, amount: Dollars)
+  /**
+    *
+    */
+  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: Meta.Id)
 
-  /** */
   object Bar extends WithFuuidKey[Bar] {
 
-    implicit def zorpEq: Eq[Bar]     = { import auto.eq._; semi.eq }
-    implicit def zorpShow: Show[Bar] = { import auto.show._; semi.show }
+    /** */
+    def apply(z: Instant, amount: Dollars, mi: Meta.Id): Bar =
+      new Bar(z, amount, mi) {}
+
+    /** */
+    def mk(amount: Dollars, meta: Meta): Stream[IO, Bar] =
+      for {
+        mi <- metas append meta
+      } yield Bar(instant, amount, mi)
+
+    def mkPipe(amounts: Stream[IO, Dollars], metas: Stream[IO, Meta]): Stream[IO, Bar] =
+      for {
+        amount <- amounts
+        meta   <- metas
+        bar    <- mk(amount, meta)
+      } yield bar
+
+    implicit def barEq: Eq[Bar]     = { import auto.eq._; semi.eq }
+    implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  lazy val Right(foos)  = keyValueStore[IO] at "target/foos.csv" ofChained Foo
-  lazy val Right(bars)  = keyValueStore[IO] at "target/bars.csv" ofChained Bar
+  lazy val Right(foos)  = keyValueStore[IO] at "target/foos.csv" ofChainAddressed Foo
+  lazy val Right(bars)  = keyValueStore[IO] at "target/bars.csv" ofChainAddressed Bar
   lazy val Right(metas) = valueStore[IO] at "target/metas.csv" ofContentAddressed Meta
 }
 
 object arbitraryMvt {
 
-  import model.Money
+  import model.{ Meta, Money }
 
   import Jt8Gen._
   import mvt._
 
+  def drift[A](aa: Gen[A]): Gen[Stream[IO, A]] =
+    for (a <- aa) yield Stream eval (IO delay a)
+
+  implicit def FIXME: Arbitrary[Meta] = ???
+
   implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
     Arbitrary {
-      def meta: Meta = ???
       for {
-        nut <- arbitrary[Nut]
-        bar <- arbitrary[Bar]
-      } yield Foo mk (nut, bar, meta)
+        bars  <- arbitrary[Stream[IO, Bar]]
+        nuts  <- drift(arbitrary[Nut])
+        metas <- drift(arbitrary[Meta])
+      } yield Foo mkPipe (nuts, bars, metas)
     }
 
-  implicit def arbitraryBar: Arbitrary[Bar] =
+  implicit def arbitraryBar: Arbitrary[Stream[IO, Bar]] =
     Arbitrary {
       for {
-        z      <- arbitrary[Instant]
         amount <- arbitrary[Money[USD]]
-      } yield Bar(z, amount)
+        meta   <- arbitrary[Meta]
+      } yield Bar mk (amount, meta)
     }
+}
+
+object ledger {
+  import cormorant.refined._
+
+  import model.{ capital, Folio, Meta, Trade, Transaction }, capital.Instrument
+
+  implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
+
+  val Right((instruments, trades, transactions, folios, metas)) = for {
+    instruments  <- keyValueStore[IO] at "instruments.csv" ofChainAddressed Instrument
+    trades       <- valueStore[IO] at "trades.csv" ofContentAddressed Trade
+    transactions <- valueStore[IO] at "transactions.csv" ofChainAddressed Transaction
+    folios       <- keyValueStore[IO] at "folios.csv" ofChainAddressed Folio
+    metas        <- valueStore[IO] at "metas.csv" ofContentAddressed Meta
+  } yield (instruments, trades, transactions, folios, metas)
 }
 
 class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {

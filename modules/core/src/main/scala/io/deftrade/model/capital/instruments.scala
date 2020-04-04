@@ -20,11 +20,14 @@ package capital
 
 import time._, market._, money._, contracts._, keyval._, refinements._
 
+import cats.{ Eq, Show }
 import cats.implicits._
+import cats.derived.{ auto, semi }
 
 import enumeratum.EnumEntry
 
 import eu.timepit.refined
+import refined.refineV
 
 import keys.{ IsIsin, IsUsin }
 
@@ -54,14 +57,14 @@ final case class Instrument(
   /**
     *  TODO: revisit this
     */
-  def isLegalTender: Boolean =
+  final def isLegalTender: Boolean =
     symbol.value === currency.code.value
 
   /**  */
-  def display: Label = cols.display
+  final def display: Label = cols.display
 
   /**  */
-  def contract: Contract = cols.contract
+  final def contract: Contract = cols.contract
 }
 
 /**
@@ -85,7 +88,26 @@ final case class Instrument(
   *
   * TODO: `Instrument` evolution as `Contract` `Novation`. (events connecting `ISIN`s?S)
   */
-object Instrument extends WithRefinedKey[String, IsAscii28, Instrument]
+object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
+
+  /** */
+  // def apply(
+  //     symbol: Label,
+  //     issuer: Party.Key,
+  //     currency: CurrencyLike,
+  //     cols: columns.Columns,
+  //     meta: Meta.Id,
+  // ): Instrument =
+  //   new Instrument(symbol, issuer, currency, cols, meta) {}
+
+  /** */
+  implicit def instrumentEq: Eq[Instrument] =
+    // import auto._; semi.eq
+    Eq.fromUniversalEquals[Instrument]
+
+  /** */
+  // implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
+}
 
 /** */
 object columns {
@@ -94,7 +116,7 @@ object columns {
   sealed trait Columns extends Product with Serializable {
     final def display: Label = {
       val name: String = productPrefix
-      val Right(label) = refined.refineV[IsLabel](name)
+      val Right(label) = refineV[IsLabel](name)
       label
     }
 
@@ -102,24 +124,34 @@ object columns {
     def contract: Contract
   }
 
-  /** */
+  /**
+    * Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
+    *
+    * Enumerating the components of an [[Index]] such as the DJIA is the typical use case.
+    */
   sealed trait Tracks { self: Columns =>
     def members: Set[Instrument.Key]
   }
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
-  sealed trait Maturity extends Columns { def matures: ZonedDateTime }
-
-  /** */
-  sealed trait Expiry extends Columns { def expires: ZonedDateTime }
-
-  /** All derivatives (e.g. Futures) are assumed to expire. */
-  sealed trait Derivative extends Expiry with Columns { def underlier: WithKey#Key }
-
-  /** Everyting with a strike is assumed to expire. */
-  sealed trait Strike[N] { self: Derivative =>
-    def strike: N
+  sealed trait Maturity { self: Columns =>
+    def matures: ZonedDateTime
   }
+
+  /** `Expiry` only applies to `Derivative`s. */
+  sealed trait Expiry extends Columns { self: Derivative =>
+    def expires: ZonedDateTime
+  }
+
+  /** `Strike`s only apply to `Derivative`s. */
+  sealed trait Strike { self: Derivative =>
+    def strike: Double
+  }
+
+  /** All derivative contracts (e.g. Futures) are assumed to be struck at a certain price,
+    * and expire on a certain day.
+    */
+  sealed trait Derivative extends Expiry with Strike with Columns { def underlier: WithKey#Key }
 
   /** */
   object Strike {
@@ -159,7 +191,8 @@ object layers {
     /** */
     case class Bond(
         override val matures: ZonedDateTime
-    ) extends Maturity {
+    ) extends Maturity
+        with Columns {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -178,11 +211,12 @@ object layers {
     /** */
     case class Bill(
         override val matures: ZonedDateTime
-    ) extends Maturity {
+    ) extends Maturity
+        with Columns {
 
       import std.zeroCouponBond
 
-      /** */
+      /** A `Bill` is a kind of zero coupon bond. */
       def contract: Contract =
         zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
     }
@@ -216,7 +250,8 @@ object layers {
     /** Exchange Traded Derivative - Future (ETD) */
     case class EtdFuture(
         override val expires: ZonedDateTime,
-        override val underlier: Instrument.Key
+        override val underlier: Instrument.Key,
+        override val strike: Double,
     ) extends Derivative
         with Columns {
 
@@ -231,9 +266,8 @@ object layers {
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Instrument.Key,
-        override val strike: N,
+        override val strike: Double,
     ) extends Derivative
-        with Strike[N]
         with Columns {
 
       /** FIXME: implement */
@@ -245,10 +279,12 @@ object layers {
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: EtdFuture.Key,
-        override val strike: N,
+        override val strike: Double,
     ) extends Derivative
-        with Strike[N]
         with Columns {
+
+      /** FIXME: implement */
+      def strikeAmount: N = ???
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -259,9 +295,8 @@ object layers {
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Index.Key,
-        override val strike: N,
+        override val strike: Double,
     ) extends Derivative
-        with Strike[N]
         with Columns {
 
       /** FIXME: implement */
