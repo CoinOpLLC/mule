@@ -50,8 +50,7 @@ final case class Instrument(
     symbol: Label,
     issuer: Party.Key,
     currency: CurrencyLike,
-    cols: columns.Columns,
-    meta: Meta.Id,
+    meta: Meta.Id,  // Columns
 ) extends Numéraire.InKind {
 
   /**
@@ -61,10 +60,10 @@ final case class Instrument(
     symbol.value === currency.code.value
 
   /**  */
-  final def display: Label = cols.display
+  final def display: Label = ???
 
   /**  */
-  final def contract: Contract = cols.contract
+  final def contract: Contract = ???
 }
 
 /**
@@ -188,7 +187,15 @@ object layers {
     /** */
     object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
 
-    /** */
+    /**
+      * Assume semiannual, Treasury-style coupons.
+      * FIXME: additional params:
+      * - coupon (as a fraction: .05 is a five percent coupon; five coin for every hundred face)
+      * State:
+      * - paidCoupons: LazyList[Instant]  // most recent first
+      * - unpaidCoupons: LazyList[ZonedDateTime]  // soonest due first
+      * under most circumstances the list is never inspected (forced)
+      */
     case class Bond(
         override val matures: ZonedDateTime
     ) extends Maturity

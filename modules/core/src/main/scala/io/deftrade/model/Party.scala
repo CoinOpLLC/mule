@@ -27,10 +27,9 @@ import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
-import refined.string.{ MatchesRegex }
-import refined.auto._
+import refined.string.{ MatchesRegex, Url }
 
-import shapeless.syntax.singleton._
+// import shapeless.syntax.singleton._
 
 import Party.Tax
 
@@ -80,10 +79,10 @@ object Party extends WithOpaqueKey[Int, Party] {
   object Tax {
 
     /** */
-    final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}""".witness
+    final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}"""
 
     /** */
-    type MatchesRxSsn = MatchesRxSsn.T
+    type MatchesRxSsn = MatchesRxSsn.type
 
     /**
       * Post [[https://www.ssa.gov/employer/randomization.html Randomization]]
@@ -129,13 +128,13 @@ object Party extends WithOpaqueKey[Int, Party] {
       *
       * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
       */
-    val IsEin = """\d{2}-\d{7}""".witness
+    final val IsEin = """\d{2}-\d{7}"""
 
     /** */
-    type IsEin = MatchesRegex[IsEin.T]
+    final type IsEin = MatchesRegex[IsEin.type]
 
     /** */
-    type Ein = String Refined IsEin
+    final type Ein = String Refined IsEin
 
     /** */
     object Ein {
@@ -158,6 +157,10 @@ final case class NaturalPerson(
     ssn: Tax.Ssn,
     meta: Meta.Id
 ) extends Party {
+
+  import refined.auto._
+
+  /**  */
   def taxId = ssn
 }
 
@@ -166,6 +169,10 @@ object NaturalPerson extends WithOpaqueKey[Int, NaturalPerson]
 
 /**  */
 final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta.Id) extends Party {
+
+  import refined.auto._
+
+  /**  */
   def taxId = ein
 }
 
@@ -259,4 +266,71 @@ object Role extends Enum[Role] with CatsEnum[Role] {
 
   /** */
   lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
+}
+
+import Contact._
+
+final case class Contact(
+    name: Name,
+    address: USAddress,
+    cell: USPhone,
+    email: Email,
+    url: Option[String Refined Url]
+)
+
+/** */
+object Contact {
+
+  import io.circe._, io.circe.refined._, io.circe.generic.semiauto._
+
+  implicit lazy val decoder: Decoder[Contact] = deriveDecoder
+  implicit lazy val encoder: Encoder[Contact] = deriveEncoder
+
+  /** */
+  final case class Name(
+      first: Label,
+      middle: Option[Label],
+      last: Label,
+  )
+
+  object Name {
+    implicit lazy val decoder: Decoder[Name] = deriveDecoder
+    implicit lazy val encoder: Encoder[Name] = deriveEncoder
+  }
+
+  /** */
+  final case class USAddress(
+      street: Label,
+      street2: Option[Label],
+      city: Label,
+      state: Alpha2,
+      zip: USZip
+  )
+
+  object USAddress {
+    implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
+    implicit lazy val encoder: Encoder[USAddress] = deriveEncoder
+  }
+
+  private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
+
+  final val TenDigit = digits(10)
+
+  /** */
+  final type IsUSPhone = MatchesRegex[TenDigit.type]
+
+  /** */
+  final type USPhone = String Refined IsUSPhone
+
+  final val Zip = s"${digits(7)}|${digits(7 + 4)}"
+
+  final type IsUSZip = MatchesRegex[Zip.type]
+
+  final type USZip = String Refined IsUSZip
+
+  /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
+  final val IsEmail =
+    """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
+
+  final type Email = String Refined MatchesRegex[IsEmail.type]
 }

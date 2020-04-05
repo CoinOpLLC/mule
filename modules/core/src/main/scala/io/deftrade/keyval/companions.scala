@@ -139,6 +139,9 @@ object WithKey {
 
     /** */
     implicit def order: Order[K]
+
+    /** */
+    implicit def show: Show[K]
   }
 
   /** Companion mez class for `Refined` key types. */
@@ -152,12 +155,12 @@ object WithKey {
     def unsafe(k: K): Refined[K, P] = Refined unsafeApply k
 
     /** */
-    override implicit def order = Order[Refined[K, P]]
+    final override implicit def order = Order[Refined[K, P]]
 
     import refined.cats._ // FIXME: why?
 
     /** nb `Show` is inferred for _all_ `OpaqueKey[K: Show, V]` (unquallified for V) */
-    implicit def show = Show[Refined[K, P]]
+    final override implicit def show = Show[Refined[K, P]]
 
     /** Where the key type is integral, we will reserve the min value. */
     def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
@@ -184,7 +187,7 @@ abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[
 /**
   * Companion supplying a [[java.util.UUID]] as `Key`.
   *
-  * Note we use [[io.chirsdavenport.fuuid.FUUID]] to (functionally) wrap the `UUID`.
+  * Note we use [[io.chrisdavenport.fuuid.FUUID]] to (functionally) wrap the `UUID`.
   */
 abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 
@@ -193,5 +196,8 @@ abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 
     /** */
     implicit def order = Order[FUUID]
+
+    /** */
+    implicit def show = Show[FUUID]
   }
 }

@@ -28,9 +28,8 @@ import refined.string.{ MatchesRegex, Trimmed }
 
 import scodec.bits.ByteVector
 
-import shapeless.syntax.singleton._
-
-import scala.language.existentials
+// import shapeless.syntax.singleton._
+// import scala.language.existentials
 
 /**
   * A palette of domain specific refined types.
@@ -45,32 +44,32 @@ object refinements {
 
   private def patRep(pat: String)(n: Int Refined Positive) = {
     val r = s"""$pat{${n.toString}}"""
-    r.witness
+    r
   }
 
   /** */
-  val Alpha2 = patRep(alpha)(2)
+  final val Alpha2 = patRep(alpha)(2)
 
   /** */
-  type Alpha2 = String Refined MatchesRegex[Alpha2.T]
+  type Alpha2 = String Refined MatchesRegex[Alpha2.type]
 
   /** */
-  val Alpha3 = patRep(alpha)(3)
+  final val Alpha3 = patRep(alpha)(3)
 
   /** */
-  type Alpha3 = String Refined MatchesRegex[Alpha3.T]
+  type Alpha3 = String Refined MatchesRegex[Alpha3.type]
 
   /** */
-  val Alpha4 = patRep(alpha)(4)
+  final val Alpha4 = patRep(alpha)(4)
 
   /** */
-  type Alpha4 = String Refined MatchesRegex[Alpha4.T]
+  type Alpha4 = String Refined MatchesRegex[Alpha4.type]
 
   /** */
-  val Num3 = patRep(num)(3)
+  final val Num3 = patRep(num)(3)
 
   /** */
-  type Num3 = String Refined MatchesRegex[Num3.T]
+  type Num3 = String Refined MatchesRegex[Num3.type]
 
   /**
     * RDB friendly `String`s that are born usable as is.

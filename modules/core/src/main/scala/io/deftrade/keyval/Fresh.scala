@@ -17,6 +17,8 @@
 package io.deftrade
 package keyval
 
+import cats.Show
+
 import refinements.{ Sha }
 
 import spire.math.Integral
@@ -47,7 +49,7 @@ object Fresh {
   /**
     * Equivalent to `autoincrement` or `serial` from SQL.
     */
-  def zeroBasedIncr[K: Integral, P]: Fresh[OpaqueKey[K, P], P] = {
+  def zeroBasedIncr[K: Integral: Show, P]: Fresh[OpaqueKey[K, P], P] = {
 
     val K = Integral[K]; import K._
 
