@@ -28,76 +28,46 @@ import enumeratum.EnumEntry
 
 import eu.timepit.refined
 import refined.refineV
+import refined.api.{ Refined }
+import refined.string.{ Url }
+import refined.numeric.{ Positive }
 
 import keys.{ IsIsin, IsUsin }
+
+/** Necessary annotations for data loaded from external sources. */
+trait Provenance {
+  def loadedAt: Instant
+  def loadedFrom: String Refined Url
+}
 
 /**
   * Models a tradeable thing.
   *
-  * TODO:
-  *   - investigate FpML ingestion
-  *   - `symbol` implies a unified symbology
-  *       - specify how to specify it
-  *   - "columns": rename as "forms" ?!
-  *   - factories for custom `Instruments` (e.g. `SAFEnote`)
+  * Everything is a `Contract` for (mostly future) money ([[InCoin]])
+  * ''except'' for the following categories of "pure stuff" ([[InKind]]):
+  *   - `Contract`s for equity (e.g shares of common stock)
+  *   - `Contract`s for physical delivery of commodities (e.g. tanks of propane)
+  *   - `Contract`s for real property (e.g. CRE assets)
   *
-  *   FIXME: model the remainder: everything is a Contract for money except:
-  *   - Contracts for equity shares (e.g common stock)
-  *   - Contracts for physical delivery of commodities
-  *   - Contracts for Real Estate(?!)
+  * TODO:
+  *   - specify the unified symbology behind `symbol`
+  *   - factories for custom `Instruments` (e.g. `SAFEnote`)
+  *   - `FpML` ingestion
   */
 final case class Instrument(
     symbol: Label,
-    issuer: Party.Key,
-    currency: CurrencyLike,
-    meta: Meta.Id,  // Columns
-) extends Numéraire.InKind {
-
-  /**
-    *  TODO: revisit this
-    */
-  final def isLegalTender: Boolean =
-    symbol.value === currency.code.value
-
-  /**  */
-  final def display: Label = ???
-
-  /**  */
-  final def contract: Contract = ???
-}
+    form: Form.Id,
+    loadedAt: Instant,
+    loadedFrom: String Refined Url
+) extends Numéraire.InKind
+    with Provenance
 
 /**
-  * Although `Instrument`s '''do not''' evolve over time, the [[keyval.WithKey]] companion takes
-  * advantage of the natural (`ISIN` derived) "business key" as a `String`.
-  *
-  * TODO: The only lifecyle event allowed for an ISIN should be to '''delete''' it.  How to enforce?
-  *
-  * TODO: an (immutable) instrument in a [[model.layers.Ledger.Position]] can hide an extensive
-  * history: What if in 1990 you had 3 separate investments in DEC, COMPAQ, and HP stock...
-  * and then this happens:
-  * {{{
-  *         HP ->  HPQ
-  *                 ^
-  *                 ^
-  *  DEC -> COMPAQ -+
-  * }}}
-  * you end up with one investment in HPQ!
-  *
-  * You will need to be able to walk the graph back in time.
-  *
-  * TODO: `Instrument` evolution as `Contract` `Novation`. (events connecting `ISIN`s?S)
+  * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
+  * The [[keyval.WithKey]] companion takes
+  * advantage of the natural (`ISIN` derived) "business key" to define a `String` refinement.
   */
 object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
-
-  /** */
-  // def apply(
-  //     symbol: Label,
-  //     issuer: Party.Key,
-  //     currency: CurrencyLike,
-  //     cols: columns.Columns,
-  //     meta: Meta.Id,
-  // ): Instrument =
-  //   new Instrument(symbol, issuer, currency, cols, meta) {}
 
   /** */
   implicit def instrumentEq: Eq[Instrument] =
@@ -108,37 +78,64 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
   // implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
 }
 
+/**
+  * Pure satellite table of metadata about `Instrument`.
+  */
+final case class Issued(
+    instrument: Instrument.Key,
+    by: LegalEntity.Key,
+    in: CurrencyLike
+)
+
 /** */
-object columns {
+object Issued extends WithId[Issued]
 
-  /** */
-  sealed trait Columns extends Product with Serializable {
-    final def display: Label = {
-      val name: String = productPrefix
-      val Right(label) = refineV[IsLabel](name)
-      label
-    }
+/**
+  * Abstract Data Type (ADT) representing [[Contract]] parameters and state.
+  *
+  * Embeds `Contract`s within `Instrument`s.
+  */
+sealed abstract class Form extends Product with Serializable {
 
-    /** */
-    def contract: Contract
+  /**
+    * The `Contract` embedded within this `Form`.
+    */
+  def contract: Contract
+
+  /**
+    * The display name is the final case class name.
+    */
+  final def display: Label = {
+    val name: String = productPrefix
+    val Right(label) = refineV[IsLabel](name)
+    label
   }
+}
+
+/** */
+object Form extends WithKey.Aux[Instrument.Key, Form] { lazy val Key = Instrument.Key }
+
+/**
+  * Parameters common to multiple `Form`s.
+  */
+object columns {
 
   /**
     * Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
     *
     * Enumerating the components of an [[Index]] such as the DJIA is the typical use case.
     */
-  sealed trait Tracks { self: Columns =>
+  sealed trait Tracks { self: Form =>
     def members: Set[Instrument.Key]
   }
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
-  sealed trait Maturity { self: Columns =>
+  sealed trait Maturity { self: Form =>
     def matures: ZonedDateTime
   }
 
   /** `Expiry` only applies to `Derivative`s. */
-  sealed trait Expiry extends Columns { self: Derivative =>
+  sealed trait Expiry { self: Derivative =>
     def expires: ZonedDateTime
   }
 
@@ -150,7 +147,7 @@ object columns {
   /** All derivative contracts (e.g. Futures) are assumed to be struck at a certain price,
     * and expire on a certain day.
     */
-  sealed trait Derivative extends Expiry with Strike with Columns { def underlier: WithKey#Key }
+  sealed trait Derivative extends Expiry with Strike { def underlier: WithKey#Key }
 
   /** */
   object Strike {
@@ -163,7 +160,9 @@ object columns {
   }
 }
 
-/** */
+/**
+  * Groups of related `Form`s.
+  */
 object layers {
 
   import columns._
@@ -174,15 +173,23 @@ object layers {
     /** */
     case class CommonStock(
         tclass: Option[Label]
-    )
+    ) extends Form {
 
-    /** */
-    object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     case class PreferredStock(
         series: Label,
-    )
+        preference: Double Refined Positive,
+        participating: Boolean,
+        dividend: Double Refined IsUnitInterval.`[0,1)` // ]
+    ) extends Form {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
 
     /** */
     object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
@@ -190,16 +197,17 @@ object layers {
     /**
       * Assume semiannual, Treasury-style coupons.
       * FIXME: additional params:
-      * - coupon (as a fraction: .05 is a five percent coupon; five coin for every hundred face)
       * State:
-      * - paidCoupons: LazyList[Instant]  // most recent first
-      * - unpaidCoupons: LazyList[ZonedDateTime]  // soonest due first
       * under most circumstances the list is never inspected (forced)
       */
     case class Bond(
-        override val matures: ZonedDateTime
-    ) extends Maturity
-        with Columns {
+        coupon: Double, // per 100 face
+        issued: Instant,
+        matures: ZonedDateTime,
+        paidCoupons: LazyList[Instant], // most recent first
+        unpaidCoupons: LazyList[ZonedDateTime] // soonest due first
+    ) extends Form
+        with Maturity {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -218,8 +226,8 @@ object layers {
     /** */
     case class Bill(
         override val matures: ZonedDateTime
-    ) extends Maturity
-        with Columns {
+    ) extends Form
+        with Maturity {
 
       import std.zeroCouponBond
 
@@ -244,8 +252,8 @@ object layers {
     /** */
     case class Index(
         override val members: Set[Instrument.Key]
-    ) extends Tracks
-        with Columns {
+    ) extends Form
+        with Tracks {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -255,40 +263,40 @@ object layers {
     object Index extends WithRefinedKey[String, IsIsin, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
-    case class EtdFuture(
+    case class XtFuture(
         override val expires: ZonedDateTime,
         override val underlier: Instrument.Key,
         override val strike: Double,
-    ) extends Derivative
-        with Columns {
+    ) extends Form
+        with Derivative {
 
       /** FIXME: implement */
       def contract: Contract = ???
     }
 
-    object EtdFuture extends WithRefinedKey[String, IsIsin, EtdFuture]
+    object XtFuture extends WithRefinedKey[String, IsIsin, XtFuture]
 
     /**Exchange Traded Derivative - Option (ETD)  */
-    case class EtdOption[N: Financial](
+    case class XtOption[N: Financial](
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Instrument.Key,
         override val strike: Double,
-    ) extends Derivative
-        with Columns {
+    ) extends Form
+        with Derivative {
 
       /** FIXME: implement */
       def contract: Contract = ???
     }
 
     /** I mean, right? */
-    case class EtdFutureOption[N: Financial](
+    case class XtFutureOption[N: Financial](
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: EtdFuture.Key,
+        override val underlier: XtFuture.Key,
         override val strike: Double,
-    ) extends Derivative
-        with Columns {
+    ) extends Form
+        with Derivative {
 
       /** FIXME: implement */
       def strikeAmount: N = ???
@@ -298,88 +306,17 @@ object layers {
     }
 
     /** */
-    case class EtdIndexOption[N: Financial](
+    case class XtIndexOption[N: Financial](
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Index.Key,
         override val strike: Double,
-    ) extends Derivative
-        with Columns {
+    ) extends Form
+        with Derivative {
 
       /** FIXME: implement */
       def contract: Contract = ???
     }
-  }
-
-  /**
-    * WIP - for otc derivative market participants (like hedge funds).
-    */
-  trait Exotics {
-
-    /** A product only used for calibration. FIXME WTF */
-    case class Calibration()
-
-    /** Credit Default Swap */
-    case class Cds()
-
-    /** */
-    case class CdsIndex()
-
-    /** Constant Maturity Swap */
-    case class Cms()
-
-    /**
-      * [[https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf Deliverable Swap Forward]]
-      */
-    case class Dsf()
-
-    /** Forward Rate Agreement */
-    case class Fra()
-
-    /** A representation based on sensitivities. FIXME WTF */
-    case class Sensitivities()
-
-    /** */
-    case class Swap()
-
-    /** */
-    case class Swaption()
-  }
-
-  /**
-    * WIP - for fx derivative market participants (like banks).
-    */
-  trait Fx extends {
-
-    /** FX Non-Deliverable Forward */
-    case class FxNdf()
-
-    /** */
-    case class FxSingle()
-
-    /** */
-    case class FxSingleBarrierOption()
-
-    /** */
-    case class FxSwap()
-
-    /** */
-    case class FxVanillaOption()
-  }
-
-  /**
-    * WIP - for otc derivative market participants (like banks).
-    */
-  trait Ibor extends {
-
-    /** */
-    case class IborCapFloor()
-
-    /** */
-    case class IborFuture()
-
-    /** */
-    case class IborFutureOption()
   }
 
   /**
@@ -392,8 +329,8 @@ object layers {
     /** */
     case class BulletPayment(
         matures: ZonedDateTime
-    ) extends Maturity
-        with Columns {
+    ) extends Form
+        with Maturity {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -403,8 +340,8 @@ object layers {
     case class CreditLine(
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1Q
-    ) extends Maturity
-        with Columns {
+    ) extends Form
+        with Maturity {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -414,14 +351,74 @@ object layers {
     case class AmortizingLoan(
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1M
-    ) extends Maturity
-        with Columns {
+    ) extends Form
+        with Maturity {
 
       /** FIXME: implement */
       def contract: Contract = ???
     }
 
     /** */
-    case class ConvertibleNote()
+    case class ConvertibleNote(
+        matures: ZonedDateTime,
+        discount: Double Refined IsUnitInterval.`[0,1)`,
+        cap: Option[Double Refined Positive]
+    ) extends Form
+        with Maturity {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
   }
 }
+
+/**
+  * Links which model `Instrument` lifecycle transformation acts
+  * (such as M&A actions) as events connecting `Instrument.Key`s.
+  *
+  * Motivation:
+  *
+  * An (immutable) instrument in a [[model.layers.Ledger.Position]] can hide an extensive
+  * history: What if in 1990 you had 3 separate investments in DEC, COMPAQ, and HP stock...
+  * and then this happens:
+  * {{{
+  *         HP ->  HPQ
+  *                 ^
+  *                 ^
+  *  DEC -> COMPAQ -+
+  * }}}
+  * you end up with one investment in HPQ!
+  *
+  * - You will need to be able to walk the graph back in time.
+  * - `Novation`s are the link relations that connect [[Instrument]]s in that graph.
+  */
+final case class Novation(
+    was: Instrument.Key,
+    becomes: Instrument.Key,
+    loadedAt: Instant,
+    loadedFrom: String Refined Url
+) extends Provenance
+
+/**
+  * A `Novation.Id` makes an effective M&A ''receipt''.
+  *
+  * There can be more than one leg in an M&A transaction:
+  * - store a `List[Novation]`
+  * - all `List` elements (legs) will get the same `Id`.
+  * - thus the ''receipt'' is common to all the legs that make up the transaction.
+  */
+object Novation extends WithId[Novation]
+
+/**
+  * Memorializes the progression of a single `Instrument`'s `Form`
+  * (and thus `Contract`) through its lifecycle.
+  */
+final case class Evolution(
+    forKey: Instrument.Key,
+    was: Form.Id,
+    becomes: Form.Id,
+    at: Instant
+)
+
+/** `Evolution`s are pure value objects. */
+object Evolution extends WithId[Evolution]

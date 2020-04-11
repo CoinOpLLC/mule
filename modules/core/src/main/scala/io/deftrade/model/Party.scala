@@ -281,6 +281,12 @@ final case class Contact(
 /** */
 object Contact {
 
+  import cats.derived
+  import refined.cats._
+
+  implicit lazy val contactEq: Eq[Contact]     = derived.semi.eq
+  implicit lazy val contactShow: Show[Contact] = derived.semi.show
+
   import io.circe._, io.circe.refined._, io.circe.generic.semiauto._
 
   implicit lazy val decoder: Decoder[Contact] = deriveDecoder
@@ -293,7 +299,12 @@ object Contact {
       last: Label,
   )
 
+  /** */
   object Name {
+
+    implicit lazy val contactEq: Eq[Name]     = derived.semi.eq
+    implicit lazy val contactShow: Show[Name] = derived.semi.show
+
     implicit lazy val decoder: Decoder[Name] = deriveDecoder
     implicit lazy val encoder: Encoder[Name] = deriveEncoder
   }
@@ -308,6 +319,10 @@ object Contact {
   )
 
   object USAddress {
+
+    implicit lazy val contactEq: Eq[USAddress]     = derived.semi.eq
+    implicit lazy val contactShow: Show[USAddress] = derived.semi.show
+
     implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
     implicit lazy val encoder: Encoder[USAddress] = deriveEncoder
   }

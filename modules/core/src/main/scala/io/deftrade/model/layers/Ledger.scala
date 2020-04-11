@@ -31,7 +31,7 @@ import refined.cats._
 
 import fs2.Stream
 
-import io.circe.Json
+import io.circe.{ Decoder, Encoder, Json }
 
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
@@ -402,7 +402,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * We can encode and decode `ADT`s from `json`, so the mapping is universal.
     */
-  sealed abstract case class Meta private (meta: Json)
+  sealed abstract class Meta private (meta: Json) { type Adt }
 
   /**
     * The Meta store is content-addressed: entries are indexed with their own Sha.
@@ -415,12 +415,16 @@ trait Ledger { module: ModuleTypes =>
   object Meta extends WithId[Meta] {
 
     /** */
-    def apply(meta: Json): Meta = new Meta(meta) {}
+    final case class Aux[T] private (meta: Json) extends Meta(meta) { final type Adr = T }
 
     /** */
-    implicit def metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
+    def apply[T: Encoder: Decoder](meta: Json): Meta = Aux[T](meta)
 
     /** */
-    implicit def metaShow: Show[Meta] = { import auto.show._; semi.show }
+    implicit def metaEq[T]: Eq[Meta.Aux[T]] = { import auto.eq._; semi.eq }
+
+    /** */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    implicit def metaShow[T]: Show[Meta.Aux[T]] = { import auto.show._; semi.show }
   }
 }

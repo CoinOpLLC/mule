@@ -5,9 +5,8 @@ import implicits._
 import time._, money._, keyval._
 import Currency.{ USD }
 
-import cats.{ Eq, Hash, Order, Show }
 import cats.implicits._
-import cats.derived._
+import cats.{ Eq, Hash, Order, Show }
 import cats.effect.{ ContextShift, IO }
 
 import fs2.{ Pipe, Stream }
@@ -44,6 +43,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object mvt {
 
+  import _root_.cats.derived.{ auto, semi }
   import cormorant.refined._
 
   import model.Meta
@@ -103,6 +103,7 @@ object mvt {
     */
   sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: Meta.Id)
 
+  /** */
   object Bar extends WithFuuidKey[Bar] {
 
     /** */

@@ -64,3 +64,74 @@ object FansiCrap {
       } grouped n map (_.mkString)
     ) mkString "\n"
 }
+
+// /**
+//   * WIP - for otc derivative market participants (like hedge funds).
+//   */
+// trait Exotics {
+//
+//   /** A product only used for calibration. FIXME WTF */
+//   case class Calibration()
+//
+//   /** Credit Default Swap */
+//   case class Cds()
+//
+//   /** */
+//   case class CdsIndex()
+//
+//   /** Constant Maturity Swap */
+//   case class Cms()
+//
+//   /**
+//     * [[https://www.cmegroup.com/trading/interest-rates/files/understanding-dsf.pdf Deliverable Swap Forward]]
+//     */
+//   case class Dsf()
+//
+//   /** Forward Rate Agreement */
+//   case class Fra()
+//
+//   /** A representation based on sensitivities. FIXME WTF */
+//   case class Sensitivities()
+//
+//   /** */
+//   case class Swap()
+//
+//   /** */
+//   case class Swaption()
+// }
+//
+// /**
+//   * WIP - for fx derivative market participants (like banks).
+//   */
+// trait Fx extends {
+//
+//   /** FX Non-Deliverable Forward */
+//   case class FxNdf()
+//
+//   /** */
+//   case class FxSingle()
+//
+//   /** */
+//   case class FxSingleBarrierOption()
+//
+//   /** */
+//   case class FxSwap()
+//
+//   /** */
+//   case class FxVanillaOption()
+// }
+//
+// /**
+//   * WIP - for otc derivative market participants (like banks).
+//   */
+// trait Ibor extends {
+//
+//   /** */
+//   case class IborCapFloor()
+//
+//   /** */
+//   case class IborFuture()
+//
+//   /** */
+//   case class IborFutureOption()
+// }
