@@ -13,56 +13,17 @@ sealed trait Contract
   *
   * Implements the [[cats.Group]] typeclass instance for `Contract`.
   *
-  * @todo TODO: consider
+  * TODO: consider:
   *   - require "consideration" in every contract representing a `Trade`
   *       - which can be constructed after the fact if need be
-  *   - just like in the real world, there's always ''Good and valuable consideration, the receipt and sufficiency of which is hearby acknowledged''.
-  *   - {{{ object GavcTrasowiha extends Contract /* another Zero */ }}}
-  *   - remember `Contract` forms a `Group` ... roll up a combined `Contract`
-  *   - based on all the trades between two counterparties?
-  *
-  * @todo TODO:
-  * {{{
-  *     // every action taken in the performance of a `Contract` is an `Evolution` of some kind.
-  *     sealed trait Evolution
-  *     case object Novation extends Evolution    // new or ammended contract
-  *     case object Assignment extends Evolution  // new parties
-  *     case object Performance extends Evolution // event driven simplification
-  *     case object Discharge extends Evolution   // do we need this? Better name?
-  * }}}
+  *   - just like in the real world, there's always this:
+  *       - ''Good and valuable consideration, the receipt and sufficiency of which
+  *       is hearby acknowledged'', which looks like this in code:
+  *       - {{{ object GavcTrasowiha extends Contract /* another Zero */ }}}
+  *   - implement {{{ implicit def mc: Monoid[Contract]}}}
+  *       - rolls up a combined `Contract` for any two Counterparties.
   */
 object Contract {
-
-  // /** monadic but just a toy implementation */
-  // private sealed abstract case class Lazy[A] private (thunk: Lazy.Thunk[A]) {
-  //   import Lazy.{ defer, Memo }
-  //   final def map[B](f: A => B): Lazy[B]           = new Lazy(Memo(() => f(thunk()))) {}
-  //   final def flatMap[B](f: A => Lazy[B]): Lazy[B] = defer(f(thunk()))
-  //   final def value: A                             = thunk()
-  // }
-  //
-  // /** implements [[cats.Defer]]`[Lazy]` */
-  // private object Lazy { outer =>
-  //
-  //   import cats.Defer
-  //
-  //   type Thunk[A] = () => A
-  //   final case class Memo[A](thunk: Thunk[A]) extends Thunk[A] {
-  //     lazy val memo: A   = thunk()
-  //     override def apply = memo
-  //   }
-  //
-  //   def later[A](a: => A): Lazy[A] = new Lazy(Memo(() => a)) {}
-  //
-  //   def defer[A](fa: => Lazy[A]) = later(fa.thunk())
-  //
-  //   lazy val lazyDefer: Defer[Lazy] = new Defer[Lazy] {
-  //     def defer[A](fa: => Lazy[A]) = outer defer fa
-  //   }
-  // }
-
-  // type LzCon = Lazy[Contract]
-  // import Lazy.later
 
   type LzCon = Eval[Contract]
   import Eval.later

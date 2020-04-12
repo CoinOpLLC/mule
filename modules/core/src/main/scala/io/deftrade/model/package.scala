@@ -29,7 +29,7 @@ import cats.kernel.CommutativeGroup
   * This package object is where the policy decision to choose generic tax accounting
   * for entities treated as partnerships.
   * Different objects, package or otherwise, could make different policy decisions.
-
+  *
   * Also, here is where we bind [[layers.ModuleTypes.MonetaryAmount]] (and thus [[money.Mny]])
   * to [[scala.math.BigDecimal]],
   * while other [[layers.ModuleTypes.Quantity]]s bind to [[scala.Double]].

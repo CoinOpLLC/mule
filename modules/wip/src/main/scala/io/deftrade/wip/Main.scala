@@ -135,3 +135,34 @@ object FansiCrap {
 //   /** */
 //   case class IborFutureOption()
 // }
+
+// /** monadic but just a toy implementation */
+// private sealed abstract case class Lazy[A] private (thunk: Lazy.Thunk[A]) {
+//   import Lazy.{ defer, Memo }
+//   final def map[B](f: A => B): Lazy[B]           = new Lazy(Memo(() => f(thunk()))) {}
+//   final def flatMap[B](f: A => Lazy[B]): Lazy[B] = defer(f(thunk()))
+//   final def value: A                             = thunk()
+// }
+//
+// /** implements [[cats.Defer]]`[Lazy]` */
+// private object Lazy { outer =>
+//
+//   import cats.Defer
+//
+//   type Thunk[A] = () => A
+//   final case class Memo[A](thunk: Thunk[A]) extends Thunk[A] {
+//     lazy val memo: A   = thunk()
+//     override def apply = memo
+//   }
+//
+//   def later[A](a: => A): Lazy[A] = new Lazy(Memo(() => a)) {}
+//
+//   def defer[A](fa: => Lazy[A]) = later(fa.thunk())
+//
+//   lazy val lazyDefer: Defer[Lazy] = new Defer[Lazy] {
+//     def defer[A](fa: => Lazy[A]) = outer defer fa
+//   }
+// }
+
+// type LzCon = Lazy[Contract]
+// import Lazy.later
