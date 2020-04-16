@@ -67,12 +67,12 @@ package object model
       F[_]: Applicative: Foldable: SemigroupK,
       K,
       A
-  ](as: F[A])(f: A => K): Map[K, F[A]] = {
+  ](fas: F[A])(f: A => K): Map[K, F[A]] = {
 
     val SA = SemigroupK[F].algebra[A]
     import SA.combine
 
-    as.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
+    fas.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
       val key = f(a)
       val v   = a.pure[F]
       acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))

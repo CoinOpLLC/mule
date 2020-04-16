@@ -19,7 +19,6 @@ package io.deftrade
 import money._
 
 import cats.implicits._
-import cats.{ Show }
 import cats.data.{ NonEmptyList }
 import cats.effect.{ ContextShift, Sync }
 

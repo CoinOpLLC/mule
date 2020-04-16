@@ -102,6 +102,7 @@ protected[deftrade] object ModuleTypes {
 }
 
 /** */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   self: ModuleTypes.Aux[F, W, V, HV] =>
 
@@ -113,63 +114,79 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   /**  */
   final type HPermRow = IdField :: HRow
 
+  /** */
+  protected def indexFrom(pr: PermRow): Index
+
+  /** */
+  protected def valueFrom(row: Row): Value
+
+  /**  table is in memory */
+  protected def tableRows: EffectStream[(Index, Value)]
+
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     *
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def permRows: EffectStream[PermRow] =
     (readLines through csvToPermRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def rows: EffectStream[Row] = permRows map (_._2)
-
-  /**  */
-  final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
+  //
+  // /**  */
+  // final def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
 
   /**  @return a `Stream` of length zero or one. */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def get(id: Id): EffectStream[Row] =
     permRows filter (_._1 === id) map (_._2)
 
+  /**  */
+  final def getAll(x: Index): EffectStream[Value] =
+    permRows
+      .filter(pr => indexFrom(pr) == x)
+      .map(pr => valueFrom(pr._2))
+
+  /**  */
+  final def getList(x: Index): EffectStream[List[Value]] =
+    getAll(x)
+      .fold(List.empty[Value])((vs, v) => v :: vs)
+      .map(_.reverse)
+
   /** FIXME: not thread safe, put a queue in front of single thread-contained appender */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def append(row: Row): EffectStream[Id] =
+    appendAll(row)
+
+  /** */
+  final def appendAll(row: Row, rows: Row*): EffectStream[Id] =
     for {
-      id <- Stream eval F.delay { prev = fresh.next(prev, row); prev }
-      _ <- Stream eval F.delay {
-            updateCache(row)
-            id -> row
-          } through permRowToCSV through appendingSink
+      id <- Stream eval F.delay { fresh.nextAll(prev, row, rows: _*) }
+      r  <- Stream evals F.delay { (row +: rows).toList }
+      _ <- Stream eval F.delay { updateCache(r); (id, r) } through
+            permRowToCSV through
+            appendingSink
     } yield id
 
-  /**  */
-  protected def tableRows: EffectStream[(Index, Value)]
+  // /**  */
+  // final protected def getMap[K2, V2](x: Index)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
+  //   tableRows
+  //     .filter(_._1 == x) // FIXME should be `===` and so Index needs an implicit Order
+  //     .map(_._2)
+  //     .fold(Map.empty[K2, V2]) { (rows, row) =>
+  //       rows + (asK2V2 coerce row)
+  //     }
 
-  /**  */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def getMap[K2, V2](x: Index)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
-    tableRows
-      .filter(_._1 == x) // FIXME should be `===` and so Index needs an implicit Order
-      .map(_._2)
-      .fold(Map.empty[K2, V2]) { (rows, row) =>
-        rows + (asK2V2 coerce row)
-      }
-
-  /** When writing whole `Map`s, all rows get the same `Id`. */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def upsertMap[K2, V2](
-      xvs: (Index, Map[K2, V2])
-  )(
-      implicit
-      asValue: (K2, V2) <~< Value
-  ): EffectStream[(Index, Value)] =
-    for {
-      k2v2 <- Stream evals F.delay { xvs._2.toList map (asValue coerce _) }
-    } yield xvs._1 -> k2v2
+  // /** When writing whole `Map`s, all rows get the same `Id`. */
+  // final protected def upsertMap[K2, V2](
+  //     xvs: (Index, Map[K2, V2])
+  // )(
+  //     implicit
+  //     asValue: (K2, V2) <~< Value
+  // ): EffectStream[(Index, Value)] =
+  //   for {
+  //     k2v2 <- Stream evals F.delay { xvs._2.toList map (asValue coerce _) }
+  //   } yield xvs._1 -> k2v2
 
   /** */
   protected def readLines: EffectStream[String]
@@ -177,7 +194,7 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
   /** */
   protected def appendingSink: Pipe[EffectType, String, Unit]
 
-  /** */
+  /** Default no-op imlementation. */
   protected def updateCache(row: Row) = ()
 
   /** */
@@ -213,28 +230,14 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   final type HRow = HValue
 
   /** */
-  final def get[K2, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
-    getMap(id)
+  protected def indexFrom(pr: PermRow): Index =
+    pr match {
+      case (id, _) => id
+    }
 
   /** */
-  final def put(v: V): EffectStream[Id] = append(v)
-
-  /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final def append[K2, V2](k2v2s: Map[K2, V2])(
-      implicit
-      asValue: (K2, V2) <~< V
-  ): EffectStream[Id] =
-    for {
-      id <- Stream eval F.delay {
-             fresh.nextAll(
-               prev,
-               k2v2s.headOption.fold(???)(asValue.coerce),
-               (k2v2s drop 1).toList.map(asValue.coerce): _*
-             )
-           }
-      _ <- upsertMap(id -> k2v2s) through permRowToCSV through appendingSink
-    } yield id
+  protected def valueFrom(row: Row): Value =
+    row
 
   /** */
   implicit final def writePermRow(
@@ -292,10 +295,27 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
   final type HEmptyRow = IdField :: KeyField :: HNil
 
   /** */
+  protected def indexFrom(pr: PermRow): Index =
+    pr match {
+      case (_, (key, _)) => key
+    }
+
+  /** */
+  protected def valueFrom(row: Row): Value =
+    row match {
+      case (_, Some(value)) => value
+    }
+
+  /** */
   def select(key: Key): EffectStream[Value]
 
   /** */
-  def select[K2, V2](key: Key)(implicit ev: Value <~< (K2, V2)): EffectStream[Map[K2, V2]]
+  final def selectAll(key: Key): EffectStream[Value] =
+    getAll(key)
+
+  /** */
+  final def selectList(key: Key): EffectStream[List[Value]] =
+    getList(key)
 
   /** */
   def insert(key: Key, value: Value): EffectStream[Id]
@@ -307,20 +327,12 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
   def delete(key: Key): EffectStream[Id]
 
   /** */
-  final def upsert(key: Key, value: Value): EffectStream[Id] = append(key -> value.some)
+  final def upsert(key: Key, value: Value): EffectStream[Id] =
+    append(key -> value.some)
 
   /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final def upsert[K2, V2](key: Key, k2v2s: Map[K2, V2])(
-      implicit ev: (K2, V2) <~< Value
-  ): EffectStream[Id] =
-    for {
-      id  <- Stream eval F.delay { prev }
-      kkv <- upsertMap(key -> k2v2s)
-      _ <- Stream eval F.delay(id -> (kkv._1 -> (kkv._2.some))) through
-            permRowToCSV through
-            appendingSink
-    } yield id
+  final def upsertAll(key: Key, value: Value, values: Key*): EffectStream[Id] =
+    append(key -> value.some)
 
   /**  */
   implicit final def writePermRow(
@@ -466,10 +478,6 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
   /** */
   final def select(key: Key): EffectStream[Value] =
     Stream evals F.delay { table get key }
-
-  /** */
-  final def select[K2, V2](key: Key)(implicit ev: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
-    getMap(key)
 
   /** */
   def insert(key: Key, value: Value): EffectStream[Id] =
