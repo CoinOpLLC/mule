@@ -62,16 +62,16 @@ protected trait ModuleTypes {
   implicit val lgv: LabelledGeneric.Aux[ValueType, HValue]
 
   /** */
-  type EffectType[_]
+  type Effect[_]
 
   /** */
-  implicit def F: Sync[EffectType]
+  implicit def F: Sync[Effect]
 
   /** */
-  implicit def X: ContextShift[EffectType]
+  implicit def X: ContextShift[Effect]
 
   /** */
-  final type EffectStream[x] = Stream[EffectType, x]
+  final type EffectStream[x] = Stream[Effect, x]
 }
 
 /** */
@@ -89,13 +89,14 @@ protected[deftrade] object ModuleTypes {
 
     final override type ValueCompanionType[x] = W[x]
     final type HValue                         = HV // === lgv.Repr  test / validate / assume ?!?
-    final type EffectType[x]                  = F[x]
+    final type Effect[x]                      = F[x]
     final type ValueType                      = V
 
     import V.{ Id, Index, Value }
 
     /** Basic in-memory table structure */
     final type Table = Map[Index, Value]
+
     final implicit lazy val putId: Put[Id] = Put[Id]
     final implicit lazy val getId: Get[Id] = Get[Id]
   }
@@ -168,40 +169,20 @@ protected trait Store[F[_], W[_] <: WithValue, V, HV <: HList] {
             appendingSink
     } yield id
 
-  // /**  */
-  // final protected def getMap[K2, V2](x: Index)(implicit asK2V2: Value <~< (K2, V2)): EffectStream[Map[K2, V2]] =
-  //   tableRows
-  //     .filter(_._1 == x) // FIXME should be `===` and so Index needs an implicit Order
-  //     .map(_._2)
-  //     .fold(Map.empty[K2, V2]) { (rows, row) =>
-  //       rows + (asK2V2 coerce row)
-  //     }
-
-  // /** When writing whole `Map`s, all rows get the same `Id`. */
-  // final protected def upsertMap[K2, V2](
-  //     xvs: (Index, Map[K2, V2])
-  // )(
-  //     implicit
-  //     asValue: (K2, V2) <~< Value
-  // ): EffectStream[(Index, Value)] =
-  //   for {
-  //     k2v2 <- Stream evals F.delay { xvs._2.toList map (asValue coerce _) }
-  //   } yield xvs._1 -> k2v2
-
   /** */
   protected def readLines: EffectStream[String]
 
   /** */
-  protected def appendingSink: Pipe[EffectType, String, Unit]
+  protected def appendingSink: Pipe[Effect, String, Unit]
 
   /** Default no-op imlementation. */
   protected def updateCache(row: Row) = ()
 
   /** */
-  protected def permRowToCSV: Pipe[EffectType, PermRow, String]
+  protected def permRowToCSV: Pipe[Effect, PermRow, String]
 
   /** */
-  protected def csvToPermRow: Pipe[EffectType, String, Result[PermRow]]
+  protected def csvToPermRow: Pipe[Effect, String, Result[PermRow]]
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
@@ -270,7 +251,7 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   final protected def deriveCsvToV(
       implicit
       llr: Lazy[LabelledRead[HV]]
-  ): Pipe[EffectType, String, Result[PermRow]] =
+  ): Pipe[Effect, String, Result[PermRow]] =
     readLabelledCompleteSafe[F, PermRow] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -279,7 +260,7 @@ trait ValueStore[F[_], V, HV <: HList] extends Store[F, WithId, V, HV] {
   final protected def deriveVToCsv(
       implicit
       llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[EffectType, PermRow, String] = writeLabelled(printer)
+  ): Pipe[Effect, PermRow, String] = writeLabelled(printer)
 }
 
 /**  */
@@ -387,7 +368,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
       implicit
       llr: Lazy[LabelledRead[HV]],
       lgetk: Lazy[Get[Key]]
-  ): Pipe[EffectType, String, Result[PermRow]] = {
+  ): Pipe[Effect, String, Result[PermRow]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
     readLabelledCompleteSafe[F, PermRow] andThen
@@ -400,7 +381,7 @@ trait KeyValueStore[F[_], K, V, HV <: HList] extends Store[F, WithKey.Aux[K, *],
       implicit
       llw: Lazy[LabelledWrite[HV]],
       lputk: Lazy[Put[Key]]
-  ): Pipe[EffectType, PermRow, String] = {
+  ): Pipe[Effect, PermRow, String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -419,7 +400,7 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends St
   def path: Path
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final private lazy val appendHandles: EffectStream[FileHandle[EffectType]] = {
+  final private lazy val appendHandles: EffectStream[FileHandle[Effect]] = {
 
     import OpenOption._
 
@@ -432,14 +413,14 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends St
       // DSYNC,
     )
     Stream resource (for {
-      blocker <- Blocker[EffectType]
+      blocker <- Blocker[Effect]
       handle  <- FileHandle fromPath (path, blocker, openOptions)
     } yield handle)
   }
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def appendingSink: Pipe[EffectType, String, Unit] =
+  final protected def appendingSink: Pipe[Effect, String, Unit] =
     for {
       handle <- appendHandles
       s      <- _
@@ -457,8 +438,8 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends St
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def readLines: EffectStream[String] =
-    (Stream resource Blocker[EffectType]) flatMap { blocker =>
-      fs2.io.file readAll [EffectType] (path, blocker, 1024 * 1024)
+    (Stream resource Blocker[Effect]) flatMap { blocker =>
+      fs2.io.file readAll [Effect] (path, blocker, 1024 * 1024)
     } through
       text.utf8Decode through
       text.lines

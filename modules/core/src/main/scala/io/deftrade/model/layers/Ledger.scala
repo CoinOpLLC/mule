@@ -48,16 +48,16 @@ trait Ledger { module: ModuleTypes =>
     type CurrencyTag
 
     /**  */
-    type EffectType[_]
+    type Effect[_]
 
     /**  */
-    val price: Thing => Stream[EffectType, Money[CurrencyTag]]
+    val price: Thing => Stream[Effect, Money[CurrencyTag]]
 
     /**  */
     implicit val C: Currency[CurrencyTag]
 
     /**  */
-    implicit val F: Sync[EffectType]
+    implicit val F: Sync[Effect]
   }
 
   /**
@@ -82,9 +82,9 @@ trait Ledger { module: ModuleTypes =>
         final override val C: Currency[C],
         final override val F: Sync[F]
     ) extends Pricer {
-      final type Thing         = T
-      final type CurrencyTag   = C
-      final type EffectType[x] = F[x]
+      final type Thing       = T
+      final type CurrencyTag = C
+      final type Effect[x]   = F[x]
     }
   }
 

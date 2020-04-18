@@ -220,10 +220,10 @@ package keyval {
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
+        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveVToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToV
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -249,10 +249,10 @@ package keyval {
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveVToCsv
+        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveVToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToV
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToV
 
         /** FIXME implementation is wrong */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -297,10 +297,10 @@ package keyval {
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[EffectType, PermRow, String] = deriveKvToCsv
+        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveKvToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[EffectType, String, Result[PermRow]] = deriveCsvToKv
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToKv
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
