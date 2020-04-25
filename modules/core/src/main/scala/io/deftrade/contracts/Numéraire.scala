@@ -42,8 +42,8 @@ object Numéraire {
 
     /** */
     def unapply(n: Numéraire): Option[InKind] = n match {
-      case instrument @ Instrument(_) => instrument.some
-      case _                          => none
+      case instrument @ Instrument(_, _, _) => instrument.some
+      case _                                => none
     }
   }
 }

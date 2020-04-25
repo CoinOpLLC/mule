@@ -361,13 +361,13 @@ trait Ledger { module: ModuleTypes =>
   object Transaction extends WithId[Transaction] {
 
     private def apply(
-        instant: Instant,
+        at: Instant,
         from: Folio.Key,
         to: Folio.Key,
-        rc: Trade.Id,
+        trade: Trade.Id,
         meta: Meta.Id
     ): Transaction =
-      new Transaction(instant, from, to, rc, meta) {}
+      new Transaction(at, from, to, trade, meta) {}
 
     /**  */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -415,7 +415,7 @@ trait Ledger { module: ModuleTypes =>
   object Meta extends WithId[Meta] {
 
     /** */
-    final case class Aux[T] private (meta: Json) extends Meta(meta) { final type Adr = T }
+    final case class Aux[T] private (meta: Json) extends Meta(meta) { final type ADT = T }
 
     /** */
     def apply[T: Encoder: Decoder](meta: Json): Meta = Aux[T](meta)

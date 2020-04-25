@@ -64,7 +64,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
   /**
     * Creation patterns for account management teams.
     */
-  object Roster {
+  object Roster extends WithId[(Account.Key, Party.Key, Role, Option[Quantity])] {
 
     import Party.Key
 

@@ -54,7 +54,11 @@ trait Provenance {
   *   - factories for custom `Instruments` (e.g. `SAFEnote`)
   *   - `FpML` ingestion
   */
-final case class Instrument(symbol: Label) extends Numéraire.InKind
+final case class Instrument(
+    symbol: Label,
+    issuedBy: LegalEntity.Key,
+    issuedIn: CurrencyLike
+) extends Numéraire.InKind
 
 /**
   * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
@@ -71,17 +75,6 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
   /** */
   // implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
 }
-
-/**
-  * Pure satellite table of metadata about `Instrument`.
-  */
-final case class Issued(
-    by: LegalEntity.Key,
-    in: CurrencyLike
-)
-
-/** */
-object Issued extends WithKey.Aux[Instrument.Key, Issued] { lazy val Key = Instrument.Key }
 
 /**
   * Abstract Data Type (ADT) representing [[Contract]] parameters and state.
@@ -416,10 +409,11 @@ object forms
   * - Termination
   */
 final case class Novation(
-    was: Instrument.Key,
-    becomes: Instrument.Key,
+    ex: Option[Instrument.Key],
+    is: Option[Instrument.Key],
     loadedAt: Instant,
-    loadedFrom: String Refined Url
+    loadedFrom: String Refined Url,
+    meta: Meta.Id,
 ) extends Provenance
 
 /**
@@ -431,20 +425,3 @@ final case class Novation(
   * - thus the ''receipt'' is common to all the legs that make up the transaction.
   */
 object Novation extends WithId[Novation]
-
-/**
-  * Memorializes the progression of a single `Instrument`'s `Form`
-  * (and thus [[contracts.Contract]]) through its lifecycle.
-  *
-  * TODO: `Evolution`s can represent `Contract`:
-  * - Performance
-  */
-final case class Evolution(
-    was: Form.Id,
-    becomes: Form.Id,
-    loadedAt: Instant,
-    loadedFrom: String Refined Url
-) extends Provenance
-
-/** `Evolution`s are pure value objects. */
-object Evolution extends WithKey.Aux[Instrument.Key, Evolution] { lazy val Key = Instrument.Key }
