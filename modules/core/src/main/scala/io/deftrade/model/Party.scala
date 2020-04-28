@@ -31,7 +31,78 @@ import refined.string.{ MatchesRegex, Url }
 
 // import shapeless.syntax.singleton._
 
-import Party.Tax
+/**  */
+object TaxId {
+
+  /** */
+  final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}"""
+
+  /** */
+  type MatchesRxSsn = MatchesRxSsn.type
+
+  /**
+    * Post [[https://www.ssa.gov/employer/randomization.html Randomization]]
+    * SSN validation: i.e., cursory only.
+    *
+    * [[https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs SSN validation]]
+    * [[https://www.ssa.gov/history/ssn/geocard.html SSN geocard]]
+    */
+  type IsSsn = MatchesRxSsn And CheckedSsn
+
+  /** */
+  type Ssn = String Refined IsSsn
+
+  object Ssn {
+    def unapply(id: Id)(implicit v: Validate[String, IsSsn]): Option[Ssn] = refineV[IsSsn](id.value).toOption
+  }
+
+  /** */
+  sealed abstract case class CheckedSsn private ()
+
+  /** */
+  object CheckedSsn {
+
+    /** */
+    lazy val instance: CheckedSsn = new CheckedSsn() {}
+
+    /** */
+    implicit def ssnValidate: Validate.Plain[String, CheckedSsn] =
+      Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSsn", instance)
+
+    /** */
+    private val predicate: String => Boolean = s => {
+      scala.util.Try {
+        val an :: gn :: sn :: Nil = (s split '-' map (_.toInt)).toList
+        def checkAn               = 0 < an && an != 666 /* sic */ && an < 900
+        checkAn && 0 < gn && 0 < sn
+      } getOrElse false
+    }
+  }
+
+  /**
+    * An `Party` represents a legal (eg corporate, or non-profit) body.
+    *
+    * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
+    */
+  final val IsEin = """\d{2}-\d{7}"""
+
+  /** */
+  final type IsEin = MatchesRegex[IsEin.type]
+
+  /** */
+  final type Ein = String Refined IsEin
+
+  /** */
+  object Ein {
+    def unapply(id: Id)(implicit v: Validate[String, IsEin]): Option[Ein] = refineV[IsEin](id.value).toOption
+  }
+
+  /** */
+  type IsId = IsSsn Or IsEin
+
+  /** */
+  type Id = String Refined IsId
+}
 
 /**
   * Models financial market participants.
@@ -39,32 +110,28 @@ import Party.Tax
   * Presumed real world actors under the aegis of, and registered with, real world
   * justistictions.
   *
-  * Small step towards privacy by design: `Tax.Id`'s are not used as `Key`s.
+  * Small step towards privacy by design: `TaxId.Id`'s are not used as `Key`s.
   */
 sealed trait Party extends Product with Serializable {
   def name: Label
-  def taxId: Tax.Id
+  def taxId: TaxId.Id
   def meta: Meta.Id
 }
 
 /**
   * Players that are recognized by the system (ours).
   */
-object Party extends WithOpaqueKey[Int, Party] {
-
-  implicit class Ops(val key: Key) {
-    def as[P <: Party]: OpaqueKey[Int, P] = OpaqueKey unsafe key.value
-  }
+object Party extends WithFuuidKey[Party] {
 
   /** TODO: this is sketchy and probably not needed */
-  def apply(name: Label, taxId: Tax.Id, meta: Meta.Id)(
+  def apply(name: Label, taxId: TaxId.Id, meta: Meta.Id)(
       implicit
-      vssn: Validate[String, Tax.IsSsn],
-      vein: Validate[String, Tax.IsEin],
+      vssn: Validate[String, TaxId.IsSsn],
+      vein: Validate[String, TaxId.IsEin],
   ) =
     taxId match {
-      case Tax.Ssn(ssn) => NaturalPerson(name, ssn, meta)
-      case Tax.Ein(ein) => LegalEntity(name, ein, meta)
+      case TaxId.Ssn(ssn) => NaturalPerson(name, ssn, meta)
+      case TaxId.Ein(ein) => LegalEntity(name, ein, meta)
     }
 
   /** */
@@ -74,79 +141,6 @@ object Party extends WithOpaqueKey[Int, Party] {
   implicit def showParty = Show.show[Party] {
     _.toString // this can evolve!
   }
-
-  /**  */
-  object Tax {
-
-    /** */
-    final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}"""
-
-    /** */
-    type MatchesRxSsn = MatchesRxSsn.type
-
-    /**
-      * Post [[https://www.ssa.gov/employer/randomization.html Randomization]]
-      * SSN validation: i.e., cursory only.
-      *
-      * [[https://en.wikipedia.org/wiki/Social_Security_number#Valid_SSNs SSN validation]]
-      * [[https://www.ssa.gov/history/ssn/geocard.html SSN geocard]]
-      */
-    type IsSsn = MatchesRxSsn And CheckedSsn
-
-    /** */
-    type Ssn = String Refined IsSsn
-
-    object Ssn {
-      def unapply(id: Id)(implicit v: Validate[String, IsSsn]): Option[Ssn] = refineV[IsSsn](id.value).toOption
-    }
-
-    /** */
-    sealed abstract case class CheckedSsn private ()
-
-    /** */
-    object CheckedSsn {
-
-      /** */
-      lazy val instance: CheckedSsn = new CheckedSsn() {}
-
-      /** */
-      implicit def ssnValidate: Validate.Plain[String, CheckedSsn] =
-        Validate.fromPredicate(predicate, t => s"$t is certainly not a valid IsSsn", instance)
-
-      /** */
-      private val predicate: String => Boolean = s => {
-        scala.util.Try {
-          val an :: gn :: sn :: Nil = (s split '-' map (_.toInt)).toList
-          def checkAn               = 0 < an && an != 666 /* sic */ && an < 900
-          checkAn && 0 < gn && 0 < sn
-        } getOrElse false
-      }
-    }
-
-    /**
-      * An `Party` represents a legal (eg corporate, or non-profit) body.
-      *
-      * TODO: '''DTC''' ''Legal Entity Identifier '' `LEI` definition (issuing party for public secs)
-      */
-    final val IsEin = """\d{2}-\d{7}"""
-
-    /** */
-    final type IsEin = MatchesRegex[IsEin.type]
-
-    /** */
-    final type Ein = String Refined IsEin
-
-    /** */
-    object Ein {
-      def unapply(id: Id)(implicit v: Validate[String, IsEin]): Option[Ein] = refineV[IsEin](id.value).toOption
-    }
-
-    /** */
-    type IsId = IsSsn Or IsEin
-
-    /** */
-    type Id = String Refined IsId
-  }
 }
 
 /**
@@ -154,7 +148,7 @@ object Party extends WithOpaqueKey[Int, Party] {
   */
 final case class NaturalPerson(
     name: Label,
-    ssn: Tax.Ssn,
+    ssn: TaxId.Ssn,
     meta: Meta.Id
 ) extends Party {
 
@@ -165,10 +159,10 @@ final case class NaturalPerson(
 }
 
 /*  */
-object NaturalPerson extends WithOpaqueKey[Int, NaturalPerson]
+object NaturalPerson extends WithFuuidKey[NaturalPerson]
 
 /**  */
-final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta.Id) extends Party {
+final case class LegalEntity(name: Label, ein: TaxId.Ein, meta: Meta.Id) extends Party {
 
   import refined.auto._
 
@@ -177,7 +171,7 @@ final case class LegalEntity(name: Label, ein: Tax.Ein, meta: Meta.Id) extends P
 }
 
 /**  */
-object LegalEntity extends WithOpaqueKey[Int, LegalEntity]
+object LegalEntity extends WithFuuidKey[LegalEntity]
 
 /**
   * There are a finite enumeration of roles which [[Party]]s may take on with respect to
@@ -190,7 +184,11 @@ sealed trait Role extends EnumEntry
 /**
   * Enumerated `Role`s.
   */
-object Role extends Enum[Role] with CatsEnum[Role] {
+object Role extends DtEnum[Role] {
+
+  sealed trait Principal extends Role
+
+  sealed trait NonPrincipal extends Role
 
   /** */
   object NonPrincipal {
@@ -198,9 +196,9 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     /**
       * A test for all `Role`s ''other than'' `Princple`.
       */
-    def unapply(role: Role): Option[Role] = role match {
-      case Principal                        => none
-      case np @ (Agent | Manager | Auditor) => np.some
+    def unapply(role: Role): Option[NonPrincipal] = role match {
+      case Principal        => none
+      case np: NonPrincipal => np.some
     }
   }
 
@@ -217,7 +215,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * `Principal`s have authority to add or remove [[Agent]]s.
     *  A `Princple` is their own `Agent` unless otherwise specified.
     */
-  case object Principal extends Role
+  case object Principal extends Principal
 
   /**
     * The primary delegate selected by a `Principal`.
@@ -225,7 +223,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * `Agents` have authortity to add or remove [[Manager]]s.
     * An `Agent` is their own `Manager` unless otherwise specified.
     */
-  case object Agent extends Role
+  case object Agent extends NonPrincipal
 
   /**
     * The primary delegate selected by the `Agent`.
@@ -234,7 +232,7 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * which will result in `Transaction`s settling to the `Account`.
     *
     */
-  case object Manager extends Role
+  case object Manager extends NonPrincipal
 
   /**
     * `Auditor`s are first class participants, with a package of rights and responsibilities.
@@ -254,15 +252,10 @@ object Role extends Enum[Role] with CatsEnum[Role] {
     * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
     * be suited eg to a Risk Manager, operating in the context of a hedge fund.
     */
-  case object Auditor extends Role
+  case object Auditor extends NonPrincipal
 
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values = findValues
-
-  /** FIXME this is just a hack to use `SortedSet`s etc
-    * it is almost certainly wrong to do this, but why?
-    */
-  implicit val orderInstance: cats.Order[Role] = cats.Order by (_.entryName)
 
   /** */
   lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
