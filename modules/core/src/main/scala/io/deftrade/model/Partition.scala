@@ -232,6 +232,11 @@ object Partition {
   )(
       amount: V Refined IsPositive
   ) = compute(keys)(amount) |> apply[K, V]
+  // FIXME
+  // import cats.{ Eq, Order, Show }
+  // import cats.derived.{ auto, semi }
+  // implicit def eq[K: Order, V: Eq]: Eq[Partition[K, V]] = { import auto.eq._; semi.eq }
+  // implicit def show[K, V]: Show[Partition[K, V]]        = { import auto.show._; semi.show }
 }
 
 /**
