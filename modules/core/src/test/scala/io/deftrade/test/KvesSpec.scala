@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import implicits._
+import syntax._
 import time._, money._, keyval._
 import Currency.{ USD }
 

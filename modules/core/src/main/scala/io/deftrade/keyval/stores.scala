@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import implicits._, refinements.IsSha
+import syntax._, refinements.IsSha
 
 import cats.implicits._
 import cats.Eq

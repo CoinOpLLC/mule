@@ -17,7 +17,7 @@
 package io.deftrade
 package money
 
-import implicits._
+import syntax._
 
 import cats.implicits._
 import cats.kernel.{ CommutativeGroup, Monoid, Semigroup }

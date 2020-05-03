@@ -1,7 +1,7 @@
 package io.deftrade
 package contracts
 
-import implicits._, time._, money._
+import syntax._, time._, money._
 
 import cats.implicits._
 import cats.{ Order, Show }

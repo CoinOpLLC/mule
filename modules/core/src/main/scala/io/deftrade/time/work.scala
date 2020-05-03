@@ -17,7 +17,7 @@
 package io.deftrade
 package time
 
-import implicits._
+import syntax._
 
 import cats.implicits._
 import cats.{ Order }

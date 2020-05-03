@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import implicits._, money._, model._
+import syntax._, money._, model._
 import Currency.{ EUR, USD }
 
 import cats.syntax.show._

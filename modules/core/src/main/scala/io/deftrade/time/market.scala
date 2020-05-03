@@ -17,7 +17,7 @@
 package io.deftrade
 package time
 
-import implicits._, time.work._, keyval._
+import syntax._, time.work._, keyval._
 
 import cats.implicits._
 

@@ -19,7 +19,7 @@ package io.deftrade
 import cats.kernel.CommutativeGroup
 
 /** Bowing to convention. */
-object implicits {
+object syntax {
 
   /**
     * I hear nice things about OCaml.

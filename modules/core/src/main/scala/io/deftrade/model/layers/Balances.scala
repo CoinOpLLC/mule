@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import time._, money._, implicits._
+import syntax._, time._, money._
 
 import cats.implicits._
 import cats.{ Invariant }

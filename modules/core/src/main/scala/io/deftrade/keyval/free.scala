@@ -1,7 +1,7 @@
 package io.deftrade
 package keyval
 
-import io.deftrade.implicits._
+import io.deftrade.syntax._
 
 import cats.implicits._
 

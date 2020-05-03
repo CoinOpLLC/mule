@@ -3,7 +3,7 @@ package test
 
 import io.deftrade._
 
-import implicits._, time._
+import syntax._, time._
 import java.time.Month
 import java.time.temporal.ChronoUnit, ChronoUnit.{ HOURS => Hours, MINUTES => Minutes }
 

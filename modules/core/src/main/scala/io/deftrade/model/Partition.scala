@@ -17,7 +17,7 @@
 package io.deftrade
 package model
 
-import implicits._, money._, refinements.IsUnitInterval
+import syntax._, money._, refinements.IsUnitInterval
 
 import cats.implicits._
 import cats.data.{ NonEmptyMap, NonEmptySet }
