@@ -210,7 +210,7 @@ object PureConfigExample {
   val confDate   = parseString(s"""{ date: 2011-12-03 }""")
   val configDate = loadConfig[ConfDate](confDate)
 
-  configDate === ConfDate(localDate("2011-12-03")).asRight |> assertOrElse(configDate.toString)
+  configDate === ConfDate(localDate("2011-12-03")).asRight |> (x => assert(x, configDate.toString))
 
   val root = "my.random.example"
   val config = ConfigFactory.parseString(

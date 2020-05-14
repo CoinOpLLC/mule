@@ -19,21 +19,21 @@ package io
 /**
   * Foundational toolkit for applications serving '''financial market participants'''.
   *
+  * This toolkit provides the necessary types and methods to specify
+  * `Abstract Algebraic Domain Model`s
+  *   - `Abstract` because models are mapped to multiple materialized types
+  * via ''natural transformations'' (i.e. multiple interpreters for the same language).
+  *   - `Algebraic` because models are formally composable
+  *   - `Domain Model`s because the abstract algebra aspires to be '''legible''' to
+  * the afformentioned ''financial market participants''.
+  *
   * What financial market participants?
   *
   *   - Initial scope: small private equity funds, small hedge funds, family offices, RIAs,
   *   loan funds, real estate funds, ad-hoc seed venture funds, etc.
   *
   *   - Potential scope: banks, credit unions, CDFIs, broker/dealers, crypto exchanges,
-  * and other actors with additional requirements.
-  *
-  * This toolkit provides the necessary types and methods to specify
-  * `Abstract Algebraic Domain Model`s
-  *   - `Abstract` because models are mapped to multiple materialized types
-  * via ''natural transformations'' (i.e. multiple interpreters for the same language).
-  *   - `Algebraic` because models are formally composable
-  *   - `Domain Model`s because the abstract algebra aspires to legibility by
-  * the afformentioned ''financial market participants''.
+  * and other actors with additional operational and regulatory requirements.
   */
 package object deftrade extends deftrade.results.mixin {
 
@@ -43,11 +43,4 @@ package object deftrade extends deftrade.results.mixin {
     * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
     */
   val discardValue: Any => Unit = (_: Any) => ()
-
-  /**
-    * Bind a message to an assertion function.
-    *
-    * Handy for development. If you write trading algos, development is basically "forever".
-    */
-  def assertOrElse(message: String): Boolean => Unit = assert(_, message)
 }

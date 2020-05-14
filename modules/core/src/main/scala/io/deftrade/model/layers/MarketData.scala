@@ -20,22 +20,27 @@ package layers
 
 import money._, keyval._
 import capital.Instrument
-import refinements.Label
+import refinements.{ IsLabel, Label }
 
 import cats.implicits._
 import cats.Monad
 import cats.data.NonEmptySet
+import cats.derived.{ auto, semi }
 
 import enumeratum.EnumEntry
 
 import spire.syntax.field._
 
 import eu.timepit.refined
+import refined.refineMV
 import refined.api.Refined
-import refined.string.{ MatchesRegex }
+import refined.boolean.{ And }
+import refined.collection.{ Forall, Size }
+import refined.numeric.{ GreaterEqual, LessEqual }
+import refined.string.{ Trimmed, Uuid => IsUuid }
+import refined.char.{ Letter, UpperCase }
 
-import shapeless.syntax.singleton._
-import refined.auto._
+import refined.cats._
 
 /** */
 trait MarketData { self: Ledger with ModuleTypes =>
@@ -240,6 +245,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     lazy val values = findValues
   }
 
+  /** */
   sealed abstract case class TickData(tick: Tick, price: MonetaryAmount, size: Long)
 
   object TickData {
@@ -259,9 +265,9 @@ trait MarketData { self: Ledger with ModuleTypes =>
   }
 
   /** */
-  val IsMic = """[A-Z]{3,4}""".witness
-
-  type IsMic = MatchesRegex[IsMic.T]
+  // type IsMic = Size[GreaterEqual[3] And LessEqual[4]] And Trimmed
+  type IsMic = Size[GreaterEqual[3]] And Size[LessEqual[4]] And Trimmed
+  // type IsMic = Size[LessEqual[4]]
 
   /** */
   type Mic = String Refined IsMic // market venue
@@ -270,23 +276,23 @@ trait MarketData { self: Ledger with ModuleTypes =>
     * Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
     *
     * Note: "double entry bookkeeping" in the context of a shared [[Ledger]] with
-    * multiple [[OrderManagement.OMS]] entails the following:
+    * multiple [[OrderManagement.OMS OMS gateways]] to externally traded `Instrument`s
+    * entails the following:
     *
-    *   - keep contra accounts per OMS gateway
+    *   - keep contra accounts per `OMS` gateway
     *   - debit contra account when we "buy shares (units)" (creates negative balance)
     *   - credit that account when settlement happens (zeros out the balance)
     *   - "reverse polarity" when we enter a short position.
     *   - indexAndSum settled positions for reconcilliation
     */
-  sealed trait Market {
-    def entity: Party.Key
-    def contra: Folio.Key
-  }
+  sealed trait Market { def entity: Party.Key; def contra: Folio.Key }
 
   /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
-  object Market extends WithRefinedKey[String, IsMic, Market] {
-    // object Market extends WithOpaqueKey[Int, Market] {
-    implicit def orderMarket: cats.Order[Market] = ???
+  object Market extends WithRefinedKey[String, IsLabel, Market] {
+
+    // import cats.derived.{ auto, semi }
+
+    implicit def orderMarket: cats.Order[Market] = ??? // { import auto.order._; semi.order }
   }
 
   /**
@@ -296,13 +302,19 @@ trait MarketData { self: Ledger with ModuleTypes =>
     * recorded on on the [[Ledger]].
     */
   sealed abstract case class Counterparty(
-      final val label: Label,
+      final val entity: Party.Key,
       final val contra: Folio.Key,
-      final val entity: Party.Key
   ) extends Market
 
   /** */
-  object Counterparty extends WithId[Counterparty]
+  object Counterparty extends WithRefinedKey[String, IsUuid, Counterparty] {
+
+    def apply(entity: Party.Key, contra: Folio.Key): Counterparty =
+      new Counterparty(entity, contra) {}
+
+    implicit def cpOrder: cats.Order[Counterparty] = { import auto.order._; semi.order }
+
+  }
 
   /**
     * Single effective counterparty: the `Exchange` itself.
@@ -311,20 +323,20 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - activity recorded in a `contra account`
     */
   sealed abstract case class Exchange private (
-      final val mic: Mic,
+      final val entity: Party.Key,
       final val contra: Folio.Key,
-      final val entity: Party.Key
   ) extends Market
 
   /** */
-  object Exchange extends WithId[Exchange] {
+  object Exchange extends WithRefinedKey[String, IsMic, Exchange] {
 
     /** */
-    def fromMic(mic: Mic): Exchange = ??? // make new contra account
+    protected[deftrade] def apply(entity: Party.Key, contra: Folio.Key): Exchange =
+      new Exchange(entity, contra) {}
 
     /** */
     def withEntity(entity: Party.Key): Exchange => Exchange =
-      x => new Exchange(x.mic, x.contra, entity) {}
+      x => Exchange(entity, x.contra)
   }
 
   /**
@@ -355,7 +367,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
   }
 
   /** FIXME: normalize fields? */
-  object MDS extends WithOpaqueKey[Long, MDS] {
+  object MDS extends WithRefinedKey[String, IsLabel, MDS] {
 
     /** */
     def single(m: Market): MDS = new MDS(NonEmptySet one m) {

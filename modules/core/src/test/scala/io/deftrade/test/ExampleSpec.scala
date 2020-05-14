@@ -54,3 +54,14 @@
 //     }
 //   }
 // }
+
+/**
+{{{
+
+implicit def uuidArbitrary[F[_, _]](
+      implicit rt: RefType[F]
+  ): Arbitrary[F[String, Uuid]] =
+    arbitraryRefType(Arbitrary.arbUuid.arbitrary.map(_.toString))
+}}}
+
+*/

@@ -8,31 +8,37 @@ object Version {
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Enumeratum = "1.5.15"
-  val Shapeless  = "2.3.3"
-  val Refined    = "0.9.13"
-
-  val Cats       = "2.1.0"
-  val Kittens    = "2.0.0"
-  val CatsEffect = "2.0.0"
+  val Cats       = "2.1.1"
+  val Kittens    = "2.1.0"
+  val CatsEffect = "2.1.3"
 
   val Spire = "0.17.0-M1"
-  val Circe = "0.13.0"
-  val Fs2   = "2.1.0"
+  val Shapeless  = "2.3.3"
+  val Refined    = "0.9.14"
 
-  val Cormorant  = "0.3.0"
+  val Enumeratum = "1.5.15"
   val Fuiid      = "0.3.0"
+
+  val Circe = "0.13.0"
   val PureConfig = "0.12.3"
   val TypesafeConfig = "1.3.3"
+  val Slf4j       = "1.7.30"
 
-  val Http4s     = "0.21.0-M4"
-  val Fansi = "0.2.7"
+  // val Fs2   = "2.3.0"
+  val Fs2   = "2.2.2"
+  val Cormorant  = "0.3.0"
+
+  val Http4s      = "0.21.4"
+  val Doobie      = "0.9.0"
+
+  val Fansi       = "0.2.7"
 
   val OpenGamma = "2.3.2"
 
+
   // Test libs
 
-  val ScalaTest  = "3.1.0"
+  val ScalaTest  = "3.1.1"
   val ScalaCheck = "1.14.3"
 
   val CatsScalaCheck      = "0.2.0"
@@ -70,10 +76,17 @@ object Deps {
   /**
     * @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
-  def refinedLibs = Seq("", "-eval", "-cats", "-pureconfig", "-shapeless")
-  val refined = refinedLibs map { x =>
-    "eu.timepit" %% s"refined$x" % Refined
-  }
+  val refined =
+    (
+      Seq(
+        "",
+        "-eval",
+        "-cats",
+        "-pureconfig",
+        "-shapeless"
+      ) map (x => "eu.timepit" %% s"refined$x" % Refined)
+    ) ++
+    Seq( "eu.timepit" %% "refined-scalacheck" % Refined % Test)
 
   val enumerata = Seq(
     "com.beachape" %% "enumeratum"       % Enumeratum,
@@ -113,7 +126,6 @@ object Deps {
 
     "org.scalatestplus" %% "scalacheck-1-14" % "3.1.0.1",
 
-    "eu.timepit"                 %% "refined-scalacheck"        % Refined,
     "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
     "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
     "io.circe"                   %% "circe-testing"             % Circe,
@@ -141,6 +153,21 @@ object Deps {
     // "co.fs2" %% "fs2-reactive-streams",
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
+
+
+  val doobies = List(
+
+    // Start with this one
+    // And add any of these as needed
+
+    "org.tpolecat" %% "doobie-core"      % Doobie,
+    "org.tpolecat" %% "doobie-h2"        % Doobie,          // H2 driver 1.4.200 + type mappings.
+    "org.tpolecat" %% "doobie-hikari"    % Doobie,          // HikariCP transactor.
+    "org.tpolecat" %% "doobie-postgres"  % Doobie,          // Postgres driver 42.2.9 + type mappings.
+    "org.tpolecat" %% "doobie-quill"     % Doobie,          // Support for Quill
+
+    "org.tpolecat" %% "doobie-scalatest" % Doobie % "test"  // ScalaTest support for typechecking statements.
+  )
 
   // val zios = List(
   //   "zio",

@@ -39,15 +39,16 @@ def module(id: String, d: String) =
 lazy val core = module(
   "core",
   """foundational finance value types and functions:
-    | - time and money dsl
-    | - core finance domain model
-    | - composable contract dsl and eval
-    | - key-value store algebras / implementations / bridges
+    | - composable contract dsl and evaluation engines
+    | - core accounting and trading domain model
+    | - privacy-first account model protects PII
+    | - language integrated query algebras and interpreters
+    | - time and money dsls including currency, pricing, quoting, duration, tenors, and holidays.
     |""".stripMargin
 ).settings(common)
   .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
 
 lazy val demo = module("demo", "something to run")

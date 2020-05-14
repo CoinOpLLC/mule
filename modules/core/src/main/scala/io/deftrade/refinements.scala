@@ -19,12 +19,13 @@ package io.deftrade
 import cats.implicits._
 
 import eu.timepit.refined
-import refined.api.{ Refined, Validate }
-import refined.boolean.And
-import refined.collection.{ Forall, MaxSize, MinSize }
-import refined.numeric.{ Interval, Positive }
+import eu.timepit.refined.boolean._
+import refined.collection.{ Forall, Size }
+import refined.numeric.{ GreaterEqual, Interval, LessEqual, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
-// import refined.api.Validate
+import refined.api.{ Inference, Refined, Validate }
+import Inference.==>
+import Interval.{ Closed => To }
 
 import scodec.bits.ByteVector
 
@@ -76,7 +77,7 @@ object refinements {
     * Postgres optimizes strings of length 126 (and shorter).
     * FIXME: account for `UTF-8` encoding
     */
-  type IsVarChar = MaxSize[126]
+  type IsVarChar = Size[LessEqual[126]]
 
   /** */
   type VarChar = String Refined IsVarChar
@@ -88,13 +89,15 @@ object refinements {
   }
 
   /** Our `Refined` type naming convention: {{{type XYZ = T Refined IsXYZ}}} */
-  type IsLabel = MinSize[3] And MaxSize[100] And Trimmed
+  // type IsLabel = Size[GreaterEqual[3] And LessEqual[100]] And Trimmed
+  type IsLabel = Size[Interval.Closed[3, 100]] And Trimmed
+  // type IsLabel = Size[LessEqual[100]]
 
   /** A saner `String` (non-empty, bounded, trimmed). */
   type Label = String Refined IsLabel
 
   /** Non-whitespace, non control block, non-empty ASCII string of bounded length. */
-  type IsAscii24 = MinSize[3] And MaxSize[24] And Forall[Interval.Closed['!', '~']]
+  type IsAscii24 = Size[3 To 24] And Forall['!' To '~']
 
   /**
     * A short, pure ASCII, all printable, no whitespace `Label`.
