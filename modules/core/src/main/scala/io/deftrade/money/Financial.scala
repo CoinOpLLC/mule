@@ -125,7 +125,6 @@ trait Financial[N] extends Fractional[N] { self =>
       Validate fromPredicate (p, t => s"${t.toString} isn't a whole number", IsWhole[I])
     }
   }
-
 }
 
 /**  */

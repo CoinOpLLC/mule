@@ -18,12 +18,12 @@ package io.deftrade
 package model
 package layers
 
-import money._, keyval._
+import money._, keyval._, time.{ instant, Instant }
 import capital.Instrument
 import refinements.{ IsLabel, Label }
 
 import cats.implicits._
-import cats.Monad
+import cats.{ Monad, Order, Show }
 import cats.data.NonEmptySet
 import cats.derived.{ auto, semi }
 
@@ -45,52 +45,76 @@ import refined.cats._
 /** */
 trait MarketData { self: Ledger with ModuleTypes =>
 
+  /** */
+  sealed abstract case class Quoted private[deftrade] (final val quote: (MonetaryAmount, MonetaryAmount)) {
+
+    type AssetType
+
+    type CurrencyType // <: CurrencyLike
+
+    /** */
+    @inline final def bid: MonetaryAmount = quote match { case (bid, _) => bid }
+
+    /** */
+    @inline final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
+
+    /** */
+    @inline final def spread = ask - bid
+
+    /** */
+    @inline final def mid = bid + spread / 2
+
+    /** */
+    def isDerived: Boolean = false
+  }
+
+  implicit def hackShow: Show[MonetaryAmount] = ???
+
+  discardValue(Show[MonetaryAmount])
+
+  /** */
+  object Quoted {
+
+    /** exclusively usable by (and necessary for) macros and other lawless entities */
+    protected def apply(quote: (MonetaryAmount, MonetaryAmount)): Quoted =
+      new Quoted(quote) {}
+
+    implicit def qOrder: Order[Quoted] = { import auto.order._; semi.order }
+    implicit def qShow: Show[Quoted]   = { import auto.show._; semi.show }
+  }
+
   /**
     * Represents a price quote (in currency `C`) for instruments of type `A`.
     *
     * The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is
     * a human-legible expression in the domain of market quotes.
     *
-    *   Instances can come from a variety of sources including live market
-    *   - "Orderly market" invariant: `ask` < `bid`.
-    *   - must model disorderly markets: not everything that comes at you down the wire makes sense.
-    *   - used summon a pricing instance, e.g.
-    *{{{val q = QuotedIn[SomeShadySpeculativeInstrument, Currency.CHF] }}}
-    *       - C is intended (but not required by this base type) to represent a currency, and will
-    * typically have a [[money.Currency]][C] typeclass instance
+    * Return both a `bid` and an `ask` for the given instrument.
     *
-    * Domain consideration: `Currency`_exchange depends on '''pricing''' of some kind.
-    * One or more Market(s) determine this price.
-    *     - A design that doesn't abstract over `QuotedIn`, '''including live data''', is useless.
-    *     - OTOH, dead simple immutable for testing / demo also required
+    * Domain modelling note: `quote` does not signal intent. For example, the client may ignore
+    * the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
+    * cannot not predjudice their responses when asked for a quote, as the client reveals nothing
+    * about their intent.
+
+    * Instances can come from a variety of sources including live market feeds
+    *   - "Orderly market" invariant: `ask` < `bid`
+    *   - must model disorderly markets: not everything that comes at you down the wire
+    *     can be expected to "make sense"
+    *
+    * Domain consideration: `Currency` exchange depends on '''pricing''' of some kind, and one or
+    * more Market(s) determine this price.
     */
-  trait QuotedIn[T, C] extends Any {
+  sealed abstract class QuotedIn[A, C] private[deftrade] (
+      q: (MonetaryAmount, MonetaryAmount)
+  ) extends Quoted(q) {
+    self =>
+
+    final type AssetType    = A
+    final type CurrencyType = C
 
     /** */
-    final def bid: MonetaryAmount = quote match { case (bid, _) => bid }
-
-    /** */
-    final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
-
-    /**
-      *
-      * Return both a `bid` and an `ask` for the given instrument.
-      *
-      * Implementations which query live markets, but do not require live data,
-      * should strongly consider caching.
-      *
-      * Domain modelling note: `quote` does not signal intent. For example, the client may ignore
-      * the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
-      * cannot not predjudice their responses when asked for a quote, as the client reveals nothing
-      * about their intent.
-      */
-    def quote: (MonetaryAmount, MonetaryAmount)
-
-    /** */
-    def tick(implicit C: Currency[C]): MonetaryAmount
-
-    /** */
-    def isDerived: Boolean = false
+    def tick(implicit C: Currency[C]): MonetaryAmount =
+      MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
 
     /** */
     type CrossType
@@ -98,54 +122,14 @@ trait MarketData { self: Ledger with ModuleTypes =>
     /** */
     def cross: Option[CrossType] = None
 
-    /** */
-    @inline final def spread = ask - bid
-
-    /** */
-    @inline final def mid = bid + spread / 2
-  }
-
-  /**
-    * TODO: implement
-    */
-  object QuotedIn {
-
-    /**
-      * Immutable value class representing a quote.
-      */
-    sealed abstract case class Memo[A, C] private[QuotedIn] (
-        final val quote: (MonetaryAmount, MonetaryAmount)
-    ) extends QuotedIn[A, C] {
-
-      /** */
-      def tick(implicit C: Currency[C]): MonetaryAmount =
-        MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
-    }
-
-    /** */
-    def apply[A, C2: Currency](
-        bid: MonetaryAmount,
-        ask: MonetaryAmount
-    ): QuotedIn[A, C2] = new Memo[A, C2]((bid, ask)) {}
-
-    /** */
-    def asTraded[A, C2: Currency](
-        amount: MonetaryAmount
-    ): QuotedIn[A, C2] = apply(amount, amount)
-
     /**
       * Inverse quotes are peculiar to `forex`.
       */
-    implicit def inverseQuote[C1: Currency, C2: Currency](
-        implicit Q: C1 QuotedIn C2
-    ): C2 QuotedIn C1 =
-      new QuotedIn[C2, C1] {
+    final def inverse(implicit C: Currency[C]): C QuotedIn A =
+      new QuotedIn[C, A]((1 / self.bid, 1 / self.ask)) {
 
-        /** */
-        def quote = (1 / Q.bid, 1 / Q.ask)
-
-        /** */
-        def tick(implicit C1: Currency[C1]) = Q.tick * mid
+        /** TODO this is not at all obvious, explain */
+        override def tick(implicit A: Currency[A]) = (self tick C) * mid
 
         /** */
         override def isDerived = true
@@ -153,30 +137,45 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     /**
       * Cross quotes are also peculiar to `forex`.
+      *
+      * Our `A` is a `Currency`, and our `C: Currency` is the cross currency.
       */
-    implicit def crossQuote[C1: Currency, CX: Currency, C2: Currency](
-        Q1X: C1 QuotedIn CX,
-        QX2: CX QuotedIn C2
-    ): C1 QuotedIn C2 =
-      new QuotedIn[C1, C2] {
+    final def cross[C2: Currency](other: C QuotedIn C2)(implicit C: Currency[C]): A QuotedIn C2 =
+      new QuotedIn[A, C2]((self.bid * other.bid, self.ask * other.ask)) {
 
         /** */
-        def quote = (Q1X.bid * QX2.bid, Q1X.ask * QX2.ask)
-
-        /** */
-        def tick(implicit C2: Currency[C2]) = QX2.tick(C2) * mid
+        override def tick(implicit C2: Currency[C2]) = (other tick C2) * mid
 
         /** */
         override def isDerived = true
 
         /** */
-        type CrossType = Currency[CX]
+        override type CrossType = Currency[C]
 
         /** */
-        override def cross: Option[CrossType] = Some(Currency[CX])
+        override def cross: Option[CrossType] = Some(C)
       }
   }
 
+  /** */
+  object QuotedIn {
+
+    def apply[A, C](quote: (MonetaryAmount, MonetaryAmount)): QuotedIn[A, C] =
+      new QuotedIn[A, C](quote) {}
+
+    /** */
+    def bidask[A, C](
+        bid: MonetaryAmount,
+        ask: MonetaryAmount
+    ): QuotedIn[A, C] =
+      apply((bid, ask))
+
+    /** */
+    def trade[A, C: Currency](amount: MonetaryAmount): QuotedIn[A, C] =
+      apply((amount, amount))
+  }
+
+  // FIXME: QuotedIn is not at all what we want here - a Stream[F, _] something
   /** An exchange rate. */
   sealed abstract case class Rate[C1, C2]()(
       implicit
@@ -246,22 +245,27 @@ trait MarketData { self: Ledger with ModuleTypes =>
   }
 
   /** */
-  sealed abstract case class TickData(tick: Tick, price: MonetaryAmount, size: Long)
+  sealed abstract case class TickData(
+      at: Instant,
+      tick: Tick,
+      price: MonetaryAmount,
+      size: Quantity
+  )
 
   object TickData {
 
     /** */
-    def apply(tick: Tick, price: MonetaryAmount, size: Long): TickData =
-      new TickData(tick, price, size) {}
+    def apply(at: Instant, tick: Tick, price: MonetaryAmount, size: Quantity): TickData =
+      new TickData(at, tick, price, size) {}
 
     /** */
-    def bid(price: MonetaryAmount, size: Long) = TickData(Tick.Bid, price, size)
+    def bid(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Bid, price, size)
 
     /** */
-    def ask(price: MonetaryAmount, size: Long) = TickData(Tick.Ask, price, size)
+    def ask(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Ask, price, size)
 
     /** */
-    def trade(price: MonetaryAmount, size: Long) = TickData(Tick.Trade, price, size)
+    def trade(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Trade, price, size)
   }
 
   /** */
@@ -290,9 +294,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
   /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
   object Market extends WithRefinedKey[String, IsLabel, Market] {
 
-    // import cats.derived.{ auto, semi }
-
-    implicit def orderMarket: cats.Order[Market] = ??? // { import auto.order._; semi.order }
+    /** beware this is below domain semantics and not what it says */
+    implicit def marketOrder: Order[Market] = ??? // { import auto.order._; semi.order }
   }
 
   /**
@@ -312,8 +315,9 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def apply(entity: Party.Key, contra: Folio.Key): Counterparty =
       new Counterparty(entity, contra) {}
 
-    implicit def cpOrder: cats.Order[Counterparty] = { import auto.order._; semi.order }
+    implicit def cpOrder: Order[Counterparty] = { import auto.order._; semi.order }
 
+    implicit def cpShow: Show[Counterparty] = { import auto.show._; semi.show }
   }
 
   /**
@@ -369,12 +373,14 @@ trait MarketData { self: Ledger with ModuleTypes =>
   /** FIXME: normalize fields? */
   object MDS extends WithRefinedKey[String, IsLabel, MDS] {
 
-    /** */
-    def single(m: Market): MDS = new MDS(NonEmptySet one m) {
+    private[deftrade] def apply(markets: NonEmptySet[Market]): MDS = new MDS(markets) {
 
       /** FIXME: how do we specialize? */
       def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
     }
+
+    /** */
+    def single(m: Market) = MDS(NonEmptySet one m)
   }
 
   /** placeholder */
