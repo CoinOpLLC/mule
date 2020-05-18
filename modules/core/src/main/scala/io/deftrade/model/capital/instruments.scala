@@ -20,8 +20,8 @@ package capital
 
 import time._, market._, money._, contracts._, keyval._, refinements._
 
-import cats.{ Eq, Show }
 import cats.implicits._
+import cats.{ Eq, Order, Show }
 import cats.derived.{ auto, semi }
 
 import enumeratum.EnumEntry
@@ -31,14 +31,9 @@ import refined.refineV
 import refined.api.{ Refined }
 import refined.string.{ Url }
 import refined.numeric.{ Positive }
+import refined.cats._
 
 import keys.{ IsIsin, IsUsin }
-
-/** Necessary annotations for data loaded from external sources. */
-trait Provenance {
-  def loadedAt: Instant
-  def loadedFrom: String Refined Url
-}
 
 /**
   * Models a tradeable thing.
@@ -383,6 +378,12 @@ object forms
 // with Exotics            // primarily for hedge funds
 // with Ibor               // primariy for banks
 
+/** Necessary annotations for data loaded from external sources. */
+private[deftrade] trait Provenance {
+  def sourcedAt: Instant
+  def sourcedFrom: String Refined Url
+}
+
 /**
   * Links which model `Instrument` lifecycle transformation acts
   * (such as M&A actions) as events connecting `Instrument.Key`s.
@@ -409,19 +410,24 @@ object forms
   * - Termination
   */
 final case class Novation(
-    ex: Option[Instrument.Key],
-    is: Option[Instrument.Key],
-    loadedAt: Instant,
-    loadedFrom: String Refined Url,
+    ante: Option[Instrument.Key],
+    post: Option[Instrument.Key],
+    date: LocalDate,
     meta: Meta.Id,
-) extends Provenance
+    sourcedAt: Instant,
+    sourcedFrom: String Refined Url,
+) // extends Provenance
 
 /**
   * A `Novation.Id` makes an effective M&A ''receipt''.
   *
   * There can be more than one leg in an M&A transaction:
-  * - store a `List[Novation]`
+  * - store a `List[Novation]` (or ideally a `NonEmptySet`)
   * - all `List` elements (legs) will get the same `Id`.
   * - thus the ''receipt'' is common to all the legs that make up the transaction.
   */
-object Novation extends WithId[Novation]
+object Novation extends WithId[Novation] {
+
+  implicit def novationOrder: Order[Novation] = { import auto.order._; semi.order }
+  implicit def novationShow: Show[Novation]   = { import auto.show._; semi.show }
+}
