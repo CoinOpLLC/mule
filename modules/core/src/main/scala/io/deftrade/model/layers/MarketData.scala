@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import money._, keyval._, time.{ instant, Instant }
+import money._, keyval._, time._
 import capital.Instrument
 import refinements.{ IsLabel, Label }
 
@@ -46,7 +46,9 @@ import refined.cats._
 trait MarketData { self: Ledger with ModuleTypes =>
 
   /** */
-  sealed abstract case class Quoted private[deftrade] (final val quote: (MonetaryAmount, MonetaryAmount)) {
+  sealed abstract case class Quoted private[deftrade] (
+      final val quote: (MonetaryAmount, MonetaryAmount)
+  ) {
 
     type AssetType
 
@@ -67,10 +69,6 @@ trait MarketData { self: Ledger with ModuleTypes =>
     /** */
     def isDerived: Boolean = false
   }
-
-  implicit def hackShow: Show[MonetaryAmount] = ???
-
-  discardValue(Show[MonetaryAmount])
 
   /** */
   object Quoted {
@@ -177,8 +175,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   // FIXME: QuotedIn is not at all what we want here - a Stream[F, _] something
   /** An exchange rate. */
-  sealed abstract case class Rate[C1, C2]()(
-      implicit
+  sealed abstract case class Rate[C1, C2](
       C1: Currency[C1],
       C2: Currency[C2],
       Q: C1 QuotedIn C2
@@ -214,19 +211,19 @@ trait MarketData { self: Ledger with ModuleTypes =>
   object Rate {
 
     /** */
-    def apply[C1: Currency, C2: Currency](implicit Q: C1 QuotedIn C2): Rate[C1, C2] =
-      new Rate[C1, C2] {}
+    def apply[C1: Currency, C2: Currency](qi: C1 QuotedIn C2): Rate[C1, C2] =
+      new Rate(Currency[C1], Currency[C2], qi) {}
   }
 
   /** */
   implicit class CurrencyOps[C: Currency](C: Currency[C]) {
 
-    /**
+    /** FIXME: seems kinda useless unless it can use an implicit FStream[C QuotedIn C2]
       * Exchange `Rate` factory. Implicit context provides pricing.
       */
-    def /[C2](cb: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
-      implicit val C2 = cb
-      Rate[C, C2]
+    def /[C2](c2: Currency[C2])(implicit Q: C QuotedIn C2): Rate[C, C2] = {
+      implicit val C2 = c2
+      Rate[C, C2](Q)
     }
   }
 
@@ -252,20 +249,35 @@ trait MarketData { self: Ledger with ModuleTypes =>
       size: Quantity
   )
 
-  object TickData {
+  /** */
+  object TickData extends WithId[TickData] {
 
     /** */
     def apply(at: Instant, tick: Tick, price: MonetaryAmount, size: Quantity): TickData =
       new TickData(at, tick, price, size) {}
 
-    /** */
-    def bid(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Bid, price, size)
+    implicit def tdOrder: Order[TickData] = { import auto.order._; semi.order }
+    implicit def tdShow: Show[TickData]   = { import auto.show._; semi.show }
 
-    /** */
-    def ask(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Ask, price, size)
+    /**
+      * {{{
+      * val myLimit: USD(55.47)
+      * val td: TickData = 100.0 bid myLimit.amount
+      * }}}
+      *
+      * TODO: separate syntax stuff
+      */
+    implicit class TickDataOps(size: Quantity) {
 
-    /** */
-    def trade(price: MonetaryAmount, size: Quantity) = TickData(instant, Tick.Trade, price, size)
+      /** */
+      def bid(price: MonetaryAmount) = TickData(instant, Tick.Bid, price, size)
+
+      /** */
+      def ask(price: MonetaryAmount) = TickData(instant, Tick.Ask, price, size)
+
+      /** */
+      def trade(price: MonetaryAmount) = TickData(instant, Tick.Trade, price, size)
+    }
   }
 
   /** */

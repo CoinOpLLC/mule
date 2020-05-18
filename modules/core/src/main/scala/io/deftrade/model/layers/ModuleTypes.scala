@@ -20,6 +20,8 @@ package layers
 
 import money.{ Financial, Mny }
 
+import cats.Show
+
 /**
   * Module level abstract quantities and monetary amounts, which may be distinct types.
   *
@@ -41,10 +43,16 @@ trait ModuleTypes {
   implicit val Quantity: Financial[Quantity]
 
   /** */
+  implicit val qShow: Show[Quantity]
+
+  /** */
   type MonetaryAmount
 
   /**  */
   implicit val MonetaryAmount: Financial[MonetaryAmount]
+
+  /** */
+  implicit val maShow: Show[MonetaryAmount]
 
   /** */
   final type Money[C] = Mny[MonetaryAmount, C]
@@ -56,7 +64,9 @@ object ModuleTypes {
   /** */
   abstract class Aux[MA, Q]()(
       implicit final val MonetaryAmount: Financial[MA],
-      implicit final val Quantity: Financial[Q]
+      implicit final val Quantity: Financial[Q],
+      implicit final val qShow: Show[Q],
+      implicit final val maShow: Show[MA]
   ) extends ModuleTypes {
 
     /** */

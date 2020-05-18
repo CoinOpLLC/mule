@@ -54,8 +54,10 @@ object CsvEnum {
 /** Fully stacc'd enum type. */
 trait DtEnum[E <: EnumEntry] extends Enum[E] with CatsEnum[E] with CsvEnum[E] {
 
-  /** FIXME this is just a hack to use `SortedSet`s etc
-    * it is almost certainly wrong to do this, but why?
+  /**
+    * This is a hack to use `SortedSet`s etc
+    *
+    * TODO: reconsider... it is almost certainly wrong to do this, but why?
     */
   implicit val orderInstance: Order[E] = Order by (_.entryName)
 
