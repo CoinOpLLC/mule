@@ -112,9 +112,9 @@ object Currency extends DtEnum[CurrencyLike] { self =>
     * over two hundred assigned; several "dead" currencies (not reused)
     * Market convention: `ABC/XYZ`: buy or sell units of `ABC`, quoted in `XYZ`.
     */
-  type CodePattern = refined.W.`"[A-Z]{3}"`.T
+  type CodePattern = "[A-Z]{3}"
 
-  /** */
+  /** TODO: check against a `NonEmptySet[Currency]` loaded at init */
   type IsCode = refined.string.MatchesRegex[CodePattern]
 
   /** */

@@ -22,6 +22,7 @@ import time._, money._, keyval._, capital._
 
 import cats.implicits._
 
+import cats.kernel.{ Monoid }
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semi }
 import cats.effect.Sync
@@ -36,6 +37,7 @@ import io.circe.{ Decoder, Encoder, Json }
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Ledger { module: ModuleTypes =>
 
   /**  */
@@ -74,13 +76,9 @@ trait Ledger { module: ModuleTypes =>
     */
   object Pricer {
 
-    /** This version of Aux is called the ''untitled fois gras patttern''. */
-    abstract class Aux[F[_]: Sync, P, C: Currency](
+    /**   */
+    abstract class Aux[F[_], P, C] protected (
         override val price: P => Stream[F, Money[C]]
-    )(
-        implicit
-        final override val C: Currency[C],
-        final override val F: Sync[F]
     ) extends Pricer {
       final type Priced      = P
       final type CurrencyTag = C
@@ -89,7 +87,7 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /** Price data per unit of instrument. */
-  sealed abstract case class InstrumentPricer[F[_]: Sync, C: Currency](
+  sealed abstract case class InstrumentPricer[F[_], C] private (
       final override val price: Instrument.Key => Stream[F, Money[C]]
   ) extends Pricer.Aux[F, Instrument.Key, C](price)
 
@@ -97,25 +95,26 @@ trait Ledger { module: ModuleTypes =>
     * Deploy `Pricer`s by creating search paths per `Currency` and instantiating
     * these pricers in the implicit context.
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   object InstrumentPricer {
 
     /** summon implicit value */
     def apply[F[_]: Sync, C: Currency](
-        implicit ip: InstrumentPricer[F, C]
-    ): InstrumentPricer[F, C] = ip
+        implicit pricer: InstrumentPricer[F, C]
+    ): InstrumentPricer[F, C] = pricer
 
-    /** */
-    def apply[F[_]: Sync, C: Currency](
+    /**  */
+    def instance[F[_], C](
         price: Instrument.Key => Stream[F, Money[C]]
+    )(
+        implicit
+        _C: Currency[C],
+        _F: Sync[F]
     ): InstrumentPricer[F, C] =
-      new InstrumentPricer(price) {}
+      new InstrumentPricer(price) { implicit val C = _C; implicit val F = _F }
 
     /** */
     def empty[F[_]: Sync, C: Currency]: InstrumentPricer[F, C] =
-      new InstrumentPricer(
-        _ => Stream.empty[F]
-      ) {}
+      instance(_ => Stream.empty[F])
 
     /**
       * @return an `InstrumentPricer` which be functions as a two element search path
@@ -128,9 +127,13 @@ trait Ledger { module: ModuleTypes =>
         a: InstrumentPricer[F, C],
         b: InstrumentPricer[F, C]
     ): InstrumentPricer[F, C] =
-      InstrumentPricer { instrument =>
+      instance { instrument =>
         (a price instrument) ++ (b price instrument) take 1
       }
+
+    /** */
+    implicit def instrumentPricerMonoid[F[_]: Sync, C: Currency]: Monoid[InstrumentPricer[F, C]] =
+      Monoid instance (empty[F, C], combine[F, C])
   }
 
   /**
@@ -144,24 +147,26 @@ trait Ledger { module: ModuleTypes =>
   object Position {
 
     /**  Enables volume discounts or other quantity-specific pricing. */
-    sealed abstract case class Pricer[F[_]: Sync, C: Currency](
+    sealed abstract case class Pricer[F[_], C] private (
         final override val price: Position => Stream[F, Money[C]]
     ) extends module.Pricer.Aux[F, Position, C](price)
 
     /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     object Pricer {
 
       /** Summon a pricer for a given currency. */
-      def apply[F[_], C: Currency: Pricer[F, *]]: Pricer[F, C] = implicitly
+      def apply[F[_], C: Currency](implicit pricer: Pricer[F, C]): Pricer[F, C] =
+        pricer
 
       /** */
-      def apply[F[_]: Sync, C: Currency](price: Position => Stream[F, Money[C]]): Pricer[F, C] =
-        new Pricer(price) {}
+      def instance[F[_], C](
+          price: Position => Stream[F, Money[C]]
+      )(implicit _C: Currency[C], _F: Sync[F]): Pricer[F, C] =
+        new Pricer(price) { implicit val C = _C; implicit val F = _F }
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: InstrumentPricer[F, *]]: Pricer[F, C] =
-        apply {
+        instance {
           case (instrument, quantity) => InstrumentPricer[F, C] price instrument map (_ * quantity)
         }
     }
@@ -223,7 +228,7 @@ trait Ledger { module: ModuleTypes =>
       * Enables package deals, or portfolio valuation informed by covariance,
       * or other holistic methodology.
       */
-    sealed abstract case class Pricer[F[_]: Sync, C: Currency](
+    sealed abstract case class Pricer[F[_], C] private (
         final override val price: Trade => Stream[F, Money[C]]
     ) extends module.Pricer.Aux[F, Trade, C](price)
 
@@ -231,19 +236,19 @@ trait Ledger { module: ModuleTypes =>
     object Pricer {
 
       /** Summon a pricer for a given currency. */
-      def apply[F[_], C: Currency: Pricer[F, *]]: Pricer[F, C] = implicitly
+      def apply[F[_], C: Currency](implicit pricer: Pricer[F, C]): Pricer[F, C] =
+        pricer
 
       /** */
-      @SuppressWarnings(Array("org.wartremover.warts.Any"))
-      def apply[F[_]: Sync, C: Currency](
+      def instance[F[_], C](
           price: Trade => Stream[F, Money[C]]
-      ): Pricer[F, C] =
-        new Pricer(price) {}
+      )(implicit _C: Currency[C], _F: Sync[F]): Pricer[F, C] =
+        new Pricer(price) { implicit val C = _C; implicit val F = _F }
 
       /** Create a pricer from a pricing function. */
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
       implicit def default[F[_]: Sync, C: Currency: Leg.Pricer[F, *]]: Pricer[F, C] =
-        Pricer { trade =>
+        instance { trade =>
           val lp = Leg.Pricer[F, C]
           val prices = for {
             leg   <- Stream evals (Sync[F] delay trade.toList)
@@ -253,60 +258,6 @@ trait Ledger { module: ModuleTypes =>
         }
     }
 
-    /** FIXME STILL WRONG0
-      * Requirements for dealing with '''cash''':
-      *   - cash has to be fungable and self-pricing.
-      *   - for legal tender instruments, we only ever know ''our'' actual instrument (bank acct).
-      *   - need to keep quantity per such "instrument" (bank acct)!
-      *
-      * So:
-      *   - a bank account is a kind of [[capital.Instrument]],
-      *   - and the key is `String Refined `[[capital.keys.IsUsBan]],
-      *   - and a `Folio` can contain a number of such "instruments" and associated quantities
-      *     (bank balances.)
-      *   - `instrument.symbol === currency.code` for all fungible currency instruments
-      *   - the `Trade`s recorded in the books do not record these bank account details but instead
-      *     deal in generic instruments with [[capital.Instrument.Key]]s constucted systematically
-      *     from Currency names.
-      *   - the bank account allocation details are recoverable through the
-      *     [[keyval.KeyValueStore]] for `Folio`s.
-      *
-      *   @return `Stream` effect will effectively subtract amount from the `against` folio
-      *
-      *   - NOTE: it is up to the payCash function to effectfully subtract the amount
-      *     from the cash position
-      *   - single designatied bank account is '''cash'''
-      *   - TODO: allocating across multi bank accts via a ''coin selection'' algo
-      *   - creates a complete, "paid" trade with a single unified, universal, anonymous,
-      *     currency specific instrument of `amount`
-      *   - records that `Trade` in its store and returns the id, which is ready-to-use in
-      *     creating a [[Transaction]].
-      *   - TODO: is is possible or desirable to generalize fungability
-      *     to asset classes other than currencies
-      */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final def paid[F[_]: Sync, C: Currency](
-        recordTrade: Trade => Stream[F, Trade.Id],
-        cashPositions: Currency[C] => Folio.Key => Stream[F, List[Position]],
-        payCash: Folio.Key => Position => Stream[F, Folio.Id]
-    )(
-        drawAgainst: Folio.Key
-    )(
-        implicit
-        C: Currency[C],
-        F: Sync[F]
-    ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] = { pricedTrades =>
-      pricedTrades flatMap {
-        case (trade, _) => // FIXME WUT NO AMOUTNA?S
-          for {
-            t         <- recordTrade(trade)
-            cps       <- cashPositions(C)(drawAgainst)
-            h         <- Stream evals (F delay cps)
-            receiptId <- payCash(drawAgainst)(h)
-          } yield Result(t.some)
-      }
-    }
-
     /**  */
     def of[F[_]: Sync, C: Currency: Trade.Pricer[F, *]](
         trade: Trade
@@ -314,6 +265,36 @@ trait Ledger { module: ModuleTypes =>
       for {
         amount <- Trade.Pricer[F, C] price trade
       } yield (trade, amount)
+  }
+
+  /**
+    * All metadata is `json`.
+    *
+    * We can derive `codec`s for arbitrary `ADT`s to and from `json`.
+    */
+  sealed abstract class Meta private (meta: Json) { type Adt }
+
+  /**
+    * The Meta store is content-addressed: entries are indexed with their own Sha.
+    *
+    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
+    * a `Meta` key value store containing the value, you have access to the value itself.
+    *
+    * Note this value is effectively unforgeable / self validating.
+    */
+  object Meta extends WithId[Meta] {
+
+    /** */
+    protected case class Aux[T] private (meta: Json) extends Meta(meta) { final type ADT = T }
+
+    /** */
+    def apply[T: Encoder: Decoder](meta: Json): Meta = Aux[T](meta)
+
+    /** */
+    implicit def metaEq[T]: Eq[Meta.Aux[T]] = { import auto.eq._; semi.eq }
+
+    /** */
+    implicit def metaShow[T]: Show[Meta.Aux[T]] = { import auto.show._; semi.show }
   }
 
   /**
@@ -354,7 +335,6 @@ trait Ledger { module: ModuleTypes =>
       new Transaction(at, from, to, trade, meta) {}
 
     /**  */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def single[F[_]: Sync](record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)])(
         from: Folio.Key,
         to: Folio.Key,
@@ -382,33 +362,50 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /**
-    * All metadata is `json`.
     *
-    * We can encode and decode `ADT`s from `json`, so the mapping is universal.
+    * '''Cash''' is:
+    *   - ''fungable''
+    *   - ''self-pricing''
+    *
+    *   - a bank account is a kind of [[capital.Instrument]]
+    *   - we know ''our'' cash `instrument` details (e.g. `USD` bank accounts).
+    *       - must track quantity (`balance`) per such `instrument` of ours
+    *       - don't want to have to need to know `instrument` details of the other party
+    *   - the [[capital.Instrument.Key key]] is a `String Refined `[[capital.keys.IsUsBan]]
+    *   - a `Folio` can contain a number of such `instrument`s and associated quantities
+    *     (bank balances)
+    *   - `instrument.symbol === currency.code` for ''all'' `cash instrument`s
+    *   - the `Trade`s recorded in the `Transaction` log do ''not'' record `cash instrument`
+    *     details but instead
+    *     deal in '''reified''' `cash instrument`s
+    *         - with [[capital.Instrument.Key]]s constucted
+    *     by taking the [[money.CurrencyLike.code three letter currency code]]
+    *     as the '''exact''' `Instrument.Key`
+    *   - The allocation of cash from/to each account is recorded in
+    *     the [[keyval.KeyValueStore]] for `Folio`s.
+    *
+    *   - creates a complete (balanced), ''paid'' `Trade` with the `reified cash instrument`
+    *   - records that `Trade` in its store and returns the id, which is ready-to-use in
+    *     creating a [[Transaction]].
+    *   - NOTE: it is up to the payCash function to effectfully subtract the amount
+    *     from the cash position
+    *   - TODO: ensure the `payCash` update is atomic (should return zero or one `Folio.Id`)
+    *   - TODO: is is possible or desirable to generalize fungability
+    *     to asset classes other than currencies
+    *
+    *   @return `Stream` effect will effectively subtract amount from the `against` folio
     */
-  sealed abstract class Meta private (meta: Json) { type Adt }
-
-  /**
-    * The Meta store is content-addressed: entries are indexed with their own Sha.
-    *
-    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
-    * a `Meta` key value store containing the value, you have access to the value itself.
-    *
-    * Note this value is effectively unforgeable / self validating.
-    */
-  object Meta extends WithId[Meta] {
-
-    /** */
-    protected case class Aux[T] private (meta: Json) extends Meta(meta) { final type ADT = T }
-
-    /** */
-    def apply[T: Encoder: Decoder](meta: Json): Meta = Aux[T](meta)
-
-    /** */
-    implicit def metaEq[T]: Eq[Meta.Aux[T]] = { import auto.eq._; semi.eq }
-
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    implicit def metaShow[T]: Show[Meta.Aux[T]] = { import auto.show._; semi.show }
-  }
+  final def payment[F[_]: Sync, C: Currency](
+      recordTrade: Trade => Stream[F, Trade.Id],
+      payCash: Folio.Key => Money[C] => Stream[F, Folio.Id],
+  )(
+      drawOn: Folio.Key
+  ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] =
+    _ flatMap {
+      case (trade, amount) =>
+        for {
+          tId <- recordTrade(trade)
+          _   <- payCash(drawOn)(amount)
+        } yield Result(tId.some)
+    }
 }
