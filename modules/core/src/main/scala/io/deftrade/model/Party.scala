@@ -18,7 +18,7 @@ package model
 
 import keyval._, refinements._
 
-import enumeratum.{ CatsEnum, Enum, EnumEntry }
+import enumeratum.{ EnumEntry }
 
 import cats.implicits._
 import cats.{ Eq, Show }

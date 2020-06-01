@@ -8,25 +8,73 @@
 
 ---
 
-### A Financial Stream Algebra Toolkit  
+### **`deftrade`**
 
-  - `value`s and `compound value`s
-      - memory-first definitions
-      - ADT basis enables persistence derivation
+A stream algebra toolkit for financial market participants.
 
-  - `streams` of `values`s
-      - `fs2.Stream` (memory)
-      - Kafka persistence layer (data in motion)
+```scala
+  import io.deftrade._
+  import money.Currency
+  import model.Money
+  import cats.effect.Sync
+  import fs2.Stream
 
-  - `stores`
-      - source and sink `stream`s of `value`s for persistence
-      - enable traceable evolution of an identified value over time
-      - Postgres (Cockroach) persistence layer (data at rest)
-      - spreadsheet integration via csv file based persistence
+  /** Witnesses that `X` is exchangeable in a fair and lawful contract. */
+  abstract class Consideration[X] { /* ... */ }
 
-  - `aggregate entities`
-      - `CQRS/ES` backed computations producing `stream`s of `event`s
-      - can be used to replicate / restore application or session state
+  /** Synchronous, effectful Arrow of Acquisition. */
+  abstract class Ferengi[F[_]: Sync] { /* ... */ }
+
+  /** Mission statement in a method signature gives us our project name. */
+  def trade[F[_]: Ferengi, X: Consideration, C: Currency](x: X): Stream[F, Money[C]] =
+    // ...
+```
+
+##### Foundational financial domain values and calculations
+
+- account management primitives
+- accounting balances and reporting
+- market data systems integration
+- order management system integration
+- ledger schema includes chained (!) cryptographic hashes
+- `dsl`s for time and money
+
+- `adt-sacc` definitions
+    - **`adt`**`:= algebraic data type`
+    - **`sacc`**`:= sealed abstract case class`
+    - "unforgable" typed values
+        - private constructor
+        - no copy method
+- `adt`s enable principled `codec` derivation
+    - binary (scodec)
+    - csv (cormorant)
+    - jdbc (doobie)
+
+##### Abstract `ValueStore`s and `KeyValueStore`s
+- `ValueStore`: source and sink `stream`s of `value`s for persistence
+- `KeyValueStore`: tracks the evolution over time of a `value` identified by a `key`
+- spreadsheet integration via csv file based persistence with json for adts
+- KeyValue database candidates:
+    - LightningDB:
+    - FoundationDB: Keys cannot exceed 10 kB in size. Values cannot exceed 100 kB in size.
+- Quill/Doobie/Postgres persistence layer
+    - use Kafka to push pg log to the cloud for replication?
+    - CockroachDB
+
+##### Stream based computations
+
+`Stream`s are (possibly) effectful computations which produce sequences of `value`s.
+
+- `fs2.Stream` (in memory)
+- Kafka streams
+- Spark
+
+In-memory computations can be thought of as producers of `Stream`s of `Event`s.
+Results of these computations should be recomputable by replaying the event stream to its consumers and *discarding their effects*.
+
+- trading algos implement state as `aggregate-entities`
+    - `aggregate entities` are maintained by `Stream` based computations
+    - this is `CQRS/ES` and can be used to replicate / restore application or session state
 
 ### NO WARRANTY  
 

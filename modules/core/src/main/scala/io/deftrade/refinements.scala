@@ -21,16 +21,16 @@ import cats.implicits._
 import eu.timepit.refined
 import eu.timepit.refined.boolean._
 import refined.collection.{ Forall, Size }
-import refined.numeric.{ GreaterEqual, Interval, LessEqual, Positive }
+import refined.numeric.{ Interval, LessEqual, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
 import refined.api.{ Inference, Refined, Validate }
-import Inference.==>
+// import Inference.==>
 import Interval.{ Closed => To }
 
 import scodec.bits.ByteVector
 
 // import shapeless.syntax.singleton._
-// import scala.language.existentials
+// import scala.language.existentials,
 
 /**
   * A palette of domain specific refined types.

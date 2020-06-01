@@ -38,8 +38,8 @@ import keys.{ IsIsin, IsUsin }
 /**
   * Models a tradeable thing.
   *
-  * Everything is a `Contract` for (mostly future) money ([[InCoin]])
-  * ''except'' for the following categories of "pure stuff" ([[InKind]]):
+  * Everything is a `Contract` for (mostly future) ([[contracts.Numéraire.InCoin money]])
+  * ''except'' for the following categories of([[contracts.Numéraire.InKind pure stuff]]):
   *   - `Contract`s for equity (e.g shares of common stock)
   *   - `Contract`s for physical delivery of commodities (e.g. tanks of propane)
   *   - `Contract`s for real property (e.g. CRE assets)
@@ -67,14 +67,14 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
     // import auto._; semi.eq
     Eq.fromUniversalEquals[Instrument]
 
-  /** */
+  // /** */
   // implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
 }
 
 /**
-  * Abstract Data Type (ADT) representing [[Contract]] parameters and state.
+  * Abstract Data Type (ADT) representing [[contracts.Contract]] parameters and state.
   *
-  * Embeds `Contract`s within `Instrument`s.
+  * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
   */
 sealed abstract class Form extends Product with Serializable {
 
@@ -104,7 +104,7 @@ object columns {
   /**
     * Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
     *
-    * Enumerating the components of an [[Index]] such as the DJIA is the typical use case.
+    * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
     */
   sealed trait Tracks { self: Form =>
     def members: Set[Instrument.Key]
