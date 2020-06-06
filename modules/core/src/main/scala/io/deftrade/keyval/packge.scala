@@ -214,16 +214,14 @@ package keyval {
 
         import V._
 
-        final override protected def tableRows = permRows
-
         /** */
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveVToCsv
+        final lazy val permRowToCSV: Pipe[Effect, IdRow, String] = deriveVToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToV
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[IdRow]] = deriveCsvToV
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -243,16 +241,14 @@ package keyval {
 
         import V._
 
-        final override protected def tableRows = permRows
-
         /** */
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveVToCsv
+        final lazy val permRowToCSV: Pipe[Effect, IdRow, String] = deriveVToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToV
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[IdRow]] = deriveCsvToV
 
         /** FIXME implementation is wrong */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -288,19 +284,19 @@ package keyval {
 
         import V._
 
-        /** */
-        final override protected def tableRows = rows collect {
-          case (k, Some(v)) => k -> v
-        }
+        // /** */
+        // final override protected def tableRows = rows collect {
+        //   case (k, Some(v)) => k -> v
+        // }
 
         /** */
         final override def path = Paths get p
 
         /** */
-        final lazy val permRowToCSV: Pipe[Effect, PermRow, String] = deriveKvToCsv
+        final lazy val permRowToCSV: Pipe[Effect, IdRow, String] = deriveKvToCsv
 
         /** */
-        final lazy val csvToPermRow: Pipe[Effect, String, Result[PermRow]] = deriveCsvToKv
+        final lazy val csvToPermRow: Pipe[Effect, String, Result[IdRow]] = deriveCsvToKv
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]

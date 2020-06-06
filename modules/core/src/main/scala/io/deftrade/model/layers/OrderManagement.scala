@@ -45,7 +45,8 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     * `andThen`.
     *
     * Reference:
-    * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270 Functional and Reactive Domain Modelling, section 4.4]]
+    * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270
+    Functional and Reactive Domain Modelling, section 4.4]]
     *
     * TODO: Revisit [[cats.data.Kleisli]] usage
     *   - Why not [[fs2.Pipe]]?

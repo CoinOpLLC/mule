@@ -80,7 +80,7 @@ object Result {
   def toTry[T](result: Result[T]): Try[T] = result.toTry
 
   /** */
-  object implicits {
+  object syntax {
 
     implicit class OptionResult[R](val o: Option[R]) extends AnyVal {
       def asResult: Result[R] = apply(o)

@@ -60,8 +60,8 @@ sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value])
     putNel(k2v2s.toNel map (asValue coerce _))
 
   /** */
-  def compilerFor[HV <: HList](
-      valueStore: ModuleTypes.Aux[Effect, WithId[*], Value, HV] with ValueStore[Effect, Value, HV]
+  def compilerFor(
+      valueStore: Types.Aux[Effect, WithId, Value] with ValueStore[Effect, Value]
   ): Cmd ~> valueStore.EffectStream =
     new FunctionK[Cmd, valueStore.EffectStream] {
 
@@ -69,7 +69,7 @@ sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value])
       def apply[A](command: Cmd[A]): valueStore.EffectStream[A] = command match {
         case Get(id)     => valueStore get id
         case GetList(id) => valueStore getList id
-        case Has(id)     => for { b <- valueStore.permRows exists (_._1 /*=*/ == id) } yield b
+        case Has(id)     => for { b <- valueStore.idRows exists (_._1 /*=*/ == id) } yield b
         case Put(v)      => valueStore append v
         case PutNel(vs)  => valueStore appendAll (vs.head, vs.tail: _*)
       }
@@ -137,13 +137,12 @@ sealed abstract class FreeKeyValueStore[Effect[_], Key, Value](val V: WithKey.Au
     putNel(key, k2v2s.toNel map (asValue coerce _))
 
   /** */
-  def compilerFor[HV <: HList](
-      kvs: ModuleTypes.Aux[
+  def compilerFor(
+      kvs: Types.Aux[
         Effect,
         WithKey.Aux[Key, *],
-        Value,
-        HV
-      ] with KeyValueStore[Effect, Key, Value, HV]
+        Value
+      ] with KeyValueStore[Effect, Key, Value]
   ): Cmd ~> kvs.EffectStream =
     new FunctionK[Cmd, kvs.EffectStream] {
 

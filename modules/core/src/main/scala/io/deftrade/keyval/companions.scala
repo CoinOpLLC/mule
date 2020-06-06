@@ -67,7 +67,7 @@ protected sealed trait WithValue {
   type Row
 
   /** */
-  final type PermRow = (Id, Row)
+  final type IdRow = (Id, Row)
 
   /** Will be assigned either Id or Key. */
   type Index
