@@ -46,162 +46,7 @@ import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
 /** */
-protected trait UrTypes {
-
-  /** */
-  type ValueType
-
-  /** */
-  type ValueCompanionType[x] <: WithValue
-
-  /** */
-  type Effect[_]
-
-  /** */
-  implicit def F: Sync[Effect]
-
-  /** */
-  implicit def X: ContextShift[Effect]
-
-  /** */
-  final type EffectStream[x] = Stream[Effect, x]
-}
-
-/** */
-protected[deftrade] object UrTypes {
-
-  /** */
-  abstract class Aux[F[_], W[_] <: WithValue, V](
-      val V: W[V]
-  )(
-      implicit
-      override val F: Sync[F],
-      override val X: ContextShift[F]
-  ) extends UrTypes {
-
-    final override type ValueCompanionType[x] = W[x]
-    final type Effect[x]                      = F[x]
-    final type ValueType                      = V
-  }
-}
-
-/** */
-protected trait UrStore[F[_], W[_] <: WithValue, V] {
-
-  self: UrTypes.Aux[F, W, V] =>
-
-  import V._
-
-  /** */
-  protected def indexFrom(pr: IdRow): Index
-
-  /**
-    * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
-    *
-    * TODO: This needs to evolve to use [[Result]]
-    */
-  def idRows: EffectStream[IdRow]
-
-  /** May override, but must be implemented (or lifted) "as if by". */
-  def rows: EffectStream[Row] = idRows map (_._2)
-
-  /**  FIXME do we need this at all? */
-  def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
-
-  /**
-    * Returns  `Stream` of length zero or one:
-    * - zero => not found
-    * - one => result value
-    */
-  def get(id: Id): EffectStream[Row] =
-    idRows filter (_._1 === id) map (_._2)
-
-  /**
-    * Like [[get]], but will return ''all'' `Row`s for the `Id` as a [[fs2.Stream]]
-    */
-  def getAll(x: Index): EffectStream[Row] =
-    idRows
-      .filter(pr => indexFrom(pr) == x)
-      .map(_._2)
-
-  /**
-    * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
-    */
-  def getList(x: Index): EffectStream[List[Row]] =
-    getAll(x)
-      .fold(List.empty[Row])((vs, v) => v :: vs)
-      .map(_.reverse)
-
-  /**
-    * May override for performance.
-    *
-    * FIXME: not thread safe, put a queue in front of single thread-contained appender?
-    */
-  final def append(row: Row): EffectStream[Id] =
-    appendAll(row)
-
-  /**
-    * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
-    */
-  def appendAll(row: Row, rows: Row*): EffectStream[Id]
-
-  /** FIXME obviously... this works, not obvously, that's the problem */
-  protected var prev: Id =
-    Refined unsafeApply [String, IsSha] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
-
-  /** */
-  protected def fresh: Fresh[Id, Row]
-}
-
-/** */
-trait UrValueStore[F[_], V] extends UrStore[F, WithId, V] {
-  self: UrTypes.Aux[F, WithId, V] =>
-  // import V._
-}
-
-/**  */
-trait UrKeyValueStore[F[_], K, V] extends UrStore[F, WithKey.Aux[K, *], V] {
-  self: UrTypes.Aux[F, WithKey.Aux[K, *], V] =>
-
-  import V._
-
-  /** */
-  final protected def indexFrom(pr: IdRow): Index =
-    pr match {
-      case (_, (key, _)) => key
-    }
-
-  /** */
-  def select(key: Key): EffectStream[Value]
-
-  /** */
-  final def selectAll(key: Key): EffectStream[Row] =
-    getAll(key)
-
-  /** */
-  final def selectList(key: Key): EffectStream[List[Row]] =
-    getList(key)
-
-  /** */
-  def insert(key: Key, value: Value): EffectStream[Id]
-
-  /** */
-  def update(key: Key, value: Value): EffectStream[Id]
-
-  /** */
-  def delete(key: Key): EffectStream[Id]
-
-  /** */
-  final def upsert(key: Key, value: Value): EffectStream[Id] =
-    append(key -> value.some)
-
-  /** */
-  final def upsertAll(key: Key, value: Value, values: Key*): EffectStream[Id] =
-    append(key -> value.some)
-}
-
-/** */
-protected trait ModuleTypes extends UrTypes {
+protected trait CsvStoreTypes extends StoreTypes {
 
   /** */
   type HValue <: HList
@@ -211,7 +56,7 @@ protected trait ModuleTypes extends UrTypes {
 }
 
 /** */
-protected[deftrade] object ModuleTypes {
+protected[deftrade] object CsvStoreTypes {
 
   /** */
   abstract class Aux[F[_], W[_] <: WithValue, V, HV <: HList](
@@ -221,7 +66,7 @@ protected[deftrade] object ModuleTypes {
       final override val F: Sync[F],
       final override val X: ContextShift[F],
       val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends UrTypes.Aux[F, W, V](V) {
+  ) extends StoreTypes.Aux[F, W, V](V) {
 
     final type HValue = HV // === lgv.Repr  test / validate / assume ?!?
 
@@ -237,8 +82,8 @@ protected trait CsvStore[
     W[_] <: WithValue,
     V,
     HV <: HList
-] extends UrStore[F, W, V] {
-  self: ModuleTypes.Aux[F, W, V, HV] =>
+] extends Store[F, W, V] {
+  self: CsvStoreTypes.Aux[F, W, V, HV] =>
 
   import V._
 
@@ -254,7 +99,7 @@ protected trait CsvStore[
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  final def idRows: EffectStream[IdRow] =
+  final def idRows: EffectStream[(Id, Row)] =
     (readLines through csvToPermRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /** */
@@ -277,10 +122,10 @@ protected trait CsvStore[
   protected def appendingSink: Pipe[Effect, String, Unit]
 
   /** */
-  protected def permRowToCSV: Pipe[Effect, IdRow, String]
+  protected def permRowToCSV: Pipe[Effect, (Id, Row), String]
 
   /** */
-  protected def csvToPermRow: Pipe[Effect, String, Result[IdRow]]
+  protected def csvToPermRow: Pipe[Effect, String, Result[(Id, Row)]]
 }
 
 /**
@@ -291,14 +136,14 @@ protected trait CsvStore[
   * [[writePermRow]], [[readPermRow]], providing access to
   * [[io.chrisdavenport.cormorant.LabelledRead]] and
   * [[io.chrisdavenport.cormorant.LabelledWrite]]
-  * instances for the [[WithValue.IdRow]] type for this store.
+  * instances for the [[WithValue.(Id, Row)]] type for this store.
   */
 trait CsvValueStore[
     F[_],
     V,
     HV <: HList
 ] extends CsvStore[F, WithId, V, HV] {
-  self: ModuleTypes.Aux[F, WithId, V, HV] =>
+  self: CsvStoreTypes.Aux[F, WithId, V, HV] =>
 
   import V._
 
@@ -306,7 +151,7 @@ trait CsvValueStore[
   final type HRow = HValue
 
   /** */
-  protected def indexFrom(pr: IdRow): Index =
+  protected def indexFrom(pr: (Id, Row)): Index =
     pr match {
       case (id, _) => id
     }
@@ -315,11 +160,11 @@ trait CsvValueStore[
   implicit final def writePermRow(
       implicit
       llw: Lazy[LabelledWrite[HValue]]
-  ): LabelledWrite[IdRow] =
-    new LabelledWrite[IdRow] {
+  ): LabelledWrite[(Id, Row)] =
+    new LabelledWrite[(Id, Row)] {
       implicit val lwhpr       = LabelledWrite[HPermRow]
       def headers: CSV.Headers = lwhpr.headers
-      override def write(pr: IdRow): CSV.Row = pr match {
+      override def write(pr: (Id, Row)): CSV.Row = pr match {
         case (i, v) =>
           lwhpr write field[id.T](i) :: (lgv to v)
       }
@@ -329,10 +174,10 @@ trait CsvValueStore[
   implicit final def readPermRow(
       implicit
       llr: Lazy[LabelledRead[HV]]
-  ): LabelledRead[IdRow] =
-    new LabelledRead[IdRow] {
+  ): LabelledRead[(Id, Row)] =
+    new LabelledRead[(Id, Row)] {
       implicit val lrhpr = LabelledRead[HPermRow]
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, IdRow] =
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] =
         lrhpr read (row, headers) map { hpr =>
           (hpr.head, lgv from hpr.tail)
         }
@@ -342,8 +187,8 @@ trait CsvValueStore[
   final protected def deriveCsvToV(
       implicit
       llr: Lazy[LabelledRead[HV]]
-  ): Pipe[Effect, String, Result[IdRow]] =
-    readLabelledCompleteSafe[F, IdRow] andThen
+  ): Pipe[Effect, String, Result[(Id, Row)]] =
+    readLabelledCompleteSafe[F, (Id, Row)] andThen
       (_ map (_ leftMap errorToFail))
 
   /** */
@@ -351,7 +196,7 @@ trait CsvValueStore[
   final protected def deriveVToCsv(
       implicit
       llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[Effect, IdRow, String] = writeLabelled(printer)
+  ): Pipe[Effect, (Id, Row), String] = writeLabelled(printer)
 }
 
 /**  */
@@ -360,9 +205,9 @@ trait CsvKeyValueStore[
     K,
     V,
     HV <: HList
-] extends UrKeyValueStore[F, K, V]
+] extends KeyValueStore[F, K, V]
     with CsvStore[F, WithKey.Aux[K, *], V, HV] {
-  self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
+  self: CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
   import V._
 
@@ -383,15 +228,15 @@ trait CsvKeyValueStore[
       implicit
       llw: LabelledWrite[HValue],
       putk: Put[Key]
-  ): LabelledWrite[IdRow] =
-    new LabelledWrite[IdRow] {
+  ): LabelledWrite[(Id, Row)] =
+    new LabelledWrite[(Id, Row)] {
 
       private val lwhpr = LabelledWrite[HPermRow]
       private val lwher = LabelledWrite[HEmptyRow]
 
       def headers: CSV.Headers = lwhpr.headers
 
-      def write(pr: IdRow): CSV.Row = pr match {
+      def write(pr: (Id, Row)): CSV.Row = pr match {
         case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
         case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
       }
@@ -402,10 +247,10 @@ trait CsvKeyValueStore[
       implicit
       llr: LabelledRead[HV],
       getk: Get[Key]
-  ): LabelledRead[IdRow] =
-    new LabelledRead[IdRow] {
+  ): LabelledRead[(Id, Row)] =
+    new LabelledRead[(Id, Row)] {
 
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, IdRow] = {
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] = {
 
         val lrhpr = LabelledRead[HPermRow]
 
@@ -431,10 +276,10 @@ trait CsvKeyValueStore[
       implicit
       llr: Lazy[LabelledRead[HV]],
       lgetk: Lazy[Get[Key]]
-  ): Pipe[Effect, String, Result[IdRow]] = {
+  ): Pipe[Effect, String, Result[(Id, Row)]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
-    readLabelledCompleteSafe[F, IdRow] andThen
+    readLabelledCompleteSafe[F, (Id, Row)] andThen
       (_ map (_ leftMap errorToFail))
   }
 
@@ -444,7 +289,7 @@ trait CsvKeyValueStore[
       implicit
       llw: Lazy[LabelledWrite[HV]],
       lputk: Lazy[Put[Key]]
-  ): Pipe[Effect, IdRow, String] = {
+  ): Pipe[Effect, (Id, Row), String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -454,7 +299,7 @@ trait CsvKeyValueStore[
 
 /** */
 protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends CsvStore[F, W, V, HV] {
-  self: ModuleTypes.Aux[F, W, V, HV] =>
+  self: CsvStoreTypes.Aux[F, W, V, HV] =>
 
   /** */
   final protected var table: Map[V.Index, V.Value] = Map.empty
@@ -515,7 +360,7 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
       WithKey.Aux[K, *],
       V,
       HV
-    ] { self: ModuleTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
+    ] { self: CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
   import V._
 
@@ -551,7 +396,7 @@ protected abstract case class MemFileValueStore[
 )(
     implicit
     final override val lgv: LabelledGeneric.Aux[V, HV],
-) extends ModuleTypes.Aux(V)
+) extends CsvStoreTypes.Aux(V)
     with CsvValueStore[F, V, HV]
     with MemFileImplV[F, WithId, V, HV]
 
@@ -567,6 +412,6 @@ protected abstract case class MemFileKeyValueStore[
 )(
     implicit
     final override val lgv: LabelledGeneric.Aux[V, HV],
-) extends ModuleTypes.Aux(V)
+) extends CsvStoreTypes.Aux(V)
     with CsvKeyValueStore[F, K, V, HV]
     with MemFileImplKV[F, K, V, HV]

@@ -30,7 +30,7 @@ import refined.cats.refTypeOrder
 import fs2.{ Stream }
 
 /** */
-protected trait Types {
+protected trait StoreTypes {
 
   /** */
   type ValueType
@@ -52,7 +52,7 @@ protected trait Types {
 }
 
 /** */
-protected[deftrade] object Types {
+protected[deftrade] object StoreTypes {
 
   /** */
   abstract class Aux[F[_], W[_] <: WithValue, V](
@@ -61,7 +61,7 @@ protected[deftrade] object Types {
       implicit
       override val F: Sync[F],
       override val X: ContextShift[F]
-  ) extends Types {
+  ) extends StoreTypes {
 
     final override type ValueCompanionType[x] = W[x]
     final type Effect[x]                      = F[x]
@@ -72,19 +72,19 @@ protected[deftrade] object Types {
 /** */
 protected trait Store[F[_], W[_] <: WithValue, V] {
 
-  self: Types.Aux[F, W, V] =>
+  self: StoreTypes.Aux[F, W, V] =>
 
   import V._
 
   /** */
-  protected def indexFrom(pr: IdRow): Index
+  protected def indexFrom(pr: (Id, Row)): Index
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     *
     * TODO: This needs to evolve to use [[Result]]
     */
-  def idRows: EffectStream[IdRow]
+  def idRows: EffectStream[(Id, Row)]
 
   /** May override, but must be implemented (or lifted) "as if by". */
   def rows: EffectStream[Row] = idRows map (_._2)
@@ -104,17 +104,18 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
     * Like [[get]], but will return ''all'' `Row`s for the `Id` as a [[fs2.Stream]]
     */
   def getAll(x: Index): EffectStream[Row] =
-    idRows
-      .filter(pr => indexFrom(pr) == x)
-      .map(_._2)
+    idRows filter (ir => indexFrom(ir) == x) map (_._2)
 
   /**
     * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   def getList(x: Index): EffectStream[List[Row]] =
-    getAll(x)
-      .fold(List.empty[Row])((vs, v) => v :: vs)
-      .map(_.reverse)
+    getAll(x) through listPipe
+
+  /** */
+  protected def listPipe[A]: EffectStream[A] => EffectStream[List[A]] =
+    _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
 
   /**
     * May override for performance.
@@ -139,18 +140,19 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
 
 /** */
 trait ValueStore[F[_], V] extends Store[F, WithId, V] {
-  self: Types.Aux[F, WithId, V] =>
+  self: StoreTypes.Aux[F, WithId, V] =>
   // import V._
 }
 
 /**  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
-  self: Types.Aux[F, WithKey.Aux[K, *], V] =>
+  self: StoreTypes.Aux[F, WithKey.Aux[K, *], V] =>
 
   import V._
 
   /** */
-  final protected def indexFrom(pr: IdRow): Index =
+  final protected def indexFrom(pr: (Id, Row)): Index =
     pr match {
       case (_, (key, _)) => key
     }
@@ -159,22 +161,15 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   def select(key: Key): EffectStream[Value]
 
   /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def selectAll(key: Key): EffectStream[Value] =
     for {
-      row   <- getAll(key)
-      value <- Stream evals F.delay { row._2 }
+      ov    <- getAll(key) map (_._2) takeWhile (_.isDefined)
+      value <- Stream evals F.delay { ov }
     } yield value
 
-  /** FIXME: implementation is broken */
+  /**  */
   final def selectList(key: Key): EffectStream[List[Value]] =
-    for {
-      rows <- getList(key)
-    } yield
-      rows map {
-        case (_, Some(value))                 => value
-        case thisIsBrokenLearnToCatamorphKThx => ???
-      }
+    selectAll(key) through listPipe
 
   /** */
   def insert(key: Key, value: Value): EffectStream[Id]
@@ -190,6 +185,6 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
     append(key -> value.some)
 
   /** */
-  final def upsertAll(key: Key, value: Value, values: Key*): EffectStream[Id] =
+  final def upsertAll(key: Key, value: Value, values: Value*): EffectStream[Id] =
     append(key -> value.some)
 }

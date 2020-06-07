@@ -66,9 +66,6 @@ protected sealed trait WithValue {
     */
   type Row
 
-  /** */
-  final type IdRow = (Id, Row)
-
   /** Will be assigned either Id or Key. */
   type Index
 
@@ -184,7 +181,7 @@ abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[
 /**
   * Companion supplying a [[java.util.UUID]] as `Key`.
   *
-  * Note we use [[io.chrisdavenport.fuuid.FUUID]] to (functionally) wrap the `UUID`.
+  * Note we use [[FUUID]] to (functionally) wrap the `UUID`.
   */
 abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 

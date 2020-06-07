@@ -61,7 +61,7 @@ sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value])
 
   /** */
   def compilerFor(
-      valueStore: Types.Aux[Effect, WithId, Value] with ValueStore[Effect, Value]
+      valueStore: StoreTypes.Aux[Effect, WithId, Value] with ValueStore[Effect, Value]
   ): Cmd ~> valueStore.EffectStream =
     new FunctionK[Cmd, valueStore.EffectStream] {
 
@@ -138,7 +138,7 @@ sealed abstract class FreeKeyValueStore[Effect[_], Key, Value](val V: WithKey.Au
 
   /** */
   def compilerFor(
-      kvs: Types.Aux[
+      kvs: StoreTypes.Aux[
         Effect,
         WithKey.Aux[Key, *],
         Value
