@@ -20,7 +20,9 @@ package keyval
 import refinements.IsSha
 
 import cats.implicits._
-
+import cats.{ Order }
+import cats.data.{ NonEmptyList, NonEmptyMap }
+import cats.evidence._
 import cats.effect.{ ContextShift, Sync }
 
 import eu.timepit.refined
@@ -28,6 +30,8 @@ import refined.api.Refined
 import refined.cats.refTypeOrder
 
 import fs2.{ Stream }
+
+import scala.collection.immutable.SortedMap
 
 /** */
 protected trait StoreTypes {
@@ -77,7 +81,7 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
   import V._
 
   /** */
-  protected def indexFrom(pr: (Id, Row)): Index
+  protected def indexFrom(ir: (Id, Row)): Index
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -87,10 +91,8 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
   def idRows: EffectStream[(Id, Row)]
 
   /** May override, but must be implemented (or lifted) "as if by". */
-  def rows: EffectStream[Row] = idRows map (_._2)
-
-  /**  FIXME do we need this at all? */
-  def filter(predicate: Row => Boolean): EffectStream[Row] = rows filter predicate
+  def rows: EffectStream[Row] =
+    idRows map (_._2)
 
   /**
     * Returns  `Stream` of length zero or one:
@@ -106,13 +108,6 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
   def getAll(x: Index): EffectStream[Row] =
     idRows filter (ir => indexFrom(ir) == x) map (_._2)
 
-  /**
-    * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def getList(x: Index): EffectStream[List[Row]] =
-    getAll(x) through listPipe
-
   /** */
   protected def listPipe[A]: EffectStream[A] => EffectStream[List[A]] =
     _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
@@ -127,6 +122,10 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
 
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
+    *
+    * This feature - the ability to assign multiple rows a single `Id` computed over those all
+    * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
+    *
     */
   def appendAll(row: Row, rows: Row*): EffectStream[Id]
 
@@ -140,8 +139,34 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
 
 /** */
 trait ValueStore[F[_], V] extends Store[F, WithId, V] {
+
   self: StoreTypes.Aux[F, WithId, V] =>
-  // import V._
+
+  import V._
+
+  /**
+    * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  def getList(x: Index): EffectStream[List[Row]] =
+    getAll(x) through listPipe
+
+  /** */
+  final def getMap[K2: Order, V2](id: Id)(
+      implicit asK2V2: Value <~< (K2, V2)
+  ): EffectStream[Map[K2, V2]] =
+    for (values <- getList(id))
+      yield SortedMap(values map (asK2V2 coerce _): _*)
+
+  /** */
+  final def appendNel(values: NonEmptyList[Value]): EffectStream[Id] =
+    appendAll(values.head, values.tail: _*)
+
+  /** */
+  final def appendNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(
+      implicit asValue: (K2, V2) <~< Value
+  ): EffectStream[Id] =
+    appendNel(k2v2s.toNel map (asValue coerce _))
 }
 
 /**  */
@@ -152,39 +177,66 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   import V._
 
   /** */
-  final protected def indexFrom(pr: (Id, Row)): Index =
-    pr match {
+  def exists(key: Key): EffectStream[Id] =
+    idRows filter (ir => indexFrom(ir) == key) map (_._1)
+
+  /** */
+  def select(key: Key): EffectStream[Value] =
+    getAll(key) flatMap (r => Stream evals F.delay { r._2 }) take 1
+
+  /** Returns all un-[[delete]]d `Value`s for the given `Key`. */
+  def selectAll(key: Key): EffectStream[Value] =
+    for {
+      value <- (getAll(key) map (_._2)).unNoneTerminate
+    } yield value
+
+  /**  */
+  def selectList(key: Key): EffectStream[List[Value]] =
+    selectAll(key) through listPipe
+
+  /** */
+  def selectMap[K2: Order, V2](key: Key)(
+      implicit asK2V2: Value <~< (K2, V2)
+  ): EffectStream[Map[K2, V2]] =
+    for (values <- selectList(key))
+      yield SortedMap(values map (asK2V2 coerce _): _*)
+
+  /** */
+  def insert(key: Key, value: Value): EffectStream[Id] =
+    exists(key).last flatMap (_.fold(append(key -> value.some))(_ => Stream.empty))
+
+  /** */
+  def update(key: Key, value: Value): EffectStream[Id] =
+    updateExistingKey(key, value.some)
+
+  /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
+  def delete(key: Key): EffectStream[Id] =
+    updateExistingKey(key, none)
+
+  /** */
+  def upsert(key: Key, value: Value): EffectStream[Id] =
+    append(key -> value.some)
+
+  /** */
+  def upsertNel(key: Key, values: NonEmptyList[Value]): EffectStream[NonEmptyList[Id]] =
+    (values map (v => append(key -> v.some))).sequence
+
+  /** */
+  def upsertNem[K2: Order, V2](key: Key, k2v2s: NonEmptyMap[K2, V2])(
+      implicit asValue: (K2, V2) <~< Value
+  ): EffectStream[NonEmptyList[Id]] =
+    upsertNel(key, k2v2s.toNel map (asValue coerce _))
+
+  /** */
+  final protected def indexFrom(ir: (Id, Row)): Index =
+    ir match {
       case (_, (key, _)) => key
     }
 
   /** */
-  def select(key: Key): EffectStream[Value]
-
-  /** */
-  final def selectAll(key: Key): EffectStream[Value] =
+  protected def updateExistingKey(key: Key, maybeValue: Option[Value]): EffectStream[Id] =
     for {
-      ov    <- getAll(key) map (_._2) takeWhile (_.isDefined)
-      value <- Stream evals F.delay { ov }
-    } yield value
-
-  /**  */
-  final def selectList(key: Key): EffectStream[List[Value]] =
-    selectAll(key) through listPipe
-
-  /** */
-  def insert(key: Key, value: Value): EffectStream[Id]
-
-  /** */
-  def update(key: Key, value: Value): EffectStream[Id]
-
-  /** */
-  def delete(key: Key): EffectStream[Id]
-
-  /** */
-  final def upsert(key: Key, value: Value): EffectStream[Id] =
-    append(key -> value.some)
-
-  /** */
-  final def upsertAll(key: Key, value: Value, values: Value*): EffectStream[Id] =
-    append(key -> value.some)
+      _  <- exists(key)
+      id <- append(key -> maybeValue)
+    } yield id
 }

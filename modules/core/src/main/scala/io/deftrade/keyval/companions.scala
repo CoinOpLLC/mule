@@ -87,7 +87,7 @@ protected object WithValue {
 }
 
 /** */
-abstract class WithId[V] extends WithValue.Aux[V] with WithValue {
+abstract class WithId[V] extends WithValue.Aux[V] {
 
   /** */
   final type Row = Value
@@ -103,7 +103,7 @@ object WithId
 trait WithKey extends WithValue {
 
   /**
-    * `Foo.Table`s are indexed by `Foo.Key`s
+    * `Foo` tables are indexed by `Foo.Key`s
     */
   type Key
 
@@ -125,6 +125,8 @@ object WithKey {
 
   /** The `Key` type member is assigned type parameter `K`. */
   abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
+
+    /** */
     final type Key = K
   }
 

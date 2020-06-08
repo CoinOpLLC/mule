@@ -41,17 +41,19 @@ sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value])
   final def has(id: Id): Free[Command[Effect, *], Boolean]  = Has(id)    |> Free.liftF
   final def put(value: Value): Free[Command[Effect, *], Id] = Put(value) |> Free.liftF
 
+  /** */
   final def getList(id: Id): Free[Command[Effect, *], List[Value]] =
     GetList(id) |> Free.liftF
-
-  final def putNel(values: NonEmptyList[Value]): Free[Command[Effect, *], Id] =
-    PutNel(values) |> Free.liftF
 
   /** */
   final def getMap[K2: Order, V2](id: Id)(
       implicit asK2V2: Value <~< (K2, V2)
   ): Free[Command[Effect, *], Map[K2, V2]] =
     for (values <- getList(id)) yield (values map (asK2V2 coerce _)).toMap
+
+  /** */
+  final def putNel(values: NonEmptyList[Value]): Free[Command[Effect, *], Id] =
+    PutNel(values) |> Free.liftF
 
   /** */
   final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(

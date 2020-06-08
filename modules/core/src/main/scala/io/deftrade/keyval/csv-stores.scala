@@ -20,8 +20,9 @@ package keyval
 import syntax._, refinements.IsSha
 
 import cats.implicits._
-import cats.Eq
-import cats.data.NonEmptyList
+import cats.{ Eq, Order }
+import cats.data.{ NonEmptyList, NonEmptyMap }
+import cats.evidence._
 
 import cats.effect.{ Blocker, ContextShift, Sync }
 
@@ -29,13 +30,11 @@ import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import eu.timepit.refined
-import refined.api.Refined
-import refined.cats.refTypeOrder
 
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle, ReadCursor, WriteCursor }
 
-import scodec.bits.ByteVector
+// import scodec.bits.ByteVector
 
 import io.chrisdavenport.cormorant
 import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Put }
@@ -91,7 +90,7 @@ protected trait CsvStore[
   type HRow <: HList
 
   /**  */
-  final type HPermRow = IdField :: HRow
+  final type HIdRow = IdField :: HRow
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -100,7 +99,7 @@ protected trait CsvStore[
     * TODO: This needs to evolve.
     */
   final def idRows: EffectStream[(Id, Row)] =
-    (readLines through csvToPermRow).rethrow handleErrorWith (_ => Stream.empty)
+    (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /** */
   final def appendAll(row: Row, rows: Row*): EffectStream[Id] =
@@ -108,7 +107,7 @@ protected trait CsvStore[
       id <- Stream eval F.delay { fresh.nextAll(prev, row, rows: _*) }
       r  <- Stream evals F.delay { (row +: rows).toList }
       _ <- Stream eval F.delay { updateCache(r); (id, r) } through
-            permRowToCSV through
+            idRowToCSV through
             appendingSink
     } yield id
 
@@ -122,10 +121,10 @@ protected trait CsvStore[
   protected def appendingSink: Pipe[Effect, String, Unit]
 
   /** */
-  protected def permRowToCSV: Pipe[Effect, (Id, Row), String]
+  protected def idRowToCSV: Pipe[Effect, (Id, Row), String]
 
   /** */
-  protected def csvToPermRow: Pipe[Effect, String, Result[(Id, Row)]]
+  protected def csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]]
 }
 
 /**
@@ -133,7 +132,7 @@ protected trait CsvStore[
   * `type Index` mapped to [[WithValue.Id]].
   *
   * Cormorant CSV is integrated by implementing implicit methods
-  * [[writePermRow]], [[readPermRow]], providing access to
+  * [[writeIdRow]], [[readIdRow]], providing access to
   * [[io.chrisdavenport.cormorant.LabelledRead]] and
   * [[io.chrisdavenport.cormorant.LabelledWrite]]
   * instances for the [[WithValue.(Id, Row)]] type for this store.
@@ -157,12 +156,12 @@ trait CsvValueStore[
     }
 
   /** */
-  implicit final def writePermRow(
+  implicit final def writeIdRow(
       implicit
       llw: Lazy[LabelledWrite[HValue]]
   ): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
-      implicit val lwhpr       = LabelledWrite[HPermRow]
+      implicit val lwhpr       = LabelledWrite[HIdRow]
       def headers: CSV.Headers = lwhpr.headers
       override def write(pr: (Id, Row)): CSV.Row = pr match {
         case (i, v) =>
@@ -171,12 +170,12 @@ trait CsvValueStore[
     }
 
   /** */
-  implicit final def readPermRow(
+  implicit final def readIdRow(
       implicit
       llr: Lazy[LabelledRead[HV]]
   ): LabelledRead[(Id, Row)] =
     new LabelledRead[(Id, Row)] {
-      implicit val lrhpr = LabelledRead[HPermRow]
+      implicit val lrhpr = LabelledRead[HIdRow]
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] =
         lrhpr read (row, headers) map { hpr =>
           (hpr.head, lgv from hpr.tail)
@@ -224,14 +223,14 @@ trait CsvKeyValueStore[
   //   }
 
   /**  */
-  implicit final def writePermRow(
+  implicit final def writeIdRow(
       implicit
       llw: LabelledWrite[HValue],
       putk: Put[Key]
   ): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
 
-      private val lwhpr = LabelledWrite[HPermRow]
+      private val lwhpr = LabelledWrite[HIdRow]
       private val lwher = LabelledWrite[HEmptyRow]
 
       def headers: CSV.Headers = lwhpr.headers
@@ -243,7 +242,7 @@ trait CsvKeyValueStore[
     }
 
   /** */
-  implicit final def readPermRow(
+  implicit final def readIdRow(
       implicit
       llr: LabelledRead[HV],
       getk: Get[Key]
@@ -252,7 +251,7 @@ trait CsvKeyValueStore[
 
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] = {
 
-        val lrhpr = LabelledRead[HPermRow]
+        val lrhpr = LabelledRead[HIdRow]
 
         row match {
 
@@ -302,7 +301,13 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Cs
   self: CsvStoreTypes.Aux[F, W, V, HV] =>
 
   /** */
-  final protected var table: Map[V.Index, V.Value] = Map.empty
+  final protected var table: Map[V.Index, V.Value]                  = Map.empty
+  final protected var tableNel: Map[V.Index, NonEmptyList[V.Value]] = Map.empty
+  final protected def tableNem[K2: Order, V2: Eq](
+      implicit asK2V2: V.Value <~< (K2, V2)
+  ): Map[V.Index, NonEmptyMap[K2, V2]] = tableNel map {
+    case (k, vs) => (k, (vs map (asK2V2 coerce _)).toNem)
+  }
 
   /** */
   def path: Path
@@ -362,27 +367,11 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
       HV
     ] { self: CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
-  import V._
-
-  /** */
-  final def select(key: Key): EffectStream[Value] =
-    Stream evals F.delay { table get key }
-
-  /** */
-  def insert(key: Key, value: Value): EffectStream[Id] =
-    (table get key).fold(append(key -> value.some))(_ => Stream.empty)
-
-  /** */
-  def update(key: Key, value: Value): EffectStream[Id] =
-    table get key match { // can't fold and get good type inference
-      case Some(_) => append(key -> value.some)
-      case None    => Stream.empty
-    }
-
-  /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
-  def delete(key: Key): EffectStream[Id] =
-    (table get key)
-      .fold(Stream.empty: EffectStream[Id])(_ => append(key -> none))
+  // import V._
+  //
+  // /** */
+  // final def select(key: Key): EffectStream[Value] =
+  //   Stream evals F.delay { table get key }
 }
 
 /** */
