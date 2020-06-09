@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import syntax._, refinements.IsSha
+import syntax._
 
 import cats.implicits._
 import cats.{ Eq, Order }
@@ -28,8 +28,6 @@ import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled._
-
-import eu.timepit.refined
 
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file.{ pulls, FileHandle, ReadCursor, WriteCursor }
@@ -45,7 +43,7 @@ import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
 /** */
-protected trait CsvStoreTypes extends StoreTypes {
+trait CsvStoreTypes extends StoreTypes {
 
   /** */
   type HValue <: HList
@@ -55,7 +53,7 @@ protected trait CsvStoreTypes extends StoreTypes {
 }
 
 /** */
-protected[deftrade] object CsvStoreTypes {
+object CsvStoreTypes {
 
   /** */
   abstract class Aux[F[_], W[_] <: WithValue, V, HV <: HList](
@@ -82,6 +80,7 @@ protected trait CsvStore[
     V,
     HV <: HList
 ] extends Store[F, W, V] {
+
   self: CsvStoreTypes.Aux[F, W, V, HV] =>
 
   import V._
@@ -128,20 +127,21 @@ protected trait CsvStore[
 }
 
 /**
-  * Ctor parameter `V` carries types specific to `type V`.
-  * `type Index` mapped to [[WithValue.Id]].
+  * Value parameter `V` carries type members specific to `type V`.
+  *
+  * Type `Index` is mapped to [[WithValue#Id Id]].
   *
   * Cormorant CSV is integrated by implementing implicit methods
   * [[writeIdRow]], [[readIdRow]], providing access to
   * [[io.chrisdavenport.cormorant.LabelledRead]] and
-  * [[io.chrisdavenport.cormorant.LabelledWrite]]
-  * instances for the [[WithValue.(Id, Row)]] type for this store.
+  * [[io.chrisdavenport.cormorant.LabelledWrite]] instances for type `(Id, Row)`.
   */
 trait CsvValueStore[
     F[_],
     V,
     HV <: HList
 ] extends CsvStore[F, WithId, V, HV] {
+
   self: CsvStoreTypes.Aux[F, WithId, V, HV] =>
 
   import V._
@@ -297,8 +297,9 @@ trait CsvKeyValueStore[
 }
 
 /** */
-protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends CsvStore[F, W, V, HV] {
-  self: CsvStoreTypes.Aux[F, W, V, HV] =>
+protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] {
+
+  self: CsvStore[F, W, V, HV] with CsvStoreTypes.Aux[F, W, V, HV] =>
 
   /** */
   final protected var table: Map[V.Index, V.Value]                  = Map.empty
@@ -325,6 +326,7 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] extends Cs
       SYNC,
       // DSYNC,
     )
+
     Stream resource (for {
       blocker <- Blocker[Effect]
       handle  <- FileHandle fromPath (path, blocker, openOptions)
@@ -365,7 +367,9 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
       WithKey.Aux[K, *],
       V,
       HV
-    ] { self: CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
+    ] {
+
+  self: CsvStore[F, WithKey.Aux[K, *], V, HV] with CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
   // import V._
   //

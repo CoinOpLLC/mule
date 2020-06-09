@@ -4,7 +4,7 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.13.1"
+  val Scala = "2.13.2"
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
@@ -16,7 +16,7 @@ object Version {
   val Shapeless  = "2.3.3"
   val Refined    = "0.9.14"
 
-  val Enumeratum = "1.5.15"
+  val Enumeratum = "1.6.1"
   val Fuiid      = "0.3.0"
 
   val Circe = "0.13.0"
@@ -25,7 +25,7 @@ object Version {
   val Slf4j       = "1.7.30"
 
   // val Fs2   = "2.3.0"
-  val Fs2   = "2.2.2"
+  val Fs2   = "2.4.0"
   val Cormorant  = "0.3.0"
 
   val Http4s      = "0.21.4"
@@ -90,8 +90,8 @@ object Deps {
 
   val enumerata = Seq(
     "com.beachape" %% "enumeratum"       % Enumeratum,
-    "com.beachape" %% "enumeratum-cats"  % "1.5.16",
-    "com.beachape" %% "enumeratum-circe" % "1.5.22",
+    "com.beachape" %% "enumeratum-cats"  % Enumeratum, // "1.5.16",
+    "com.beachape" %% "enumeratum-circe" % Enumeratum, // "1.5.22",
   )
 
   val circeii = Seq(

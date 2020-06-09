@@ -13,19 +13,17 @@ import cats.evidence._
 
 import cats.effect.{ ContextShift, IO, Sync }
 
-import shapeless.{ HList }
-
 import scala.collection.immutable.SortedMap
 
 /** */
-sealed abstract class Command[F[_], A]
+protected sealed abstract class Command[F[_], A]
 
 /** */
-object Command
+protected object Command
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value]) {
+protected sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value]) {
 
   protected final type Id = Value.Id
 
@@ -80,7 +78,7 @@ sealed abstract class FreeValueStore[Effect[_], Value](val Value: WithId[Value])
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-object FreeValueStore {
+protected object FreeValueStore {
 
   /** */
   def apply[F[_]: Sync: ContextShift, V](V: WithId[V]): FreeValueStore[F, V] =
@@ -93,7 +91,7 @@ object FreeValueStore {
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-sealed abstract class FreeKeyValueStore[Effect[_], Key, Value](val V: WithKey.Aux[Key, Value]) {
+protected sealed abstract class FreeKeyValueStore[Effect[_], Key, Value](val V: WithKey.Aux[Key, Value]) {
 
   final type Id = V.Id
 
@@ -163,7 +161,7 @@ sealed abstract class FreeKeyValueStore[Effect[_], Key, Value](val V: WithKey.Au
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-object FreeKeyValueStore {
+protected object FreeKeyValueStore {
 
   /** */
   def apply[F[_]: Sync: ContextShift, K, V](

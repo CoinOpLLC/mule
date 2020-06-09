@@ -34,7 +34,7 @@ import fs2.{ Stream }
 import scala.collection.immutable.SortedMap
 
 /** */
-protected trait StoreTypes {
+trait StoreTypes {
 
   /** */
   type ValueType
@@ -56,7 +56,7 @@ protected trait StoreTypes {
 }
 
 /** */
-protected[deftrade] object StoreTypes {
+object StoreTypes {
 
   /** */
   abstract class Aux[F[_], W[_] <: WithValue, V](

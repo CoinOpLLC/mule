@@ -22,30 +22,17 @@ import cats.implicits._
 import cats.data.{ NonEmptyList }
 import cats.effect.{ ContextShift, Sync }
 
-import cats.Eq
-import cats.data.NonEmptyList
-import cats.effect.{ ContextShift, Sync }
-
-import shapeless.{ HList, LabelledGeneric, Lazy }
-// import shapeless.labelled._
-
-import shapeless.syntax.singleton._
-
 import eu.timepit.refined
 import refined.api.Refined
-import fs2.{ Pipe }
-
-import io.circe.Json
 
 import io.chrisdavenport.cormorant
 import cormorant.implicits.stringPut
-import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
-// import cormorant.refined._
+import cormorant.{ CSV, Error, Get, Printer, Put }
 
 import io.chrisdavenport.fuuid
 import fuuid.FUUID
 
-import java.nio.file.{ Paths }
+import shapeless.syntax.singleton._
 
 /**
   * Derived types and implicit methods for the persistence and caching of
@@ -164,143 +151,24 @@ package object keyval {
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
 
-  /** */
-  implicit lazy val jsonGet: Get[Json] =
-    new Get[Json] {
-
-      /** */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, Json] = ???
-      // Base58 => bytes => String(bytes) => Json (via parse)
-      // N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
-    }
-
-  /**  */
-  implicit lazy val jsonPut: Put[Json] = ???
+  // /** */
+  // implicit lazy val jsonGet: Get[Json] =
+  //   new Get[Json] {
+  //
+  //     /** */
+  //     def get(field: CSV.Field): Either[Error.DecodeFailure, Json] = ???
+  //     // Base58 => bytes => String(bytes) => Json (via parse)
+  //     // N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+  //   }
+  //
+  // /**  */
+  // implicit lazy val jsonPut: Put[Json] = ???
   // Json => String canonical print (no spaces, sort keys - centralize!)
   // String => ByteVector (UFT-8) => String (Base58)
 
   /** */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def valueStore[F[_]: Sync: ContextShift]: FVS[F] = new FVS[F] {}
+  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
 
   /** */
-  def keyValueStore[F[_]: Sync: ContextShift]: FKVS[F] = new FKVS[F] {}
-}
-
-package keyval {
-
-  /** dsl for value stores: `at` clause */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class FVS[F[_]: Sync: ContextShift] {
-
-    /** */
-    def at(p: String): FVSP[F] = new FVSP(p) {}
-  }
-
-  /** dsl for value stores: `of` clause */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class FVSP[F[_]: Sync: ContextShift](p: String) {
-
-    /** */
-    def ofChainAddressed[V: Eq, HV <: HList](
-        v: WithId[V],
-    )(
-        implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[MemFileValueStore[F, V, HV]] = Result safe {
-      new MemFileValueStore(v) {
-
-        import V._
-
-        /** */
-        final override def path = Paths get p
-
-        /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveVToCsv
-
-        /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvToV
-
-        /** */
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-      }
-    }
-
-    /** */
-    def ofContentAddressed[V: Eq, HV <: HList](
-        v: WithId[V],
-    )(
-        implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[MemFileValueStore[F, V, HV]] = Result safe {
-      new MemFileValueStore(v) {
-
-        import V._
-
-        /** */
-        final override def path = Paths get p
-
-        /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveVToCsv
-
-        /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvToV
-
-        /** FIXME implementation is wrong */
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-        // final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaContentAddress
-      }
-    }
-  }
-
-  /** dsl for key value stores: `of` clause */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class FKVS[F[_]: Sync: ContextShift] {
-
-    /** */
-    def at(p: String): FKVSP[F] = new FKVSP(p) {}
-  }
-
-  /** dsl for key value stores: `of` clause */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  sealed abstract class FKVSP[F[_]: Sync: ContextShift](p: String) {
-
-    /** */
-    def ofChainAddressed[K, V: Eq, HV <: HList](
-        kv: WithKey.Aux[K, V]
-    )(
-        implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]],
-        lgetk: Lazy[Get[K]],
-        lputk: Lazy[Put[K]]
-    ): Result[MemFileKeyValueStore[F, K, V, HV]] = Result safe {
-      new MemFileKeyValueStore(kv) { self =>
-
-        import V._
-
-        // /** */
-        // final override protected def tableRows = rows collect {
-        //   case (k, Some(v)) => k -> v
-        // }
-
-        /** */
-        final override def path = Paths get p
-
-        /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveKvToCsv
-
-        /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvToKv
-
-        /** */
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-      }
-    }
-  }
+  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
 }

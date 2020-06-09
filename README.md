@@ -32,12 +32,13 @@ A stream algebra toolkit for financial market participants.
 
 ##### Foundational financial domain values and calculations
 
-- account management primitives
-- accounting balances and reporting
-- market data systems integration
-- order management system integration
+- composable contract dsl and evaluation engines
 - ledger schema includes chained (!) cryptographic hashes
-- `dsl`s for time and money
+- account management: privacy-first data model protects PII
+- core accounting balances and reporting
+- order management system integration for external markets
+- market data systems integration
+- `dsl`s for commercial time and money calculations 
 
 - `adt-sacc` definitions
     - **`adt`**`:= algebraic data type`

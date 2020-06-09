@@ -47,7 +47,7 @@ addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.2.0")
   * As with real warts, there will be blood: be prepeared.
   * [[http://www.wartremover.org/ Wart Remover]]
   */
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.3")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.9")
 
 /**
   * [Coursier](https://github.com/coursier/coursier#command-line)

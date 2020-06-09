@@ -23,7 +23,7 @@ import eu.timepit.refined.boolean._
 import refined.collection.{ Forall, Size }
 import refined.numeric.{ Interval, LessEqual, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
-import refined.api.{ Inference, Refined, Validate }
+import refined.api.{ Refined, Validate }
 // import Inference.==>
 import Interval.{ Closed => To }
 
@@ -43,10 +43,8 @@ object refinements {
   private def alpha = "[A-Z]"
   private def num   = "[0-9]"
 
-  private def patRep(pat: String)(n: Int Refined Positive) = {
-    val r = s"""$pat{${n.toString}}"""
-    r
-  }
+  private def patRep(pat: String)(n: Int Refined Positive) =
+    s"""$pat{${n.toString}}"""
 
   /** */
   final val Alpha2 = patRep(alpha)(2)
