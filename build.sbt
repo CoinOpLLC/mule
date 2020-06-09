@@ -38,13 +38,7 @@ def module(id: String, d: String) =
 
 lazy val core = module(
   "core",
-  """foundational finance value types and functions:
-    | - composable contract dsl and evaluation engines
-    | - core accounting and trading domain model
-    | - privacy-first account model protects PII
-    | - language integrated query algebras and interpreters
-    | - time and money dsls including currency, pricing, quoting, duration, tenors, and holidays.
-    |""".stripMargin
+  """foundational finance value types and functions"""
 ).settings(common)
   .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
   .settings(

@@ -21,9 +21,9 @@ package layers
 import keyval._, time._, money._
 
 import cats.implicits._
-import cats.{ Monad }
+// import cats.{ Sync }
 import cats.data.{ Kleisli, NonEmptySet }
-
+import cats.effect.{ Sync }
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
@@ -35,8 +35,11 @@ import scala.collection.immutable.SortedSet
 /** */
 trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
-  /** FIXME placeholder */
-  type FolioTable = Map[Folio.Key, Folio.Value]
+  /** */
+  type Allocation = UnitPartition[Folio.Key, Quantity]
+
+  /** Namespace placeholder */
+  object Allocation
 
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.
@@ -52,12 +55,12 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Why not [[fs2.Pipe]]?
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
-  sealed abstract case class OMS[F[_]: Monad] private (
+  sealed abstract case class OMS[F[_]: Sync] private (
       entity: Party.Key,
       entry: Folio.Key,
       contra: Folio.Key,
       markets: NonEmptySet[Market.Key],
-      folios: FolioTable
+      folios: OMS.Folios[F]
   ) {
 
     /** */
@@ -102,13 +105,12 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * What actually happened to the [[Order]] at the [[Market]].
       *
-      * TODO: describe in more detail how partial executions end up as multiple [[Transaction]]s.
+      * Partial executions reference the same `Order` and end up as multiple [[Transaction]]s.
       */
     sealed abstract case class Execution(
-        ts: Instant,
+        at: Instant,
         order: Order.Key,
-        oms: OMS.Key,
-        tx: Transaction.Id
+        transaction: Transaction.Id
     )
 
     /**
@@ -128,7 +130,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       riskCheck[C, A](block) andThen
         trade andThen
         allocate(allocation) andThen
-        settle(folios)(entry)
+        settle
 
     /** */
     def riskCheck[C: Currency, A](a: A): Phase[A, Order]
@@ -140,23 +142,16 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     def allocate(a: Allocation): Phase[Execution, Execution]
 
     /** */
-    def settle(
-        folios: FolioTable
-    )(
-        p: Folio.Key
-    ): Phase[Execution, Unit]
+    def settle: Phase[Execution, Unit]
   }
-
-  /** */
-  type Allocation = UnitPartition[Folio.Key, Quantity]
-
-  /** Namespace placeholder */
-  object Allocation
 
   /**
     * FIXME: augment/evolve creation pattern.
     */
-  object OMS extends WithOpaqueKey[Long, OMS[cats.Id]] {
+  object OMS {
+
+    /** */
+    type Folios[F[_]] = KeyValueStore[F, Folio.Key, Folio.Value]
 
     /**
       * Each OMS must maintain a contra [[Ledger.Folio.Key]].
@@ -164,11 +159,11 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       * before the OMS is created.
       *
       */
-    def apply[F[_]: Monad](
+    def apply[F[_]: Sync](
         key: Party.Key,
         entry: Folio.Key,
         contra: Folio.Key,
-        folios: FolioTable,
+        folios: Folios[F],
         market: Market.Key,
         ms: Market.Key*
     ): OMS[F] =
@@ -184,30 +179,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         def allocate(a: Allocation): Phase[Execution, Execution] = ???
 
         /** */
-        def settle(
-            folios: FolioTable
-        )(
-            p: Folio.Key
-        ): Phase[Execution, Unit] = ???
+        def settle: Phase[Execution, Unit] = ???
       }
   }
 }
-/*
- * example "blotter" gathered randomly from the web - for reference only
- * there is a lot wrong with this example, actually, and it won't translate directly or uniquely
- *
- * Client name
- * Trade name
- * Settlement Date
- * Buy/Sell
- * CUSIP
- * SecuritySymbol
- * SecurityDesc.
- * Quantity
- * UnitPrice
- * Principal/Proceeds
- * TotalCommission
- * Fees
- * Net Proceeds
- * Broker
- */

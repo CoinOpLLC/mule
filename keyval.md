@@ -46,7 +46,7 @@ the `Id` may be computed directly given the `Value`, this type of `store` can be
 
 ##### chained address
 
-We can use a previous `Id` (computed fromm some prior `Row`)
+We can use a previous `Id` (computed from some prior `Row`)
 to compute a new (Merkel chained) `Id` for a given `Row`.
 
 ```scala
@@ -129,3 +129,25 @@ Id | (Key | (K2 | V2))
 This is a key value store of `Map[K2, V2]` rows.
 
 `Store`s of this shape are used for `model.Folio`s
+
+---
+
+### What is a `Blotter`, anyway?
+
+Here's an example "blotter" gathered randomly from the web - for reference only
+there is a lot wrong with this example, actually, and it won't translate directly or uniquely
+
+- Client name
+- Trade name
+- Settlement Date
+- Buy/Sell
+- CUSIP
+- SecuritySymbol
+- SecurityDesc.
+- Quantity
+- UnitPrice
+- Principal/Proceeds
+- TotalCommission
+- Fees
+- Net Proceeds
+- Broker
