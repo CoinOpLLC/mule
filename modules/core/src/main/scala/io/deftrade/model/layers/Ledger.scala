@@ -275,7 +275,7 @@ trait Ledger { module: ModuleTypes =>
   sealed abstract class Meta private (meta: Json) { type Adt }
 
   /**
-    * The Meta store is content-addressed: entries are indexed with their own Sha.
+    * A `Meta` store is content-addressed: entries are indexed with their own `Sha`.
     *
     * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
     * a `Meta` key value store containing the value, you have access to the value itself.

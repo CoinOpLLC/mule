@@ -108,14 +108,14 @@ object TaxId {
   * Models financial market participants.
   *
   * Presumed real world actors under the aegis of, and registered with, real world
-  * justistictions.
+  * juristictions.
   *
   * Small step towards privacy by design: `TaxId.Id`'s are not used as `Key`s.
   */
 sealed trait Party extends Product with Serializable {
   def name: Label
   def taxId: TaxId.Id
-  def meta: Meta.Id
+  def contact: Contact.Id
 }
 
 /**
@@ -149,7 +149,7 @@ object Party extends WithFuuidKey[Party] {
 final case class NaturalPerson(
     name: Label,
     ssn: TaxId.Ssn,
-    meta: Meta.Id
+    contact: Contact.Id
 ) extends Party {
 
   import refined.auto._
@@ -162,7 +162,11 @@ final case class NaturalPerson(
 object NaturalPerson extends WithFuuidKey[NaturalPerson]
 
 /**  */
-final case class LegalEntity(name: Label, ein: TaxId.Ein, meta: Meta.Id) extends Party {
+final case class LegalEntity(
+    name: Label,
+    ein: TaxId.Ein,
+    contact: Contact.Id
+) extends Party {
 
   import refined.auto._
 
@@ -261,8 +265,9 @@ object Role extends DtEnum[Role] {
   lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
 }
 
-import Contact._
+import Contact.{ Email, Name, USAddress, USPhone }
 
+/** */
 final case class Contact(
     name: Name,
     address: USAddress,
@@ -272,7 +277,7 @@ final case class Contact(
 )
 
 /** */
-object Contact {
+object Contact extends WithId[Meta] {
 
   import cats.derived
   import refined.cats._

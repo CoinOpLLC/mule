@@ -105,7 +105,8 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * What actually happened to the [[Order]] at the [[Market]].
       *
-      * Partial executions reference the same `Order` and end up as multiple [[Transaction]]s.
+      * Multiple partial executions reference the same `Order`
+      * and end up as multiple [[Transaction]]s.
       */
     sealed abstract case class Execution(
         at: Instant,
@@ -120,7 +121,9 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       */
     object Execution extends WithId[Execution]
 
-    /** */
+    /**
+      * FIXME: address the issue of scheduling T+2 etc.
+      */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def process[C: Currency, A](
         allocation: Allocation
@@ -138,10 +141,15 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**  */
     def trade: Phase[Order, Execution]
 
-    /** */
+    /** Moves the traded [[Instrument]]s to their final destination [[Folio]]. */
     def allocate(a: Allocation): Phase[Execution, Execution]
 
-    /** */
+    /**
+      * Updates the actual [[Folio]]s, with [[Account]] specific (and this `Folio` specific)
+      * cash account [[Instrument]]s substituted for the raw [[money.Currency]]
+      * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
+      * of the [[Trade]] specified in the [[Transaction]].
+      */
     def settle: Phase[Execution, Unit]
   }
 

@@ -6,7 +6,7 @@ import keyval._
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.data.{ NonEmptyMap, NonEmptySet }
+import cats.data.{ NonEmptySet }
 import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
@@ -26,7 +26,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[Party.Key, Quantity],
-      private val nps: Role.NonPrincipal Map NonEmptySet[Party.Key]
+      private val nps: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
   ) {
 
     import Party.Key
