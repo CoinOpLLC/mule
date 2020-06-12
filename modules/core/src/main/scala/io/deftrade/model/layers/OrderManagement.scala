@@ -56,7 +56,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
   sealed abstract case class OMS[F[_]: Sync] private (
-      entity: Party.Key,
+      party: Party.Key,
       entry: Folio.Key,
       contra: Folio.Key,
       markets: NonEmptySet[Market.Key],
@@ -87,7 +87,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /**
       * Once placed, an [[Order]] may be modified or canceled,
-      * and so is modeled as an entity which can evolve.
+      * and so is modeled as an `entity` which can evolve over time.
       */
     object Order extends WithOpaqueKey[Long, Order] {
 

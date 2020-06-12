@@ -158,7 +158,7 @@ final case class NaturalPerson(
   def taxId = ssn
 }
 
-/*  */
+/**  */
 object NaturalPerson extends WithFuuidKey[NaturalPerson]
 
 /**  */
@@ -316,6 +316,7 @@ object Contact extends WithId[Meta] {
       zip: USZip
   )
 
+  /** */
   object USAddress {
 
     implicit lazy val contactEq: Eq[USAddress]     = derived.semi.eq
@@ -327,6 +328,7 @@ object Contact extends WithId[Meta] {
 
   private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
 
+  /** */
   final val TenDigit = digits(10)
 
   /** */
@@ -335,15 +337,19 @@ object Contact extends WithId[Meta] {
   /** */
   final type USPhone = String Refined IsUSPhone
 
+  /** */
   final val Zip = s"${digits(7)}|${digits(7 + 4)}"
 
+  /** */
   final type IsUSZip = MatchesRegex[Zip.type]
 
+  /** */
   final type USZip = String Refined IsUSZip
 
   /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
   final val IsEmail =
     """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
 
+  /** */
   final type Email = String Refined MatchesRegex[IsEmail.type]
 }

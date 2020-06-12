@@ -136,6 +136,12 @@ trait Accounts { self: Ledger with ModuleTypes =>
   }
 
   /**
+    * Predicate defining a very conventional looking account numbering scheme.
+    */
+  type IsAccountNo = Interval.Closed[100000100108L, 999999999999L]
+  type AccountNo   = Long Refined IsAccountNo
+
+  /**
     * `Account`s consist of:
     *   - a `Folio` of settled [[Ledger.Transaction]]s
     *   - a `Folio` of `Transaction`s not yet settled
@@ -147,12 +153,6 @@ trait Accounts { self: Ledger with ModuleTypes =>
       settled: Folio.Key,
       unsettled: Folio.Key,
   )
-
-  /**
-    * Predicate defining a very conventional looking account numbering scheme.
-    */
-  type IsAccountNo = Interval.Closed[100000100108L, 999999999999L]
-  type AccountNo   = Long Refined IsAccountNo
 
   /**
     * Accounts are modelled as long lived entities that can evolve over time.

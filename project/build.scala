@@ -166,7 +166,7 @@ object Deps {
     "org.tpolecat" %% "doobie-postgres"  % Doobie,          // Postgres driver 42.2.9 + type mappings.
     "org.tpolecat" %% "doobie-quill"     % Doobie,          // Support for Quill
 
-    "org.tpolecat" %% "doobie-scalatest" % Doobie % "test"  // ScalaTest support for typechecking statements.
+    "org.tpolecat" %% "doobie-scalatest" % Doobie % "test"  //
   )
 
   // val zios = List(

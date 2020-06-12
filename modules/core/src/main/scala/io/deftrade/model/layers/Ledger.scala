@@ -32,8 +32,6 @@ import refined.cats._
 
 import fs2.{ Pipe, Stream }
 
-import io.circe.{ Decoder, Encoder, Json }
-
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
@@ -268,33 +266,23 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /**
-    * All metadata is `json`.
+    * Root of [[Transaction]] metadata ADT.
     *
-    * We can derive `codec`s for arbitrary `ADT`s to and from `json`.
+    * TODO: this is tabula rasa right now do something with it
     */
-  sealed abstract class Meta private (meta: Json) { type Adt }
+  sealed abstract class Meta
 
-  /**
-    * A `Meta` store is content-addressed: entries are indexed with their own `Sha`.
-    *
-    * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
-    * a `Meta` key value store containing the value, you have access to the value itself.
-    *
-    * Note this value is effectively unforgeable / self validating.
-    */
-  object Meta extends WithId[Meta] {
+  /** */
+  object Meta extends WithId[Misc.Aux[Meta]] {
 
     /** */
-    protected case class Aux[T] private (meta: Json) extends Meta(meta) { final type ADT = T }
+    def apply: Meta = new Meta {}
 
     /** */
-    def apply[T: Encoder: Decoder](meta: Json): Meta = Aux[T](meta)
+    implicit lazy val metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
 
     /** */
-    implicit def metaEq[T]: Eq[Meta.Aux[T]] = { import auto.eq._; semi.eq }
-
-    /** */
-    implicit def metaShow[T]: Show[Meta.Aux[T]] = { import auto.show._; semi.show }
+    implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
   }
 
   /**
