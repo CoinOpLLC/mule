@@ -25,6 +25,9 @@ import cats.effect.{ ContextShift, Sync }
 import eu.timepit.refined
 import refined.api.Refined
 
+import io.circe.syntax._
+import io.circe.{ Decoder, Encoder, Json }
+
 import io.chrisdavenport.cormorant
 import cormorant.implicits.stringPut
 import cormorant.{ CSV, Error, Get, Printer, Put }
@@ -151,20 +154,22 @@ package object keyval {
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
 
-  // /** */
-  // implicit lazy val jsonGet: Get[Json] =
-  //   new Get[Json] {
-  //
-  //     /** */
-  //     def get(field: CSV.Field): Either[Error.DecodeFailure, Json] = ???
-  //     // Base58 => bytes => String(bytes) => Json (via parse)
-  //     // N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
-  //   }
-  //
-  // /**  */
-  // implicit lazy val jsonPut: Put[Json] = ???
-  // Json => String canonical print (no spaces, sort keys - centralize!)
-  // String => ByteVector (UFT-8) => String (Base58)
+  /** */
+  implicit def miscGet[T: Encoder: Decoder]: Get[Misc.Aux[T]] =
+    new Get[Misc.Aux[T]] {
+
+      import io.circe.parser._
+
+      /** */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Misc.Aux[T]] =
+        for {
+          json <- parse(field.x) leftMap (p => Error.DecodeFailure(NonEmptyList one p.toString))
+        } yield Misc from json
+    }
+
+  /**  */
+  implicit lazy val miscPut: Put[Misc] =
+    stringPut contramap (_.canoncicalString)
 
   /** */
   def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()

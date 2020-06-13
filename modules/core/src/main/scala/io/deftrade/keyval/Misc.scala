@@ -1,16 +1,13 @@
 package io.deftrade
-package model
+package keyval
 
 import cats.implicits._
 import cats.{ Eq, Show }
+import cats.data.NonEmptyList
 import cats.derived.{ auto, semi }
 
 import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Json }
-
-import io.chrisdavenport.cormorant
-import cormorant.implicits.stringPut
-import cormorant.{ CSV, Error, Get, Put }
 
 /**
   * All `misc` data - semistructured, to use an antiquated term - is `json` (for now).
@@ -25,6 +22,8 @@ sealed class Misc private (protected val json: Json) {
   /** */
   final def decoded(implicit ev: Decoder[ADT]): Result[ADT] =
     json.as[ADT] leftMap (x => Fail.fromString(x.toString))
+
+  final def canoncicalString: String = json.noSpacesSortKeys
 }
 
 /**
@@ -44,26 +43,11 @@ object Misc {
   }
 
   /** */
-  def apply[T: Encoder: Decoder](json: Json): Misc = new Aux[T](json) {}
-  def apply(json: Json): Misc                      = ???
+  def from[T: Encoder: Decoder](json: Json): Misc.Aux[T] = new Aux[T](json) {}
 
   /** */
-  def of[T: Encoder: Decoder](t: T): Misc =
-    apply[T](t.asJson)
+  def of[T: Encoder: Decoder](t: T): Misc = from[T](t.asJson)
 
-  implicit lazy val miscEq: Eq[Misc]     = ??? // { import auto.eq._; semi.eq }
-  implicit lazy val miscShow: Show[Misc] = ??? // { import auto.show._; semi.show }
-
-  /** FIXME: need [T] here? makes this a `def` */
-  implicit lazy val miscGet: Get[Misc] =
-    new Get[Misc] {
-
-      /** */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, Misc] = ???
-    }
-
-  /**  */
-  implicit lazy val miscPut: Put[Misc] =
-    stringPut contramap (_.json.toString)
-
+  implicit lazy val miscEq: Eq[Misc]     = Eq by (_.json)
+  implicit lazy val miscShow: Show[Misc] = Show show (_.json.show)
 }
