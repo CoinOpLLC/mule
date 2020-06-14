@@ -20,7 +20,7 @@ package layers
 
 import money._, keyval._, time._
 import capital.Instrument
-import refinements.{ IsLabel, Label }
+import refinements.{ IsLabel }
 
 import cats.implicits._
 import cats.{ Monad, Order, Show }
@@ -32,13 +32,11 @@ import enumeratum.EnumEntry
 import spire.syntax.field._
 
 import eu.timepit.refined
-import refined.refineMV
 import refined.api.Refined
 import refined.boolean.{ And }
-import refined.collection.{ Forall, Size }
+import refined.collection.{ Size }
 import refined.numeric.{ GreaterEqual, LessEqual }
 import refined.string.{ Trimmed, Uuid => IsUuid }
-import refined.char.{ Letter, UpperCase }
 
 import refined.cats._
 

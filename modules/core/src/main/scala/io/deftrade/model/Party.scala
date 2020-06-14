@@ -18,16 +18,15 @@ package model
 
 import keyval._, refinements._
 
-import enumeratum.{ EnumEntry }
-
 import cats.implicits._
 import cats.{ Eq, Show }
+import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
-import refined.string.{ MatchesRegex, Url }
+import refined.string.{ MatchesRegex }
 
 // import shapeless.syntax.singleton._
 
@@ -134,23 +133,14 @@ object Party extends WithFuuidKey[Party] {
       case TaxId.Ein(ein) => LegalEntity(name, ein, meta)
     }
 
-  /** */
-  implicit def eqParty = Eq.fromUniversalEquals[Party]
-
-  /** */
-  implicit def showParty = Show.show[Party] {
-    _.toString // this can evolve!
-  }
+  implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
+  implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
 }
 
 /**
   * `NaturalPerson`s are `Party`s.
   */
-final case class NaturalPerson(
-    name: Label,
-    ssn: TaxId.Ssn,
-    contact: Contact.Id
-) extends Party {
+final case class NaturalPerson(name: Label, ssn: TaxId.Ssn, contact: Contact.Id) extends Party {
 
   import refined.auto._
 
@@ -159,14 +149,16 @@ final case class NaturalPerson(
 }
 
 /**  */
-object NaturalPerson extends WithFuuidKey[NaturalPerson]
+object NaturalPerson extends WithFuuidKey[NaturalPerson] {
+
+  import refined.cats._
+
+  implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
+  implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
+}
 
 /**  */
-final case class LegalEntity(
-    name: Label,
-    ein: TaxId.Ein,
-    contact: Contact.Id
-) extends Party {
+final case class LegalEntity(name: Label, ein: TaxId.Ein, contact: Contact.Id) extends Party {
 
   import refined.auto._
 
@@ -175,181 +167,10 @@ final case class LegalEntity(
 }
 
 /**  */
-object LegalEntity extends WithFuuidKey[LegalEntity]
+object LegalEntity extends WithFuuidKey[LegalEntity] {
 
-/**
-  * There are a finite enumeration of roles which [[Party]]s may take on with respect to
-  * [[layers.Accounts.Account]]s.
-  *
-  * Every `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]].
-  */
-sealed trait Role extends EnumEntry
-
-/**
-  * Enumerated `Role`s.
-  */
-object Role extends DtEnum[Role] {
-
-  sealed trait Principal extends Role
-
-  sealed trait NonPrincipal extends Role
-
-  /** */
-  object NonPrincipal {
-
-    /**
-      * A test for all `Role`s ''other than'' `Princple`.
-      */
-    def unapply(role: Role): Option[NonPrincipal] = role match {
-      case Principal        => none
-      case np: NonPrincipal => np.some
-    }
-  }
-
-  /**
-    * That [[Party]] which is the market participant
-    * responsible for establishing the [[layers.Accounts.Account]].
-    *
-    * Semantics for `Principal` are conditioned on the status of account, for examples:
-    * - beneficial owner for an asset
-    * - responsible party for a liability
-    * - shareholder for equity
-    * - business unit chief for revenue and expenses
-    *
-    * `Principal`s have authority to add or remove [[Agent]]s.
-    *  A `Princple` is their own `Agent` unless otherwise specified.
-    */
-  case object Principal extends Principal
-
-  /**
-    * The primary delegate selected by a `Principal`.
-    *
-    * `Agents` have authortity to add or remove [[Manager]]s.
-    * An `Agent` is their own `Manager` unless otherwise specified.
-    */
-  case object Agent extends NonPrincipal
-
-  /**
-    * The primary delegate selected by the `Agent`.
-    * `Party`(s) with responsibility for, and authority over,
-    * the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions
-    * which will result in `Transaction`s settling to the `Account`.
-    *
-    */
-  case object Manager extends NonPrincipal
-
-  /**
-    * `Auditor`s are first class participants, with a package of rights and responsibilities.
-    *
-    * There are a finite enumeration of [[Role]]s.
-    * Every `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]]
-    * which is situation and juristiction specific.
-    *
-    * Practically, what this means is that `Auditor`s will have a (possibly limited) view
-    * into the state of the `Ledger`,
-    * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
-    * or even intitiate `Transaction`s.
-    *
-    * Actions of the `Auditor` may include the publishing of specific summaries of its views
-    * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
-    *
-    * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
-    * be suited eg to a Risk Manager, operating in the context of a hedge fund.
-    */
-  case object Auditor extends NonPrincipal
-
-  /** The `findValues` macro collects all `value`s in the order written. */
-  lazy val values = findValues
-
-  /** */
-  lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
-}
-
-import Contact.{ Email, Name, USAddress, USPhone }
-
-/** */
-final case class Contact(
-    name: Name,
-    address: USAddress,
-    cell: USPhone,
-    email: Email,
-    url: Option[String Refined Url]
-)
-
-/** */
-object Contact extends WithId[Meta] {
-
-  import cats.derived
   import refined.cats._
 
-  implicit lazy val contactEq: Eq[Contact]     = derived.semi.eq
-  implicit lazy val contactShow: Show[Contact] = derived.semi.show
-
-  import io.circe._, io.circe.refined._, io.circe.generic.semiauto._
-
-  implicit lazy val decoder: Decoder[Contact] = deriveDecoder
-  implicit lazy val encoder: Encoder[Contact] = deriveEncoder
-
-  /** */
-  final case class Name(
-      first: Label,
-      middle: Option[Label],
-      last: Label,
-  )
-
-  /** */
-  object Name {
-
-    implicit lazy val contactEq: Eq[Name]     = derived.semi.eq
-    implicit lazy val contactShow: Show[Name] = derived.semi.show
-
-    implicit lazy val decoder: Decoder[Name] = deriveDecoder
-    implicit lazy val encoder: Encoder[Name] = deriveEncoder
-  }
-
-  /** */
-  final case class USAddress(
-      street: Label,
-      street2: Option[Label],
-      city: Label,
-      state: Alpha2,
-      zip: USZip
-  )
-
-  /** */
-  object USAddress {
-
-    implicit lazy val contactEq: Eq[USAddress]     = derived.semi.eq
-    implicit lazy val contactShow: Show[USAddress] = derived.semi.show
-
-    implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
-    implicit lazy val encoder: Encoder[USAddress] = deriveEncoder
-  }
-
-  private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
-
-  /** */
-  final val TenDigit = digits(10)
-
-  /** */
-  final type IsUSPhone = MatchesRegex[TenDigit.type]
-
-  /** */
-  final type USPhone = String Refined IsUSPhone
-
-  /** */
-  final val Zip = s"${digits(7)}|${digits(7 + 4)}"
-
-  /** */
-  final type IsUSZip = MatchesRegex[Zip.type]
-
-  /** */
-  final type USZip = String Refined IsUSZip
-
-  /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
-  final val IsEmail =
-    """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
-
-  /** */
-  final type Email = String Refined MatchesRegex[IsEmail.type]
+  implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
+  implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
 }

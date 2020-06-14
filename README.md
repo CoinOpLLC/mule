@@ -38,7 +38,7 @@ A stream algebra toolkit for financial market participants.
 - core accounting balances and reporting
 - order management system integration for external markets
 - market data systems integration
-- `dsl`s for commercial time and money calculations 
+- `dsl`s for commercial time and money calculations
 
 - `adt-sacc` definitions
     - **`adt`**`:= algebraic data type`
@@ -76,6 +76,10 @@ Results of these computations should be recomputable by replaying the event stre
 - trading algos implement state as `aggregate-entities`
     - `aggregate entities` are maintained by `Stream` based computations
     - this is `CQRS/ES` and can be used to replicate / restore application or session state
+
+Why scala 2.13?  
+- Map is less broken
+- type level is less broken 
 
 ### NO WARRANTY  
 

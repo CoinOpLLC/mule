@@ -32,6 +32,8 @@ import io.chrisdavenport.fuuid.FUUID
 
 import shapeless.labelled._
 
+import java.util.UUID
+
 /** */
 object OpaqueKey {
 
@@ -189,6 +191,9 @@ abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 
   /** */
   object Key extends WithKey.KeyCompanion[FUUID] {
+
+    /** */
+    def random: Key = FUUID fromUUID UUID.randomUUID
 
     /** */
     implicit def order = Order[FUUID]

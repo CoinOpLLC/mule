@@ -32,7 +32,7 @@ import refined.api.{ Refined, Validate }
 import refined.numeric._
 import refined.auto._
 
-import scala.collection.immutable.SortedMap
+import scala.collection.immutable.{ SortedMap, SortedSet }
 
 /** */
 object PartitionLike {
@@ -274,8 +274,14 @@ object UnitPartition {
   def single[K: cats.Order, V: Financial](k: K): UnitPartition[K, V] =
     unsafe(SortedMap(k -> Financial[V].one))
 
-  /** What every pizza slicer aims for; their's is a fine example. */
-  def fair[K: cats.Order, V: Financial](ks: NonEmptySet[K]): UnitPartition[K, V] = {
+  /** What every pizza slicer aims for. */
+  def fair[K: cats.Order, V: Financial](ks: K*): Result[UnitPartition[K, V]] =
+    Result(for {
+      k <- ks.headOption if SortedSet(ks: _*).size === ks.size
+    } yield fairExact(NonEmptySet(k, SortedSet((ks drop 1): _*))))
+
+  /** */
+  def fairExact[K: cats.Order, V: Financial](ks: NonEmptySet[K]): UnitPartition[K, V] = {
     val V        = Fractional[V]; import V._
     val oneSlice = one / (V fromLong ks.size)
     val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)

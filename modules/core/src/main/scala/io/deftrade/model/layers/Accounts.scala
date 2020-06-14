@@ -102,43 +102,46 @@ trait Accounts { self: Ledger with ModuleTypes =>
       ps ++ nps
     }
 
-    /**
-      * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
-      * regardless of their share of the principle pie.
-      */
-    def forPrinciples(principals: UnitPartition[Party.Key, Quantity]): Roster =
+    /** most general public creation method */
+    def from(
+        principals: UnitPartition[Party.Key, Quantity],
+        nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
+    ): Roster =
       apply(
         principals,
-        nonPrincipals = Map.empty withDefault { _ =>
+        nonPrincipals withDefault { _ =>
           NonEmptySet(principals.keys.head, principals.keys.tail)
         }
       )
 
     /**
-      * Splits partition equally among [[Role.Principal]]s.
+      * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
+      * regardless of their share of the principle pie.
       */
-    def equalSplitFrom(rs: Map[Role, Key]): Result[Roster] = ???
+    def fromPrinciples(principals: UnitPartition[Party.Key, Quantity]): Roster =
+      from(principals, Map.empty)
 
     /** */
     def single(entity: Party.Key): Roster =
-      apply(
-        principals = UnitPartition single entity,
-        nonPrincipals = Map.empty withDefault { _ =>
-          NonEmptySet one entity
-        }
-      )
+      fromPrinciples(principals = UnitPartition single entity)
 
-    // /** */
-    // implicit def eq: Eq[Roster] = { import auto.eq._; semi.eq }
-    //
-    // /** */
-    // implicit def show: Show[Roster] = { import auto.show._; semi.show }
+    /**
+      * Splits partition equally among [[Role.Principal]]s.
+      */
+    def equalSplitFrom(ps: Party.Key*): Result[Roster] =
+      for {
+        slices <- UnitPartition fair [Party.Key, Quantity] (ps: _*)
+      } yield fromPrinciples(slices)
+
+    /** */
+    implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
+    implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
   }
 
   /**
     * Predicate defining a very conventional looking account numbering scheme.
     */
-  type IsAccountNo = Interval.Closed[100000100108L, 999999999999L]
+  type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
   type AccountNo   = Long Refined IsAccountNo
 
   /**
@@ -158,13 +161,11 @@ trait Accounts { self: Ledger with ModuleTypes =>
     * Accounts are modelled as long lived entities that can evolve over time.
     */
   object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
-    // object Account extends WithKey.Aux[AccountNo, Account] {
 
-    /** FIXME implement
-      *
-      *   - domanin model issue: need to configure one of several ways of selecting UUIDs
+    /**
+      *   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
       */
-    protected[deftrade] def freshFolioKey: Folio.Key = ???
+    protected[deftrade] def freshFolioKey = Folio.Key.random
 
     /** */
     protected[deftrade] def apply(s: Folio.Key, u: Folio.Key): Account =
@@ -173,10 +174,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     /** */
     protected[deftrade] def empty = Account(freshFolioKey, freshFolioKey)
 
-    /** */
-    implicit def eq: Eq[Account] = { import auto.eq._; semi.eq }
-
-    /** */
-    implicit def show: Show[Account] = { import auto.show._; semi.show }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 }
