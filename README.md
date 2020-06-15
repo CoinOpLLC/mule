@@ -1,14 +1,4 @@
-# mule
-
-`mule` carries all of the libraries used by our [CoinOpLLC](https://coinopllc.com) projects.
-
-`mule` integrates them so that they pack up well together for the journey.
-
-`mule` wanders and loads new libraries in anticipation of their use.
-
----
-
-### **`deftrade`**
+# `deftrade`  
 
 A stream algebra toolkit for financial market participants.
 
@@ -30,28 +20,37 @@ A stream algebra toolkit for financial market participants.
     // ...
 ```
 
-##### Foundational financial domain values and calculations
+## Foundational financial domain values and calculations
 
-- composable contract dsl and evaluation engines
-- ledger schema includes chained (!) cryptographic hashes
-- account management: privacy-first data model protects PII
-- core accounting balances and reporting
-- order management system integration for external markets
-- market data systems integration
-- `dsl`s for commercial time and money calculations
+- `ledger` data model specifies chained (!) cryptographic hashes
+- `account` management: privacy-first data model protects PII
+    - account and tax `Id`s are excluded from core `Ledger` data model  
+    - `cash account` details (e.g. bank account) remain private to the `account`  
+- composable `contract` DSL and evaluation engines
+    - `form`s encapsulate common `contract`s for publicly traded `instrument`s
+    - custom `contract`s (e.g. convertible notes) can be embedded within ad-hoc `instrument`s
+        - "exempt" securities
+    - non-cash instruments (e.g. public stock) are identified with common keys (e.g. `CUSIP`s)
+- core `accounting` balances and reporting
+- `order management system` integration for external markets
+- `market data system` integration for real time tick stream providers
+- `DSL`s for commercial time and money calculations
 
-- `adt-sacc` definitions
-    - **`adt`**`:= algebraic data type`
-    - **`sacc`**`:= sealed abstract case class`
-    - "unforgable" typed values
-        - private constructor
-        - no copy method
-- `adt`s enable principled `codec` derivation
+## Implementation notes
+
+### data definitions use `ADT`s and `SACC`s.
+
+- **`ADT`** := algebraic data type
+    - enable principled `codec` derivation
     - binary (scodec)
     - csv (cormorant)
     - jdbc (doobie)
+- **`SACC`** := sealed abstract case class
+- "unforgable" typed values
+    - private constructor
+    - no copy method
 
-##### Abstract `ValueStore`s and `KeyValueStore`s
+### Abstract `ValueStore`s and `KeyValueStore`s
 - `ValueStore`: source and sink `stream`s of `value`s for persistence
 - `KeyValueStore`: tracks the evolution over time of a `value` identified by a `key`
 - spreadsheet integration via csv file based persistence with json for adts
@@ -62,7 +61,7 @@ A stream algebra toolkit for financial market participants.
     - use Kafka to push pg log to the cloud for replication?
     - CockroachDB
 
-##### Stream based computations
+### Stream based computations
 
 `Stream`s are (possibly) effectful computations which produce sequences of `value`s.
 
@@ -79,7 +78,9 @@ Results of these computations should be recomputable by replaying the event stre
 
 Why scala 2.13?  
 - Map is less broken
-- type level is less broken 
+- type level is less broken
+
+A project of [CoinOpLLC](https://coinopllc.com).
 
 ### NO WARRANTY  
 

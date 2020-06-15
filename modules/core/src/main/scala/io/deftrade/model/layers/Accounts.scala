@@ -19,6 +19,45 @@ import refined.numeric.Interval
 trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
+    * Predicate defining a very conventional looking account numbering scheme.
+    */
+  type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
+
+  /**
+    * `Account`s consist of:
+    *   - a `Folio` of settled [[Ledger.Transaction]]s
+    *   - a `Folio` of `Transaction`s not yet settled
+    *
+    *  A [[Roster]] - who gets to do what, and who are the beneficial owners - is linked to the
+    * `Account` via its own table, indexed by the [[Account.Key]].
+    */
+  sealed abstract case class Account(
+      settled: Folio.Key,
+      unsettled: Folio.Key,
+  )
+
+  /**
+    * Accounts are modelled as long lived entities that can evolve over time.
+    */
+  object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
+
+    /**
+      *   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
+      */
+    protected[deftrade] def freshFolioKey = Folio.Key.random
+
+    /** */
+    protected[deftrade] def apply(s: Folio.Key, u: Folio.Key): Account =
+      new Account(s, u) {}
+
+    /** */
+    protected[deftrade] def empty = Account(freshFolioKey, freshFolioKey)
+
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
+  }
+
+  /**
     * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
     * and their crew.
     *
@@ -136,45 +175,5 @@ trait Accounts { self: Ledger with ModuleTypes =>
     /** */
     implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
-  }
-
-  /**
-    * Predicate defining a very conventional looking account numbering scheme.
-    */
-  type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
-  type AccountNo   = Long Refined IsAccountNo
-
-  /**
-    * `Account`s consist of:
-    *   - a `Folio` of settled [[Ledger.Transaction]]s
-    *   - a `Folio` of `Transaction`s not yet settled
-    *
-    *  A [[Roster]] - who gets to do what, and who are the beneficial owners - is linked to the
-    * `Account` via its own table, indexed by the [[Account.Key]].
-    */
-  sealed abstract case class Account(
-      settled: Folio.Key,
-      unsettled: Folio.Key,
-  )
-
-  /**
-    * Accounts are modelled as long lived entities that can evolve over time.
-    */
-  object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
-
-    /**
-      *   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
-      */
-    protected[deftrade] def freshFolioKey = Folio.Key.random
-
-    /** */
-    protected[deftrade] def apply(s: Folio.Key, u: Folio.Key): Account =
-      new Account(s, u) {}
-
-    /** */
-    protected[deftrade] def empty = Account(freshFolioKey, freshFolioKey)
-
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
-    implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 }
