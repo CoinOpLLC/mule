@@ -25,7 +25,7 @@ import cats.implicits._
 import cats.kernel.{ Monoid }
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semi }
-import cats.effect.Sync
+import cats.effect.{ ContextShift, Sync }
 
 import eu.timepit.refined
 import refined.cats._
@@ -398,4 +398,10 @@ trait Ledger { module: ModuleTypes =>
           _   <- payCash(drawOn)(amount)
         } yield Result(tId.some)
     }
+
+  lazy val Instruments  = KeyValueStore of Instrument
+  lazy val Trades       = ValueStore of Trade
+  lazy val Folios       = KeyValueStore of Folio
+  lazy val Metas        = ValueStore of Meta
+  lazy val Transactions = ValueStore of Transaction
 }

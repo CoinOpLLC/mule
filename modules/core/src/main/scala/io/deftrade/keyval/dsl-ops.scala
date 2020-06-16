@@ -118,4 +118,12 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
       }
     }
   }
+
+  /** */
+  def of(V: WithKey) = TypeOps(V)
+
+  /** */
+  sealed case class TypeOps(final val V: WithKey) {
+    final type StoreType = KeyValueStore[F, V.Key, V.Value]
+  }
 }

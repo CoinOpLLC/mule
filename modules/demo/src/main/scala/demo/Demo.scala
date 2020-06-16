@@ -1,12 +1,13 @@
 /**
-* Demonstration vehicle for the `deftrade` suite of libraries.
-*/
-
+  * Demonstration vehicle for the `deftrade` suite of libraries.
+  */
 package demo
 
-import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
+import io.deftrade.time._
+
+import cats.effect.{ Blocker, ExitCode, IO, IOApp, Resource }
 import cats.implicits._
-import fs2.{io, text, Stream, Pipe}
+import fs2.{ io, text, Pipe, Stream }
 
 import java.nio.file.Paths
 import java.{ time => jt }, jt.{ temporal => jtt }, jtt.TemporalAdjusters
@@ -16,9 +17,6 @@ import scala.concurrent.{ duration => scd }
 
 /** Simple usage examples for the [[io.deftrade.time]] package. */
 object TimeExample {
-
-
-  import io.deftrade.time._
 
   // java.time.Duration
   val d1 = duration(seconds = 20, nanos = 1)
@@ -86,26 +84,26 @@ object TimeExample {
   val thirdTuesday                   = TemporalAdjuster { firstTuesday andThen (_ + 2.weeks) }
 }
 
-
 /** */
-object Demo extends IOApp {
-
-  final val BUFFER_SIZE = 4096 // * 4096 // nostalgia
-
-  type Report = Pipe[IO, Transaction, BookSet]
-  val report: Report = ???
-
-  val reporter: Stream[IO, Unit] = (Stream resource Blocker[IO]) flatMap { blocker =>
-    io.file.readAll[IO](Paths get "transactions.csv", blocker, BUFFER_SIZE)
-      .through(text.utf8Decode)
-      .through(text.lines)
-      .through(/* csv read => Transaction */)
-      .through(report)
-      .through(/* BookSet.show */)
-      .through(text.utf8Encode)
-      .through(io.file.writeAll(Paths get "reports/booksets.txt", blocker))
-  }
-
-  def run(args: List[String]): IO[ExitCode] =
-    reporter.compile.drain as ExitCode.Success
-}
+// object Demo extends IOApp {
+//
+//   final val BUFFER_SIZE = 4096 // * 4096 // nostalgia
+//
+//   type Report = Pipe[IO, Transaction, BookSet]
+//   val report: Report = ???
+//
+//   val reporter: Stream[IO, Unit] = (Stream resource Blocker[IO]) flatMap { blocker =>
+//     io.file
+//       .readAll[IO](Paths get "transactions.csv", blocker, BUFFER_SIZE)
+//       .through(text.utf8Decode)
+//       .through(text.lines)
+//       .through( /* csv read => Transaction */ )
+//       .through(report)
+//       .through( /* BookSet.show */ )
+//       .through(text.utf8Encode)
+//       .through(io.file.writeAll(Paths get "reports/booksets.txt", blocker))
+//   }
+//
+//   def run(args: List[String]): IO[ExitCode] =
+//     reporter.compile.drain as ExitCode.Success
+// }

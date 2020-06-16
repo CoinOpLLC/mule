@@ -169,6 +169,18 @@ trait ValueStore[F[_], V] extends Store[F, WithId, V] {
     appendNel(k2v2s.toNel map (asValue coerce _))
 }
 
+/** dsl enhancements - ''dry'' type definitions for `Store`s */
+object ValueStore {
+
+  /** */
+  def of(V: WithValue) = TypeOps(V)
+
+  /** */
+  sealed case class TypeOps(final val V: WithValue) {
+    final type Store[F[_]] = ValueStore[F, V.Value]
+  }
+}
+
 /**  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
@@ -239,4 +251,19 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
       _  <- exists(key)
       id <- append(key -> maybeValue)
     } yield id
+}
+
+/** dsl enhancements - ''dry'' type definitions for `Store`s */
+object KeyValueStore {
+
+  /** */
+  def of(V: WithKey) = TypeOps(V)
+
+  /** */
+  sealed case class TypeOps(final val V: WithKey) {
+
+    /** */
+    final type Store[F[_]] = KeyValueStore[F, V.Key, V.Value]
+  }
+
 }

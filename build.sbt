@@ -50,7 +50,7 @@ lazy val demo = module("demo", "something to run")
   .settings(common)
   .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
+    libraryDependencies ++= pureConfigs ++ funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
 // .settings(
 //   libraryDependencies ++= funlibs ++ enumerata ++ refined ++
