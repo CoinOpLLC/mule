@@ -97,4 +97,17 @@ package object model
 
   implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
     new MapCommutativeGroup[K, V]
+
+///////////////////////////////////////////////////////////////////////////////////
+
+  // object Accounts {
+  //
+  //   val Right((accounts, rosters, contacts)) = for {
+  //     accounts <- keyValueStore[IO] at "accounts.csv" ofChainAddressed Account
+  //     rosters  <- keyValueStore[IO] at "rosters.csv" ofChainAddressed Roster
+  //     parties  <- keyValueStore[IO] at "parties.csv" ofChainAddressed Party
+  //     contacts <- valueStore[IO] at "contacts.csv" ofContentAddressed Contact
+  //   } yield (accounts, rosters, parties, contacts)
+  // }
+
 }

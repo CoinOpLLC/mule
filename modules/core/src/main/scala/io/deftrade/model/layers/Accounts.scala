@@ -10,7 +10,6 @@ import cats.data.{ NonEmptySet }
 import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
-import refined.api.Refined
 import refined.numeric.Interval
 
 /**
@@ -28,7 +27,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     *   - a `Folio` of settled [[Ledger.Transaction]]s
     *   - a `Folio` of `Transaction`s not yet settled
     *
-    *  A [[Roster]] - who gets to do what, and who are the beneficial owners - is linked to the
+    *  A [[Roster]] - specifies a mapping of [[Party]]s to [[Role]]s,
+    * and who are the beneficial owners - is linked to the
     * `Account` via its own table, indexed by the [[Account.Key]].
     */
   sealed abstract case class Account(
@@ -51,7 +51,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       new Account(s, u) {}
 
     /** */
-    protected[deftrade] def empty = Account(freshFolioKey, freshFolioKey)
+    protected[deftrade] def empty = apply(freshFolioKey, freshFolioKey)
 
     implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }

@@ -21,6 +21,7 @@ import keyval._, refinements._
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semi }
+import cats.effect.{ Sync }
 
 import eu.timepit.refined
 import refined.refineV
@@ -28,10 +29,12 @@ import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
 import refined.string.{ MatchesRegex }
 
+import fs2.Stream
+
 // import shapeless.syntax.singleton._
 
 /**  */
-object TaxId {
+object Tax {
 
   /** */
   final val MatchesRxSsn = """\d{3}-\d{2}-\d{4}"""
@@ -52,7 +55,7 @@ object TaxId {
   type Ssn = String Refined IsSsn
 
   object Ssn {
-    def unapply(id: Id)(implicit v: Validate[String, IsSsn]): Option[Ssn] = refineV[IsSsn](id.value).toOption
+    def unapply(no: No)(implicit v: Validate[String, IsSsn]): Option[Ssn] = refineV[IsSsn](no.value).toOption
   }
 
   /** */
@@ -93,14 +96,14 @@ object TaxId {
 
   /** */
   object Ein {
-    def unapply(id: Id)(implicit v: Validate[String, IsEin]): Option[Ein] = refineV[IsEin](id.value).toOption
+    def unapply(no: No)(implicit v: Validate[String, IsEin]): Option[Ein] = refineV[IsEin](no.value).toOption
   }
 
   /** */
-  type IsId = IsSsn Or IsEin
+  type IsNo = IsSsn Or IsEin
 
   /** */
-  type Id = String Refined IsId
+  type No = String Refined IsNo
 }
 
 /**
@@ -109,11 +112,11 @@ object TaxId {
   * Presumed real world actors under the aegis of, and registered with, real world
   * juristictions.
   *
-  * Small step towards privacy by design: `TaxId.Id`'s are not used as `Key`s.
+  * Small step towards privacy by design: `Tax.No`'s are not used as `Key`s.
   */
 sealed trait Party extends Product with Serializable {
   def name: Label
-  def taxId: TaxId.Id
+  def taxNo: Tax.No
   def contact: Contact.Id
 }
 
@@ -123,14 +126,14 @@ sealed trait Party extends Product with Serializable {
 object Party extends WithFuuidKey[Party] {
 
   /** TODO: this is sketchy and probably not needed */
-  def apply(name: Label, taxId: TaxId.Id, meta: Meta.Id)(
+  def apply(name: Label, taxNo: Tax.No, meta: Meta.Id)(
       implicit
-      vssn: Validate[String, TaxId.IsSsn],
-      vein: Validate[String, TaxId.IsEin],
+      vssn: Validate[String, Tax.IsSsn],
+      vein: Validate[String, Tax.IsEin],
   ) =
-    taxId match {
-      case TaxId.Ssn(ssn) => NaturalPerson(name, ssn, meta)
-      case TaxId.Ein(ein) => LegalEntity(name, ein, meta)
+    taxNo match {
+      case Tax.Ssn(ssn) => NaturalPerson(name, ssn, meta)
+      case Tax.Ein(ein) => LegalEntity(name, ein, meta)
     }
 
   implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
@@ -140,16 +143,30 @@ object Party extends WithFuuidKey[Party] {
 /**
   * `NaturalPerson`s are `Party`s.
   */
-final case class NaturalPerson(name: Label, ssn: TaxId.Ssn, contact: Contact.Id) extends Party {
-
-  import refined.auto._
+sealed abstract case class NaturalPerson(
+    name: Label,
+    ssn: Tax.Ssn,
+    contact: Contact.Id
+) extends Party {
 
   /**  */
-  def taxId = ssn
+  final def taxNo: Tax.No = {
+    import refined.auto._
+    ssn
+  }
 }
 
 /**  */
 object NaturalPerson extends WithFuuidKey[NaturalPerson] {
+
+  /**  */
+  def apply(name: Label, ssn: Tax.Ssn, contact: Contact.Id): NaturalPerson =
+    new NaturalPerson(name, ssn, contact) {}
+
+  /**  FIXME: `Accounts.contacts` dependency is unmapped */
+  def mk[F[_]: Sync](ssn: Tax.Ssn, contact: Contact): Stream[F, Result[NaturalPerson]] =
+    // extract name from contact before persisting it
+    ???
 
   import refined.cats._
 
@@ -158,16 +175,25 @@ object NaturalPerson extends WithFuuidKey[NaturalPerson] {
 }
 
 /**  */
-final case class LegalEntity(name: Label, ein: TaxId.Ein, contact: Contact.Id) extends Party {
-
-  import refined.auto._
+sealed abstract case class LegalEntity private (
+    name: Label,
+    ein: Tax.Ein,
+    contact: Contact.Id
+) extends Party {
 
   /**  */
-  def taxId = ein
+  final def taxNo: Tax.No = {
+    import refined.auto._
+    ein
+  }
 }
 
 /**  */
 object LegalEntity extends WithFuuidKey[LegalEntity] {
+
+  /**  */
+  def apply(name: Label, ein: Tax.Ein, contact: Contact.Id): LegalEntity =
+    new LegalEntity(name, ein, contact) {}
 
   import refined.cats._
 

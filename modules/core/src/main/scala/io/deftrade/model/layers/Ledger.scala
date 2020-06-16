@@ -272,6 +272,8 @@ trait Ledger { module: ModuleTypes =>
     */
   sealed abstract class Meta
 
+  // case class Memo(memo: Label) extends Meta
+
   /** */
   object Meta extends WithId[Misc.Aux[Meta]] {
 

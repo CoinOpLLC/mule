@@ -25,19 +25,20 @@ import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
 
-import Contact.{ Email, Name, USAddress, USPhone }
-
 /** */
 final case class Contact(
-    name: Name,
-    address: USAddress,
-    cell: USPhone,
-    email: Email,
+    name: Contact.Name,
+    address: Contact.USAddress,
+    cell: Contact.USPhone,
+    email: Contact.Email,
     url: Option[String Refined Url]
 )
 
 /** */
-object Contact extends WithId[Meta] {
+object Contact extends WithId[Misc.Aux[Contact]] {
+// object Contact extends WithKey.Aux[Party.Key, Misc.Aux[Contact]] {
+//
+//   lazy val Key = Party.Key
 
   import cats.derived
   import refined.cats._
@@ -98,7 +99,7 @@ object Contact extends WithId[Meta] {
   final type USPhone = String Refined IsUSPhone
 
   /** */
-  final val Zip = s"${digits(7)}|${digits(7 + 4)}"
+  final val Zip = s"${digits(5)}|${digits(5 + 4)}"
 
   /** */
   final type IsUSZip = MatchesRegex[Zip.type]

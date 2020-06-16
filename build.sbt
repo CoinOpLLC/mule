@@ -48,22 +48,26 @@ lazy val core = module(
 lazy val demo = module("demo", "something to run")
   .dependsOn(core)
   .settings(common)
+  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
   .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++
-      pureConfigs ++
-      Seq(opengamma) ++
-      httplibs ++
-      testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
+// .settings(
+//   libraryDependencies ++= funlibs ++ enumerata ++ refined ++
+//     pureConfigs ++
+//     Seq(opengamma) ++
+//     httplibs ++
+//     testers
+// )
 
-// wip := work in progress
-lazy val wip = module("wip", "back on my bullshit")
-  .dependsOn(core)
-  .settings(common)
-  .settings(
-    libraryDependencies ++=
-      pureConfigs ++
-        Seq(opengamma) ++
-        httplibs ++
-        testers
-  )
+// // wip := work in progress
+// lazy val wip = module("wip", "back on my bullshit")
+//   .dependsOn(core)
+//   .settings(common)
+//   .settings(
+//     libraryDependencies ++=
+//       pureConfigs ++
+//         Seq(opengamma) ++
+//         httplibs ++
+//         testers
+//   )
