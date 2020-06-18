@@ -52,7 +52,7 @@ import keys.{ IsIsin, IsUsin }
 final case class Instrument(
     symbol: Label,
     issuedBy: LegalEntity.Key,
-    issuedIn: CurrencyLike
+    issuedIn: Option[CurrencyLike]
 ) extends Numéraire.InKind
 
 /**

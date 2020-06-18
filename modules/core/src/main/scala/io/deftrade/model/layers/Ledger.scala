@@ -23,7 +23,8 @@ import time._, money._, keyval._, capital._
 import cats.implicits._
 
 import cats.kernel.{ Monoid }
-import cats.{ Eq, Show }
+import cats.{ Eq, Order, Show }
+import cats.data.{ NonEmptyList, NonEmptyMap }
 import cats.derived.{ auto, semi }
 import cats.effect.{ ContextShift, Sync }
 
@@ -134,12 +135,24 @@ trait Ledger { module: ModuleTypes =>
       Monoid instance (empty[F, C], combine[F, C])
   }
 
+  /** Entry as in double. This object serves as the root of a dependent type tree. */
+  object Entry {
+    type Key   = Instrument.Key
+    type Value = Quantity
+  }
+
+  /**
+    * Any kind of `ledger entry` must carry with it a `key`:
+    * `value`s are assumed fungeable within `key`s, but not across them.
+    */
+  type Entry = (Entry.Key, Entry.Value)
+
   /**
     * How much of a given [[capital.Instrument]] is held.
     *
     * Can also be thought of as a [[Trade]] [[Leg]] at rest.
     */
-  type Position = (Instrument.Key, Quantity)
+  type Position = Entry
 
   /** */
   object Position {
@@ -171,7 +184,7 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /** A [[Position]] in motion. */
-  type Leg = Position
+  type Leg = Entry
 
   /** placeholder */
   lazy val Leg = Position
@@ -186,7 +199,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
     */
-  type Folio = Map[Instrument.Key, Quantity]
+  type Folio = Map[Entry.Key, Entry.Value]
 
   /**
     * A `Folio` store is a `Map` of `Map`s, which, normalized and written out as a list,
@@ -194,7 +207,7 @@ trait Ledger { module: ModuleTypes =>
     *   (Folio.Key, Instrument.Key, Quantity)
     * }}}
     */
-  object Folio extends WithFuuidKey[Position] { // sicc hacc
+  object Folio extends WithFuuidKey[Position] {
 
     /**
       * Conceptually, lifts all the [[Position]]s into `Map`s,
@@ -214,13 +227,17 @@ trait Ledger { module: ModuleTypes =>
   /**
     * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     */
-  object Trade extends WithId[Leg] { // (sic)
+  object Trade extends WithId[Leg] {
 
     /** */
-    def apply(ps: Leg*): Trade = indexAndSum(ps.toList)
+    def apply(l: Leg, ls: Leg*): Trade = indexAndSum(l :: ls.toList)
 
     /** */
     def empty: Trade = Map.empty
+
+    /** */
+    def nelFrom(trade: Trade): NonEmptyList[Leg] =
+      trade.headOption.fold(???)(NonEmptyList(_, (trade drop 1).toList))
 
     /**
       * Enables package deals, or portfolio valuation informed by covariance,
@@ -386,22 +403,28 @@ trait Ledger { module: ModuleTypes =>
     *   @return `Stream` effect will effectively subtract amount from the `against` folio
     */
   final def payment[F[_]: Sync, C: Currency](
-      recordTrade: Trade => Stream[F, Trade.Id],
-      payCash: Folio.Key => Money[C] => Stream[F, Folio.Id],
+      trades: Trades.Store[F]
   )(
       drawOn: Folio.Key
+  )(
+      payCash: Folio.Key => Money[C] => Stream[F, Result[Folio.Id]],
   ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] =
     _ flatMap {
       case (trade, amount) =>
         for {
-          tId <- recordTrade(trade)
-          _   <- payCash(drawOn)(amount)
+          tId <- trades appendNel (Trade nelFrom trade)
+          // tId <- recordTrade(trade)
+          _ <- payCash(drawOn)(amount)
         } yield Result(tId.some)
     }
 
-  lazy val Instruments  = KeyValueStore of Instrument
-  lazy val Trades       = ValueStore of Trade
-  lazy val Folios       = KeyValueStore of Folio
-  lazy val Metas        = ValueStore of Meta
-  lazy val Transactions = ValueStore of Transaction
+  // val toNem: Trade => Result[NonEmptyMap[Instrument.Key, Quantity]] = _ => ???
+
+  lazy final val Novations    = ValueStore of Novation
+  lazy final val Instruments  = KeyValueStore of Instrument
+  lazy final val Forms        = KeyValueStore of Form
+  lazy final val Trades       = ValueStore of Trade
+  lazy final val Folios       = KeyValueStore of Folio
+  lazy final val Metas        = ValueStore of Meta
+  lazy final val Transactions = ValueStore of Transaction
 }

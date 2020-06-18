@@ -173,17 +173,20 @@ trait ValueStore[F[_], V] extends Store[F, WithId, V] {
 object ValueStore {
 
   /** */
-  def of(V: WithValue) = TypeOps(V)
+  def of[V](V: WithId[V]) = TypeOps(V)
 
   /** */
-  sealed case class TypeOps(final val V: WithValue) {
-    final type Store[F[_]] = ValueStore[F, V.Value]
+  sealed case class TypeOps[V](final val V: WithId[V]) {
+    final type Store[F[_]] = ValueStore[F, V.Value] with StoreTypes.Aux[F, WithId, V.Value]
+
+    // final type ValueType   = V.Value appears useless
   }
 }
 
 /**  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
+
   self: StoreTypes.Aux[F, WithKey.Aux[K, *], V] =>
 
   import V._
@@ -265,5 +268,4 @@ object KeyValueStore {
     /** */
     final type Store[F[_]] = KeyValueStore[F, V.Key, V.Value]
   }
-
 }
