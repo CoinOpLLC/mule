@@ -23,13 +23,15 @@ import time._, money._, keyval._, capital._
 import cats.implicits._
 
 import cats.kernel.{ Monoid }
-import cats.{ Eq, Order, Show }
-import cats.data.{ NonEmptyList, NonEmptyMap }
+import cats.{ Eq, Show }
 import cats.derived.{ auto, semi }
-import cats.effect.{ ContextShift, Sync }
+import cats.effect.{ Sync }
 
 import eu.timepit.refined
 import refined.cats._
+
+import io.circe.{ Decoder, Encoder };
+import io.circe.refined._
 
 import fs2.{ Pipe, Stream }
 
@@ -135,10 +137,19 @@ trait Ledger { module: ModuleTypes =>
       Monoid instance (empty[F, C], combine[F, C])
   }
 
-  /** Entry as in double. This object serves as the root of a dependent type tree. */
+  /**
+    * Entry as in ''double entry''. This object serves as the root of a dependent type tree.
+    */
   object Entry {
-    type Key   = Instrument.Key
+
+    /** */
+    type Key = Instrument.Key
+
+    /** */
     type Value = Quantity
+
+    /** */
+    type Table = Map[Key, Value]
   }
 
   /**
@@ -199,7 +210,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
     */
-  type Folio = Map[Entry.Key, Entry.Value]
+  type Folio = Entry.Table
 
   /**
     * A `Folio` store is a `Map` of `Map`s, which, normalized and written out as a list,
@@ -221,8 +232,11 @@ trait Ledger { module: ModuleTypes =>
     def empty: Folio = Map.empty
   }
 
+  /** */
+  lazy final val Folios = KeyValueStore of Folio
+
   /** A [[Folio]] in motion. */
-  type Trade = Folio
+  type Trade = Entry.Table
 
   /**
     * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
@@ -234,10 +248,6 @@ trait Ledger { module: ModuleTypes =>
 
     /** */
     def empty: Trade = Map.empty
-
-    /** */
-    def nelFrom(trade: Trade): NonEmptyList[Leg] =
-      trade.headOption.fold(???)(NonEmptyList(_, (trade drop 1).toList))
 
     /**
       * Enables package deals, or portfolio valuation informed by covariance,
@@ -282,14 +292,16 @@ trait Ledger { module: ModuleTypes =>
       } yield (trade, amount)
   }
 
+  /** */
+  lazy final val Trades = ValueStore of Trade
+
   /**
     * Root of [[Transaction]] metadata ADT.
-    *
-    * TODO: this is tabula rasa right now do something with it
     */
   sealed abstract class Meta
 
-  // case class Memo(memo: Label) extends Meta
+  /** Provisional. */
+  case class Derp(memo: refinements.Label) extends Meta
 
   /** */
   object Meta extends WithId[Misc.Aux[Meta]] {
@@ -302,7 +314,24 @@ trait Ledger { module: ModuleTypes =>
 
     /** */
     implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
+
+    import io.circe.generic.semiauto._
+
+    implicit lazy val decoder: Decoder[Meta] = deriveDecoder
+    implicit lazy val encoder: Encoder[Meta] = deriveEncoder
   }
+
+  /** */
+  object Derp {
+
+    import io.circe.generic.semiauto._
+
+    implicit lazy val decoder: Decoder[Derp] = deriveDecoder
+    implicit lazy val encoder: Encoder[Derp] = deriveEncoder
+  }
+
+  /** */
+  lazy final val Metas = ValueStore of Meta
 
   /**
     * The concrete record for `Ledger` updates.
@@ -332,6 +361,41 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId[Transaction] {
 
+    /**  */
+    def singleLeg[F[_]: Sync](
+        // record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)]
+        trades: Trades.Store[F],
+        metas: Metas.Store[F]
+    )(
+        from: Folio.Key,
+        to: Folio.Key,
+        leg: Leg,
+        meta: Meta
+        // meta: Meta
+    ): Stream[F, Transaction] =
+      multiLeg(trades, metas)(from, to, Trade(leg), meta)
+
+    /**   */
+    def multiLeg[F[_]: Sync](
+        trades: Trades.Store[F],
+        metas: Metas.Store[F]
+    )(
+        from: Folio.Key,
+        to: Folio.Key,
+        trade: Trade,
+        meta: Meta
+    ): Stream[F, Transaction] =
+      for {
+        tid <- trades putMap trade
+        mid <- metas put (Misc of meta)
+      } yield Transaction(instant, from, to, tid, mid)
+
+    /** */
+    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semi.eq }
+
+    /** */
+    implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
+
     private def apply(
         at: Instant,
         from: Folio.Key,
@@ -340,33 +404,10 @@ trait Ledger { module: ModuleTypes =>
         meta: Meta.Id
     ): Transaction =
       new Transaction(at, from, to, trade, meta) {}
-
-    /**  */
-    def single[F[_]: Sync](record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)])(
-        from: Folio.Key,
-        to: Folio.Key,
-        instrument: Instrument.Key,
-        amount: Quantity,
-        meta: Meta
-    ): Stream[F, Transaction] = multi(record)(from, to, Trade(instrument -> amount), meta)
-
-    /**   */
-    def multi[F[_]: Sync](record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)])(
-        from: Folio.Key,
-        to: Folio.Key,
-        trade: Trade,
-        meta: Meta
-    ): Stream[F, Transaction] =
-      for {
-        ids <- record(trade, meta)
-      } yield Transaction(instant, from, to, ids._1, ids._2)
-
-    /** */
-    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semi.eq }
-
-    /** */
-    implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
   }
+
+  /** */
+  lazy final val Transactions = ValueStore of Transaction
 
   /**
     *
@@ -405,26 +446,15 @@ trait Ledger { module: ModuleTypes =>
   final def payment[F[_]: Sync, C: Currency](
       trades: Trades.Store[F]
   )(
-      drawOn: Folio.Key
-  )(
       payCash: Folio.Key => Money[C] => Stream[F, Result[Folio.Id]],
+  )(
+      drawOn: Folio.Key
   ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] =
     _ flatMap {
       case (trade, amount) =>
         for {
-          tId <- trades appendNel (Trade nelFrom trade)
-          // tId <- recordTrade(trade)
-          _ <- payCash(drawOn)(amount)
-        } yield Result(tId.some)
+          id <- trades putMap trade
+          _  <- payCash(drawOn)(amount)
+        } yield Result(id.some)
     }
-
-  // val toNem: Trade => Result[NonEmptyMap[Instrument.Key, Quantity]] = _ => ???
-
-  lazy final val Novations    = ValueStore of Novation
-  lazy final val Instruments  = KeyValueStore of Instrument
-  lazy final val Forms        = KeyValueStore of Form
-  lazy final val Trades       = ValueStore of Trade
-  lazy final val Folios       = KeyValueStore of Folio
-  lazy final val Metas        = ValueStore of Meta
-  lazy final val Transactions = ValueStore of Transaction
 }

@@ -29,7 +29,7 @@ sealed class Misc private (protected val json: Json) {
 /**
   * A `Meta` store is content-addressed: entries are indexed with their own `Sha`.
   *
-  * Therefore, if you have the Sha (from a [[Transaction]], for instance) ''and'' access to
+  * Therefore, if you have the Sha (from a [[model.Transaction]], for instance) ''and'' access to
   * a `Meta` key value store containing the value, you have access to the value itself.
   *
   * Note this value is forgery resistant (up to the strength of the `Sha`).
@@ -46,7 +46,7 @@ object Misc {
   def from[T: Encoder: Decoder](json: Json): Misc.Aux[T] = new Aux[T](json) {}
 
   /** */
-  def of[T: Encoder: Decoder](t: T): Misc = from[T](t.asJson)
+  def of[T: Encoder: Decoder](t: T): Misc.Aux[T] = from[T](t.asJson)
 
   implicit lazy val miscEq: Eq[Misc]     = Eq by (_.json)
   implicit lazy val miscShow: Show[Misc] = Show show (_.json.show)

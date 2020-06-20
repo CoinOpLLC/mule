@@ -16,6 +16,7 @@
 
 package io.deftrade
 package keyval
+package impl
 
 import syntax._
 
@@ -74,7 +75,7 @@ object CsvStoreTypes {
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-protected trait CsvStore[
+trait CsvStore[
     F[_],
     W[_] <: WithValue,
     V,
@@ -297,7 +298,7 @@ trait CsvKeyValueStore[
 }
 
 /** */
-protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] {
+protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   self: CsvStore[F, W, V, HV] with CsvStoreTypes.Aux[F, W, V, HV] =>
 
@@ -361,8 +362,8 @@ protected trait MemFileImplV[F[_], W[_] <: WithValue, V, HV <: HList] {
 }
 
 /** */
-protected trait MemFileImplKV[F[_], K, V, HV <: HList]
-    extends MemFileImplV[
+trait MemFileKV[F[_], K, V, HV <: HList]
+    extends MemFileV[
       F,
       WithKey.Aux[K, *],
       V,
@@ -380,7 +381,7 @@ protected trait MemFileImplKV[F[_], K, V, HV <: HList]
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-protected abstract case class MemFileValueStore[
+abstract case class MemFileValueStore[
     F[_]: Sync: ContextShift,
     V: Eq,
     HV <: HList
@@ -391,11 +392,11 @@ protected abstract case class MemFileValueStore[
     final override val lgv: LabelledGeneric.Aux[V, HV],
 ) extends CsvStoreTypes.Aux(V)
     with CsvValueStore[F, V, HV]
-    with MemFileImplV[F, WithId, V, HV]
+    with MemFileV[F, WithId, V, HV]
 
 /** */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-protected abstract case class MemFileKeyValueStore[
+abstract case class MemFileKeyValueStore[
     F[_]: Sync: ContextShift,
     K,
     V: Eq,
@@ -407,4 +408,4 @@ protected abstract case class MemFileKeyValueStore[
     final override val lgv: LabelledGeneric.Aux[V, HV],
 ) extends CsvStoreTypes.Aux(V)
     with CsvKeyValueStore[F, K, V, HV]
-    with MemFileImplKV[F, K, V, HV]
+    with MemFileKV[F, K, V, HV]

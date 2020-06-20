@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, time._, money._
+import keyval._, time._, money._, refinements.{ IsLabel }
 
 import cats.implicits._
 // import cats.{ Sync }
@@ -33,6 +33,7 @@ import fs2.Stream
 import scala.collection.immutable.SortedSet
 
 /** */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /** */
@@ -40,6 +41,15 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /** Namespace placeholder */
   object Allocation
+
+  /** `link` table */
+  case class OMSmarkets(market: Market.Key)
+
+  /** */
+  object OMSmarkets extends WithId[OMSmarkets]
+
+  /** */
+  type OMSrecord = (LegalEntity.Key, Folio.Key, Folio.Key, OMSmarkets.Id)
 
   /**
     *`OMS` := Order Management System. Ubiquitous domain acronym.
@@ -56,18 +66,17 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
   sealed abstract case class OMS[F[_]: Sync] private (
-      party: Party.Key,
+      host: LegalEntity.Key,
       entry: Folio.Key,
       contra: Folio.Key,
       markets: NonEmptySet[Market.Key],
-      folios: OMS.Folios[F]
   ) {
 
     /** */
     type EffectStream[A] = Stream[F, A]
 
     /** */
-    type Phase[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
+    type ToStreamOf[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
 
     /**
       * What the client wants [[Execution]] of.
@@ -124,42 +133,38 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * FIXME: address the issue of scheduling T+2 etc.
       */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def process[C: Currency, A](
         allocation: Allocation
     )(
         block: => A
-    ): Phase[A, Unit] =
+    ): A ToStreamOf Unit =
       riskCheck[C, A](block) andThen
         trade andThen
         allocate(allocation) andThen
         settle
 
     /** */
-    def riskCheck[C: Currency, A](a: A): Phase[A, Order]
+    def riskCheck[C: Currency, A](a: A): A ToStreamOf Order
 
     /**  */
-    def trade: Phase[Order, Execution]
+    def trade: Order ToStreamOf Execution
 
-    /** Moves the traded [[Instrument]]s to their final destination [[Folio]]. */
-    def allocate(a: Allocation): Phase[Execution, Execution]
+    /** Moves the traded [[capital.Instrument]]s to their final destination [[Folio]]. */
+    def allocate(a: Allocation): Execution ToStreamOf Execution
 
     /**
       * Updates the actual [[Folio]]s, with [[Account]] specific (and this `Folio` specific)
-      * cash account [[Instrument]]s substituted for the raw [[money.Currency]]
+      * cash account [[capital.Instrument]]s substituted for the raw [[money.Currency]]
       * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
       * of the [[Trade]] specified in the [[Transaction]].
       */
-    def settle: Phase[Execution, Unit]
+    def settle: Execution ToStreamOf Unit
   }
 
   /**
     * FIXME: augment/evolve creation pattern.
     */
-  object OMS {
-
-    /** */
-    type Folios[F[_]] = KeyValueStore[F, Folio.Key, Folio.Value]
+  object OMS extends WithRefinedKey[String, IsLabel, OMSrecord] {
 
     /**
       * Each OMS must maintain a contra [[Ledger.Folio.Key]].
@@ -168,26 +173,25 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       */
     def apply[F[_]: Sync](
-        key: Party.Key,
+        host: LegalEntity.Key,
         entry: Folio.Key,
         contra: Folio.Key,
-        folios: Folios[F],
         market: Market.Key,
         ms: Market.Key*
     ): OMS[F] =
-      new OMS[F](key, entry, contra, NonEmptySet(market, SortedSet(ms: _*)), folios) {
+      new OMS[F](host, entry, contra, NonEmptySet(market, SortedSet(ms: _*))) {
 
         /** */
-        def riskCheck[C: Currency, A](a: A): Phase[A, Order] = ???
+        def riskCheck[C: Currency, A](a: A): A ToStreamOf Order = ???
 
-        /** This phase is implemented by the brokerage api integration code - IBRK is first. */
-        def trade: Phase[Order, Execution] = ???
-
-        /** */
-        def allocate(a: Allocation): Phase[Execution, Execution] = ???
+        /** This phase is implemented by the brokerage api integration code. */
+        def trade: Order ToStreamOf Execution = ???
 
         /** */
-        def settle: Phase[Execution, Unit] = ???
+        def allocate(a: Allocation): Execution ToStreamOf Execution = ???
+
+        /** */
+        def settle: Execution ToStreamOf Unit = ???
       }
   }
 }

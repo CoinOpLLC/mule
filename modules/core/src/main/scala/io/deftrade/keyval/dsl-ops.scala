@@ -1,6 +1,8 @@
 package io.deftrade
 package keyval
 
+import impl._
+
 import cats.Eq
 import cats.effect.{ ContextShift, Sync }
 

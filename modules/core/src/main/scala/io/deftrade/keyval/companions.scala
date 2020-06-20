@@ -185,7 +185,7 @@ abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[
 /**
   * Companion supplying a [[java.util.UUID]] as `Key`.
   *
-  * Note we use [[FUUID]] to (functionally) wrap the `UUID`.
+  * Note we use [[io.chrisdavenport.fuuid.FUUID FUUID]]s to (functionally) wrap the `UUID`s.
   */
 abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 

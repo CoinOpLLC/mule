@@ -159,14 +159,30 @@ trait ValueStore[F[_], V] extends Store[F, WithId, V] {
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
   /** */
-  final def appendNel(values: NonEmptyList[Value]): EffectStream[Id] =
+  final def put(value: Value): EffectStream[Id] =
+    appendAll(value)
+
+  /** */
+  final def putList(values: List[Value]): EffectStream[Id] =
+    values.headOption.fold(Stream.empty[F]: EffectStream[Id])(
+      value => appendAll(value, (values drop 1): _*)
+    )
+
+  /** */
+  final def putNel(values: NonEmptyList[Value]): EffectStream[Id] =
     appendAll(values.head, values.tail: _*)
 
   /** */
-  final def appendNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(
+  final def putMap[K2: Order, V2](k2v2s: Map[K2, V2])(
       implicit asValue: (K2, V2) <~< Value
   ): EffectStream[Id] =
-    appendNel(k2v2s.toNel map (asValue coerce _))
+    putList(k2v2s.toList map (asValue coerce _))
+
+  /** */
+  final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(
+      implicit asValue: (K2, V2) <~< Value
+  ): EffectStream[Id] =
+    putNel(k2v2s.toNel map (asValue coerce _))
 }
 
 /** dsl enhancements - ''dry'' type definitions for `Store`s */

@@ -299,7 +299,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - "reverse polarity" when we enter a short position.
     *   - indexAndSum settled positions for reconcilliation
     */
-  sealed trait Market { def entity: Party.Key; def contra: Folio.Key }
+  sealed trait Market { def host: Party.Key; def contra: Folio.Key }
 
   /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
   object Market extends WithRefinedKey[String, IsLabel, Market] {
@@ -315,15 +315,15 @@ trait MarketData { self: Ledger with ModuleTypes =>
     * recorded on on the [[Ledger]].
     */
   sealed abstract case class Counterparty(
-      final val entity: Party.Key,
+      final val host: Party.Key,
       final val contra: Folio.Key,
   ) extends Market
 
   /** */
   object Counterparty extends WithRefinedKey[String, IsUuid, Counterparty] {
 
-    def apply(entity: Party.Key, contra: Folio.Key): Counterparty =
-      new Counterparty(entity, contra) {}
+    def apply(host: Party.Key, contra: Folio.Key): Counterparty =
+      new Counterparty(host, contra) {}
 
     implicit def cpOrder: Order[Counterparty] = { import auto.order._; semi.order }
 
@@ -337,7 +337,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - activity recorded in a `contra account`
     */
   sealed abstract case class Exchange private (
-      final val entity: Party.Key,
+      final val host: Party.Key,
       final val contra: Folio.Key,
   ) extends Market
 
@@ -345,12 +345,12 @@ trait MarketData { self: Ledger with ModuleTypes =>
   object Exchange extends WithRefinedKey[String, IsMic, Exchange] {
 
     /** */
-    protected[deftrade] def apply(entity: Party.Key, contra: Folio.Key): Exchange =
-      new Exchange(entity, contra) {}
+    protected[deftrade] def apply(host: Party.Key, contra: Folio.Key): Exchange =
+      new Exchange(host, contra) {}
 
     /** */
-    def withEntity(entity: Party.Key): Exchange => Exchange =
-      x => Exchange(entity, x.contra)
+    def withEntity(host: Party.Key): Exchange => Exchange =
+      x => Exchange(host, x.contra)
   }
 
   /**

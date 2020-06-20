@@ -44,46 +44,54 @@ import shapeless.syntax.singleton._
   *
   * Defines a
   * [[https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration]]
-  * system for:
-  *   - `id`s: opaque Long based `id` (with `Order` instances)
-  *   - `key`s: identifiers (including opaque identifiers)
-  * with `Order`, and `Show` typeclass instances
-  *   - `value`s: value class typeclass instances (`Eq`, `Hash` and `Show`).
-  *   - etc.
+  * system for `id`s and `key`s:
+  *   - `Id`: SHA type
+  *       - computed via `sha(Row)`,
+  *       - immutable representation
+  *       - content addressed or chained
+  *   - `Key`: identifier types
+  *       - domain legible (e.g. `AccountNo`)
+  *       - opaque (e.g. `UUID`s)
+  *   - Both `Id` and `Key` have `Order`, and `Show` typeclass instances
+  *   - `Value`:
+  *       - value class
+  *       - typeclass instances for `Eq`, and `Show`.
+  *       - Map methods enabled when `Value <~< (K2: Order, V2: Eq)`
   *
-  * '''Convention''': A `type Foo` may not depend upon the type of the `key` for `Foo`s.
+  * A `type Foo` may not contain instances of, nor even depend upon, type `Foo.Key`.
   *
-  * Point being: there will be no `id: Id` fields within domain types; these will be carried
-  * separately (e.g. `key`s in an in-memory [[scala.collection.Map]])
-  * and will not depend in any way on the domain value types.
+  * Point being: there will be no `id: Id` or `key: Key` fields within domain types!
+  * These are stored separately (e.g. `key`s in an in-memory [[scala.collection.Map]])
   *
   * However, foreign keys which reference other domain value types are permitted within value types.
   *
-  * This package provides `key` and `id` implementations which abide the
-  * convention given above.
-  *   - aliasing `Refined` as an opaque key for a collection of a given type of values
-  *   - assinging the `Value` type to be the `phantom type` parameter
-  * for the `Refined` type constructor
-  *   - providing the `Key` types and instances as companion base classes.
-  *   - providing a `Row` type `(Key, Value)`
-  *   - providing implementations of `store`a with implicit derivations
-  *   for csv file readers and writers of `Row`s, thereby enabling spreadsheet integration.
+  * It is assumed that package clients will generally pursue
+  * [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling and use `hub`s
+  * and `link`s to define graphs of `value types` defined by `business key`s,
+  * with certain exceptions to denormalize `essential attributes`.
   *
-  * So what goes in value types? Business keys and essential attributes.
+  *   - Q: what goes in `value types`?
+  *   - A: `Business keys` and `essential attributes`.
   *   - Q: What is a "business key?"
   *   - A: "Real business keys only change when the business changes!"
-  *   - Dito those essential, universal, canonical attributes
-  *   - everything else is `meta: Meta`
-  *   - `Meta` encapsulates `io.cice.Json`
-  *      - which can be stored / indexed as binary in Mongo and Postgres
-  *      - which can be projected to create `satellite views`.
-  *   - TODO: consider explicitly separating the structural items (keys and links between keys)
-  *   from the descriptive attributes, as with
-  *   [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling.
+  *   - Q: What is an "essential attribute"?
+  *   - A: Some attributes are like `business keys`:
+  *       - essential
+  *       - universal
+  *       - canonical
+  *
+  *   Essential attributes are necessary everywhere in the same form.
+  *   - such attributes are non-nullable
+  *   - subject to tactical denormalization
+  *       - deviates from strict Data Vault methodology
+  *       - mixes `satelite` fields in with `link` or `hub` shaped relations
+  *    - nullable / polymorphic fields are modelled as `Misc.Aux[ADT]`
+  *       - `ADT` := Algebraic Data Type  
+  *       - [[io.circe.Json Json]] `encoder`s and `decoder`s
+  *       - which can be stored / indexed as binary in Mongo and Postgres
+  *       - which can be projected to create true `satellite` views.
   *
   * TODO: snapshots
-  *
-  * TODO: enhance the in-memory aspect of the `stores`.
   *
   * TODO: Postgres and Kafka integration
   *
