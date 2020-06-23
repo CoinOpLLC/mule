@@ -23,6 +23,7 @@ sealed class Misc private (protected val json: Json) {
   final def decoded(implicit ev: Decoder[ADT]): Result[ADT] =
     json.as[ADT] leftMap (x => Fail.fromString(x.toString))
 
+  /** TODO: revisit this*/
   final def canoncicalString: String = json.noSpacesSortKeys
 }
 
@@ -39,6 +40,8 @@ object Misc {
 
   /** */
   sealed abstract case class Aux[T](final override protected val json: Json) extends Misc(json) {
+
+    /** */
     final type ADT = T
   }
 

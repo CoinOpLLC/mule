@@ -37,6 +37,8 @@ import java.security.MessageDigest
   * is suitable to be persisted.
   */
 sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
+
+  /** */
   def nextAll(j: K, v: V, vs: V*): K =
     vs.foldLeft(next(j, v))(next)
 }
@@ -61,9 +63,6 @@ object Fresh {
   /**
     * Simple content-addressed `Id` generation using secure hash (`Sha`) on a
     * canonical Json object.
-    *
-    * TODO: "noSpacesSortKeys" is a very impoverished notion of "canonical".
-    * Evolve this.
     */
   def shaContentAddress: Fresh[Sha, Json] =
     apply { (_, json) =>
@@ -78,6 +77,7 @@ object Fresh {
   def shaChain[V]: Fresh[Sha, V] = {
 
     val md = MessageDigest getInstance Sha.Algo
+
     new Fresh[Sha, V](
       (j, v) => {
         md update (Sha toByteVector j).toArray

@@ -184,7 +184,7 @@ trait CsvValueStore[
     }
 
   /** */
-  final protected def deriveCsvToV(
+  final protected def deriveCsvDecoderV(
       implicit
       llr: Lazy[LabelledRead[HV]]
   ): Pipe[Effect, String, Result[(Id, Row)]] =
@@ -193,7 +193,7 @@ trait CsvValueStore[
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveVToCsv(
+  final protected def deriveCsvEncoderV(
       implicit
       llw: Lazy[LabelledWrite[HV]]
   ): Pipe[Effect, (Id, Row), String] = writeLabelled(printer)
@@ -272,7 +272,7 @@ trait CsvKeyValueStore[
     }
 
   /** */
-  final protected def deriveCsvToKv(
+  final protected def deriveCsvDecoderKv(
       implicit
       llr: Lazy[LabelledRead[HV]],
       lgetk: Lazy[Get[Key]]
@@ -285,7 +285,7 @@ trait CsvKeyValueStore[
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveKvToCsv(
+  final protected def deriveCsvEncoderKv(
       implicit
       llw: Lazy[LabelledWrite[HV]],
       lputk: Lazy[Put[Key]]
@@ -372,11 +372,6 @@ trait MemFileKV[F[_], K, V, HV <: HList]
 
   self: CsvStore[F, WithKey.Aux[K, *], V, HV] with CsvStoreTypes.Aux[F, WithKey.Aux[K, *], V, HV] =>
 
-  // import V._
-  //
-  // /** */
-  // final def select(key: Key): EffectStream[Value] =
-  //   Stream evals F.delay { table get key }
 }
 
 /** */

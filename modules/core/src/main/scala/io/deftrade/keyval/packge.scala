@@ -25,8 +25,7 @@ import cats.effect.{ ContextShift, Sync }
 import eu.timepit.refined
 import refined.api.Refined
 
-import io.circe.syntax._
-import io.circe.{ Decoder, Encoder, Json }
+import io.circe.{ Decoder, Encoder }
 
 import io.chrisdavenport.cormorant
 import cormorant.implicits.stringPut
@@ -75,25 +74,25 @@ import shapeless.syntax.singleton._
   *   - Q: What is a "business key?"
   *   - A: "Real business keys only change when the business changes!"
   *   - Q: What is an "essential attribute"?
-  *   - A: Some attributes are like `business keys`:
+  *   - A: Some attributes are like `business keys`: necessary everywhere in the same form
   *       - essential
   *       - universal
   *       - canonical
   *
-  *   Essential attributes are necessary everywhere in the same form.
+  * Implications for `essential attribute`s.
   *   - such attributes are non-nullable
   *   - subject to tactical denormalization
   *       - deviates from strict Data Vault methodology
   *       - mixes `satelite` fields in with `link` or `hub` shaped relations
   *    - nullable / polymorphic fields are modelled as `Misc.Aux[ADT]`
-  *       - `ADT` := Algebraic Data Type  
+  *       - `ADT` := Algebraic Data Type
   *       - [[io.circe.Json Json]] `encoder`s and `decoder`s
   *       - which can be stored / indexed as binary in Mongo and Postgres
   *       - which can be projected to create true `satellite` views.
   *
   * TODO: snapshots
   *
-  * TODO: Postgres and Kafka integration
+  * TODO: Postgres / Mongo / Kafka integration
   *
   */
 package object keyval {
@@ -120,7 +119,7 @@ package object keyval {
   private[keyval] def printer: Printer = Printer.default
 
   /** */
-  private val decodeFailureFromThrowable: Throwable => Error.DecodeFailure =
+  private val toDecodeFailure: Throwable => Error.DecodeFailure =
     fail => Error.DecodeFailure(NonEmptyList one fail.toString)
 
   /** */
@@ -129,7 +128,7 @@ package object keyval {
 
       /** */
       def get(field: CSV.Field): Either[Error.DecodeFailure, FUUID] =
-        FUUID fromString field.x leftMap decodeFailureFromThrowable
+        FUUID fromString field.x leftMap toDecodeFailure
     }
 
   /** */
@@ -142,7 +141,7 @@ package object keyval {
 
       /** */
       def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
-        Mny parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+        Mny parse field.x leftMap toDecodeFailure
     }
 
   /** */
@@ -155,7 +154,7 @@ package object keyval {
 
       /** */
       def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
-        N parse field.x leftMap (fail => Error.DecodeFailure(NonEmptyList one fail.toString))
+        N parse field.x leftMap toDecodeFailure
     }
 
   /** */
@@ -171,7 +170,7 @@ package object keyval {
       /** */
       def get(field: CSV.Field): Either[Error.DecodeFailure, Misc.Aux[T]] =
         for {
-          json <- parse(field.x) leftMap (p => Error.DecodeFailure(NonEmptyList one p.toString))
+          json <- parse(field.x) leftMap toDecodeFailure
         } yield Misc from json
     }
 
