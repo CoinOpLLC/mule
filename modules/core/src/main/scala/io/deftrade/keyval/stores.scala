@@ -80,13 +80,10 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
 
   import V._
 
-  /** */
-  protected def indexFrom(ir: (Id, Row)): Index
-
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     *
-    * TODO: This needs to evolve to use [[Result]]
+    * TODO: Does this need to evolve to use [[Result]]? Think through exception handling.
     */
   def idRows: EffectStream[(Id, Row)]
 
@@ -105,8 +102,8 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
   /**
     * Like [[get]], but will return ''all'' `Row`s for the `Id` as a [[fs2.Stream]]
     */
-  def getAll(x: Index): EffectStream[Row] =
-    idRows filter (ir => indexFrom(ir) == x) map (_._2)
+  def getAll(id: Id): EffectStream[Row] =
+    idRows filter (_._1 === id) map (_._2)
 
   /** */
   protected def listPipe[A]: EffectStream[A] => EffectStream[List[A]] =
@@ -148,8 +145,8 @@ trait ValueStore[F[_], V] extends Store[F, WithId, V] {
     * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def getList(x: Index): EffectStream[List[Row]] =
-    getAll(x) through listPipe
+  def getList(id: Id): EffectStream[List[Row]] =
+    getAll(id) through listPipe
 
   /** */
   final def getMap[K2: Order, V2](id: Id)(
@@ -205,11 +202,16 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
 
   self: StoreTypes.Aux[F, WithKey.Aux[K, *], V] =>
 
-  import V._
+  import V._, Key._
+
+  @inline private final def keyFrom(idRow: (Id, Row)): Key = idRow._2._1
+
+  def getAll(key: Key): EffectStream[Row] =
+    idRows filter (ir => keyFrom(ir) === key) map (_._2)
 
   /** */
   def exists(key: Key): EffectStream[Id] =
-    idRows filter (ir => indexFrom(ir) == key) map (_._1)
+    idRows filter (ir => keyFrom(ir) === key) map (_._1)
 
   /** */
   def select(key: Key): EffectStream[Value] =
@@ -257,12 +259,6 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
       implicit asValue: (K2, V2) <~< Value
   ): EffectStream[NonEmptyList[Id]] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
-
-  /** */
-  final protected def indexFrom(ir: (Id, Row)): Index =
-    ir match {
-      case (_, (key, _)) => key
-    }
 
   /** */
   protected def updateExistingKey(key: Key, maybeValue: Option[Value]): EffectStream[Id] =

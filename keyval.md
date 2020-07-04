@@ -48,7 +48,7 @@ An `Id` calculated via `sha` can span multiple `Rows`.
      * single `sha` validates single transaction semantics
      */
    def rowsSha: (Row, List[Row]) => Id =
-     (row, rows) => rows.foldLeft(rowSha(row))((s, r) => sha)
+     (row, rows) => rows.foldLeft(rowSha(row))((s, r) => chain(s)(sha(r)))
 
    /** chained addressed `Id`s spanning multiple `Row`s (single transaction) */
    def chainedRowsSha: Id => (Row, List[Row]) => Id =

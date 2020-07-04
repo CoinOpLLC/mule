@@ -130,8 +130,6 @@ trait CsvStore[
 /**
   * Value parameter `V` carries type members specific to `type V`.
   *
-  * Type `Index` is mapped to [[WithValue#Id Id]].
-  *
   * Cormorant CSV is integrated by implementing implicit methods
   * [[writeIdRow]], [[readIdRow]], providing access to
   * [[io.chrisdavenport.cormorant.LabelledRead]] and
@@ -149,12 +147,6 @@ trait CsvValueStore[
 
   /** */
   final type HRow = HValue
-
-  /** */
-  protected def indexFrom(pr: (Id, Row)): Index =
-    pr match {
-      case (id, _) => id
-    }
 
   /** */
   implicit final def writeIdRow(
@@ -303,13 +295,13 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
   self: CsvStore[F, W, V, HV] with CsvStoreTypes.Aux[F, W, V, HV] =>
 
   /** */
-  final protected var table: Map[V.Index, V.Value]                  = Map.empty
-  final protected var tableNel: Map[V.Index, NonEmptyList[V.Value]] = Map.empty
-  final protected def tableNem[K2: Order, V2: Eq](
-      implicit asK2V2: V.Value <~< (K2, V2)
-  ): Map[V.Index, NonEmptyMap[K2, V2]] = tableNel map {
-    case (k, vs) => (k, (vs map (asK2V2 coerce _)).toNem)
-  }
+  // final protected var table: Map[V.Index, V.Value]                  = Map.empty
+  // final protected var tableNel: Map[V.Index, NonEmptyList[V.Value]] = Map.empty
+  // final protected def tableNem[K2: Order, V2: Eq](
+  //     implicit asK2V2: V.Value <~< (K2, V2)
+  // ): Map[V.Index, NonEmptyMap[K2, V2]] = tableNel map {
+  //   case (k, vs) => (k, (vs map (asK2V2 coerce _)).toNem)
+  // }
 
   /** */
   def path: Path

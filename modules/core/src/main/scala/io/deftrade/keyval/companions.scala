@@ -68,9 +68,6 @@ protected sealed trait WithValue {
     */
   type Row
 
-  /** Will be assigned either Id or Key. */
-  type Index
-
   /** The full type of the [[Id]] column. */
   final type IdField = FieldType[id.T, Id]
 }
@@ -93,9 +90,6 @@ abstract class WithId[V] extends WithValue.Aux[V] {
 
   /** */
   final type Row = Value
-
-  /** */
-  final type Index = Id
 }
 
 /** */
@@ -114,9 +108,6 @@ trait WithKey extends WithValue {
 
   /** Absence of a `Value` indicates an intent to delete the `Row` indexed by `Key`. */
   final type Row = (Key, Option[Value])
-
-  /** */
-  final type Index = Key
 
   /** The full type of the [[Key]] column. */
   final type KeyField = FieldType[key.T, Key]
