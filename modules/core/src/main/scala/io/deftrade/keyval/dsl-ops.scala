@@ -76,7 +76,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
         /** FIXME implementation is wrong */
         // final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaContentAddress
+        final protected lazy val fresh: Fresh[Id, Row] = ??? // Fresh.shaContentAddress[Row]
       }
     }
   }

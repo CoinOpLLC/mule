@@ -4,7 +4,7 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.13.2"
+  val Scala = "2.13.3"
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
@@ -25,7 +25,7 @@ object Version {
   val Slf4j       = "1.7.30"
 
   // val Fs2   = "2.3.0"
-  val Fs2   = "2.4.0"
+  val Fs2   = "2.4.2"
   val Cormorant  = "0.3.0"
 
   val Http4s      = "0.21.4"
@@ -233,7 +233,7 @@ object Args {
     "-Xlint:inaccessible", // Warn about inaccessible types in method signatures.
     "-Xlint:infer-any", // Warn when a type argument is inferred to be `Any`.
     "-Xlint:missing-interpolator", // A string literal appears to be missing an interpolator id.
-    "-Xlint:nullary-override", // Warn when non-nullary `def f()' overrides nullary `def f'.
+    // "-Xlint:nullary-override", // Warn when non-nullary `def f()' overrides nullary `def f'.
     "-Xlint:nullary-unit", // Warn when nullary methods return Unit.
     "-Xlint:option-implicit", // Option.apply used implicit view.
     "-Xlint:package-object-classes", // Class or object defined in package object.

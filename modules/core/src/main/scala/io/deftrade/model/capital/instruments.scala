@@ -93,7 +93,22 @@ sealed abstract class Form extends Product with Serializable {
   }
 }
 
-/** */
+/**
+  * Instances of `Form` memorialize the state of a `Contract` at a given point in time.
+  * (E.g.: the principle and interest balances in a term loan amortization schedule.)
+  * Therefore, a `Form` instance, associated with a given `Instrument`, will evolve over time.
+  * The key value store captures that evolution.
+  *
+  * How many evolutions per Instrument key is it reasonable to expect?
+  * Dozens (e.g. monthly) not billions (e.g. every millisecond).
+  * As an extreme example, the "trace" of bespoke structured product, quoted every
+  * fifteen minutes for ten years, would run to about sixty thosand entries. This might be fine.
+  *
+  * Other examples:
+  * - interest or dividend payment
+  * - optionality exercise
+  * - price fixings
+  */
 object Form extends WithKey.Aux[Instrument.Key, Form] { lazy val Key = Instrument.Key }
 
 /**

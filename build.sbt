@@ -6,6 +6,8 @@ resolvers += Resolver.sonatypeRepo("releases")
 
 // addCompilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch)
 
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+
 scalafmtOnCompile in ThisBuild := true // all projects
 
 import Deps._
