@@ -73,10 +73,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
   ) {
 
     /** */
-    type EffectStream[A] = Stream[F, A]
-
-    /** */
-    type ToStreamOf[T, R] = Kleisli[ResultT[EffectStream, *], T, R]
+    type ToStreamOf[T, R] = Kleisli[ResultT[Stream[F, *], *], T, R]
 
     /**
       * What the client wants [[Execution]] of.

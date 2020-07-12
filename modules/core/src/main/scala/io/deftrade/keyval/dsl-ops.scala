@@ -42,10 +42,10 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         final override def path = Paths get p
 
         /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveCsvEncoderV
+        final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderV
 
         /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvDecoderV
+        final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderV
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -69,10 +69,10 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         final override def path = Paths get p
 
         /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveCsvEncoderV
+        final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderV
 
         /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvDecoderV
+        final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderV
 
         /** FIXME implementation is wrong */
         // final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
@@ -110,10 +110,10 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
         final override def path = Paths get p
 
         /** */
-        final lazy val idRowToCSV: Pipe[Effect, (Id, Row), String] = deriveCsvEncoderKv
+        final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderKv
 
         /** */
-        final lazy val csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]] = deriveCsvDecoderKv
+        final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderKv
 
         /** */
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]

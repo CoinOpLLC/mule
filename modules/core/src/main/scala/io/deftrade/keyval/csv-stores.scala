@@ -98,11 +98,11 @@ trait CsvStore[
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  final def idRows: EffectStream[(Id, Row)] =
+  final def idRows: Stream[F, (Id, Row)] =
     (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /** */
-  final def appendAll(row: Row, rows: Row*): EffectStream[Id] =
+  final def append(row: Row, rows: Row*): Stream[F, Id] =
     for {
       id <- Stream eval F.delay { fresh.nextAll(prev, row, rows: _*) }
       r  <- Stream evals F.delay { (row +: rows).toList }
@@ -115,16 +115,16 @@ trait CsvStore[
   protected def updateCache(row: Row) = ()
 
   /** */
-  protected def readLines: EffectStream[String]
+  protected def readLines: Stream[F, String]
 
   /** */
-  protected def appendingSink: Pipe[Effect, String, Unit]
+  protected def appendingSink: Pipe[F, String, Unit]
 
   /** */
-  protected def idRowToCSV: Pipe[Effect, (Id, Row), String]
+  protected def idRowToCSV: Pipe[F, (Id, Row), String]
 
   /** */
-  protected def csvToIdRow: Pipe[Effect, String, Result[(Id, Row)]]
+  protected def csvToIdRow: Pipe[F, String, Result[(Id, Row)]]
 }
 
 /**
@@ -179,7 +179,7 @@ trait CsvValueStore[
   final protected def deriveCsvDecoderV(
       implicit
       llr: Lazy[LabelledRead[HV]]
-  ): Pipe[Effect, String, Result[(Id, Row)]] =
+  ): Pipe[F, String, Result[(Id, Row)]] =
     readLabelledCompleteSafe[F, (Id, Row)] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -188,7 +188,7 @@ trait CsvValueStore[
   final protected def deriveCsvEncoderV(
       implicit
       llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[Effect, (Id, Row), String] = writeLabelled(printer)
+  ): Pipe[F, (Id, Row), String] = writeLabelled(printer)
 }
 
 /**  */
@@ -268,7 +268,7 @@ trait CsvKeyValueStore[
       implicit
       llr: Lazy[LabelledRead[HV]],
       lgetk: Lazy[Get[Key]]
-  ): Pipe[Effect, String, Result[(Id, Row)]] = {
+  ): Pipe[F, String, Result[(Id, Row)]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
     readLabelledCompleteSafe[F, (Id, Row)] andThen
@@ -281,7 +281,7 @@ trait CsvKeyValueStore[
       implicit
       llw: Lazy[LabelledWrite[HV]],
       lputk: Lazy[Put[Key]]
-  ): Pipe[Effect, (Id, Row), String] = {
+  ): Pipe[F, (Id, Row), String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -307,7 +307,7 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
   def path: Path
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final private lazy val appendHandles: EffectStream[FileHandle[Effect]] = {
+  final private lazy val appendHandles: Stream[F, FileHandle[F]] = {
 
     import OpenOption._
 
@@ -321,14 +321,14 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
     )
 
     Stream resource (for {
-      blocker <- Blocker[Effect]
+      blocker <- Blocker[F]
       handle  <- FileHandle fromPath (path, blocker, openOptions)
     } yield handle)
   }
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def appendingSink: Pipe[Effect, String, Unit] =
+  final protected def appendingSink: Pipe[F, String, Unit] =
     for {
       handle <- appendHandles
       s      <- _
@@ -345,9 +345,9 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   /** */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def readLines: EffectStream[String] =
-    (Stream resource Blocker[Effect]) flatMap { blocker =>
-      fs2.io.file readAll [Effect] (path, blocker, 1024 * 1024)
+  final protected def readLines: Stream[F, String] =
+    (Stream resource Blocker[F]) flatMap { blocker =>
+      fs2.io.file readAll [F] (path, blocker, 1024 * 1024)
     } through
       text.utf8Decode through
       text.lines

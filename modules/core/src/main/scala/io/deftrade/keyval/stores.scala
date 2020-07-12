@@ -43,16 +43,17 @@ trait StoreTypes {
   type ValueCompanionType[x] <: WithValue
 
   /** */
-  type Effect[_]
+  type EffectType[_]
 
   /** */
-  implicit def F: Sync[Effect]
+  final type StreamF[x] = Stream[EffectType, x]
 
   /** */
-  implicit def X: ContextShift[Effect]
+  implicit def F: Sync[EffectType]
 
   /** */
-  final type EffectStream[x] = Stream[Effect, x]
+  implicit def X: ContextShift[EffectType]
+
 }
 
 /** */
@@ -68,13 +69,13 @@ object StoreTypes {
   ) extends StoreTypes {
 
     final override type ValueCompanionType[x] = W[x]
-    final type Effect[x]                      = F[x]
+    final type EffectType[x]                  = F[x]
     final type ValueType                      = V
   }
 }
 
 /** */
-protected trait Store[F[_], W[_] <: WithValue, V] {
+trait Store[F[_], W[_] <: WithValue, V] {
 
   self: StoreTypes.Aux[F, W, V] =>
 
@@ -85,37 +86,7 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
     *
     * TODO: Does this need to evolve to use [[Result]]? Think through exception handling.
     */
-  def idRows: EffectStream[(Id, Row)]
-
-  /** May override, but must be implemented (or lifted) "as if by". */
-  def rows: EffectStream[Row] =
-    idRows map (_._2)
-
-  /**
-    * Returns  `Stream` of length zero or one:
-    * - zero => not found
-    * - one => result value
-    */
-  def get(id: Id): EffectStream[Row] =
-    idRows filter (_._1 === id) map (_._2)
-
-  /**
-    * Like [[get]], but will return ''all'' `Row`s for the `Id` as a [[fs2.Stream]]
-    */
-  def getAll(id: Id): EffectStream[Row] =
-    idRows filter (_._1 === id) map (_._2)
-
-  /** */
-  protected def listPipe[A]: EffectStream[A] => EffectStream[List[A]] =
-    _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
-
-  /**
-    * May override for performance.
-    *
-    * FIXME: not thread safe, put a queue in front of single thread-contained appender?
-    */
-  final def append(row: Row): EffectStream[Id] =
-    appendAll(row)
+  protected def idRows: Stream[F, (Id, Row)]
 
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
@@ -123,8 +94,13 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
     * This feature - the ability to assign multiple rows a single `Id` computed over those all
     * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
     *
+    * FIXME: not thread safe, put a queue in front of single thread-contained appender?
     */
-  def appendAll(row: Row, rows: Row*): EffectStream[Id]
+  protected def append(row: Row, rows: Row*): Stream[F, Id]
+
+  // /** May override, but must be implemented (or lifted) "as if by". */
+  // protected def append(row: Row): Stream[F, Id] =
+  //   append(row)
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
@@ -135,50 +111,71 @@ protected trait Store[F[_], W[_] <: WithValue, V] {
 }
 
 /** */
+object Store {
+
+  /** */
+  def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
+    _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
+}
+
+/** */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait ValueStore[F[_], V] extends Store[F, WithId, V] {
 
   self: StoreTypes.Aux[F, WithId, V] =>
 
   import V._
 
-  /**
-    * Like [[getAll]], but returns `Row`s as a [[scala.collection.immutable.List List]]
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def getList(id: Id): EffectStream[List[Row]] =
-    getAll(id) through listPipe
+  /** FIXME: implement */
+  def has(id: Id): Stream[F, Boolean] =
+    idRows exists (_._1 === id)
 
-  /** */
+  /**
+    * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
+    */
+  def get(id: Id): Stream[F, Row] =
+    idRows filter (_._1 === id) map (_._2)
+
+  /**
+    * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]
+    * FIXME move to `Nel`
+    */
+  def getList(id: Id): Stream[F, List[Row]] =
+    get(id) through Store.listPipe
+
+  /**
+    * FIXME move to `Nem`
+    */
   final def getMap[K2: Order, V2](id: Id)(
       implicit asK2V2: Value <~< (K2, V2)
-  ): EffectStream[Map[K2, V2]] =
+  ): Stream[F, Map[K2, V2]] =
     for (values <- getList(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
   /** */
-  final def put(value: Value): EffectStream[Id] =
-    appendAll(value)
+  final def put(value: Value): Stream[F, Id] =
+    append(value)
 
   /** */
-  final def putList(values: List[Value]): EffectStream[Id] =
-    values.headOption.fold(Stream.empty[F]: EffectStream[Id])(
-      value => appendAll(value, (values drop 1): _*)
+  final def putList(values: List[Value]): Stream[F, Id] =
+    values.headOption.fold(Stream.empty[F]: Stream[F, Id])(
+      value => append(value, (values drop 1): _*)
     )
-
-  /** */
-  final def putNel(values: NonEmptyList[Value]): EffectStream[Id] =
-    appendAll(values.head, values.tail: _*)
 
   /** */
   final def putMap[K2: Order, V2](k2v2s: Map[K2, V2])(
       implicit asValue: (K2, V2) <~< Value
-  ): EffectStream[Id] =
+  ): Stream[F, Id] =
     putList(k2v2s.toList map (asValue coerce _))
+
+  /** */
+  final def putNel(values: NonEmptyList[Value]): Stream[F, Id] =
+    append(values.head, values.tail: _*)
 
   /** */
   final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(
       implicit asValue: (K2, V2) <~< Value
-  ): EffectStream[Id] =
+  ): Stream[F, Id] =
     putNel(k2v2s.toNel map (asValue coerce _))
 }
 
@@ -204,68 +201,66 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
 
   import V._, Key._
 
-  @inline private final def keyFrom(idRow: (Id, Row)): Key = idRow._2._1
-
-  def getAll(key: Key): EffectStream[Row] =
-    idRows filter (ir => keyFrom(ir) === key) map (_._2)
+  protected def idRowsWith(key: Key): Stream[F, (Id, Row)] =
+    idRows filter (_._2._1 === key)
 
   /** */
-  def exists(key: Key): EffectStream[Id] =
-    idRows filter (ir => keyFrom(ir) === key) map (_._1)
-
-  /** */
-  def select(key: Key): EffectStream[Value] =
-    getAll(key) flatMap (r => Stream evals F.delay { r._2 }) take 1
-
-  /** Returns all un-[[delete]]d `Value`s for the given `Key`. */
-  def selectAll(key: Key): EffectStream[Value] =
+  protected def updateExistingKey(key: Key, maybeValue: Option[Value]): Stream[F, Id] =
     for {
-      value <- (getAll(key) map (_._2)).unNoneTerminate
+      _  <- exists(key)
+      id <- append(key -> maybeValue)
+    } yield id
+
+  /** */
+  def exists(key: Key): Stream[F, Id] =
+    idRowsWith(key) map (_._1)
+
+  /** */
+  def select(key: Key): Stream[F, Value] =
+    selectAll(key) take 1
+
+  /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
+  def selectAll(key: Key): Stream[F, Value] =
+    for {
+      value <- (idRowsWith(key) map (_._2._2)).unNoneTerminate
     } yield value
 
   /**  */
-  def selectList(key: Key): EffectStream[List[Value]] =
-    selectAll(key) through listPipe
+  def selectList(key: Key): Stream[F, List[Value]] =
+    selectAll(key) through Store.listPipe
 
   /** */
   def selectMap[K2: Order, V2](key: Key)(
       implicit asK2V2: Value <~< (K2, V2)
-  ): EffectStream[Map[K2, V2]] =
+  ): Stream[F, Map[K2, V2]] =
     for (values <- selectList(key))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
   /** */
-  def insert(key: Key, value: Value): EffectStream[Id] =
+  def insert(key: Key, value: Value): Stream[F, Id] =
     exists(key).last flatMap (_.fold(append(key -> value.some))(_ => Stream.empty))
 
   /** */
-  def update(key: Key, value: Value): EffectStream[Id] =
+  def update(key: Key, value: Value): Stream[F, Id] =
     updateExistingKey(key, value.some)
 
   /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`! */
-  def delete(key: Key): EffectStream[Id] =
+  def delete(key: Key): Stream[F, Id] =
     updateExistingKey(key, none)
 
   /** */
-  def upsert(key: Key, value: Value): EffectStream[Id] =
+  def upsert(key: Key, value: Value): Stream[F, Id] =
     append(key -> value.some)
 
   /** */
-  def upsertNel(key: Key, values: NonEmptyList[Value]): EffectStream[NonEmptyList[Id]] =
+  def upsertNel(key: Key, values: NonEmptyList[Value]): Stream[F, NonEmptyList[Id]] =
     (values map (v => append(key -> v.some))).sequence
 
   /** */
   def upsertNem[K2: Order, V2](key: Key, k2v2s: NonEmptyMap[K2, V2])(
       implicit asValue: (K2, V2) <~< Value
-  ): EffectStream[NonEmptyList[Id]] =
+  ): Stream[F, NonEmptyList[Id]] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
-
-  /** */
-  protected def updateExistingKey(key: Key, maybeValue: Option[Value]): EffectStream[Id] =
-    for {
-      _  <- exists(key)
-      id <- append(key -> maybeValue)
-    } yield id
 }
 
 /** dsl enhancements - ''dry'' type definitions for `Store`s */
