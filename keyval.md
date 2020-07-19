@@ -435,3 +435,49 @@ For `Map[Map]` and `Map[Map[Nel]]` specializations,
 Id | (Key | Option[(K2 | Option[V2])])
 :--- | --- | --- | ---:
 `y` = chainedRowSha(`c`) | IBan.06776 | `XAU` | `null`
+
+---
+
+### codecs interior to companion objects
+
+```scala
+
+// identity, basically
+// overrideable (?!) Misc / Json stuff
+def fromValue[A](v: Value)(implicit asA: Value <~< A): A = asA 
+def toValue(a: A)(implicit asValue: A <~< Value): Value  = asValue 
+
+// `List`
+def fromValues[A](vs: List[Value])(implicit asA: Value <~< A): List[A] = 
+  vs map fromValue
+
+def toValues(az: List[A])(implicit asValue: A <~< Value): List[Value]  = 
+  az map toValue 
+
+// TODO: consider `Stream` instead of `List` here 
+def fromValues[K2: Order, V2: Eq](vs: List[Value])(
+  implicit asK2V2: Value <~< (K2, V2)
+): Map[K2, V2] = ...
+
+// ditto
+def toValues[K2: Order, V2: Eq](k2v2s: Map[K2, V2])(
+  implicit asK2V2: (K2, V2) <~< Value
+): List[Value] = ...
+
+// collect the `Debit`s and `Credit`s with pattern matching (`unapply`)
+// to extract the two `Map`s from one `List` for `Balance`
+def fromValues[C: Currency](vs: List[Value])(
+  implicit asBalanceRow: Value <~< (AccountingKey, Money[C])
+): Balance[C] = ...
+
+// one big list, as if one map
+def toValues[C: Currency](balance: Balance[C])(
+  implicit asValue: (AccountingKey, Money[C]) <~< Value
+): List[Value] = ...
+
+// no general implementation 
+// special case override 
+// used for `Roster` (others?)
+def fromValues[A](vs: List[Value]): A
+def toValues[A](a: A): List[Value]
+```

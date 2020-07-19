@@ -23,7 +23,7 @@ import time._, money._, keyval._, capital._
 import cats.implicits._
 
 import cats.kernel.{ Monoid }
-import cats.{ Eq, Show }
+import cats.{ Eq, Show, Order }
 import cats.derived.{ auto, semi }
 import cats.effect.{ Sync }
 
@@ -34,6 +34,7 @@ import io.circe.{ Decoder, Encoder };
 import io.circe.refined._
 
 import fs2.{ Pipe, Stream }
+import io.deftrade.keyval.WithKey.KeyCompanion
 
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
@@ -69,7 +70,7 @@ trait Ledger { module: ModuleTypes =>
     *   - `Model`: reports a ''fair value'' modelled price
     *     - may depend on `market data` for callibration
     *     - therefore limited by accuracy (in practice)
-    *   - `Mark`: reports the current ''mark to market'' price
+    *   - `Market`: reports the current ''mark to market'' price
     *     - may depend on a `model` for interpolation to thinly traded / untraded assets...
     *     - therefore extensible to all assets (theoretically)
     *   - `Book`: the price we paid for the asset
@@ -134,7 +135,7 @@ trait Ledger { module: ModuleTypes =>
 
     /** */
     implicit def instrumentPricerMonoid[F[_]: Sync, C: Currency]: Monoid[InstrumentPricer[F, C]] =
-      Monoid instance (empty[F, C], combine[F, C])
+      Monoid.instance(empty[F, C], combine[F, C])
   }
 
   /**
@@ -201,19 +202,20 @@ trait Ledger { module: ModuleTypes =>
   lazy val Leg = Position
 
   /**
-    * A set of [[Position]]s.
+    * A set of (open) [[Position]]s.
     *
-    * A `Folio` can be thought of as a "flat portfolio", i.e. a portfolio without
-    * sub portfolios.
+    * A `Folio` can be thought of as a "flat" portfolio", 
+    * i.e. a portfolio without sub portfolios.
     *
-    * A `Folio` can also be thought of as a "sheet" (as its name suggests) in a spreadsheet.
-    *
-    * Finally, a `Folio` can also be thought of as a [[Trade]] at rest.
+    * A `Folio` can also be thought of as a "sheet" in a spreadsheet.
     */
   type Folio = Entry.Table
 
   /**
-    * A `Folio` store is a `Map` of `Map`s, which, normalized and written out as a list,
+    * A `Folio` key value store holds (open) [[Trade]]s, 
+    * indexed by opaque [[Account]] identifiers.
+    * 
+    * Specifically: a `Map` of `Map`s, which, normalized and written out as a list,
     * has rows of type: {{{
     *   (Folio.Key, Instrument.Key, Quantity)
     * }}}
@@ -339,8 +341,9 @@ trait Ledger { module: ModuleTypes =>
     * Do we mean `Transaction` in the ''business'' sense, or the ''computer science'' sense?
     * '''Yes''': both parties must agree upon the result, under all semantics for the term.
     *
-    * The exact semantics will depend on the higher level context
-    *  (eg booking a trade vs receiving notice of settlement).
+    * The exact semantics will depend on the higher level context: a `Transaction` 
+    * memorializing a booked `Trade` will spawn a cascade of `Transaction`s (and [[Confirmation]]s)
+    * as that `Transaction` is settled.
     *
     * Note: there is no currency field; cash payments are reified in currency-as-instrument.
     * Store the '''cryptographic hash''' of whatever metadata there is.
@@ -409,6 +412,21 @@ trait Ledger { module: ModuleTypes =>
   /** */
   lazy final val Transactions = ValueStore of Transaction
 
+  /** */
+  sealed abstract case class Confirmation(from: Folio.Id, to: Folio.Id)
+
+  /** */
+  object Confirmation extends WithKey.Aux[Transaction.Id, Confirmation] {
+    
+    object Key extends KeyCompanion[Transaction.Id] {
+      implicit def order = Order[Transaction.Id]
+      implicit def show  = Show[Transaction.Id]
+    }
+  }
+
+  /** */
+  lazy final val Confirmations = KeyValueStore of Confirmation
+  
   /**
     *
     * '''Cash''' is:

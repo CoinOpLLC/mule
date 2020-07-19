@@ -64,4 +64,4 @@ implicit def uuidArbitrary[F[_, _]](
     arbitraryRefType(Arbitrary.arbUuid.arbitrary.map(_.toString))
 }}}
 
-*/
+  */

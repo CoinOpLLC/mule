@@ -84,19 +84,19 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /** specify key types */
-  sealed abstract class Balance[D <: Debit, C <: Credit, CCY] private[Balances] (
-      ds: AccountMap[D, CCY],
-      cs: AccountMap[C, CCY]
+  sealed abstract class Balance[DB <: Debit, CR <: Credit, C] private[Balances] (
+      ds: AccountMap[DB, C],
+      cs: AccountMap[CR, C]
   ) extends BalanceLike {
 
     /** */
-    final type DebitType = D
+    final type DebitType = DB
 
     /** */
-    final type CreditType = C
+    final type CreditType = CR
 
     /** */
-    final type CurrencyType = CCY
+    final type CurrencyType = C
 
     /** overridable */
     def debits: AccountMap[DebitType, CurrencyType] = ds
@@ -113,9 +113,9 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   object Balance {
 
     /** Decompose into separate `Debit` and `Credit` maps. */
-    def unapply[D <: Debit, C <: Credit, CCY: Currency](
-        b: Balance[D, C, CCY]
-    ): Option[(AccountMap[D, CCY], AccountMap[C, CCY])] =
+    def unapply[DB <: Debit, CR <: Credit, C: Currency](
+        b: Balance[DB, CR, C]
+    ): Option[(AccountMap[DB, C], AccountMap[CR, C])] =
       (b.debits, b.credits).some
   }
 

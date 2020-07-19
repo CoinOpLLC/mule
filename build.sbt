@@ -1,3 +1,7 @@
+resolvers += Resolver.bintrayRepo("virtuslab", "graphbuddy")
+addCompilerPlugin("com.virtuslab.semanticgraphs" % "scalac-plugin" % "0.2.2" cross CrossVersion.full)
+scalacOptions += "-Yrangepos"
+
 resolvers += Resolver.sonatypeRepo("releases")
 
 // addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)

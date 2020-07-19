@@ -68,7 +68,11 @@ object mvt {
     implicit def fooShow: Show[Foo] = { import auto.show._; semi.show }
 
     def apply(
-      nut: Nut, bar: Bar.Key, label: Label, r: Double Refined `[0,1)`, contact: Contact.Id
+        nut: Nut,
+        bar: Bar.Key,
+        label: Label,
+        r: Double Refined `[0,1)`,
+        contact: Contact.Id
     ): Foo =
       new Foo(nut, bar, label, r, contact) {}
 

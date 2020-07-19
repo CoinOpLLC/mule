@@ -28,6 +28,12 @@ bin/
 .worksheet/
 
 #
+# VS Code
+#
+metals.*
+.bloop/
+
+#
 # ensime
 #
 .ensime

@@ -305,7 +305,7 @@ object Engine {
       * `value process` representation
       */
     final case class PR[A] private (val rvs: LL[RV[A]]) extends AnyVal {
-      def take(n: Int)                           = PR take (this, n)
+      def take(n: Int)                           = PR.take(this, n)
       def horizon                                = PR horizon this
       def forall(implicit isBool: A === Boolean) = PR forall (isBool substitute this)
     }

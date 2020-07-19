@@ -42,7 +42,7 @@ object Contract {
   implicit lazy val contractGroup: Group[Contract] =
     new Group[Contract] {
       def empty: Contract                             = contracts.zero
-      def combine(x: Contract, y: Contract): Contract = contracts both (x, y)
+      def combine(x: Contract, y: Contract): Contract = contracts.both(x, y)
       def inverse(a: Contract): Contract              = contracts give a
     }
 
