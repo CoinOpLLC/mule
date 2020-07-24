@@ -33,7 +33,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Account(
       settled: Folio.Key,
-      unsettled: Folio.Key,
+      unsettled: Folio.Key
   )
 
   /**
@@ -46,11 +46,13 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     protected[deftrade] def freshFolioKey = Folio.Key.random
 
-    /** */
+    /**
+      */
     protected[deftrade] def apply(s: Folio.Key, u: Folio.Key): Account =
       new Account(s, u) {}
 
-    /** */
+    /**
+      */
     protected[deftrade] def empty = apply(freshFolioKey, freshFolioKey)
 
     implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
@@ -70,30 +72,35 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import Party.Key
 
-    /** */
+    /**
+      */
     lazy val nonPrincipals: Role.NonPrincipal => NonEmptySet[Party.Key] = nps(_)
 
-    /** */
+    /**
+      */
     lazy val roles: Role => NonEmptySet[Key] = {
       case Role.Principal        => principals.keys
       case Role.NonPrincipal(np) => nonPrincipals(np)
     }
 
-    /** */
+    /**
+      */
     def withAgent(agent: Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Agent -> (NonEmptySet one agent))
       )
 
-    /** */
+    /**
+      */
     def withManager(manager: Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Manager -> (NonEmptySet one manager))
       )
 
-    /** */
+    /**
+      */
     def withAuditor(auditor: Party.Key): Roster =
       Roster(
         principals = principals,
@@ -123,7 +130,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
           value match {
             case (p, Principal, Some(u)) => ((p, u) :: us, nps)
             case (p, NonPrincipal(r), None) =>
-              (us, nps updated (r, (nps get r).fold(NonEmptySet one p)(_ add p)))
+              (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
           }
       }
       val Right(principals) = UnitPartition exact (xs: _*)
@@ -160,7 +167,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromPrinciples(principals: UnitPartition[Party.Key, Quantity]): Roster =
       from(principals, Map.empty)
 
-    /** */
+    /**
+      */
     def single(entity: Party.Key): Roster =
       fromPrinciples(principals = UnitPartition single entity)
 
@@ -172,7 +180,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
         slices <- UnitPartition fair [Party.Key, Quantity] (ps: _*)
       } yield fromPrinciples(slices)
 
-    /** */
+    /**
+      */
     implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
   }

@@ -3,8 +3,6 @@ package keyval
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.data.NonEmptyList
-import cats.derived.{ auto, semi }
 
 import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Json }
@@ -16,14 +14,16 @@ import io.circe.{ Decoder, Encoder, Json }
   */
 sealed class Misc private (protected val json: Json) {
 
-  /** */
+  /**
+    */
   type ADT
 
-  /** */
+  /**
+    */
   final def decoded(implicit ev: Decoder[ADT]): Result[ADT] =
     json.as[ADT] leftMap (x => Fail.fromString(x.toString))
 
-  /** TODO: revisit this*/
+  /** TODO: revisit this */
   final def canoncicalString: String = json.noSpacesSortKeys
 }
 
@@ -36,19 +36,23 @@ sealed class Misc private (protected val json: Json) {
   * Note this value is forgery resistant (up to the strength of the `Sha`).
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-object Misc {
+object Misc extends WithId[Misc] {
 
-  /** */
+  /**
+    */
   sealed abstract case class Aux[T](final override protected val json: Json) extends Misc(json) {
 
-    /** */
+    /**
+      */
     final type ADT = T
   }
 
-  /** */
+  /**
+    */
   def from[T: Encoder: Decoder](json: Json): Misc.Aux[T] = new Aux[T](json) {}
 
-  /** */
+  /**
+    */
   def of[T: Encoder: Decoder](t: T): Misc.Aux[T] = from[T](t.asJson)
 
   implicit lazy val miscEq: Eq[Misc]     = Eq by (_.json)

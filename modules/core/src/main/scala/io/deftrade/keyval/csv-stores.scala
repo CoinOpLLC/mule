@@ -21,9 +21,8 @@ package impl
 import syntax._
 
 import cats.implicits._
-import cats.{ Eq, Order }
-import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.evidence._
+import cats.{ Eq }
+import cats.data.{ NonEmptyList }
 
 import cats.effect.{ Blocker, ContextShift, Sync }
 
@@ -31,7 +30,7 @@ import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled._
 
 import fs2.{ text, Pipe, Stream }
-import fs2.io.file.{ pulls, FileHandle, ReadCursor, WriteCursor }
+import fs2.io.file.{ pulls, FileHandle /*, ReadCursor, WriteCursor */ }
 
 // import scodec.bits.ByteVector
 
@@ -43,28 +42,32 @@ import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
-/** */
+/**
+  */
 trait CsvStoreTypes extends StoreTypes {
 
-  /** */
+  /**
+    */
   type HValue <: HList
 
-  /** */
+  /**
+    */
   implicit val lgv: LabelledGeneric.Aux[ValueType, HValue]
 }
 
-/** */
+/**
+  */
 object CsvStoreTypes {
 
-  /** */
+  /**
+    */
   abstract class Aux[F[_], W[_] <: WithValue, V, HV <: HList](
       override val V: W[V]
-  )(
-      implicit
-      final override val F: Sync[F],
-      final override val X: ContextShift[F],
-      val lgv: LabelledGeneric.Aux[V, HV]
-  ) extends StoreTypes.Aux[F, W, V](V) {
+  )(implicit
+    final override val F: Sync[F],
+    final override val X: ContextShift[F],
+    val lgv: LabelledGeneric.Aux[V, HV])
+      extends StoreTypes.Aux[F, W, V](V) {
 
     final type HValue = HV // === lgv.Repr  test / validate / assume ?!?
 
@@ -73,23 +76,27 @@ object CsvStoreTypes {
   }
 }
 
-/** */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait CsvStore[
     F[_],
     W[_] <: WithValue,
     V,
     HV <: HList
-] extends Store[F, W, V] {
+] extends Store[F, W, V]
+    with CsvImplicits {
 
   self: CsvStoreTypes.Aux[F, W, V, HV] =>
 
   import V._
 
-  /**  */
+  /**
+    */
   type HRow <: HList
 
-  /**  */
+  /**
+    */
   final type HIdRow = IdField :: HRow
 
   /**
@@ -101,11 +108,12 @@ trait CsvStore[
   final def idRows: Stream[F, (Id, Row)] =
     (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
-  /** */
+  /**
+    */
   final def append(row: Row, rows: Row*): Stream[F, Id] =
     for {
-      id <- Stream eval F.delay { fresh.nextAll(prev, row, rows: _*) }
-      r  <- Stream evals F.delay { (row +: rows).toList }
+      id <- Stream eval F.delay(fresh.nextAll(prev, row, rows: _*))
+      r  <- Stream evals F.delay((row +: rows).toList)
       _ <- Stream eval F.delay { updateCache(r); (id, r) } through
             idRowToCSV through
             appendingSink
@@ -114,16 +122,20 @@ trait CsvStore[
   /** Default no-op imlementation. */
   protected def updateCache(row: Row) = ()
 
-  /** */
+  /**
+    */
   protected def readLines: Stream[F, String]
 
-  /** */
+  /**
+    */
   protected def appendingSink: Pipe[F, String, Unit]
 
-  /** */
+  /**
+    */
   protected def idRowToCSV: Pipe[F, (Id, Row), String]
 
-  /** */
+  /**
+    */
   protected def csvToIdRow: Pipe[F, String, Result[(Id, Row)]]
 }
 
@@ -145,10 +157,12 @@ trait CsvValueStore[
 
   import V._
 
-  /** */
+  /**
+    */
   final type HRow = HValue
 
-  /** */
+  /**
+    */
   implicit final def writeIdRow(
       implicit
       llw: Lazy[LabelledWrite[HValue]]
@@ -156,13 +170,15 @@ trait CsvValueStore[
     new LabelledWrite[(Id, Row)] {
       implicit val lwhpr       = LabelledWrite[HIdRow]
       def headers: CSV.Headers = lwhpr.headers
-      override def write(pr: (Id, Row)): CSV.Row = pr match {
-        case (i, v) =>
-          lwhpr write field[id.T](i) :: (lgv to v)
-      }
+      override def write(pr: (Id, Row)): CSV.Row =
+        pr match {
+          case (i, v) =>
+            lwhpr write field[id.T](i) :: (lgv to v)
+        }
     }
 
-  /** */
+  /**
+    */
   implicit final def readIdRow(
       implicit
       llr: Lazy[LabelledRead[HV]]
@@ -170,12 +186,13 @@ trait CsvValueStore[
     new LabelledRead[(Id, Row)] {
       implicit val lrhpr = LabelledRead[HIdRow]
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] =
-        lrhpr read (row, headers) map { hpr =>
+        lrhpr.read(row, headers) map { hpr =>
           (hpr.head, lgv from hpr.tail)
         }
     }
 
-  /** */
+  /**
+    */
   final protected def deriveCsvDecoderV(
       implicit
       llr: Lazy[LabelledRead[HV]]
@@ -183,7 +200,8 @@ trait CsvValueStore[
     readLabelledCompleteSafe[F, (Id, Row)] andThen
       (_ map (_ leftMap errorToFail))
 
-  /** */
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def deriveCsvEncoderV(
       implicit
@@ -191,7 +209,8 @@ trait CsvValueStore[
   ): Pipe[F, (Id, Row), String] = writeLabelled(printer)
 }
 
-/**  */
+/**
+  */
 trait CsvKeyValueStore[
     F[_],
     K,
@@ -203,10 +222,12 @@ trait CsvKeyValueStore[
 
   import V._
 
-  /** */
+  /**
+    */
   final type HRow = KeyField :: HValue
 
-  /** */
+  /**
+    */
   final type HEmptyRow = IdField :: KeyField :: HNil
 
   // /** */
@@ -215,12 +236,11 @@ trait CsvKeyValueStore[
   //     case (_, Some(value)) => value
   //   }
 
-  /**  */
-  implicit final def writeIdRow(
-      implicit
-      llw: LabelledWrite[HValue],
-      putk: Put[Key]
-  ): LabelledWrite[(Id, Row)] =
+  /**
+    */
+  implicit final def writeIdRow(implicit
+                                llw: LabelledWrite[HValue],
+                                putk: Put[Key]): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
 
       private val lwhpr = LabelledWrite[HIdRow]
@@ -228,18 +248,18 @@ trait CsvKeyValueStore[
 
       def headers: CSV.Headers = lwhpr.headers
 
-      def write(pr: (Id, Row)): CSV.Row = pr match {
-        case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
-        case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
-      }
+      def write(pr: (Id, Row)): CSV.Row =
+        pr match {
+          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
+        }
     }
 
-  /** */
-  implicit final def readIdRow(
-      implicit
-      llr: LabelledRead[HV],
-      getk: Get[Key]
-  ): LabelledRead[(Id, Row)] =
+  /**
+    */
+  implicit final def readIdRow(implicit
+                               llr: LabelledRead[HV],
+                               getk: Get[Key]): LabelledRead[(Id, Row)] =
     new LabelledRead[(Id, Row)] {
 
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] = {
@@ -251,37 +271,35 @@ trait CsvKeyValueStore[
           case CSV.Row(
               NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
-            lrhpr read (row, headers) map { hpr =>
+            lrhpr.read(row, headers) map { hpr =>
               (hpr.head, (hpr.tail.head, none))
             }
 
           case _ =>
-            lrhpr read (row, headers) map { hpr =>
+            lrhpr.read(row, headers) map { hpr =>
               (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
             }
         }
       }
     }
 
-  /** */
-  final protected def deriveCsvDecoderKv(
-      implicit
-      llr: Lazy[LabelledRead[HV]],
-      lgetk: Lazy[Get[Key]]
-  ): Pipe[F, String, Result[(Id, Row)]] = {
+  /**
+    */
+  final protected def deriveCsvDecoderKv(implicit
+                                         llr: Lazy[LabelledRead[HV]],
+                                         lgetk: Lazy[Get[Key]]): Pipe[F, String, Result[(Id, Row)]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
     readLabelledCompleteSafe[F, (Id, Row)] andThen
       (_ map (_ leftMap errorToFail))
   }
 
-  /** */
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderKv(
-      implicit
-      llw: Lazy[LabelledWrite[HV]],
-      lputk: Lazy[Put[Key]]
-  ): Pipe[F, (Id, Row), String] = {
+  final protected def deriveCsvEncoderKv(implicit
+                                         llw: Lazy[LabelledWrite[HV]],
+                                         lputk: Lazy[Put[Key]]): Pipe[F, (Id, Row), String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -289,12 +307,14 @@ trait CsvKeyValueStore[
   }
 }
 
-/** */
+/**
+  */
 protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   self: CsvStore[F, W, V, HV] with CsvStoreTypes.Aux[F, W, V, HV] =>
 
-  /** */
+  /**
+    */
   // final protected var table: Map[V.Index, V.Value]                  = Map.empty
   // final protected var tableNel: Map[V.Index, NonEmptyList[V.Value]] = Map.empty
   // final protected def tableNem[K2: Order, V2: Eq](
@@ -303,7 +323,8 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
   //   case (k, vs) => (k, (vs map (asK2V2 coerce _)).toNem)
   // }
 
-  /** */
+  /**
+    */
   def path: Path
 
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -316,7 +337,7 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
       // READ,
       WRITE,
       APPEND,
-      SYNC,
+      SYNC
       // DSYNC,
     )
 
@@ -326,7 +347,8 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
     } yield handle)
   }
 
-  /** */
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def appendingSink: Pipe[F, String, Unit] =
     for {
@@ -343,7 +365,8 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
         .stream |> discardValue // nota bene this is intentional and necessary
   // WriteCursor(out, 0).writeAll(in).void
 
-  /** */
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def readLines: Stream[F, String] =
     (Stream resource Blocker[F]) flatMap { blocker =>
@@ -353,7 +376,8 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
       text.lines
 }
 
-/** */
+/**
+  */
 trait MemFileKV[F[_], K, V, HV <: HList]
     extends MemFileV[
       F,
@@ -366,7 +390,8 @@ trait MemFileKV[F[_], K, V, HV <: HList]
 
 }
 
-/** */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract case class MemFileValueStore[
     F[_]: Sync: ContextShift,
@@ -374,14 +399,14 @@ abstract case class MemFileValueStore[
     HV <: HList
 ](
     final override val V: WithId[V]
-)(
-    implicit
-    final override val lgv: LabelledGeneric.Aux[V, HV],
-) extends CsvStoreTypes.Aux(V)
+)(implicit
+  final override val lgv: LabelledGeneric.Aux[V, HV])
+    extends CsvStoreTypes.Aux(V)
     with CsvValueStore[F, V, HV]
     with MemFileV[F, WithId, V, HV]
 
-/** */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract case class MemFileKeyValueStore[
     F[_]: Sync: ContextShift,
@@ -390,9 +415,8 @@ abstract case class MemFileKeyValueStore[
     HV <: HList
 ](
     final override val V: WithKey.Aux[K, V]
-)(
-    implicit
-    final override val lgv: LabelledGeneric.Aux[V, HV],
-) extends CsvStoreTypes.Aux(V)
+)(implicit
+  final override val lgv: LabelledGeneric.Aux[V, HV])
+    extends CsvStoreTypes.Aux(V)
     with CsvKeyValueStore[F, K, V, HV]
     with MemFileKV[F, K, V, HV]

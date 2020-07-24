@@ -40,10 +40,12 @@ import refined.string.{ Trimmed, Uuid => IsUuid }
 
 import refined.cats._
 
-/** */
+/**
+  */
 trait MarketData { self: Ledger with ModuleTypes =>
 
-  /** */
+  /**
+    */
   sealed abstract case class Quoted private[deftrade] (
       final val quote: (MonetaryAmount, MonetaryAmount)
   ) {
@@ -52,23 +54,29 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     type CurrencyType // <: CurrencyLike
 
-    /** */
+    /**
+      */
     @inline final def bid: MonetaryAmount = quote match { case (bid, _) => bid }
 
-    /** */
+    /**
+      */
     @inline final def ask: MonetaryAmount = quote match { case (_, ask) => ask }
 
-    /** */
+    /**
+      */
     @inline final def spread = ask - bid
 
-    /** */
+    /**
+      */
     @inline final def mid = bid + spread / 2
 
-    /** */
+    /**
+      */
     def isDerived: Boolean = false
   }
 
-  /** */
+  /**
+    */
   object Quoted {
 
     /** exclusively usable by (and necessary for) macros and other lawless entities */
@@ -91,7 +99,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     * the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
     * cannot not predjudice their responses when asked for a quote, as the client reveals nothing
     * about their intent.
-
+    *
     * Instances can come from a variety of sources including live market feeds
     *   - "Orderly market" invariant: `ask` < `bid`
     *   - must model disorderly markets: not everything that comes at you down the wire
@@ -108,14 +116,17 @@ trait MarketData { self: Ledger with ModuleTypes =>
     final type AssetType    = A
     final type CurrencyType = C
 
-    /** */
+    /**
+      */
     def tick(implicit C: Currency[C]): MonetaryAmount =
-      MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
+      maFinancial from [BigDecimal] C.pip //  / 10 // this is a thing now
 
-    /** */
+    /**
+      */
     type CrossType
 
-    /** */
+    /**
+      */
     def cross: Option[CrossType] = None
 
     /**
@@ -127,7 +138,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
         /** TODO this is not at all obvious, explain */
         override def tick(implicit A: Currency[A]) = (self tick C) * mid
 
-        /** */
+        /**
+          */
         override def isDerived = true
       }
 
@@ -139,34 +151,41 @@ trait MarketData { self: Ledger with ModuleTypes =>
     final def cross[C2: Currency](other: C QuotedIn C2)(implicit C: Currency[C]): A QuotedIn C2 =
       new QuotedIn[A, C2]((self.bid * other.bid, self.ask * other.ask)) {
 
-        /** */
+        /**
+          */
         override def tick(implicit C2: Currency[C2]) = (other tick C2) * mid
 
-        /** */
+        /**
+          */
         override def isDerived = true
 
-        /** */
+        /**
+          */
         override type CrossType = Currency[C]
 
-        /** */
+        /**
+          */
         override def cross: Option[CrossType] = Some(C)
       }
   }
 
-  /** */
+  /**
+    */
   object QuotedIn {
 
     def apply[A, C](quote: (MonetaryAmount, MonetaryAmount)): QuotedIn[A, C] =
       new QuotedIn[A, C](quote) {}
 
-    /** */
+    /**
+      */
     def bidask[A, C](
         bid: MonetaryAmount,
         ask: MonetaryAmount
     ): QuotedIn[A, C] =
       apply((bid, ask))
 
-    /** */
+    /**
+      */
     def trade[A, C: Currency](amount: MonetaryAmount): QuotedIn[A, C] =
       apply((amount, amount))
   }
@@ -181,39 +200,48 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     import Q._
 
-    /** */
+    /**
+      */
     @inline def buy(m1: Money[C1]): Money[C2] = convert(m1, ask)
 
-    /** */
+    /**
+      */
     @inline def sell(m1: Money[C1]): Money[C2] = convert(m1, bid)
 
-    /** */
+    /**
+      */
     @inline def apply(m1: Money[C1]): Money[C2] = convert(m1, mid)
 
-    /** */
+    /**
+      */
     def quote: (Money[C2], Money[C2]) = {
-      val single = C1(MonetaryAmount.one)
+      val single = C1(maFinancial.one)
       (buy(single), sell(single))
     }
 
-    /** */
+    /**
+      */
     def description: String = s"""
           |Quoter buys  ${C1.toString} and sells ${C2.toString} at ${bid.toString}
           |Quoter sells ${C1.toString} and buys  ${C2.toString} at ${ask.toString}""".stripMargin
 
-    /** */
+    /**
+      */
     private def convert(m1: Money[C1], rate: MonetaryAmount): Money[C2] = C2(m1.amount * rate)
   }
 
-  /** */
+  /**
+    */
   object Rate {
 
-    /** */
+    /**
+      */
     def apply[C1: Currency, C2: Currency](qi: C1 QuotedIn C2): Rate[C1, C2] =
       new Rate(Currency[C1], Currency[C2], qi) {}
   }
 
-  /** */
+  /**
+    */
   implicit class CurrencyOps[C: Currency](C: Currency[C]) {
 
     /** FIXME: seems kinda useless unless it can use an implicit FStream[C QuotedIn C2]
@@ -225,21 +253,25 @@ trait MarketData { self: Ledger with ModuleTypes =>
     }
   }
 
-  /** */
+  /**
+    */
   sealed trait Tick extends EnumEntry with Serializable
 
-  /** */
+  /**
+    */
   object Tick extends DtEnum[Tick] {
 
     case object Bid   extends Tick
     case object Ask   extends Tick
     case object Trade extends Tick
 
-    /** */
+    /**
+      */
     lazy val values = findValues
   }
 
-  /** */
+  /**
+    */
   sealed abstract case class TickData(
       at: Instant,
       tick: Tick,
@@ -247,10 +279,12 @@ trait MarketData { self: Ledger with ModuleTypes =>
       size: Quantity
   )
 
-  /** */
+  /**
+    */
   object TickData extends WithId[TickData] {
 
-    /** */
+    /**
+      */
     def apply(at: Instant, tick: Tick, price: MonetaryAmount, size: Quantity): TickData =
       new TickData(at, tick, price, size) {}
 
@@ -267,23 +301,28 @@ trait MarketData { self: Ledger with ModuleTypes =>
       */
     implicit class TickDataOps(size: Quantity) {
 
-      /** */
+      /**
+        */
       def bid(price: MonetaryAmount) = TickData(instant, Tick.Bid, price, size)
 
-      /** */
+      /**
+        */
       def ask(price: MonetaryAmount) = TickData(instant, Tick.Ask, price, size)
 
-      /** */
+      /**
+        */
       def trade(price: MonetaryAmount) = TickData(instant, Tick.Trade, price, size)
     }
   }
 
-  /** */
+  /**
+    */
   // type IsMic = Size[GreaterEqual[3] And LessEqual[4]] And Trimmed
   type IsMic = Size[GreaterEqual[3]] And Size[LessEqual[4]] And Trimmed
   // type IsMic = Size[LessEqual[4]]
 
-  /** */
+  /**
+    */
   type Mic = String Refined IsMic // market venue
 
   /**
@@ -316,10 +355,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Counterparty(
       final val host: Party.Key,
-      final val contra: Folio.Key,
+      final val contra: Folio.Key
   ) extends Market
 
-  /** */
+  /**
+    */
   object Counterparty extends WithRefinedKey[String, IsUuid, Counterparty] {
 
     def apply(host: Party.Key, contra: Folio.Key): Counterparty =
@@ -338,17 +378,20 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Exchange private (
       final val host: Party.Key,
-      final val contra: Folio.Key,
+      final val contra: Folio.Key
   ) extends Market
 
-  /** */
+  /**
+    */
   object Exchange extends WithRefinedKey[String, IsMic, Exchange] {
 
-    /** */
+    /**
+      */
     protected[deftrade] def apply(host: Party.Key, contra: Folio.Key): Exchange =
       new Exchange(host, contra) {}
 
-    /** */
+    /**
+      */
     def withEntity(host: Party.Key): Exchange => Exchange =
       x => Exchange(host, x.contra)
   }
@@ -361,11 +404,13 @@ trait MarketData { self: Ledger with ModuleTypes =>
     /** `Currency`-specific quote factory. */
     def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
 
-    /** */
+    /**
+      */
     final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Money[C]] =
       Monad[F] pure (Currency[C] apply quotedIn(ik).mid)
 
-    /** */
+    /**
+      */
     final def quoteLeg[F[_]: Monad, C: Currency](leg: Leg): F[Money[C]] =
       leg match {
         case (security, quantity) => quote[F, C](security) map (_ * quantity)
@@ -383,13 +428,15 @@ trait MarketData { self: Ledger with ModuleTypes =>
   /** FIXME: normalize fields? */
   object MDS extends WithRefinedKey[String, IsLabel, MDS] {
 
-    private[deftrade] def apply(markets: NonEmptySet[Market]): MDS = new MDS(markets) {
+    private[deftrade] def apply(markets: NonEmptySet[Market]): MDS =
+      new MDS(markets) {
 
-      /** FIXME: how do we specialize? */
-      def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
-    }
+        /** FIXME: how do we specialize? */
+        def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
+      }
 
-    /** */
+    /**
+      */
     def single(m: Market) = MDS(NonEmptySet one m)
   }
 

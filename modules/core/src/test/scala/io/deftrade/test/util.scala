@@ -15,7 +15,7 @@ import refined.numeric._
 import refined.auto._
 
 import org.scalacheck._
-import org.scalacheck.cats.implicits._
+// import org.scalacheck.cats.implicits._
 import org.scalacheck.ScalacheckShapeless._
 import Arbitrary.arbitrary
 
@@ -40,10 +40,10 @@ package object test {
     }
 
   def continuallyOneOf[A](xs: Seq[A]): Arbitrary[LazyList[A]] =
-    Arbitrary { infiniteLazyList(Gen oneOf xs) }
+    Arbitrary(infiniteLazyList(Gen oneOf xs))
 
   implicit def arbitraryLazyList[A](implicit A: Arbitrary[A]): Arbitrary[LazyList[A]] =
-    Arbitrary { infiniteLazyList(A.arbitrary) }
+    Arbitrary(infiniteLazyList(A.arbitrary))
 
   val error: Label = "error"
   val greek        = "ΑαΒβΓγΔδΕεΖζΗηΘθΙιΚκΛλΜμΝνΞξΟοΠπΡρΣσΤτΥυΦφΧχΨψΩω"
@@ -187,10 +187,12 @@ package test {
       }
   }
 
-  /**  */
+  /**
+    */
   sealed trait Nut extends EnumEntry with Serializable
 
-  /**  */
+  /**
+    */
   object Nut extends DtEnum[Nut] {
 
     case object Peanut     extends Nut

@@ -15,7 +15,7 @@ class MoneySpec extends AnyFlatSpec {
 
   import currencies._
 
-  implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn(bid = 1.1245, ask = 1.1250)
+  implicit def eurusdStaticPrice: EUR QuotedIn USD = QuotedIn((1.1245, 1.1250))
 
   "Mny" should "be created via fiat `Currency`s" in {
 

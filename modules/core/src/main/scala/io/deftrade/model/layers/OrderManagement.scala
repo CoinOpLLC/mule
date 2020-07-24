@@ -32,11 +32,13 @@ import fs2.Stream
 
 import scala.collection.immutable.SortedSet
 
-/** */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
-  /** */
+  /**
+    */
   type Allocation = UnitPartition[Folio.Key, Quantity]
 
   /** Namespace placeholder */
@@ -45,21 +47,23 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
   /** `link` table */
   case class OMSmarkets(market: Market.Key)
 
-  /** */
+  /**
+    */
   object OMSmarkets extends WithId[OMSmarkets]
 
-  /** */
+  /**
+    */
   type OMSrecord = (LegalEntity.Key, Folio.Key, Folio.Key, OMSmarkets.Id)
 
   /**
-    *`OMS` := Order Management System. Ubiquitous domain acronym.
+    * `OMS` := Order Management System. Ubiquitous domain acronym.
     *
     * The methods on `OMS` return [[cats.data.Kleisli]] arrows, which are intended to be chained with
     * `andThen`.
     *
     * Reference:
     * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270
-    Functional and Reactive Domain Modelling, section 4.4]]
+    *    Functional and Reactive Domain Modelling, section 4.4]]
     *
     * TODO: Revisit [[cats.data.Kleisli]] usage
     *   - Why not [[fs2.Pipe]]?
@@ -69,10 +73,11 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       host: LegalEntity.Key,
       entry: Folio.Key,
       contra: Folio.Key,
-      markets: NonEmptySet[Market.Key],
+      markets: NonEmptySet[Market.Key]
   ) {
 
-    /** */
+    /**
+      */
     type ToStreamOf[T, R] = Kleisli[ResultT[Stream[F, *], *], T, R]
 
     /**
@@ -103,7 +108,8 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
         new Order(instant, market, trade, Currency[C], none) {}
 
-      /** */
+      /**
+        */
       def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Money[C]): Order =
         new Order(instant, market, trade, Currency[C], limit.amount.some) {}
     }
@@ -129,6 +135,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /**
       * FIXME: address the issue of scheduling T+2 etc.
+      * also: this is the *wrong* place for the allcocation param
       */
     final def process[C: Currency, A](
         allocation: Allocation
@@ -140,10 +147,12 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         allocate(allocation) andThen
         settle
 
-    /** */
+    /**
+      */
     def riskCheck[C: Currency, A](a: A): A ToStreamOf Order
 
-    /**  */
+    /**
+      */
     def trade: Order ToStreamOf Execution
 
     /** Moves the traded [[capital.Instrument]]s to their final destination [[Folio]]. */
@@ -167,7 +176,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       * Each OMS must maintain a contra [[Ledger.Folio.Key]].
       * The creation of this account (and its [[Ledger.Folio.Key]]) must occur
       * before the OMS is created.
-      *
       */
     def apply[F[_]: Sync](
         host: LegalEntity.Key,
@@ -178,17 +186,25 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     ): OMS[F] =
       new OMS[F](host, entry, contra, NonEmptySet(market, SortedSet(ms: _*))) {
 
-        /** */
+        /**
+          */
         def riskCheck[C: Currency, A](a: A): A ToStreamOf Order = ???
 
         /** This phase is implemented by the brokerage api integration code. */
         def trade: Order ToStreamOf Execution = ???
 
-        /** */
+        /**
+          */
         def allocate(a: Allocation): Execution ToStreamOf Execution = ???
 
-        /** */
+        /**
+          */
         def settle: Execution ToStreamOf Unit = ???
       }
   }
+
+  /**
+    * How do we settle a trade?
+    */
+  object SettlementAgent
 }

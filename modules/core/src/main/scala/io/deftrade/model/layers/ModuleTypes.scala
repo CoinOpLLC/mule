@@ -32,47 +32,57 @@ import cats.Show
   * Modules parameterized like this may create `Mny[MA, C] <=> (MI, Q)` codecs via a table of
   * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
-  *
   */
 trait ModuleTypes {
 
-  /** */
+  /**
+    */
   type Quantity
 
-  /** */
-  implicit val Quantity: Financial[Quantity]
+  /**
+    */
+  implicit protected val qFinancial: Financial[Quantity]
 
-  /** */
-  implicit val qShow: Show[Quantity]
+  /**
+    */
+  implicit protected val qShow: Show[Quantity]
 
-  /** */
+  /**
+    */
   type MonetaryAmount
 
-  /**  */
-  implicit val MonetaryAmount: Financial[MonetaryAmount]
+  /**
+    */
+  implicit protected val maFinancial: Financial[MonetaryAmount]
 
-  /** */
-  implicit val maShow: Show[MonetaryAmount]
+  /**
+    */
+  implicit protected val maShow: Show[MonetaryAmount]
 
-  /** */
+  /**
+    */
   final type Money[C] = Mny[MonetaryAmount, C]
 }
 
-/** */
+/**
+  */
 object ModuleTypes {
 
-  /** */
+  /**
+    */
   abstract class Aux[MA, Q]()(
-      implicit final val MonetaryAmount: Financial[MA],
-      implicit final val Quantity: Financial[Q],
-      implicit final val qShow: Show[Q],
-      implicit final val maShow: Show[MA]
+      implicit final protected val maFinancial: Financial[MA],
+      implicit final protected val qFinancial: Financial[Q],
+      implicit final protected val qShow: Show[Q],
+      implicit final protected val maShow: Show[MA]
   ) extends ModuleTypes {
 
-    /** */
+    /**
+      */
     final type MonetaryAmount = MA
 
-    /** */
+    /**
+      */
     final type Quantity = Q
   }
 }

@@ -93,14 +93,3 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
-
-#
-# project specfic
-#
-
-# do not check in sources from IB
-ib-client/src/test/java/com/ib/
-
-# Random files go here
-.scratch/
-logs/

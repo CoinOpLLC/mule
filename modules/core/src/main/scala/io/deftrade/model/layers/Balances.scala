@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import syntax._, time._, money._
+import syntax._, time._, money._, keyval._
 
 import cats.implicits._
 import cats.{ Invariant }
@@ -55,31 +55,37 @@ import refined.auto._
   *     + Reserves                                   // you never know
   *     + RetainedEarnings                           // add to book value of partners' equity
   * }}}
-  *
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   import AccountingKey.implicits._
 
-  /** */
+  /**
+    */
   sealed trait BalanceLike extends Product with Serializable {
 
-    /** */
+    /**
+      */
     type CurrencyType
 
-    /** */
+    /**
+      */
     final def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
 
-    /** */
+    /**
+      */
     type DebitType <: Debit
 
-    /** */
+    /**
+      */
     def debits: AccountMap[DebitType, CurrencyType]
 
-    /** */
+    /**
+      */
     type CreditType <: Credit
 
-    /** */
+    /**
+      */
     def credits: AccountMap[CreditType, CurrencyType]
   }
 
@@ -89,13 +95,16 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       cs: AccountMap[CR, C]
   ) extends BalanceLike {
 
-    /** */
+    /**
+      */
     final type DebitType = DB
 
-    /** */
+    /**
+      */
     final type CreditType = CR
 
-    /** */
+    /**
+      */
     final type CurrencyType = C
 
     /** overridable */
@@ -104,13 +113,18 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /** overridable */
     def credits: AccountMap[CreditType, CurrencyType] = cs
 
-    /** */
+    /**
+      */
     final def net(implicit C: Currency[CurrencyType]): Money[CurrencyType] =
       credits.total - debits.total
   }
 
-  /** */
-  object Balance {
+  /**
+    */
+  // object Balance extends WithKey.Aux[(Folio.Key, LocalDate, Period), BalanceLike] {
+  object Balance extends WithKey.Aux[Folio.Key, BalanceLike] {
+
+    lazy val Key = Folio.Key
 
     /** Decompose into separate `Debit` and `Credit` maps. */
     def unapply[DB <: Debit, CR <: Credit, C: Currency](
@@ -132,36 +146,36 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       override val credits: Credits[C]
   ) extends Balance(debits, credits) {
 
-    /** */
+    /**
+      */
     final def updated(
         keys: DebitCreditKey[Debit, Credit],
         amount: Money[C]
-    )(
-        implicit C: Currency[C]
-    ): TrialBalance[C] =
+    )(implicit C: Currency[C]): TrialBalance[C] =
       TrialBalance(
         debits |+| (keys.debits priced -amount),
         credits |+| (keys.credits priced amount)
       )
 
-    /** */
+    /**
+      */
     final def swapped[T <: AccountingKey](
         keys: SwapKey[T],
         amount: Money[C]
-    )(
-        implicit C: Currency[C]
-    ): TrialBalance[C] = {
-      val am: AccountMap[AccountingKey, C] = (SwapKey accountMap (keys, amount)).widenKeys
+    )(implicit C: Currency[C]): TrialBalance[C] = {
+      val am: AccountMap[AccountingKey, C] = (SwapKey.accountMap(keys, amount)).widenKeys
       TrialBalance(
         debits |+| (am collectKeys Debit.unapply),
         credits |+| (am collectKeys Credit.unapply)
       )
     }
 
-    /** */
+    /**
+      */
     final def cashBooks: CashBookSet[C] = ???
 
-    /** */
+    /**
+      */
     final def accrualBooks: AccrualBookSet[C] = ???
   }
 
@@ -170,21 +184,24 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     */
   object TrialBalance {
 
-    /** */
+    /**
+      */
     private[model] def apply[C: Currency](
         debits: Debits[C],
         credits: Credits[C]
     ): TrialBalance[C] =
       new TrialBalance(debits, credits) {}
 
-    /** */
+    /**
+      */
     def empty[C: Currency]: TrialBalance[C] =
       apply(
         debits = AccountMap.empty[Debit, C],
-        credits = AccountMap.empty[Credit, C],
+        credits = AccountMap.empty[Credit, C]
       )
 
-    /** */
+    /**
+      */
     implicit def trialBalanceCommutativeGroup[C: Currency]: CommutativeGroup[TrialBalance[C]] =
       (Invariant[CommutativeGroup] imap CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -192,7 +209,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         unapply(_).fold(???)(identity)
       }
 
-    /** */
+    /**
+      */
     def from[F[_]: Sync, C: Currency](
         period: Period,
         cratchit: Transaction => Stream[F, DoubleEntryKey]
@@ -216,7 +234,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       val revenues: Revenues[C]
   ) extends Balance(expenses, revenues)
 
-  /** */
+  /**
+    */
   object IncomeStatement {
 
     private[model] def apply[C: Currency](
@@ -224,8 +243,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         revenues: Revenues[C]
     ): IncomeStatement[C] = new IncomeStatement(expenses, revenues) {}
 
-    /** */
-    implicit def incomeStatementCommutativeGroup[C: Currency]: CommutativeGroup[IncomeStatement[C]] =
+    /**
+      */
+    implicit def incomeStatementCommutativeGroup[
+        C: Currency
+    ]: CommutativeGroup[IncomeStatement[C]] =
       (Invariant[CommutativeGroup] imap CommutativeGroup[(Expenses[C], Revenues[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
@@ -234,52 +256,57 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    * Follow the `Mny`.
+    * Follow the `Money`:
     * - Operations
     * - Investment
     * - Financing
-    *
-    * - FIXME: isn't the typing too restrictive here? Consider cash capital transactions.
     */
   sealed abstract case class CashFlowStatement[C] private (
-      val outflows: Expenses[C],
-      val inflows: Revenues[C]
+      val outflows: Debits[C],
+      val inflows: Credits[C]
   ) extends Balance(outflows, inflows)
 
-  /**  */
+  /**
+    */
   object CashFlowStatement {
 
-    /** */
+    /**
+      */
     private[model] def apply[C: Currency](
-        outflows: Expenses[C],
-        inflows: Revenues[C]
+        outflows: Debits[C],
+        inflows: Credits[C]
     ): CashFlowStatement[C] = new CashFlowStatement(outflows, inflows) {}
 
-    /** */
+    /**
+      */
     implicit def cashflowStatementCommutativeGroup[C: Currency]: CommutativeGroup[CashFlowStatement[C]] =
-      Invariant[CommutativeGroup].imap(CommutativeGroup[(Expenses[C], Revenues[C])]) {
+      Invariant[CommutativeGroup].imap(CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
       } {
         unapply(_).fold(???)(identity)
       }
   }
 
-  /** */
+  /**
+    */
   sealed abstract case class BalanceSheet[C] private (
       val assets: Assets[C],
       val liabilities: Liabilities[C]
   ) extends Balance(assets, liabilities)
 
-  /** */
+  /**
+    */
   object BalanceSheet {
 
-    /** */
+    /**
+      */
     private[model] def apply[C: Currency](
         assets: Assets[C],
         liabilities: Liabilities[C]
     ): BalanceSheet[C] = new BalanceSheet(assets, liabilities) {}
 
-    /** */
+    /**
+      */
     implicit def balanceCommutativeGroup[C: Currency]: CommutativeGroup[BalanceSheet[C]] =
       Invariant[CommutativeGroup].imap(CommutativeGroup[(Assets[C], Liabilities[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -290,10 +317,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     * Should really be called
-    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity Statement of Changes in Equity]],
+    *    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity
+    * Statement of Changes in Equity]],
     * but that is judged insufficienty consise and regular.
     *
-    * Since there is no other equity stament, this shall be it.
+    * Since there is no other equity stament, this naming causes no confusion.
     *
     * Nota Bene the (arithmetic) indifference of the equity holder to equity
     * transactions at market price: their book value is unaffected by such
@@ -314,7 +342,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       override val credits: Credits[C]
   ) extends Balance(debits, credits)
 
-  /** */
+  /**
+    */
   object EquityStatement {
 
     private[model] def apply[C: Currency](
@@ -322,7 +351,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         credits: Credits[C]
     ): EquityStatement[C] = new EquityStatement(debits, credits) {}
 
-    /** */
+    /**
+      */
     implicit def equityStatementCommutativeGroup[C: Currency]: CommutativeGroup[EquityStatement[C]] =
       (Invariant[CommutativeGroup] imap CommutativeGroup[(Debits[C], Credits[C])]) {
         case (ds, cs) => apply(ds, cs)
@@ -331,56 +361,75 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       }
   }
 
-  /** */
+  /**
+    * FIXME: need to project (currency specific) Balance subclass from a `Balance.Id`
+    */
   sealed trait BookSet[C] {
 
-    /** */
+    /**
+      */
     type Repr <: BookSet[C]
 
-    /** */
+    /**
+      */
     def asOf: LocalDate
 
-    /** */
+    /**
+      */
     def period: Period
 
     /** `previous.asOf === this.asOf - this.Period` */
     def previous: Repr
 
-    /** */
+    /**
+      */
     def cs: CashFlowStatement[C]
 
-    /** */
+    /**
+      */
     def bs: BalanceSheet[C]
 
-    /** */
+    /**
+      */
     def es: EquityStatement[C]
   }
 
-  /** */
+  /**
+    * Placeholder
+    */
+  object BookSet {}
+
+  /**
+    */
   sealed abstract case class CashBookSet[C] private (
       asOf: LocalDate,
       period: Period,
       previous: CashBookSet[C],
       cs: CashFlowStatement[C],
       bs: BalanceSheet[C],
-      es: EquityStatement[C],
+      es: EquityStatement[C]
   ) extends BookSet[C] {
 
-    /** */
+    /**
+      */
     final type Repr = CashBookSet[C]
   }
 
-  /** */
-  object CashBookSet {
+  /** FIXME: existential types stink
+    */
+  object CashBookSet extends WithKey.Aux[Folio.Key, CashBookSet[_]] {
 
-    /** */
+    lazy val Key = Folio.Key
+
+    /**
+      */
     private[Balances] def apply[F[_], C: Currency](
         asOf: LocalDate,
         period: Period,
         previous: CashBookSet[C],
         cs: CashFlowStatement[C],
         bs: BalanceSheet[C],
-        es: EquityStatement[C],
+        es: EquityStatement[C]
     ): CashBookSet[C] =
       new CashBookSet(asOf, period, previous, cs, bs, es) {}
 
@@ -391,7 +440,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Pipe[F, Transaction, CashBookSet[C]] = ???
   }
 
-  /** */
+  /**
+    */
   sealed abstract case class AccrualBookSet[C] private (
       asOf: LocalDate,
       period: Period,
@@ -399,17 +449,33 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       cs: CashFlowStatement[C],
       is: IncomeStatement[C],
       bs: BalanceSheet[C],
-      es: EquityStatement[C],
+      es: EquityStatement[C]
   ) extends BookSet[C] {
 
-    /** */
+    /**
+      */
     final type Repr = AccrualBookSet[C]
   }
 
-  /** */
-  object AccrualBookSet {
+  /**
+    */
+  object AccrualBookSet extends WithKey.Aux[Folio.Key, AccrualBookSet[_]] {
 
-    /** */
+    lazy val Key = Folio.Key
+
+    case class View[C](
+        cs: CashFlowStatement[C],
+        is: IncomeStatement[C],
+        bs: BalanceSheet[C],
+        es: EquityStatement[C]
+    )
+
+    /** wip */
+    def view[F[_], C: Currency](abss: AccrualBookSets.Store[F])(abs: AccrualBookSet.Id): View[C] =
+      ???
+
+    /**
+      */
     private[Balances] def apply[C: Currency](
         asOf: LocalDate,
         period: Period,
@@ -417,14 +483,28 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         cs: CashFlowStatement[C],
         is: IncomeStatement[C],
         bs: BalanceSheet[C],
-        es: EquityStatement[C],
+        es: EquityStatement[C]
     ): AccrualBookSet[C] =
       new AccrualBookSet(asOf, period, previous, cs, is, bs, es) {}
 
-    /** */
+    /**
+      */
     def pipe[F[_]: Sync, C: Currency](
         period: Period,
         cratchit: Transaction => Stream[F, DoubleEntryKey]
     ): Pipe[F, Transaction, AccrualBookSet[C]] = ???
+
+    /**
+      */
+    def closeTheBooks[F[_]: Sync, C: Currency](
+        previous: AccrualBookSet.Id,
+        period: Period,
+        treatment: Transaction.Id => Stream[F, DoubleEntryKey]
+    ): Stream[F, Transaction.Id] => F[AccrualBookSet.Id] =
+      ???
   }
+
+  /**
+    */
+  lazy val AccrualBookSets = KeyValueStore of AccrualBookSet
 }
