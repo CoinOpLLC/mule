@@ -28,19 +28,24 @@ import enumeratum._
   */
 trait Accounting { self: ModuleTypes =>
 
-  /** */
+  /**
+    */
   sealed trait AccountingKey extends EnumEntry with Product with Serializable
 
-  /** */
+  /**
+    */
   object AccountingKey {
 
-    /** FIXME whither cats enum?  */
+    /**
+      */
     implicit def orderKeys[K <: AccountingKey]: cats.Order[K] = cats.Order by (_.entryName)
 
-    /** */
+    /**
+      */
     object implicits {
 
-      /** */
+      /**
+        */
       implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
 
         /**
@@ -51,16 +56,17 @@ trait Accounting { self: ModuleTypes =>
           * @param subKey Easily provided via an extractor.
           * @return A map containing those entries whose keys match a subclassing pattern.
           * @see [[keyval.DtEnum]]
-          *
           */
         def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
           m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
 
-        /** */
+        /**
+          */
         def widenKeys[J >: K <: AccountingKey]: Map[J, V] = m.toMap // shrugs
 
-        /** */
-        def denominated[C: Currency](implicit V: Financial[V]): AccountMap[K, C] =
+        /**
+          */
+        def denominated[C: Currency](implicit V: Financial[V]): AccountingMap[K, C] =
           m map {
             case (k, n) =>
               (k, Currency[C] apply (Financial[V] to [MonetaryAmount] n))
@@ -69,61 +75,76 @@ trait Accounting { self: ModuleTypes =>
     }
   }
 
-  /** */
+  /**
+    */
   sealed trait Debit extends AccountingKey
   object Debit extends DtEnum[Debit] {
 
-    /** */
+    /**
+      */
     lazy val values = Asset.values ++ Expense.values
   }
 
-  /** */
+  /**
+    */
   sealed trait Credit extends AccountingKey
   object Credit extends DtEnum[Credit] {
 
-    /** */
+    /**
+      */
     lazy val values = Liability.values ++ Revenue.values
   }
 
-  /** */
+  /**
+    */
   trait Liability extends Credit
 
-  /** */
+  /**
+    */
   object Liability extends DtEnum[Liability] {
 
-    /** */
+    /**
+      */
     lazy val values = Debt.values ++ Equity.values
   }
 
-  /** */
+  /**
+    */
   trait Expense extends Debit
   val Expense: DtEnum[_ <: Expense]
 
-  /** */
+  /**
+    */
   trait Revenue extends Credit
   val Revenue: DtEnum[_ <: Revenue]
 
-  /** */
+  /**
+    */
   trait Asset extends Debit
   val Asset: DtEnum[_ <: Asset]
 
-  /** And by income we mean net income. */
+  /** And by income we mean net income.
+    */
   trait Income extends Credit
   val Income: DtEnum[_ <: Income]
 
-  /** Reserved for now. :| */
+  /** Reserved for now. :|
+    */
   trait Reserve extends Credit
   val Reserve: DtEnum[_ <: Reserve]
 
-  /** */
+  /**
+    */
   trait Debt extends Liability
   val Debt: DtEnum[_ <: Debt]
 
-  /** */
+  /**
+    */
   trait Equity extends Liability
   val Equity: DtEnum[_ <: Equity]
 
-  /** Legal tender, immediately available funds (payable on demand). */
+  /** Legal tender, immediately available funds (payable on demand).
+    */
   sealed trait Cash extends Asset
   object Cash extends DtEnum[Cash] {
     case object Physical   extends Cash
@@ -134,65 +155,77 @@ trait Accounting { self: ModuleTypes =>
 
   /** instantiate double entry key module with appropriate monetary amount type */
   /** Mapping accounting keys to [[money.Mny]]. */
-  final type AccountMap[A <: AccountingKey, C] = Map[A, Money[C]]
+  final type AccountingMap[A <: AccountingKey, C] = Map[A, Money[C]]
 
-  /** */
-  object AccountMap {
+  /**
+    */
+  object AccountingMap {
 
-    /** */
-    def empty[K <: AccountingKey, C: Currency]: AccountMap[K, C] = Map.empty
+    /**
+      */
+    def empty[K <: AccountingKey, C: Currency]: AccountingMap[K, C] = Map.empty
   }
 
-  /** */
-  final type Debits[C] = AccountMap[Debit, C]
+  /**
+    */
+  final type Debits[C] = AccountingMap[Debit, C]
 
-  /** */
-  final type Credits[C] = AccountMap[Credit, C]
+  /**
+    */
+  final type Credits[C] = AccountingMap[Credit, C]
 
   /** [[BalanceSheet]] assets */
-  final type Assets[C] = AccountMap[Asset, C]
+  final type Assets[C] = AccountingMap[Asset, C]
 
   /** [[BalanceSheet]] liabilities */
-  final type Liabilities[C] = AccountMap[Liability, C]
+  final type Liabilities[C] = AccountingMap[Liability, C]
 
   /** Assets net of Liabilities */
-  final type Equities[C] = AccountMap[Equity, C]
+  final type Equities[C] = AccountingMap[Equity, C]
 
   /** "Top line" */
-  final type Revenues[C] = AccountMap[Revenue, C]
+  final type Revenues[C] = AccountingMap[Revenue, C]
 
-  /** */
-  final type Expenses[C] = AccountMap[Expense, C]
+  /**
+    */
+  final type Expenses[C] = AccountingMap[Expense, C]
 
   /** Revenues net of Expenses */
-  final type Incomes[C] = AccountMap[Income, C]
+  final type Incomes[C] = AccountingMap[Income, C]
 
   /** TODO: Name needs work. */
-  final type Cashes[C] = AccountMap[Cash, C]
+  final type Cashes[C] = AccountingMap[Cash, C]
 
-  /** */
+  /**
+    */
   sealed trait Nettable extends EnumEntry with Serializable {
 
-    /** */
+    /**
+      */
     type AssetType <: Asset
 
-    /** */
+    /**
+      */
     def gross: AssetType
 
-    /** */
+    /**
+      */
     def less: AssetType
 
-    /** */
+    /**
+      */
     final def net[C: Currency](assets: Assets[C]): Money[C] =
       assets(gross) - assets(less)
   }
 
-  /** */
+  /**
+    */
   object Nettable {
 
-    /** */
-    abstract class Aux[D <: Asset](val gross: D, val less: D) extends Nettable {
-      final type AssetType = D
+    /**
+      */
+    abstract class Aux[DB <: Asset](val gross: DB, val less: DB) extends Nettable {
+      final type AssetType = DB
     }
   }
 
@@ -201,85 +234,103 @@ trait Accounting { self: ModuleTypes =>
   /**
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
+    *
+    * FIXME: BR0K3N 4F
     */
   type Treatment[K <: AccountingKey] = UnitPartition[K, MonetaryAmount]
 
-  /** */
+  /**
+    */
   final val Treatment = UnitPartition
 
   /**
     * General form of a "double (bookkeeping) entry" key.
     */
-  sealed trait DoubleEntryKey extends EnumEntry with Product with Serializable {
+  sealed trait DoubleEntryKey extends EnumEntry {
 
-    /** */
+    /**
+      */
     type EntryKey <: AccountingKey
 
-    /** */
+    /**
+      */
     type ContraKey <: AccountingKey
 
-    /** */
+    /**
+      */
     def entries: Treatment[EntryKey]
 
-    /** */
+    /**
+      */
     def contras: Treatment[ContraKey]
   }
 
-  /** */
+  /**
+    */
   object DoubleEntryKey {
 
     /** subclass which assigns type parameters to type members */
-    sealed abstract class Aux[K1 <: AccountingKey, K2 <: AccountingKey](
+    sealed abstract class Aux[
+        K1 <: AccountingKey,
+        K2 <: AccountingKey
+    ](
         es: Treatment[K1],
         cs: Treatment[K2]
     ) extends DoubleEntryKey {
 
-      /** */
+      /**
+        */
       final type EntryKey = K1
 
-      /** */
+      /**
+        */
       final type ContraKey = K2
 
-      /** */
+      /**
+        */
       final def entries: Treatment[EntryKey] = es
 
-      /** */
+      /**
+        */
       final def contras: Treatment[ContraKey] = cs
     }
   }
 
   /** not sealed - extension point */
-  abstract class DebitCreditKey[D <: Debit, C <: Credit](
-      debits: Treatment[D],
-      credits: Treatment[C]
-  ) extends DoubleEntryKey.Aux(debits, credits) {
-    final def debits: Treatment[D]  = entries
-    final def credits: Treatment[C] = contras
-  }
+  abstract class DebitCreditKey(
+      final val debits: Treatment[Debit],
+      final val credits: Treatment[Credit]
+  ) extends DoubleEntryKey.Aux(debits, credits)
 
-  /** */
+  /**
+    */
   object DebitCreditKey {
 
-    /** */
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def accountMap[D <: Debit, C <: Credit, CCY: Currency](
-        ks: DebitCreditKey[D, C],
-        amount: Money[CCY]
-    ): (AccountMap[D, CCY], AccountMap[C, CCY]) =
-      (
-        (ks.debits.kvs map (amount * _.value)).toSortedMap,
-        (ks.credits.kvs map (amount * _.value)).toSortedMap
-      )
+    /**
+      */
+    private[model] def apply(debits: Treatment[Debit], credits: Treatment[Credit]) =
+      new DebitCreditKey(debits, credits) {}
 
-    /** */
-    def unapply[D <: Debit, C <: Credit](
-        dck: DebitCreditKey[D, C]
-    ): Option[(Treatment[D], Treatment[C])] =
-      (dck.debits, dck.credits).some
+    /**
+      */
+    def unapply(dc: DebitCreditKey): Option[(Treatment[Debit], Treatment[Credit])] =
+      (dc.debits, dc.credits).some
+
+    /**
+      */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    def accountingMaps[C: Currency](
+        dc: DebitCreditKey,
+        amount: Money[C]
+    ): (AccountingMap[Debit, C], AccountingMap[Credit, C]) =
+      (
+        (dc.debits.kvs map (amount * _.value)).toSortedMap,
+        (dc.credits.kvs map (amount * _.value)).toSortedMap
+      )
   }
 
   /**
-    * Keys that preserve the balance of a [[Balances.TrialBalance]].
+    * Keys that preserve the balance of a [[Balances.Balance]].
     *
     * `SwapKey`'s type parameter restricts the swap to occur
     * within the same "column" of the `Balance`.
@@ -289,76 +340,87 @@ trait Accounting { self: ModuleTypes =>
       val to: Treatment[K]
   ) extends DoubleEntryKey.Aux(from, to)
 
-  /** */
+  /**
+    */
   object SwapKey {
 
-    /** */
+    /**
+      */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def accountMap[K <: AccountingKey, C: Currency](
-        ks: SwapKey[K],
+        s: SwapKey[K],
         amount: Money[C]
-    ): AccountMap[K, C] = {
-      def from = (ks.from.kvs map (-amount * _.value)).toSortedMap
-      def to   = (ks.to.kvs map (amount * _.value)).toSortedMap
+    ): AccountingMap[K, C] = {
+      def from = (s.from.kvs map (-amount * _.value)).toSortedMap
+      def to   = (s.to.kvs map (amount * _.value)).toSortedMap
       from |+| to
     }
 
-    /** */
+    /**
+      */
     def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(Treatment[K], Treatment[K])] =
       (sk.from, sk.to).some
   }
 
-  /** not sealed - extension point */
-  abstract class DebitSwapKey[D <: Debit](
-      from: Treatment[D],
-      to: Treatment[D]
+  /** not sealed - extension point
+    */
+  abstract class DebitSwapKey(
+      from: Treatment[Debit],
+      to: Treatment[Debit]
   ) extends SwapKey(from, to)
 
-  /** */
+  /**
+    */
   object DebitSwapKey {
 
-    /** */
+    /**
+      */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def accountMap[D <: Debit, CCY: Currency](
-        ks: DebitSwapKey[D],
-        amount: Money[CCY]
-    ): (AccountMap[D, CCY], AccountMap[D, CCY]) =
+    def accountMap[C: Currency](
+        ks: DebitSwapKey,
+        amount: Money[C]
+    ): (AccountingMap[Debit, C], AccountingMap[Debit, C]) =
       (
         (ks.from.kvs map (amount * _.value)).toSortedMap,
         (ks.to.kvs map (amount * _.value)).toSortedMap
       )
 
-    /** */
-    def unapply[D <: Debit](
-        dsk: DebitSwapKey[D]
-    ): Option[(Treatment[D], Treatment[D])] =
-      (dsk.from, dsk.to).some
+    /**
+      */
+    def unapply(
+        ds: DebitSwapKey
+    ): Option[(Treatment[Debit], Treatment[Debit])] =
+      (ds.from, ds.to).some
   }
 
-  /** */
-  abstract class CreditSwapKey[C <: Credit] private[model] (
-      f: Treatment[C],
-      t: Treatment[C]
-  ) extends SwapKey[C](f, t)
+  /**
+    */
+  abstract class CreditSwapKey private[model] (
+      f: Treatment[Credit],
+      t: Treatment[Credit]
+  ) extends SwapKey[Credit](f, t)
 
-  /** */
+  /**
+    */
   object CreditSwapKey {
 
-    /** */
+    /**
+      */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    def accountMap[C <: Credit, CCY: Currency](
-        ks: CreditSwapKey[C],
-        amount: Money[CCY]
-    ): (AccountMap[C, CCY], AccountMap[C, CCY]) =
+    def accountMap[C: Currency](
+        ks: CreditSwapKey,
+        amount: Money[C]
+    ): (AccountingMap[Credit, C], AccountingMap[Credit, C]) =
       (
         (ks.from.kvs map (amount * _.value)).toSortedMap,
         (ks.to.kvs map (amount * _.value)).toSortedMap
       )
 
-    /** */
-    def unapply[C <: Credit](
-        dsk: CreditSwapKey[C]
-    ): Option[(Treatment[C], Treatment[C])] =
-      (dsk.from, dsk.to).some
+    /**
+      */
+    def unapply(
+        cs: CreditSwapKey
+    ): Option[(Treatment[Credit], Treatment[Credit])] =
+      (cs.from, cs.to).some
   }
 }

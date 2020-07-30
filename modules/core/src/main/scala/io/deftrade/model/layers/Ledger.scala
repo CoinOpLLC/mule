@@ -449,7 +449,7 @@ trait Ledger { module: ModuleTypes =>
     */
   sealed abstract case class Confirmation(from: Folio.Id, to: Folio.Id)
 
-  /**
+  /** No deletion
     */
   object Confirmation extends WithKey.Aux[Transaction.Id, Confirmation] {
 

@@ -69,7 +69,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Why not [[fs2.Pipe]]?
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
-  sealed abstract case class OMS[F[_]: Sync] private (
+  sealed abstract case class OMS[F[_]](
       host: LegalEntity.Key,
       entry: Folio.Key,
       contra: Folio.Key,
@@ -81,7 +81,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     type ToStreamOf[T, R] = Kleisli[ResultT[Stream[F, *], *], T, R]
 
     /**
-      * What the client wants [[Execution]] of.
+      * What it is that the client wants [[Execution]] of.
       *
       * Note: a denominating currency is always required by the [[MarketData.Exchange]]s,
       * in order to fully specify the trade, even if there is no limit amount attached.
@@ -129,46 +129,41 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * `Execution`s are pure values (do not evolve.)
       *
-      * Note: this implies that so-called "broken trades" require explicit modelling.
+      * So-called "broken trades" require explicit modelling.
       */
-    object Execution extends WithId[Execution]
+    object Execution extends WithId[Execution] {}
 
-    /**
-      * FIXME: address the issue of scheduling T+2 etc.
-      * also: this is the *wrong* place for the allcocation param
-      */
-    final def process[C: Currency, A](
-        allocation: Allocation
-    )(
-        block: => A
-    ): A ToStreamOf Unit =
-      riskCheck[C, A](block) andThen
-        trade andThen
-        allocate(allocation) andThen
-        settle
+    def riskCheck: Order ToStreamOf Order
 
-    /**
-      */
-    def riskCheck[C: Currency, A](a: A): A ToStreamOf Order
-
-    /**
-      */
     def trade: Order ToStreamOf Execution
 
-    /** Moves the traded [[capital.Instrument]]s to their final destination [[Folio]]. */
-    def allocate(a: Allocation): Execution ToStreamOf Execution
+    /** Bind allocations at the beginning of processing. The order processing ppipe need know
+      * nothing about the details of the account and the sub accounts.
+      *
+      * FIXME: implement (it's a system affortance)
+      */
+    final def allocate(a: Allocation): Execution ToStreamOf Execution = ???
 
     /**
-      * Updates the actual [[Folio]]s, with [[Account]] specific (and this `Folio` specific)
+      * Settlement updates the actual [[Folio]]s,
+      * with [[Account]] specific (and this `Folio` specific)
       * cash account [[capital.Instrument]]s substituted for the raw [[money.Currency]]
       * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
       * of the [[Trade]] specified in the [[Transaction]].
+      *
+      * FIXME: implement (it's a system affortance)
       */
-    def settle: Execution ToStreamOf Unit
+    final val settle: Execution ToStreamOf Confirmation = ???
+
+    /**
+      * Order processing is all just kleisli arrows? Always has been.
+      */
+    final def process(allocation: Allocation): Order ToStreamOf Confirmation =
+      riskCheck andThen trade andThen allocate(allocation) andThen settle
+
   }
 
   /**
-    * FIXME: augment/evolve creation pattern.
     */
   object OMS extends WithRefinedKey[String, IsLabel, OMSrecord] {
 
@@ -176,8 +171,10 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       * Each OMS must maintain a contra [[Ledger.Folio.Key]].
       * The creation of this account (and its [[Ledger.Folio.Key]]) must occur
       * before the OMS is created.
+      *
+      * TODO: evole
       */
-    def apply[F[_]: Sync](
+    def mk[F[_]: Sync](
         host: LegalEntity.Key,
         entry: Folio.Key,
         contra: Folio.Key,
@@ -188,23 +185,25 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
         /**
           */
-        def riskCheck[C: Currency, A](a: A): A ToStreamOf Order = ???
+        def riskCheck: Order ToStreamOf Order = ???
 
         /** This phase is implemented by the brokerage api integration code. */
         def trade: Order ToStreamOf Execution = ???
-
-        /**
-          */
-        def allocate(a: Allocation): Execution ToStreamOf Execution = ???
-
-        /**
-          */
-        def settle: Execution ToStreamOf Unit = ???
       }
   }
 
   /**
     * How do we settle a trade?
+    * - both sides do:
+    *     - for all negative items in the `Trade`, `map (_ * -1)` and move them to `unsettled`
+    *     - atomic swap items in `unsettled`
+    *     - sweep what was swapped into `unsettled` into `settled`
+    *     - `unsettled` is left empty for a sucessful transaction
+    *
+    * brainfart:
+    * - make `unsettled` "disposable" (transaction specific)... a "burner" folio.
+    * - empties get recycled for a 2 gen (nursery and LTS) garbage collector
+    * - LTS generation is populated with broken legs - settlement fails, basically
     */
   object SettlementAgent
 }

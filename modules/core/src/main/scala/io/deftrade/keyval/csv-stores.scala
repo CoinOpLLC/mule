@@ -63,10 +63,7 @@ object CsvStoreTypes {
     */
   abstract class Aux[F[_], W[_] <: WithValue, V, HV <: HList](
       override val V: W[V]
-  )(implicit
-    final override val F: Sync[F],
-    final override val X: ContextShift[F],
-    val lgv: LabelledGeneric.Aux[V, HV])
+  )(implicit final override val F: Sync[F], final override val X: ContextShift[F], val lgv: LabelledGeneric.Aux[V, HV])
       extends StoreTypes.Aux[F, W, V](V) {
 
     final type HValue = HV // === lgv.Repr  test / validate / assume ?!?
@@ -115,8 +112,8 @@ trait CsvStore[
       id <- Stream eval F.delay(fresh.nextAll(prev, row, rows: _*))
       r  <- Stream evals F.delay((row +: rows).toList)
       _ <- Stream eval F.delay { updateCache(r); (id, r) } through
-            idRowToCSV through
-            appendingSink
+             idRowToCSV through
+             appendingSink
     } yield id
 
   /** Default no-op imlementation. */
@@ -163,8 +160,7 @@ trait CsvValueStore[
 
   /**
     */
-  implicit final def writeIdRow(
-      implicit
+  implicit final def writeIdRow(implicit
       llw: Lazy[LabelledWrite[HValue]]
   ): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
@@ -179,8 +175,7 @@ trait CsvValueStore[
 
   /**
     */
-  implicit final def readIdRow(
-      implicit
+  implicit final def readIdRow(implicit
       llr: Lazy[LabelledRead[HV]]
   ): LabelledRead[(Id, Row)] =
     new LabelledRead[(Id, Row)] {
@@ -193,8 +188,7 @@ trait CsvValueStore[
 
   /**
     */
-  final protected def deriveCsvDecoderV(
-      implicit
+  final protected def deriveCsvDecoderV(implicit
       llr: Lazy[LabelledRead[HV]]
   ): Pipe[F, String, Result[(Id, Row)]] =
     readLabelledCompleteSafe[F, (Id, Row)] andThen
@@ -203,8 +197,7 @@ trait CsvValueStore[
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderV(
-      implicit
+  final protected def deriveCsvEncoderV(implicit
       llw: Lazy[LabelledWrite[HV]]
   ): Pipe[F, (Id, Row), String] = writeLabelled(printer)
 }
@@ -238,9 +231,7 @@ trait CsvKeyValueStore[
 
   /**
     */
-  implicit final def writeIdRow(implicit
-                                llw: LabelledWrite[HValue],
-                                putk: Put[Key]): LabelledWrite[(Id, Row)] =
+  implicit final def writeIdRow(implicit llw: LabelledWrite[HValue], putk: Put[Key]): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
 
       private val lwhpr = LabelledWrite[HIdRow]
@@ -257,9 +248,7 @@ trait CsvKeyValueStore[
 
   /**
     */
-  implicit final def readIdRow(implicit
-                               llr: LabelledRead[HV],
-                               getk: Get[Key]): LabelledRead[(Id, Row)] =
+  implicit final def readIdRow(implicit llr: LabelledRead[HV], getk: Get[Key]): LabelledRead[(Id, Row)] =
     new LabelledRead[(Id, Row)] {
 
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, (Id, Row)] = {
@@ -269,7 +258,7 @@ trait CsvKeyValueStore[
         row match {
 
           case CSV.Row(
-              NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
             lrhpr.read(row, headers) map { hpr =>
               (hpr.head, (hpr.tail.head, none))
@@ -286,8 +275,9 @@ trait CsvKeyValueStore[
   /**
     */
   final protected def deriveCsvDecoderKv(implicit
-                                         llr: Lazy[LabelledRead[HV]],
-                                         lgetk: Lazy[Get[Key]]): Pipe[F, String, Result[(Id, Row)]] = {
+      llr: Lazy[LabelledRead[HV]],
+      lgetk: Lazy[Get[Key]]
+  ): Pipe[F, String, Result[(Id, Row)]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
     readLabelledCompleteSafe[F, (Id, Row)] andThen
@@ -298,8 +288,9 @@ trait CsvKeyValueStore[
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def deriveCsvEncoderKv(implicit
-                                         llw: Lazy[LabelledWrite[HV]],
-                                         lputk: Lazy[Put[Key]]): Pipe[F, (Id, Row), String] = {
+      llw: Lazy[LabelledWrite[HV]],
+      lputk: Lazy[Put[Key]]
+  ): Pipe[F, (Id, Row), String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -354,15 +345,14 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
     for {
       handle <- appendHandles
       s      <- _
-    } yield
-      pulls
-        .writeAllToFileHandle(
-          Stream eval
-            (F pure s) through
-            text.utf8Encode,
-          handle
-        )
-        .stream |> discardValue // nota bene this is intentional and necessary
+    } yield pulls
+      .writeAllToFileHandle(
+        Stream eval
+          (F pure s) through
+          text.utf8Encode,
+        handle
+      )
+      .stream |> discardValue // nota bene this is intentional and necessary
   // WriteCursor(out, 0).writeAll(in).void
 
   /**
@@ -399,8 +389,7 @@ abstract case class MemFileValueStore[
     HV <: HList
 ](
     final override val V: WithId[V]
-)(implicit
-  final override val lgv: LabelledGeneric.Aux[V, HV])
+)(implicit final override val lgv: LabelledGeneric.Aux[V, HV])
     extends CsvStoreTypes.Aux(V)
     with CsvValueStore[F, V, HV]
     with MemFileV[F, WithId, V, HV]
@@ -415,8 +404,7 @@ abstract case class MemFileKeyValueStore[
     HV <: HList
 ](
     final override val V: WithKey.Aux[K, V]
-)(implicit
-  final override val lgv: LabelledGeneric.Aux[V, HV])
+)(implicit final override val lgv: LabelledGeneric.Aux[V, HV])
     extends CsvStoreTypes.Aux(V)
     with CsvKeyValueStore[F, K, V, HV]
     with MemFileKV[F, K, V, HV]
