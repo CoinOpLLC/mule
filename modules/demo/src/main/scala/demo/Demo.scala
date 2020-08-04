@@ -81,15 +81,16 @@ object TimeExample {
 
   // third tuesday
   val TemporalAdjuster(firstTuesday) = TemporalAdjusters firstInMonth DayOfWeek.WEDNESDAY
-  val thirdTuesday                   = TemporalAdjuster { firstTuesday andThen (_ + 2.weeks) }
+  val thirdTuesday                   = TemporalAdjuster(firstTuesday andThen (_ + 2.weeks))
 }
 
-/** */
+/**
+  */
 // object Demo extends IOApp {
 //
 //   final val BUFFER_SIZE = 4096 // * 4096 // nostalgia
 //
-//   type Report = Pipe[IO, Transaction, BookSet]
+//   type Report = Pipe[IO, Transaction, Report]
 //   val report: Report = ???
 //
 //   val reporter: Stream[IO, Unit] = (Stream resource Blocker[IO]) flatMap { blocker =>
@@ -99,7 +100,7 @@ object TimeExample {
 //       .through(text.lines)
 //       .through( /* csv read => Transaction */ )
 //       .through(report)
-//       .through( /* BookSet.show */ )
+//       .through( /* Report.show */ )
 //       .through(text.utf8Encode)
 //       .through(io.file.writeAll(Paths get "reports/booksets.txt", blocker))
 //   }

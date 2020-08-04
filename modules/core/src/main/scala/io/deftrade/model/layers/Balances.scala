@@ -58,7 +58,7 @@ import refined.auto._
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
-  import AccountingKey.implicits._
+  import AccountingKey.syntax._
 
   /**
     */
@@ -66,7 +66,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /**
       */
-    type CurrencyType
+    type CurrencyTag
 
     /**
       */
@@ -78,19 +78,19 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /**
       */
-    def debits: AccountingMap[DebitType, CurrencyType]
+    def debits: AccountingMap[DebitType, CurrencyTag]
 
     /**
       */
-    def credits: AccountingMap[CreditType, CurrencyType]
+    def credits: AccountingMap[CreditType, CurrencyTag]
 
     /**
       */
-    final def currency(implicit C: Currency[CurrencyType]): Currency[CurrencyType] = C
+    final def currency(implicit C: Currency[CurrencyTag]): Currency[CurrencyTag] = C
 
     /**
       */
-    final def net(implicit C: Currency[CurrencyType]): Money[CurrencyType] =
+    final def net(implicit C: Currency[CurrencyTag]): Money[CurrencyTag] =
       credits.total - debits.total
 
   }
@@ -109,15 +109,15 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
       /**
         */
+      final type CurrencyTag = C
+
+      /**
+        */
       final type DebitType = DB
 
       /**
         */
       final type CreditType = CR
-
-      /**
-        */
-      final type CurrencyType = C
     }
 
     lazy val Key = Folio.Key
@@ -168,11 +168,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /** TODO: consider: what if these were just views?
       */
-    final def cashBooks: CashBookSet[C] = ???
+    final def cashBooks: CashReport.Aux[C] = ???
 
     /**
       */
-    final def accrualBooks: AccrualBookSet[C] = ???
+    final def accrualBooks: AccrualReport.Aux[C] = ???
   }
 
   /**
@@ -224,8 +224,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   /**
     */
   sealed trait IncomeStatement extends Balance {
-    def expenses: Expenses[CurrencyType]
-    def revenues: Revenues[CurrencyType]
+    def expenses: Expenses[CurrencyTag]
+    def revenues: Revenues[CurrencyTag]
   }
 
   /**
@@ -253,8 +253,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     * - Financing
     */
   sealed trait CashFlowStatement extends Balance {
-    def outflows: Debits[CurrencyType]
-    def inflows: Credits[CurrencyType]
+    def outflows: Debits[CurrencyTag]
+    def inflows: Credits[CurrencyTag]
   }
 
   /**
@@ -282,8 +282,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   /**
     */
   sealed trait BalanceSheet extends Balance {
-    def assets: Assets[CurrencyType]
-    def liabilities: Liabilities[CurrencyType]
+    def assets: Assets[CurrencyTag]
+    def liabilities: Liabilities[CurrencyTag]
   }
 
   /**
@@ -352,22 +352,26 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  sealed trait BookSet[C] {
+  sealed trait Report {
 
     /**
       */
-    type Repr <: BookSet[C]
+    type CurrencyTag
 
     /**
       */
-    def asOf: LocalDate
+    type ReprId <: Report.Id
+
+    /**
+      */
+    def asOf: Instant
 
     /**
       */
     def period: Period
 
     /** `previous.asOf === this.asOf - this.Period` */
-    def previous: Repr
+    def previous: ReprId
 
     /**
       */
@@ -380,119 +384,133 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /**
       */
     def es: EquityStatement.Id
+
+    /**
+      */
+    final def currency(implicit C: Currency[CurrencyTag]): Currency[CurrencyTag] = C
   }
 
   /**
     * Placeholder
     */
-  object BookSet {}
-
-  /**
-    */
-  sealed abstract case class CashBookSet[C] private (
-      asOf: LocalDate,
-      period: Period,
-      previous: CashBookSet[C],
-      cs: CashFlowStatement.Id,
-      bs: BalanceSheet.Id,
-      es: EquityStatement.Id
-  ) extends BookSet[C] {
+  object Report extends WithId[(Folio.Id, Report)] {
 
     /**
       */
-    final type Repr = CashBookSet[C]
+    sealed abstract class Aux[C] extends Report {
+      final type CurrencyTag = C
+    }
   }
 
-  /** FIXME: existential types stink
+  /**
     */
-  object CashBookSet extends WithKey.Aux[Folio.Key, CashBookSet[_]] {
+  sealed trait CashReport extends Report {
+
+    /**
+      */
+    final type ReprId = CashReport.Id
+  }
+
+  /**
+    */
+  object CashReport extends WithKey.Aux[Folio.Key, CashReport] {
+
+    /**
+      */
+    sealed abstract case class Aux[C] private[CashReport] (
+        asOf: Instant,
+        period: Period,
+        previous: CashReport.Id,
+        cs: CashFlowStatement.Id,
+        bs: BalanceSheet.Id,
+        es: EquityStatement.Id
+    ) extends Report.Aux[C]
+        with CashReport
 
     lazy val Key = Folio.Key
 
     /**
       */
-    private[Balances] def apply[F[_], C: Currency](
-        asOf: LocalDate,
+    private[model] def apply[F[_], C: Currency](
+        asOf: Instant,
         period: Period,
-        previous: CashBookSet[C],
+        previous: CashReport.Id,
         cs: CashFlowStatement.Id,
         bs: BalanceSheet.Id,
         es: EquityStatement.Id
-    ): CashBookSet[C] =
-      new CashBookSet(asOf, period, previous, cs, bs, es) {}
+    ): CashReport =
+      new Aux[C](asOf, period, previous, cs, bs, es) {}
 
     /** TODO: restricted set of DoubleEntryKeys for cash books? */
     def pipe[F[_]: Sync, C: Currency](
         period: Period,
         cratchit: Transaction => Stream[F, DoubleEntryKey]
-    ): Pipe[F, Transaction, CashBookSet[C]] = ???
+    ): Pipe[F, Transaction, CashReport] = ???
   }
 
   /**
     */
-  sealed abstract case class AccrualBookSet[C] private (
-      asOf: LocalDate,
-      period: Period,
-      previous: AccrualBookSet[C],
-      cs: CashFlowStatement.Id,
-      is: IncomeStatement.Id,
-      bs: BalanceSheet.Id,
-      es: EquityStatement.Id
-  ) extends BookSet[C] {
+  sealed trait AccrualReport extends Report {
+
+    final type ReprId = AccrualReport.Id
 
     /**
       */
-    final type Repr = AccrualBookSet[C]
-  }
-
-  /**
-    */
-  object AccrualBookSet extends WithKey.Aux[Folio.Key, AccrualBookSet[_]] {
-
-    lazy val Key = Folio.Key
-
-    case class View[C](
-        cs: CashFlowStatement.Aux[C],
-        is: IncomeStatement.Aux[C],
-        bs: BalanceSheet.Aux[C],
-        es: EquityStatement.Aux[C]
+    sealed abstract case class View private[AccrualReport] (
+        cs: CashFlowStatement.Aux[CurrencyTag],
+        is: IncomeStatement.Aux[CurrencyTag],
+        bs: BalanceSheet.Aux[CurrencyTag],
+        es: EquityStatement.Aux[CurrencyTag]
     )
 
     /** wip */
-    def view[F[_], C: Currency](abss: AccrualBookSets.Store[F])(abs: AccrualBookSet.Id): View[C] =
+    def view[F[_]](abss: AccrualReports.Store[F])(abs: AccrualReport.Id): View =
       ???
 
-    /**
-      */
-    private[Balances] def apply[C: Currency](
-        asOf: LocalDate,
+    def is: IncomeStatement.Id
+  }
+
+  /**
+    */
+  object AccrualReport extends WithKey.Aux[Folio.Key, AccrualReport] {
+
+    lazy val Key = Folio.Key
+
+    sealed abstract case class Aux[C] private[AccrualReport] (
+        asOf: Instant,
         period: Period,
-        previous: AccrualBookSet[C],
+        previous: AccrualReport.Id,
         cs: CashFlowStatement.Id,
         is: IncomeStatement.Id,
         bs: BalanceSheet.Id,
         es: EquityStatement.Id
-    ): AccrualBookSet[C] =
-      new AccrualBookSet(asOf, period, previous, cs, is, bs, es) {}
+    ) extends Report.Aux[C]
+        with AccrualReport
 
     /**
       */
-    def pipe[F[_]: Sync, C: Currency](
+    private[Balances] def apply[C: Currency](
+        asOf: Instant,
         period: Period,
-        cratchit: Transaction => Stream[F, DoubleEntryKey]
-    ): Pipe[F, Transaction, AccrualBookSet[C]] = ???
+        previous: AccrualReport.Id,
+        cs: CashFlowStatement.Id,
+        is: IncomeStatement.Id,
+        bs: BalanceSheet.Id,
+        es: EquityStatement.Id
+    ): AccrualReport =
+      new Aux(asOf, period, previous, cs, is, bs, es) {}
 
     /**
       */
-    def closeTheBooks[F[_]: Sync, C: Currency](
-        previous: AccrualBookSet.Id,
+    final def report[F[_]: Sync, C: Currency](
+        previous: AccrualReport.Id,
         period: Period,
-        treatment: Transaction.Id => Stream[F, DoubleEntryKey]
-    ): Stream[F, Transaction.Id] => F[AccrualBookSet.Id] =
+        treatment: Transaction => Stream[F, DoubleEntryKey]
+    ): Stream[F, Transaction.Id] => F[AccrualReport.Id] =
       ???
   }
 
   /**
     */
-  lazy val AccrualBookSets = KeyValueStore of AccrualBookSet
+  lazy val AccrualReports = KeyValueStore of AccrualReport
 }

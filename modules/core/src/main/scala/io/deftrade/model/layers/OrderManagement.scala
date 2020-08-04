@@ -191,19 +191,4 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         def trade: Order ToStreamOf Execution = ???
       }
   }
-
-  /**
-    * How do we settle a trade?
-    * - both sides do:
-    *     - for all negative items in the `Trade`, `map (_ * -1)` and move them to `unsettled`
-    *     - atomic swap items in `unsettled`
-    *     - sweep what was swapped into `unsettled` into `settled`
-    *     - `unsettled` is left empty for a sucessful transaction
-    *
-    * brainfart:
-    * - make `unsettled` "disposable" (transaction specific)... a "burner" folio.
-    * - empties get recycled for a 2 gen (nursery and LTS) garbage collector
-    * - LTS generation is populated with broken legs - settlement fails, basically
-    */
-  object SettlementAgent
 }

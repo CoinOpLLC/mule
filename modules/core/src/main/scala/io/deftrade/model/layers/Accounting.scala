@@ -30,7 +30,7 @@ trait Accounting { self: ModuleTypes =>
 
   /**
     */
-  sealed trait AccountingKey extends EnumEntry with Product with Serializable
+  sealed trait AccountingKey extends EnumEntry
 
   /**
     */
@@ -42,23 +42,29 @@ trait Accounting { self: ModuleTypes =>
 
     /**
       */
-    object implicits {
+    object syntax {
 
       /**
         */
-      implicit final class MoarMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+      implicit final class AccountingMapOps[K <: AccountingKey, V](m: Map[K, V]) {
+
+        /** TODO: understand if both of these `collect` methods are needed
+          */
+        def collect[L <: K](pf: PartialFunction[K, L]): Map[L, V] =
+          collectKeys(pf.lift)
 
         /**
           * Filters a map by narrowing the scope of the keys contained.
           *
-          * TODO: Revisit. This is awkward, but DRY and reflection free... needs to evolve.
+          * TODO: Revisit. Feels awkward, but DRY and reflection free. Type bounds and pattern
+          * summation check each other.
           *
           * @param subKey Easily provided via an extractor.
           * @return A map containing those entries whose keys match a subclassing pattern.
           * @see [[keyval.DtEnum]]
           */
         def collectKeys[L <: K](subKey: K => Option[L]): Map[L, V] =
-          m collect (Function unlift { case (k, v) => subKey(k) map (l => (l, v)) })
+          m collect (Function unlift { case (k, v) => subKey(k) map { _ -> v } })
 
         /**
           */

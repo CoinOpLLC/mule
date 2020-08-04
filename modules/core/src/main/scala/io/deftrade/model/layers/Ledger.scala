@@ -394,6 +394,17 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
+    private def apply(
+        at: Instant,
+        from: Folio.Key,
+        to: Folio.Key,
+        trade: Trade.Id,
+        meta: Meta.Id
+    ): Transaction =
+      new Transaction(at, from, to, trade, meta) {}
+
+    /**
+      */
     def singleLeg[F[_]: Sync](
         // record: (Trade, Meta) => Stream[F, (Trade.Id, Meta.Id)]
         trades: Trades.Store[F],
@@ -430,38 +441,70 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
-
-    private def apply(
-        at: Instant,
-        from: Folio.Key,
-        to: Folio.Key,
-        trade: Trade.Id,
-        meta: Meta.Id
-    ): Transaction =
-      new Transaction(at, from, to, trade, meta) {}
   }
 
   /**
     */
   lazy final val Transactions = ValueStore of Transaction
 
-  /**
+  /** Realize that `Folio { type UpdatedEvent = Id }`.
+    *
+    * A trail (`Stream`) of `Confirmations` is low-touch auditable.
+    *
+    * How do we settle a trade?
+    *     - the net effect must be to transfer the `Trade` between `Folio`s.
+    *
+    * Both sides do:
+    *     - for all negative items in the `Trade`, `map (_ * -1)` and move them to `unsettled`
+    *     - atomic swap items in `unsettled`
+    *     - sweep what was swapped into `unsettled` into `settled`
+    *     - `unsettled` is left empty for a sucessful transaction
+    *
+    * FIXME:
+    * - make `unsettled` "disposable" (transaction specific)...
+    *     - `unsettled` becomes a "burner" folio
+    *     - remove `unsettled` from `Account`
+    * - ''empties'' get "thrown away" (deleted)
+    * - non-empty `unsettled` `Folio`s represent the broken legs of settlement fails
     */
-  sealed abstract case class Confirmation(from: Folio.Id, to: Folio.Id)
+  sealed abstract case class Confirmation private (from: Folio.Id, to: Folio.Id)
 
-  /** No deletion
+  /** TODO: implement the ''No deletion'' policy for this `KeyValueStore`
     */
   object Confirmation extends WithKey.Aux[Transaction.Id, Confirmation] {
+
+    private[model] def apply(from: Folio.Id, to: Folio.Id): Confirmation =
+      new Confirmation(from, to) {}
 
     object Key extends KeyCompanion[Transaction.Id] {
       implicit def order = Order[Transaction.Id]
       implicit def show  = Show[Transaction.Id]
     }
+
+    /**
+      */
+    implicit lazy val confirmationEq: Eq[Confirmation] = { import auto.eq._; semi.eq }
+
+    /**
+      */
+    implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
+
   }
 
   /**
     */
   lazy final val Confirmations = KeyValueStore of Confirmation
+
+  /**
+    * Drives the exchange of [[Trade]]s between [[Folio]]s.
+    *
+    * FIXME: define and implement
+    */
+  trait SettlementAgent
+
+  /**
+    */
+  object SettlementAgent
 
   /**
     * '''Cash''' is:
@@ -510,4 +553,9 @@ trait Ledger { module: ModuleTypes =>
           _  <- payCash(drawOn)(amount)
         } yield Result(id.some)
     }
+
+  /** Monotonic, in that [[Transaction]]s are never observed to "unsettle".
+    */
+  final def settled[F[_]: Sync](x: Transaction)(cfs: Stream[F, Confirmation]): F[Boolean] =
+    ???
 }
