@@ -30,6 +30,7 @@ import refined.refineV
 import refined.api.Refined
 
 import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
+import shapeless.Fin
 
 /**
   * Unparameterized [[Currency]] base class.
@@ -45,6 +46,9 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
   final def apply[N: Financial](amount: N): Mny[N, Type] =
     Mny fiat amount
 
+  /** Usage such as `USD fiat amount`. */
+  final def fiat[N: Financial](amount: N) = apply(amount)
+
   /** TODO: don't trust, ''test'' all codes in `java.currency` in order to justify this impl */
   final def code: Currency.Code = {
 
@@ -52,20 +56,25 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     c
   }
 
-  /** */
+  /**
+    */
   final def numericCode: Int = jc.getNumericCode
 
-  /** */
+  /**
+    */
   final def displayName: String = jc.getDisplayName
 
-  /** */
+  /**
+    */
   final def symbol: String = jc.getSymbol
 
-  /** */
-  final def defaultFractionDigits: Int = jc.getDefaultFractionDigits match {
-    case -1 => 4 // typical use case is unit-of-account: no real std, just need a decent default
-    case fd => fd
-  }
+  /**
+    */
+  final def defaultFractionDigits: Int =
+    jc.getDefaultFractionDigits match {
+      case -1 => 4 // typical use case is unit-of-account: no real std, just need a decent default
+      case fd => fd
+    }
 
   /**
     * pip: percentage in point https://en.wikipedia.org/wiki/Percentage_in_point
@@ -77,29 +86,35 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     */
   final def pipScale: Int = defaultFractionDigits + 2
 
-  /** */
+  /**
+    */
   def fractionDigits: Int = defaultFractionDigits
 
-  /** */
-  def rounding: RoundingMode = self.entryName match {
-    case "JPY" => DOWN
-    case _     => HALF_UP
-  }
+  /**
+    */
+  def rounding: RoundingMode =
+    self.entryName match {
+      case "JPY" => DOWN
+      case _     => HALF_UP
+    }
 
-  /** */
+  /**
+    */
   final private lazy val jc = java.util.Currency getInstance self.entryName
 }
 
-/**  */
+/**
+  */
 object CurrencyLike {
 
   import refined.cats._
 
-  /** */
+  /**
+    */
   implicit lazy val order: Order[CurrencyLike] = Order by { _.code }
 }
 
-/** `Aux` pattern in all but name.  */
+/** `Aux` pattern in all but name. */
 sealed trait Currency[C] extends CurrencyLike { final type Type = C }
 
 /**
@@ -117,7 +132,8 @@ object Currency extends DtEnum[CurrencyLike] { self =>
   /** TODO: check against a `NonEmptySet[Currency]` loaded at init */
   type IsCode = refined.string.MatchesRegex[CodePattern]
 
-  /** */
+  /**
+    */
   type Code = String Refined IsCode
 
   /**
@@ -127,10 +143,11 @@ object Currency extends DtEnum[CurrencyLike] { self =>
 
   /**
     */
-  def unapply(n: Numéraire): Option[CurrencyLike] = n match {
-    case c: CurrencyLike if values contains c => Some(c)
-    case _                                    => None
-  }
+  def unapply(n: Numéraire): Option[CurrencyLike] =
+    n match {
+      case c: CurrencyLike if values contains c => Some(c)
+      case _                                    => None
+    }
 
   /**
     * The Majors are: EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CHF, NZD/USD and USD/CAD. (wiki)
@@ -189,6 +206,7 @@ object Currency extends DtEnum[CurrencyLike] { self =>
 
   // TODO: MOAR...
 
-  /** */
+  /**
+    */
   val values = findValues
 }

@@ -25,7 +25,8 @@ import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
 
-/** */
+/**
+  */
 final case class Contact(
     name: Contact.Name,
     address: Contact.USAddress,
@@ -34,11 +35,9 @@ final case class Contact(
     url: Option[String Refined Url]
 )
 
-/** */
-object Contact extends WithId[Misc.Aux[Contact]] {
-// object Contact extends WithKey.Aux[Party.Key, Misc.Aux[Contact]] {
-//
-//   lazy val Key = Party.Key
+/**
+  */
+object Contact extends WithId.Aux[SADT.Aux[Contact]] {
 
   import cats.derived
   import refined.cats._
@@ -51,14 +50,16 @@ object Contact extends WithId[Misc.Aux[Contact]] {
   implicit lazy val decoder: Decoder[Contact] = deriveDecoder
   implicit lazy val encoder: Encoder[Contact] = deriveEncoder
 
-  /** */
+  /**
+    */
   final case class Name(
       first: Label,
       middle: Option[Label],
-      last: Label,
+      last: Label
   )
 
-  /** */
+  /**
+    */
   object Name {
 
     implicit lazy val nameEq: Eq[Name]     = derived.semi.eq
@@ -68,7 +69,8 @@ object Contact extends WithId[Misc.Aux[Contact]] {
     implicit lazy val encoder: Encoder[Name] = deriveEncoder
   }
 
-  /** */
+  /**
+    */
   final case class USAddress(
       street: Label,
       street2: Option[Label],
@@ -77,7 +79,8 @@ object Contact extends WithId[Misc.Aux[Contact]] {
       zip: USZip
   )
 
-  /** */
+  /**
+    */
   object USAddress {
 
     implicit lazy val usAddressEq: Eq[USAddress]     = derived.semi.eq
@@ -89,28 +92,35 @@ object Contact extends WithId[Misc.Aux[Contact]] {
 
   private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
 
-  /** */
+  /**
+    */
   final val TenDigit = digits(10)
 
-  /** */
+  /**
+    */
   final type IsUSPhone = MatchesRegex[TenDigit.type]
 
-  /** */
+  /**
+    */
   final type USPhone = String Refined IsUSPhone
 
-  /** */
+  /**
+    */
   final val Zip = s"${digits(5)}|${digits(5 + 4)}"
 
-  /** */
+  /**
+    */
   final type IsUSZip = MatchesRegex[Zip.type]
 
-  /** */
+  /**
+    */
   final type USZip = String Refined IsUSZip
 
   /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
   final val IsEmail =
     """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
 
-  /** */
+  /**
+    */
   final type Email = String Refined MatchesRegex[IsEmail.type]
 }

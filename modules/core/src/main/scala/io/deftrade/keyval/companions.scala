@@ -34,13 +34,16 @@ import shapeless.labelled._
 
 import java.util.UUID
 
-/** */
+/**
+  */
 object OpaqueKey {
 
-  /** */
+  /**
+    */
   private[keyval] def apply[K: Order: Show, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
 
-  /** */
+  /**
+    */
   def unsafe[K: Order: Show, V](k: K): OpaqueKey[K, V] = apply(k)
 
   /** FIXME questionable */
@@ -56,7 +59,8 @@ object OpaqueKey {
   */
 protected sealed trait WithValue {
 
-  /** */
+  /**
+    */
   type Value
 
   /** A permanent identifier (eg auto-increment in a db col) */
@@ -72,7 +76,8 @@ protected sealed trait WithValue {
   final type IdField = FieldType[id.T, Id]
 }
 
-/** */
+/**
+  */
 protected object WithValue {
 
   /**
@@ -80,22 +85,37 @@ protected object WithValue {
     */
   sealed abstract class Aux[V] extends WithValue {
 
-    /** */
+    /**
+      */
     final type Value = V
   }
 }
 
-/** */
-abstract class WithId[V] extends WithValue.Aux[V] {
+/**
+  */
+sealed trait WithId extends WithValue {
 
-  /** */
+  /**
+    */
   final type Row = Value
 }
 
-/** */
-object WithId
+/**
+  */
+object WithId {
 
-/**  */
+  /**
+    */
+  abstract class Aux[V] extends WithValue.Aux[V] with WithId {
+
+    /**
+      */
+    final type Store[F[_]] = ValueStore[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
+  }
+}
+
+/**
+  */
 trait WithKey extends WithValue {
 
   /**
@@ -113,37 +133,47 @@ trait WithKey extends WithValue {
   final type KeyField = FieldType[key.T, Key]
 }
 
-/** */
+/**
+  */
 object WithKey {
 
   /** The `Key` type member is assigned type parameter `K`. */
   abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
 
-    /** */
+    /**
+      */
     final type Key = K
+
+    /**
+      */
+    final type Store[F[_]] = KeyValueStore[F, Key, Value]
   }
 
   /** Key type companion base class. */
   abstract class KeyCompanion[K] {
 
-    /** */
+    /**
+      */
     implicit def order: Order[K]
 
-    /** */
+    /**
+      */
     implicit def show: Show[K]
   }
 
   /** Companion mez class for `Refined` key types. */
   abstract class RefinedKeyCompanion[K: Order: Show, P] extends KeyCompanion[Refined[K, P]] {
 
-    /** */
+    /**
+      */
     def apply(k: K)(implicit ev: Validate[K, P]): Result[Refined[K, P]] =
       refineV[P](k) leftMap Fail.fromString
 
     /** for testability */
     def unsafe(k: K): Refined[K, P] = Refined unsafeApply k
 
-    /** */
+    /**
+      */
     final override implicit def order = Order[Refined[K, P]]
 
     import refined.cats._ // FIXME: why?
@@ -169,7 +199,8 @@ abstract class WithOpaqueKey[K: Order: Show, V] extends WithRefinedKey[K, V, V]
   */
 abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[K, P], V] {
 
-  /** */
+  /**
+    */
   object Key extends WithKey.RefinedKeyCompanion[K, P]
 }
 
@@ -180,16 +211,20 @@ abstract class WithRefinedKey[K: Order: Show, P, V] extends WithKey.Aux[Refined[
   */
 abstract class WithFuuidKey[V] extends WithKey.Aux[FUUID, V] {
 
-  /** */
+  /**
+    */
   object Key extends WithKey.KeyCompanion[FUUID] {
 
-    /** */
+    /**
+      */
     def random: Key = FUUID fromUUID UUID.randomUUID
 
-    /** */
+    /**
+      */
     implicit def order = Order[FUUID]
 
-    /** */
+    /**
+      */
     implicit def show = Show[FUUID]
   }
 }

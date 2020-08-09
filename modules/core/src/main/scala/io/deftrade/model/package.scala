@@ -39,7 +39,7 @@ import cats.kernel.CommutativeGroup
 package object model
 /*
   All layers and augments need to agree on certain types:
-     */
+ */
     extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,
       /* type Quantity       = */ Double
@@ -60,9 +60,11 @@ package object model
     //
     // necessary package level augmentation
     //
+    with DefaultMetas
     with IRS1065 { // replace or enhance as necessary
 
-  /**  */
+  /**
+    */
   def groupBy[
       F[_]: Applicative: Foldable: SemigroupK,
       K,
@@ -87,7 +89,8 @@ package object model
   //     case (k, kvs) => (k, kvs map (_._2))
   //   }
   //
-  /**  */
+  /**
+    */
   def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K, V: CommutativeGroup](
       kvs: F[(K, V)]
   ): Map[K, V] =

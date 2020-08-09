@@ -73,7 +73,7 @@ import refined.api.Refined
   *   - subject to tactical denormalization
   *       - deviates from strict Data Vault methodology
   *       - mixes `satelite` fields in with `link` or `hub` shaped relations
-  *    - nullable / polymorphic fields are modelled as `Misc.Aux[ADT]`
+  *    - nullable / polymorphic fields are modelled as `SADT.Aux[ADT]`
   *       - `ADT` := Algebraic Data Type
   *       - [[io.circe.Json Json]] `encoder`s and `decoder`s
   *       - which can be stored / indexed as binary in Mongo and Postgres
@@ -186,22 +186,22 @@ package keyval {
 
     /**
       */
-    implicit def miscGet[T: Encoder: Decoder]: Get[Misc.Aux[T]] =
-      new Get[Misc.Aux[T]] {
+    implicit def miscGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
+      new Get[SADT.Aux[T]] {
 
         import io.circe.parser._
 
         /**
           */
-        def get(field: CSV.Field): Either[Error.DecodeFailure, Misc.Aux[T]] =
+        def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
           for {
             json <- parse(field.x) leftMap toDecodeFailure
-          } yield Misc from json
+          } yield SADT[T](json)
       }
 
     /**
       */
-    implicit lazy val miscPut: Put[Misc] =
+    implicit lazy val miscPut: Put[SADT] =
       stringPut contramap (_.canoncicalString)
 
   }

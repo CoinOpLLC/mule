@@ -443,7 +443,7 @@ Id | (Key | Option[(K2 | Option[V2])])
 ```scala
 
 // identity, basically
-// overrideable (?!) Misc / Json stuff
+// overrideable (?!) SADT / Json stuff
 def fromValue[A](v: Value)(implicit asA: Value <~< A): A = asA 
 def toValue(a: A)(implicit asValue: A <~< Value): Value  = asValue 
 

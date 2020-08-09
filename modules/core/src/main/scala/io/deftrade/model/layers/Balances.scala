@@ -393,7 +393,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   /**
     * Placeholder
     */
-  object Report extends WithId[(Folio.Id, Report)] {
+  object Report extends WithId.Aux[(Folio.Id, Report)] {
 
     /**
       */
@@ -464,7 +464,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     )
 
     /** wip */
-    def view[F[_]](abss: AccrualReports.Store[F])(abs: AccrualReport.Id): View =
+    def view[F[_]](abss: AccrualReport.Store[F])(abs: AccrualReport.Id): View =
       ???
 
     def is: IncomeStatement.Id
@@ -509,8 +509,4 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Stream[F, Transaction.Id] => F[AccrualReport.Id] =
       ???
   }
-
-  /**
-    */
-  lazy val AccrualReports = KeyValueStore of AccrualReport
 }

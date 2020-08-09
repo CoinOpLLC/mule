@@ -33,37 +33,45 @@ import fs2.{ Stream }
 
 import scala.collection.immutable.SortedMap
 
-/** */
+/**
+  */
 trait StoreTypes {
 
-  /** */
+  /**
+    */
   type ValueType
 
-  /** */
+  /**
+    */
   type ValueCompanionType[x] <: WithValue
 
-  /** */
+  /**
+    */
   type EffectType[_]
 
-  /** */
+  /**
+    */
   final type StreamF[x] = Stream[EffectType, x]
 
-  /** */
+  /**
+    */
   implicit def F: Sync[EffectType]
 
-  /** */
+  /**
+    */
   implicit def X: ContextShift[EffectType]
 
 }
 
-/** */
+/**
+  */
 object StoreTypes {
 
-  /** */
+  /**
+    */
   abstract class Aux[F[_], W[_] <: WithValue, V](
       val V: W[V]
-  )(
-      implicit
+  )(implicit
       override val F: Sync[F],
       override val X: ContextShift[F]
   ) extends StoreTypes {
@@ -74,12 +82,18 @@ object StoreTypes {
   }
 }
 
-/** */
+/**
+  * Note the only way to get an Id is as the result of an effectful mutation or probe.
+  */
 trait Store[F[_], W[_] <: WithValue, V] {
 
   self: StoreTypes.Aux[F, W, V] =>
 
   import V._
+
+  /**
+    */
+  final def rows: Stream[F, Row] = idRows map (_._2)
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -106,23 +120,27 @@ trait Store[F[_], W[_] <: WithValue, V] {
   protected var prev: Id =
     Refined unsafeApply [String, IsSha] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
 
-  /** */
+  /**
+    */
   protected def fresh: Fresh[Id, Row]
 }
 
-/** */
+/**
+  */
 object Store {
 
-  /** */
+  /**
+    */
   def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
     _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
 }
 
-/** */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStore[F[_], V] extends Store[F, WithId, V] {
+trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
 
-  self: StoreTypes.Aux[F, WithId, V] =>
+  self: StoreTypes.Aux[F, WithId.Aux, V] =>
 
   import V._
 
@@ -146,54 +164,47 @@ trait ValueStore[F[_], V] extends Store[F, WithId, V] {
   /**
     * FIXME move to `Nem`
     */
-  final def getMap[K2: Order, V2](id: Id)(
-      implicit asK2V2: Value <~< (K2, V2)
+  final def getMap[K2: Order, V2](id: Id)(implicit
+      asK2V2: V <~< (K2, V2)
   ): Stream[F, Map[K2, V2]] =
     for (values <- getList(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
-  /** */
+  /**
+    */
   final def put(value: Value): Stream[F, Id] =
     append(value)
 
-  /** */
+  /**
+    */
   final def putList(values: List[Value]): Stream[F, Id] =
-    values.headOption.fold(Stream.empty[F]: Stream[F, Id])(
-      value => append(value, (values drop 1): _*)
-    )
+    values.headOption.fold(Stream.empty[F]: Stream[F, Id])(value => append(value, (values drop 1): _*))
 
-  /** */
-  final def putMap[K2: Order, V2](k2v2s: Map[K2, V2])(
-      implicit asValue: (K2, V2) <~< Value
+  /**
+    */
+  final def putMap[K2: Order, V2](k2v2s: Map[K2, V2])(implicit
+      asValue: (K2, V2) <~< V
   ): Stream[F, Id] =
     putList(k2v2s.toList map (asValue coerce _))
 
-  /** */
+  /**
+    */
   final def putNel(values: NonEmptyList[Value]): Stream[F, Id] =
     append(values.head, values.tail: _*)
 
-  /** */
-  final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(
-      implicit asValue: (K2, V2) <~< Value
+  /**
+    */
+  final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(implicit
+      asValue: (K2, V2) <~< Value
   ): Stream[F, Id] =
     putNel(k2v2s.toNel map (asValue coerce _))
 }
 
-/** dsl enhancements - ''dry'' type definitions for `Store`s */
-object ValueStore {
+/** placeholder */
+object ValueStore
 
-  /** */
-  def of[V](V: WithId[V]) = TypeOps(V)
-
-  /** */
-  sealed case class TypeOps[V](final val V: WithId[V]) {
-    final type Store[F[_]] = ValueStore[F, V.Value] with StoreTypes.Aux[F, WithId, V.Value]
-
-    // final type ValueType   = V.Value appears useless
-  }
-}
-
-/**  */
+/**
+  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
 
@@ -204,18 +215,21 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   protected def idRowsWith(key: Key): Stream[F, (Id, Row)] =
     idRows filter (_._2._1 === key)
 
-  /** */
+  /**
+    */
   protected def updateExistingKey(key: Key, maybeValue: Option[Value]): Stream[F, Id] =
     for {
       _  <- exists(key)
       id <- append(key -> maybeValue)
     } yield id
 
-  /** */
+  /**
+    */
   def exists(key: Key): Stream[F, Id] =
     idRowsWith(key) map (_._1)
 
-  /** */
+  /**
+    */
   def select(key: Key): Stream[F, Value] =
     selectAll(key) take 1
 
@@ -225,22 +239,26 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
       value <- (idRowsWith(key) map (_._2._2)).unNoneTerminate
     } yield value
 
-  /**  */
+  /**
+    */
   def selectList(key: Key): Stream[F, List[Value]] =
     selectAll(key) through Store.listPipe
 
-  /** */
-  def selectMap[K2: Order, V2](key: Key)(
-      implicit asK2V2: Value <~< (K2, V2)
+  /**
+    */
+  def selectMap[K2: Order, V2](key: Key)(implicit
+      asK2V2: Value <~< (K2, V2)
   ): Stream[F, Map[K2, V2]] =
     for (values <- selectList(key))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
-  /** */
+  /**
+    */
   def insert(key: Key, value: Value): Stream[F, Id] =
     exists(key).last flatMap (_.fold(append(key -> value.some))(_ => Stream.empty))
 
-  /** */
+  /**
+    */
   def update(key: Key, value: Value): Stream[F, Id] =
     updateExistingKey(key, value.some)
 
@@ -248,31 +266,23 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   def delete(key: Key): Stream[F, Id] =
     updateExistingKey(key, none)
 
-  /** */
+  /**
+    */
   def upsert(key: Key, value: Value): Stream[F, Id] =
     append(key -> value.some)
 
-  /** */
+  /**
+    */
   def upsertNel(key: Key, values: NonEmptyList[Value]): Stream[F, NonEmptyList[Id]] =
     (values map (v => append(key -> v.some))).sequence
 
-  /** */
-  def upsertNem[K2: Order, V2](key: Key, k2v2s: NonEmptyMap[K2, V2])(
-      implicit asValue: (K2, V2) <~< Value
+  /**
+    */
+  def upsertNem[K2: Order, V2](key: Key, k2v2s: NonEmptyMap[K2, V2])(implicit
+      asValue: (K2, V2) <~< Value
   ): Stream[F, NonEmptyList[Id]] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
 }
 
-/** dsl enhancements - ''dry'' type definitions for `Store`s */
-object KeyValueStore {
-
-  /** */
-  def of(V: WithKey) = TypeOps(V)
-
-  /** */
-  sealed case class TypeOps(final val V: WithKey) {
-
-    /** */
-    final type Store[F[_]] = KeyValueStore[F, V.Key, V.Value]
-  }
-}
+/** placeholder */
+object KeyValueStore

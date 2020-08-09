@@ -77,7 +77,7 @@ object mvt {
 
     /**
       */
-    def mk(nut: Nut, bar: Bar, contact: Contact, meta: Misc): Stream[IO, Foo] = {
+    def mk(nut: Nut, bar: Bar, contact: Contact, meta: SADT): Stream[IO, Foo] = {
       val Right(r) =
         refineV[`[0,1)`](bar.show.size / (bar.show.size + meta.show.size).toDouble)
       for {
@@ -106,7 +106,7 @@ object mvt {
 
   /**
     */
-  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: Misc.Id)
+  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: SADT.Id)
 
   /**
     */
@@ -114,17 +114,17 @@ object mvt {
 
     /**
       */
-    def apply(z: Instant, amount: Dollars, mi: Misc.Id): Bar =
+    def apply(z: Instant, amount: Dollars, mi: SADT.Id): Bar =
       new Bar(z, amount, mi) {}
 
     /**
       */
-    def mk(amount: Dollars, meta: Misc): Stream[IO, Bar] =
+    def mk(amount: Dollars, meta: SADT): Stream[IO, Bar] =
       for {
         mi <- metas append meta
       } yield Bar(instant, amount, mi)
 
-    def mkPipe(amounts: Stream[IO, Dollars], metas: Stream[IO, Misc]): Stream[IO, Bar] =
+    def mkPipe(amounts: Stream[IO, Dollars], metas: Stream[IO, SADT]): Stream[IO, Bar] =
       for {
         amount <- amounts
         meta   <- metas
@@ -139,12 +139,12 @@ object mvt {
 
   lazy val Right(foos)  = keyValueStore[IO] at "target/foos.csv" ofChainAddressed Foo
   lazy val Right(bars)  = keyValueStore[IO] at "target/bars.csv" ofChainAddressed Bar
-  lazy val Right(metas) = valueStore[IO] at "target/metas.csv" ofContentAddressed Misc
+  lazy val Right(metas) = valueStore[IO] at "target/metas.csv" ofContentAddressed SADT
 }
 
 object arbitraryMvt {
 
-  import keval.{ Misc }
+  import keval.{ SADT }
   import model.{ Money }
 
   import Jt8Gen._
@@ -153,14 +153,14 @@ object arbitraryMvt {
   def drift[A](aa: Gen[A]): Gen[Stream[IO, A]] =
     for (a <- aa) yield Stream eval (IO delay a)
 
-  implicit def FIXME: Arbitrary[Misc] = ???
+  implicit def FIXME: Arbitrary[SADT] = ???
 
   implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
     Arbitrary {
       for {
         bars  <- arbitrary[Stream[IO, Bar]]
         nuts  <- drift(arbitrary[Nut])
-        metas <- drift(arbitrary[Misc])
+        metas <- drift(arbitrary[SADT])
       } yield Foo mkPipe (nuts, bars, metas)
     }
 
@@ -168,7 +168,7 @@ object arbitraryMvt {
     Arbitrary {
       for {
         amount <- arbitrary[Money[USD]]
-        meta   <- arbitrary[Misc]
+        meta   <- arbitrary[SADT]
       } yield Bar mk (amount, meta)
     }
 }
@@ -183,8 +183,8 @@ class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
     //     println(bar)
     //   }
     //
-    //   forAll { bar: Misc =>
-    //     val key = Misc.Key unsafe bar.hashCode.toLong
+    //   forAll { bar: SADT =>
+    //     val key = SADT.Key unsafe bar.hashCode.toLong
     //     val id  = bars upsert (key, bar)
     //     println(id -> (key -> bar))
     //   }

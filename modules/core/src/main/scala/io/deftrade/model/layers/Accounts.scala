@@ -55,7 +55,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     protected[deftrade] def empty = apply(freshFolioKey, freshFolioKey)
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
@@ -185,9 +185,4 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
   }
-
-  lazy val Accounts = KeyValueStore of Account
-  lazy val Rosters  = KeyValueStore of Roster
-  lazy val Parties  = KeyValueStore of Party
-  lazy val Contacts = ValueStore of Contact
 }
