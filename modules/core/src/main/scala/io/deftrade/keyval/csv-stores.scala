@@ -148,9 +148,9 @@ trait CsvValueStore[
     F[_],
     V,
     HV <: HList
-] extends CsvStore[F, WithId, V, HV] {
+] extends CsvStore[F, WithId.Aux, V, HV] {
 
-  self: CsvStoreTypes.Aux[F, WithId, V, HV] =>
+  self: CsvStoreTypes.Aux[F, WithId.Aux, V, HV] =>
 
   import V._
 
@@ -290,9 +290,7 @@ trait CsvKeyValueStore[
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderKv(implicit
-                                         llw: Lazy[LabelledWrite[HV]],
-                                         lputk: Lazy[Put[Key]]): Pipe[F, (Id, Row), String] = {
+  final protected def deriveCsvEncoderKv(implicit llw: Lazy[LabelledWrite[HV]], lputk: Lazy[Put[Key]]): Pipe[F, (Id, Row), String] = {
 
     implicit def lwhv: LabelledWrite[HV] = llw.value
     implicit def putk: Put[Key]          = lputk.value
@@ -391,11 +389,11 @@ abstract case class MemFileValueStore[
     V: Eq,
     HV <: HList
 ](
-    final override val V: WithId[V]
+    final override val V: WithId.Aux[V]
 )(implicit final override val lgv: LabelledGeneric.Aux[V, HV])
     extends CsvStoreTypes.Aux(V)
     with CsvValueStore[F, V, HV]
-    with MemFileV[F, WithId, V, HV]
+    with MemFileV[F, WithId.Aux, V, HV]
 
 /**
   */

@@ -72,9 +72,9 @@ object StoreTypes {
   abstract class Aux[F[_], W[_] <: WithValue, V](
       val V: W[V]
   )(implicit
-      override val F: Sync[F],
-      override val X: ContextShift[F]
-  ) extends StoreTypes {
+    override val F: Sync[F],
+    override val X: ContextShift[F])
+      extends StoreTypes {
 
     final override type ValueCompanionType[x] = W[x]
     final type EffectType[x]                  = F[x]
@@ -165,8 +165,7 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
     * FIXME move to `Nem`
     */
   final def getMap[K2: Order, V2](id: Id)(implicit
-      asK2V2: V <~< (K2, V2)
-  ): Stream[F, Map[K2, V2]] =
+                                          asK2V2: V <~< (K2, V2)): Stream[F, Map[K2, V2]] =
     for (values <- getList(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
@@ -183,8 +182,7 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
   /**
     */
   final def putMap[K2: Order, V2](k2v2s: Map[K2, V2])(implicit
-      asValue: (K2, V2) <~< V
-  ): Stream[F, Id] =
+                                                      asValue: (K2, V2) <~< V): Stream[F, Id] =
     putList(k2v2s.toList map (asValue coerce _))
 
   /**
@@ -195,8 +193,7 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
   /**
     */
   final def putNem[K2: Order, V2](k2v2s: NonEmptyMap[K2, V2])(implicit
-      asValue: (K2, V2) <~< Value
-  ): Stream[F, Id] =
+                                                              asValue: (K2, V2) <~< Value): Stream[F, Id] =
     putNel(k2v2s.toNel map (asValue coerce _))
 }
 
@@ -247,8 +244,7 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   /**
     */
   def selectMap[K2: Order, V2](key: Key)(implicit
-      asK2V2: Value <~< (K2, V2)
-  ): Stream[F, Map[K2, V2]] =
+                                         asK2V2: Value <~< (K2, V2)): Stream[F, Map[K2, V2]] =
     for (values <- selectList(key))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
@@ -279,8 +275,7 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   /**
     */
   def upsertNem[K2: Order, V2](key: Key, k2v2s: NonEmptyMap[K2, V2])(implicit
-      asValue: (K2, V2) <~< Value
-  ): Stream[F, NonEmptyList[Id]] =
+                                                                     asValue: (K2, V2) <~< Value): Stream[F, NonEmptyList[Id]] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
 }
 

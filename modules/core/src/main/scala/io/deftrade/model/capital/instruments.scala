@@ -62,7 +62,8 @@ final case class Instrument(
   */
 object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
 
-  /** */
+  /**
+    */
   implicit def instrumentEq: Eq[Instrument] =
     // import auto._; semi.eq
     Eq.fromUniversalEquals[Instrument]
@@ -125,7 +126,7 @@ object columns {
     def members: Set[Instrument.Key]
   }
 
-  /** Bonds (primary capital) `mature` (as opposed to `expire`.)*/
+  /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
   sealed trait Maturity { self: Form =>
     def matures: ZonedDateTime
   }
@@ -158,10 +159,12 @@ object layers {
 
   import columns._
 
-  /** */
+  /**
+    */
   trait PrimaryCapital {
 
-    /** */
+    /**
+      */
     case class CommonStock(
         tclass: Option[Label]
     ) extends Form {
@@ -170,10 +173,12 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
 
-    /** */
+    /**
+      */
     case class PreferredStock(
         series: Label,
         preference: Double Refined Positive,
@@ -185,7 +190,8 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
 
     /**
@@ -213,7 +219,8 @@ object layers {
       */
     object Bond extends WithRefinedKey[String, IsIsin, Bond]
 
-    /** */
+    /**
+      */
     case class Bill(
         override val matures: ZonedDateTime
     ) extends Form
@@ -237,17 +244,20 @@ object layers {
     */
   trait VanillaDerivatives {
 
-    /** */
+    /**
+      */
     sealed trait PutCall extends EnumEntry
 
-    /** */
+    /**
+      */
     object PutCall extends DtEnum[PutCall] {
       case object Put  extends PutCall
       case object Call extends PutCall
       lazy val values = findValues
     }
 
-    /** */
+    /**
+      */
     case class Index(
         members: Set[Instrument.Key]
     ) extends Form
@@ -257,14 +267,15 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     object Index extends WithRefinedKey[String, IsIsin, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
     case class XtFuture(
         expires: ZonedDateTime,
         underlier: Instrument.Key,
-        strike: Double,
+        strike: Double
     ) extends Form
         with Derivative {
 
@@ -272,15 +283,16 @@ object layers {
       def contract: Contract = ???
     }
 
-    /**  */
+    /**
+      */
     object XtFuture extends WithRefinedKey[String, IsIsin, XtFuture]
 
-    /**Exchange Traded Derivative - Option (ETD)  */
+    /** Exchange Traded Derivative - Option (ETD) */
     case class XtOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Instrument.Key,
-        override val strike: Double,
+        override val strike: Double
     ) extends Form
         with Derivative {
 
@@ -288,15 +300,16 @@ object layers {
       def contract: Contract = ???
     }
 
-    /**  TODO: recheck that `Isin` thing... */
+    /** TODO: recheck that `Isin` thing... */
     object XtOption extends WithRefinedKey[String, IsIsin, XtOption]
 
-    /**  */
+    /**
+      */
     case class XtFutureOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: XtFuture.Key,
-        override val strike: Double,
+        override val strike: Double
     ) extends Form
         with Derivative {
 
@@ -307,15 +320,17 @@ object layers {
       def contract: Contract = ???
     }
 
-    /**  */
+    /**
+      */
     object XtFutureOption extends WithRefinedKey[String, IsIsin, XtFutureOption]
 
-    /** */
+    /**
+      */
     case class XtIndexOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
         override val underlier: Index.Key,
-        override val strike: Double,
+        override val strike: Double
     ) extends Form
         with Derivative {
 
@@ -323,7 +338,8 @@ object layers {
       def contract: Contract = ???
     }
 
-    /**  */
+    /**
+      */
     object XtIndexOption extends WithRefinedKey[String, IsIsin, XtIndexOption]
   }
 
@@ -334,7 +350,8 @@ object layers {
     */
   trait Lending {
 
-    /** */
+    /**
+      */
     case class BulletPayment(
         matures: ZonedDateTime
     ) extends Form
@@ -344,7 +361,8 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     case class CreditLine(
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1Q
@@ -355,7 +373,8 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     case class AmortizingLoan(
         matures: ZonedDateTime,
         frequency: Frequency // = Frequency.F1M
@@ -366,7 +385,8 @@ object layers {
       def contract: Contract = ???
     }
 
-    /** */
+    /**
+      */
     case class ConvertibleNote(
         matures: ZonedDateTime,
         discount: Double Refined IsUnitInterval.`[0,1)`,
@@ -430,7 +450,7 @@ final case class Novation(
     date: LocalDate,
     meta: Meta.Id,
     sourcedAt: Instant,
-    sourcedFrom: String Refined Url,
+    sourcedFrom: String Refined Url
 ) // extends Provenance
 
 /**
@@ -441,7 +461,7 @@ final case class Novation(
   * - all `List` elements (legs) will get the same `Id`.
   * - thus the ''receipt'' is common to all the legs that make up the transaction.
   */
-object Novation extends WithId[Novation] {
+object Novation extends WithId.Aux[Novation] {
 
   implicit def novationOrder: Order[Novation] = { import auto.order._; semi.order }
   implicit def novationShow: Show[Novation]   = { import auto.show._; semi.show }

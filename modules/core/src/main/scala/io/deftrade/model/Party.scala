@@ -143,15 +143,14 @@ object Party extends WithFuuidKey[Party] {
 
   /** TODO: this is sketchy and probably not needed */
   def apply(name: Label, taxNo: Tax.No, meta: Meta.Id)(implicit
-      vssn: Validate[String, Tax.IsSsn],
-      vein: Validate[String, Tax.IsEin]
-  ) =
+                                                       vssn: Validate[String, Tax.IsSsn],
+                                                       vein: Validate[String, Tax.IsEin]) =
     taxNo match {
       case Tax.Ssn(ssn) => NaturalPerson(name, ssn, meta)
       case Tax.Ein(ein) => LegalEntity(name, ein, meta)
     }
 
-  implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
+  implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
   implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
 }
 
@@ -188,7 +187,7 @@ object NaturalPerson extends WithFuuidKey[NaturalPerson] {
 
   import refined.cats._
 
-  implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
+  implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
   implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
 }
 
@@ -219,6 +218,6 @@ object LegalEntity extends WithFuuidKey[LegalEntity] {
 
   import refined.cats._
 
-  implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
+  implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
   implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
 }

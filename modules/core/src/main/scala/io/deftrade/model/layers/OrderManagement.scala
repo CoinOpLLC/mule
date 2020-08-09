@@ -49,7 +49,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /**
     */
-  object OMSmarkets extends WithId[OMSmarkets]
+  object OMSmarkets extends WithId.Aux[OMSmarkets]
 
   /**
     */
@@ -131,7 +131,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       * So-called "broken trades" require explicit modelling.
       */
-    object Execution extends WithId[Execution] {}
+    object Execution extends WithId.Aux[Execution] {}
 
     def riskCheck: Order ToStreamOf Order
 

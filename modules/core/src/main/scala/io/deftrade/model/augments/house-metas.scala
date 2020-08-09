@@ -29,7 +29,7 @@ trait DefaultMetas { self: ModuleTypes with Ledger =>
     */
   final override object Meta extends WithSADT[Meta] {
 
-    implicit lazy val metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
+    implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
     implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
 
     import io.circe.generic.semiauto._

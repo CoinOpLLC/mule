@@ -55,7 +55,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     protected[deftrade] def empty = apply(freshFolioKey, freshFolioKey)
 
-    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 

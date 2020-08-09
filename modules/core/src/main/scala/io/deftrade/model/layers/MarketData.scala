@@ -281,7 +281,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object TickData extends WithId[TickData] {
+  object TickData extends WithId.Aux[TickData] {
 
     /**
       */
