@@ -20,10 +20,13 @@ import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
+import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
+
+import fs2.Stream
 
 /**
   */
@@ -33,7 +36,18 @@ final case class Contact(
     cell: Contact.USPhone,
     email: Contact.Email,
     url: Option[String Refined Url]
-)
+) {
+
+  /** FIXME: `Accounts.contacts` dependency is unmapped */
+  def naturalPerson[F[_]: Sync](ssn: Tax.Ssn): Stream[F, Result[NaturalPerson]] =
+    ???
+  // extract name from contact before persisting it
+
+  /** FIXME: `Accounts.contacts` dependency is unmapped */
+  def legalEntity[F[_]: Sync](ein: Tax.Ein): Stream[F, Result[LegalEntity]] =
+    // extract name from contact before persisting it
+    ???
+}
 
 /**
   */

@@ -5,11 +5,11 @@ package demo
 
 import io.deftrade.time._
 
-import cats.effect.{ Blocker, ExitCode, IO, IOApp, Resource }
-import cats.implicits._
-import fs2.{ io, text, Pipe, Stream }
+// import cats.effect.{ Blocker, ExitCode, IO, IOApp, Resource }
+// import cats.implicits._
+// import fs2.{ io, text, Pipe, Stream }
 
-import java.nio.file.Paths
+// import java.nio.file.Paths
 import java.{ time => jt }, jt.{ temporal => jtt }, jtt.TemporalAdjusters
 import jt.{ DayOfWeek, Month }, Month.{ JANUARY => January } // if you must
 

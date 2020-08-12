@@ -30,9 +30,6 @@ import cats.effect.{ Sync }
 import eu.timepit.refined
 import refined.cats._
 
-import io.circe.{ Decoder, Encoder };
-import io.circe.refined._
-
 import fs2.{ Pipe, Stream }
 import io.deftrade.keyval.WithKey.KeyCompanion
 
@@ -58,7 +55,9 @@ trait Ledger { module: ModuleTypes =>
       */
     type EffectType[_]
 
-    /** Note that we are using `price` as a ''verb'' here. */
+    /** Note that we are using `price` as a ''verb'' here.
+      * TODO: consider how to memoize
+      */
     val price: Priced => Stream[EffectType, Money[CurrencyTag]]
 
     /**
@@ -155,7 +154,13 @@ trait Ledger { module: ModuleTypes =>
           // } yield position
 
           Stream(3.14, 6.18).map(Currency[C] fiat _.to[MonetaryAmount]).covary[F]
-        })
+        }) {
+
+      /** FIXME: need a method to pull the timetamps from the Transaction stream.
+        */
+      final def lots(instrument: capital.Instrument.Key): Stream[F, (Quantity, Instant)] = ???
+      // folios.rows filter (_._1 === instrument) map (r => (r._2._1, ???))
+    }
 
     object Book
   }
@@ -222,10 +227,12 @@ trait Ledger { module: ModuleTypes =>
     }
   }
 
-  /** A [[Position]] in motion. */
+  /** A [[Position]] in motion.
+    */
   type Leg = Entry
 
-  /** placeholder */
+  /**
+    */
   lazy val Leg = Position
 
   /**
@@ -324,9 +331,21 @@ trait Ledger { module: ModuleTypes =>
       } yield (trade, amount)
   }
 
+  /**
+    * Root of the transaction metadata abstract datatype.
+    */
   type Meta
 
-  /** FIXME needds to be its own C0mp4n1un
+  /**
+    * Persisted as an [[keyval.SADT]].
+    *
+    * Nota Bene: By exploiting the `content addressed` nature of the `store` and
+    * recording the `Id` of an `SADT` instance, the [[Transaction]] record affords a
+    * '''contemporaneous attestation''' of the data and its association with the transaction.
+    *
+    * This may be essential to the construction of certain smart [[contract]] systems, especially
+    * in conjunction with digital signatures. Thus the metadata is bound into the Ricardian
+    * lineage of the contract.
     */
   val Meta: WithSADT[Meta]
 
@@ -359,7 +378,6 @@ trait Ledger { module: ModuleTypes =>
     */
   object Transaction extends WithId.Aux[Transaction] {
 
-    import io.circe.syntax._
     import Meta._
 
     /**
@@ -415,13 +433,10 @@ trait Ledger { module: ModuleTypes =>
     *
     * A trail (`Stream`) of `Confirmations` is low-touch auditable.
     *
-    * FIXME:
-    * - break `unsettled` into `escrow` and `expected`
-    * - use "burner" `Folio`s ([[Transaction]] specific)...
-    *     - ''empties'' get "thrown away" (deleted)
-    *     - non-empty `unsettled` `Folio`s represent the broken legs of settlement fails
+    * Nota Bene: the `Transaction.Id` is chained into the `Confirmation.Id`s that go into the
+    * settlement computation.
     *
-    * Q: How do we settle a `Trade`, assuming both sides are "native" to the `Ledger`?
+    * Q: How do we settle a `Trade`?
     *     - the net effect must be to transfer the `Trade` between `Folio`s.
     *
     * A: Use two fibers (per `Trade`)
@@ -475,18 +490,32 @@ trait Ledger { module: ModuleTypes =>
       */
     implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
 
+    /**
+      * Drives the exchange of [[Trade]]s between [[Folio]]s.
+      *
+      * FIXME: define and implement
+      */
+    trait Agent
+
+    /**
+      */
+    object Agent
+
+    /**
+      * For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
+      */
+    def unsettled[F[_]]: Transaction.Id => Stream[F, Confirmation.Id] => F[Trade] =
+      ???
+
+    /**
+      * Monotonic, in that [[Transaction]]s are never observed to "unsettle".
+      *
+      * Nota Bene - '''memoize''' these if need be
+      */
+    def settled[F[_]: cats.Functor]: Transaction.Id => Stream[F, Confirmation.Id] => F[Boolean] =
+      xn => cs => unsettled(xn)(cs) map (_ === Trade.empty)
+
   }
-
-  /**
-    * Drives the exchange of [[Trade]]s between [[Folio]]s.
-    *
-    * FIXME: define and implement
-    */
-  trait SettlementAgent
-
-  /**
-    */
-  object SettlementAgent
 
   /**
     * '''Cash''' is:
@@ -536,8 +565,8 @@ trait Ledger { module: ModuleTypes =>
         } yield Result(id.some)
     }
 
-  /** Monotonic, in that [[Transaction]]s are never observed to "unsettle".
+  /** wip
     */
-  final def settled[F[_]: Sync](x: Transaction)(cfs: Stream[F, Confirmation]): F[Boolean] =
-    ???
+  def unsettled2[F[_]](cs: Confirmation.Store[F])(xn: Transaction.Id): F[Trade] = ???
+  // Confirmation.unsettled(xn)(cs select xn) FIXME
 }

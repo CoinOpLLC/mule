@@ -35,15 +35,9 @@ sealed class SADT private (protected val json: Json) {
   final def canoncicalString: String = json.noSpacesSortKeys
 }
 
+/**
+  */
 object SADT {
-
-  /**
-    */
-  private[deftrade] def apply[T](json: Json): Aux[T] = new Aux[T](json) {}
-
-  /**
-    */
-  def from[T: Encoder](t: T): Aux[T] = apply(t.asJson)
 
   /**
     */
@@ -53,6 +47,20 @@ object SADT {
       */
     final type ADT = T
   }
+
+  /**
+    */
+  private[deftrade] def apply[T](json: Json): Aux[T] = new Aux[T](json) {}
+
+  /**
+    */
+  def from[T: Encoder](t: T): Aux[T] = apply(t.asJson)
+
+  private val Right(braces) = io.circe.parser parse "{}"
+
+  // FIXME decide if this is the way or not
+  private[keyval] def empty[T]: SADT.Aux[T] = apply(braces)
+
   implicit lazy val miscEq: Eq[SADT]     = Eq by (_.json)
   implicit lazy val miscShow: Show[SADT] = Show show (_.json.show)
 }
@@ -67,6 +75,15 @@ object SADT {
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class WithSADT[T] extends WithId.Aux[SADT.Aux[T]] {
+
+  /**
+    * Every `ADT` shall decode `braces` as the legal and unique `empty: T`
+    * FIXME: test this lmao
+    */
+  final def empty: T = {
+    val Right(ret) = SADT.empty[T].decoded
+    ret
+  }
 
   /** TODO: review lawful evil implementation
     */

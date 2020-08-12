@@ -481,3 +481,22 @@ def toValues[C: Currency](balance: Balance[C])(
 def fromValues[A](vs: List[Value]): A
 def toValues[A](a: A): List[Value]
 ```
+
+### TODO
+
+- KeyValueStore API: 12 distinct versions
+```
+  { concat, sum, replace } X { delete / no delete } X { single / multi }
+```
+- use foldMap to implement `snapshot` on all, `CQRS/ES` style
+- `snapshot` effectively preserves cryptographic history 
+    - by chaining `snapshot` results into the source stream
+
+
+
+
+
+
+
+
+

@@ -2,7 +2,7 @@ package io.deftrade
 package model
 package layers
 
-import keyval._
+import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
@@ -10,6 +10,7 @@ import cats.data.{ NonEmptySet }
 import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
+import refined.cats._
 import refined.numeric.Interval
 
 /**
@@ -32,8 +33,10 @@ trait Accounts { self: Ledger with ModuleTypes =>
     * `Account` via its own table, indexed by the [[Account.Key]].
     */
   sealed abstract case class Account(
-      settled: Folio.Key,
-      unsettled: Folio.Key
+      roster: Roster.Id,
+      open: Folio.Key,
+      escrowed: Folio.Key,
+      expected: Folio.Key
   )
 
   /**
@@ -48,14 +51,24 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    protected[deftrade] def apply(s: Folio.Key, u: Folio.Key): Account =
-      new Account(s, u) {}
+    protected[deftrade] def apply(
+        roster: Roster.Id,
+        open: Folio.Key,
+        escrowed: Folio.Key,
+        expected: Folio.Key
+    ): Account =
+      new Account(roster, open, escrowed, expected) {}
 
     /**
       */
-    protected[deftrade] def empty = apply(freshFolioKey, freshFolioKey)
+    def fromRoster(roster: Roster.Id): Account =
+      apply(roster, freshFolioKey, freshFolioKey, freshFolioKey)
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    /** alt version FIXME: implement */
+    def fromRoster[F[_]](roster: Roster): F[Account.Id] =
+      ???
+
+    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
@@ -70,22 +83,20 @@ trait Accounts { self: Ledger with ModuleTypes =>
       private val nps: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
   ) {
 
-    import Party.Key
-
     /**
       */
     lazy val nonPrincipals: Role.NonPrincipal => NonEmptySet[Party.Key] = nps(_)
 
     /**
       */
-    lazy val roles: Role => NonEmptySet[Key] = {
+    lazy val roles: Role => NonEmptySet[Party.Key] = {
       case Role.Principal        => principals.keys
       case Role.NonPrincipal(np) => nonPrincipals(np)
     }
 
     /**
       */
-    def withAgent(agent: Key): Roster =
+    def withAgent(agent: Party.Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Agent -> (NonEmptySet one agent))
@@ -93,7 +104,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    def withManager(manager: Key): Roster =
+    def withManager(manager: Party.Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Manager -> (NonEmptySet one manager))
@@ -111,9 +122,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
   /**
     * Creation patterns for account management teams.
     */
-  object Roster extends WithKey.Aux[Account.Key, (Party.Key, Role, Option[Quantity])] {
-
-    val Key = Account.Key
+  object Roster extends WithId.Aux[(Party.Key, Role, Option[Quantity])] {
 
     private[deftrade] def apply(
         principals: UnitPartition[Party.Key, Quantity],
@@ -185,4 +194,92 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
   }
+
+  /**
+    * Models financial market participants.
+    *
+    * Presumed real world actors under the aegis of, and registered with, real world
+    * juristictions.
+    *
+    * Small step towards privacy by design: `Tax.No`'s are not used as `Key`s.
+    */
+  sealed trait Party {
+    def name: Label
+    def taxNo: Tax.No
+    def contact: Contact.Id
+  }
+
+  /**
+    * Players that are recognized by the system (ours).
+    */
+  object Party extends WithFuuidKey[Party] {
+
+    /** TODO: this is sketchy and probably not needed */
+    def apply(name: Label, taxNo: Tax.No, meta: Meta.Id): Party =
+      taxNo match {
+        case Tax.Ssn(ssn) => NaturalPerson(name, ssn, meta)
+        case Tax.Ein(ein) => LegalEntity(name, ein, meta)
+      }
+
+    implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
+    implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
+  }
+
+  /**
+    * `NaturalPerson`s are `Party`s.
+    */
+  sealed abstract case class NaturalPerson(
+      name: Label,
+      ssn: Tax.Ssn,
+      contact: Contact.Id
+  ) extends Party {
+
+    /**
+      */
+    final def taxNo: Tax.No = { import refined.auto._; ssn }
+  }
+
+  /**
+    */
+  object NaturalPerson extends WithFuuidKey[NaturalPerson] {
+
+    /**
+      */
+    def apply(name: Label, ssn: Tax.Ssn, contact: Contact.Id): NaturalPerson =
+      new NaturalPerson(name, ssn, contact) {}
+
+    import refined.cats._
+
+    implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
+    implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
+  }
+
+  /**
+    */
+  sealed abstract case class LegalEntity private (
+      name: Label,
+      ein: Tax.Ein,
+      contact: Contact.Id
+  ) extends Party {
+
+    /**
+      */
+    final def taxNo: Tax.No = { import refined.auto._; ein }
+  }
+
+  /**
+    */
+  object LegalEntity extends WithFuuidKey[LegalEntity] {
+
+    /**
+      */
+    def apply(name: Label, ein: Tax.Ein, contact: Contact.Id): LegalEntity =
+      new LegalEntity(name, ein, contact) {}
+
+    import refined.cats._
+
+    implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
+    implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
+  }
+
 }
