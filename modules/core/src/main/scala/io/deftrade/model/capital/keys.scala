@@ -28,18 +28,22 @@ object keys {
   type IsIsin        = MatchesRxIsin And CheckedIsin
   type Isin          = String Refined IsIsin
 
-  /** */
+  /**
+    */
   sealed abstract case class CheckedIsin()
 
-  /** */
+  /**
+    */
   object CheckedIsin {
 
-    /** */
+    /**
+      */
     lazy val instance: CheckedIsin = new CheckedIsin() {}
 
-    /** */
+    /**
+      */
     implicit def isinValidate: Validate.Plain[String, CheckedIsin] =
-      Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
+      Validate.fromPredicate(predicate, t => s"$t is not Luhny", instance)
 
     /**
       * * TODO need to add country checks,
@@ -51,48 +55,54 @@ object keys {
       *   - XB: Interactive Brokers `ConId` number
       *   - the other 25 mappings in X[A-Z] are reserved for use facing other brokers' apis.
       */
-    private def predicate(isin: String): Boolean = failsafe {
+    private def predicate(isin: String): Boolean =
+      failsafe {
 
-      val digits = for {
-        c <- isin
-        d <- Character.digit(c, 36).toString
-      } yield d.asDigit
+        val digits = for {
+          c <- isin
+          d <- Character.digit(c, 36).toString
+        } yield d.asDigit
 
-      val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
+        val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
 
-      check.sum % 10 === 0
+        check.sum % 10 === 0
 
-    }
+      }
   }
 
   /** Pseudo `Isin` matches `Isin` regex, but uses the 9 digit body for proprietary mappings. */
   type IsPsin = MatchesRxIsin And CheckedPsin // sic
   type Psin   = String Refined IsPsin
 
-  /**  */
+  /**
+    */
   sealed abstract case class CheckedPsin()
 
-  /** */
+  /**
+    */
   object CheckedPsin {
 
-    /** */
+    /**
+      */
     lazy val instance: CheckedPsin = new CheckedPsin() {}
 
-    /** */
+    /**
+      */
     implicit def isinValidate: Validate.Plain[String, CheckedPsin] =
-      Validate fromPredicate (predicate, t => s"$t is not Luhny", instance)
+      Validate.fromPredicate(predicate, t => s"$t is not Luhny", instance)
 
-    private def predicate(isin: String): Boolean = failsafe {
+    private def predicate(isin: String): Boolean =
+      failsafe {
 
-      val digits = for {
-        c <- isin
-        d <- Character.digit(c, 36).toString
-      } yield d.asDigit
+        val digits = for {
+          c <- isin
+          d <- Character.digit(c, 36).toString
+        } yield d.asDigit
 
-      val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
+        val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
 
-      check.sum % 10 === 0
-    }
+        check.sum % 10 === 0
+      }
   }
 
   /**
@@ -104,7 +114,8 @@ object keys {
   type IsUsin = IsIsin Or IsPsin
   type Usin   = String Refined IsUsin
 
-  /** */
+  /**
+    */
   object Usin {
 
     /**
@@ -112,34 +123,43 @@ object keys {
       */
     def from(s: String): Result[Usin] = ???
 
-    /** */
+    /**
+      */
     def fromIsin(isin: Isin): Isin = ???
 
-    /** */
+    /**
+      */
     def fromCusip(cusip: Cusip): Isin = ???
     // def fromSedol(sedol: Sedol): Isin = ???
 
-    /** */
+    /**
+      */
     def fromUnreg(unreg: Unreg): Psin = ???
 
-    /** */
+    /**
+      */
     def fromIbrk(ibrk: Ibrk): Psin = ???
 
-    /** */
+    /**
+      */
     def toIsin(usin: Usin): Result[Isin] = ???
 
-    /** */
+    /**
+      */
     def toCusip(usin: Usin): Result[Cusip] = ???
     // def toSedol(usin: Usin): Result[Sedol] = ???
 
-    /** */
+    /**
+      */
     def toUnreg(usin: Usin): Result[Unreg] = ???
 
-    /** */
+    /**
+      */
     def toIbrk(usin: Usin): Result[Ibrk] = ???
   }
 
-  /** */
+  /**
+    */
   val MatchesRxCusip = """[0-9]{3}[0-9A-Z]{3}[0-9]{3}""".witness
   type MatchesRxCusip = MatchesRegex[MatchesRxCusip.T]
   type IsCusip        = MatchesRxCusip And CheckedCusip
@@ -151,15 +171,18 @@ object keys {
     */
   sealed abstract case class CheckedCusip()
 
-  /** */
+  /**
+    */
   object CheckedCusip {
 
-    /** */
+    /**
+      */
     lazy val instance: CheckedCusip = new CheckedCusip() {}
 
-    /** */
+    /**
+      */
     implicit def cusipValidate: Validate.Plain[String, CheckedCusip] =
-      Validate fromPredicate (predicate, t => s"$t is not legit", instance)
+      Validate.fromPredicate(predicate, t => s"$t is not legit", instance)
 
     private def predicate(isin: String): Boolean =
       failsafe {

@@ -27,8 +27,6 @@ import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
 
-import fs2.Stream
-
 /**
   * The House Contact class.
   */
@@ -45,12 +43,12 @@ trait Contacts {
   ) {
 
     /** FIXME: `Accounts.contacts` dependency is unmapped */
-    def naturalPerson[F[_]: Sync](ssn: Tax.Ssn): Stream[F, Result[NaturalPerson]] =
+    def naturalPerson[F[_]: Sync](ssn: Tax.Ssn): F[NaturalPerson] =
       ???
     // extract name from contact before persisting it
 
     /** FIXME: `Accounts.contacts` dependency is unmapped */
-    def legalEntity[F[_]: Sync](ein: Tax.Ein): Stream[F, Result[LegalEntity]] =
+    def legalEntity[F[_]: Sync](ein: Tax.Ein): F[LegalEntity] =
       // extract name from contact before persisting it
       ???
   }

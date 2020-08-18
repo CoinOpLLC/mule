@@ -46,28 +46,36 @@ object refinements {
   private def patRep(pat: String)(n: Int Refined Positive) =
     s"""$pat{${n.toString}}"""
 
-  /** */
+  /**
+    */
   final val Alpha2 = patRep(alpha)(2)
 
-  /** */
+  /**
+    */
   type Alpha2 = String Refined MatchesRegex[Alpha2.type]
 
-  /** */
+  /**
+    */
   final val Alpha3 = patRep(alpha)(3)
 
-  /** */
+  /**
+    */
   type Alpha3 = String Refined MatchesRegex[Alpha3.type]
 
-  /** */
+  /**
+    */
   final val Alpha4 = patRep(alpha)(4)
 
-  /** */
+  /**
+    */
   type Alpha4 = String Refined MatchesRegex[Alpha4.type]
 
-  /** */
+  /**
+    */
   final val Num3 = patRep(num)(3)
 
-  /** */
+  /**
+    */
   type Num3 = String Refined MatchesRegex[Num3.type]
 
   /**
@@ -77,10 +85,12 @@ object refinements {
     */
   type IsVarChar = Size[LessEqual[126]]
 
-  /** */
+  /**
+    */
   type VarChar = String Refined IsVarChar
 
-  /** */
+  /**
+    */
   object VarChar {
     import refined.auto._
     val empty: VarChar = ""
@@ -102,7 +112,8 @@ object refinements {
     */
   type Ascii24 = String Refined IsAscii24
 
-  /** */
+  /**
+    */
   sealed abstract case class IsSha()
 
   object IsSha {
@@ -110,28 +121,33 @@ object refinements {
     lazy val instance: IsSha = new IsSha() {}
 
     implicit def isSha256Validate: Validate.Plain[String, IsSha] =
-      Validate fromPredicate (predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
+      Validate.fromPredicate(predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
 
-    def predicate(s: String): Boolean = failsafe {
-      val Some(bs) = ByteVector fromBase58 s
-      bs.size === 32
-    }
+    def predicate(s: String): Boolean =
+      failsafe {
+        val Some(bs) = ByteVector fromBase58 s
+        bs.size === 32
+      }
   }
 
-  /** */
+  /**
+    */
   type Sha = String Refined IsSha
 
-  /** */
+  /**
+    */
   object Sha {
 
     /** Chosen project-wide (for now) */
     val Algo = "SHA-256"
 
-    /** */
+    /**
+      */
     def toByteVector(sha: Sha) = ByteVector fromValidBase58 sha.value
   }
 
-  /**  */
+  /**
+    */
   object IsUnitInterval {
     import _root_.shapeless.nat.{ _0, _1 }
     type `(0,1)` = Interval.Open[_0, _1]
@@ -140,7 +156,8 @@ object refinements {
     type `[0,1]` = Interval.Closed[_0, _1]
   }
 
-  /**  */
+  /**
+    */
   private[deftrade] def failsafe(thunk: => Boolean): Boolean =
-    scala.util.Try apply thunk fold (_ => false, identity)
+    scala.util.Try(thunk).fold(_ => false, identity)
 }

@@ -401,7 +401,7 @@ trait Ledger { module: ModuleTypes =>
         to: Folio.Key,
         leg: Leg,
         meta: Meta
-    ): Stream[F, Transaction] =
+    ): F[Transaction] =
       multiLeg(trades, metas)(from, to, Trade(leg), meta)
 
     /**
@@ -414,11 +414,11 @@ trait Ledger { module: ModuleTypes =>
         to: Folio.Key,
         trade: Trade,
         meta: Meta
-    ): Stream[F, Transaction] =
+    ): F[Transaction] =
       for {
         tid <- trades putMap trade
-        mid <- metas put (SADT from meta)
-      } yield Transaction(instant, from, to, tid, mid)
+        mid <- metas put (SADT from meta) map (_._1)
+      } yield Transaction(instant, from, to, tid.fold(???)(_._1), mid)
 
     /**
       */
@@ -559,10 +559,11 @@ trait Ledger { module: ModuleTypes =>
   ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] =
     _ flatMap {
       case (trade, amount) =>
-        for {
-          id <- trades putMap trade
-          _  <- payCash(drawOn)(amount)
-        } yield Result(id.some)
+        // for {
+        //   id <- trades putMap trade
+        //   _  <- payCash(drawOn)(amount)
+        // } yield Result(id.some)
+        ???
     }
 
   /** wip

@@ -102,18 +102,19 @@ trait CsvStore[
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  final def idRows: Stream[F, (Id, Row)] =
+  final def idZippedRows: Stream[F, (Id, Row)] =
     (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /**
     */
-  final def append(row: Row, rows: Row*): Stream[F, Id] =
+  final def append(row: Row, rows: Row*): F[Id] =
     for {
-      id <- Stream eval F.delay(fresh.nextAll(prev, row, rows: _*))
-      r  <- Stream evals F.delay((row +: rows).toList)
-      _ <- Stream eval F.delay { updateCache(r); (id, r) } through
-            idRowToCSV through
-            appendingSink
+      id <- F delay nextId(row, rows: _*)
+      rs <- F delay (row +: rows).toList
+      _ <- (Stream evals (F delay (rs map { r =>
+            updateCache(r)
+            (id, r)
+          })) through idRowToCSV through appendingSink).compile.drain
     } yield id
 
   /** Default no-op imlementation. */

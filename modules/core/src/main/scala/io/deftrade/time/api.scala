@@ -36,7 +36,7 @@ trait api {
 
   def clockDefaultZone                      = Clock.systemDefaultZone
   def clockDefaultUTC                       = Clock.systemUTC
-  def clockFrozen(i: Instant, zone: ZoneId) = Clock fixed (i, zone)
+  def clockFrozen(i: Instant, zone: ZoneId) = Clock.fixed(i, zone)
 
   def clock(zone: ZoneId) = Clock system zone
 
@@ -59,7 +59,7 @@ trait api {
     */
   type Duration = java.time.Duration
 
-  def duration(unit: ChronoUnit)(n: Long) = Duration of (n, unit)
+  def duration(unit: ChronoUnit)(n: Long) = Duration.of(n, unit)
   def duration(seconds: Long, nanos: Int) = Duration ofSeconds seconds withNanos nanos
 
   def hours(n: Long)   = duration(HOURS)(n)
@@ -72,7 +72,7 @@ trait api {
 
   type Period = java.time.Period
 
-  def period(years: Int, months: Int, days: Int) = Period of (years, months, days)
+  def period(years: Int, months: Int, days: Int) = Period.of(years, months, days)
 
   def years(y: Int)  = period(y, 0, 0)
   def months(m: Int) = period(0, m, 0)
@@ -89,22 +89,25 @@ trait api {
 
   type TemporalAdjuster = java.time.temporal.TemporalAdjuster
 
-  /** */
+  /**
+    */
   object TemporalAdjuster {
     type HM[A] = A => A
     type HMLD  = HM[LocalDate]
 
-    def apply(adjust: HMLD): TemporalAdjuster = new TemporalAdjuster {
-      // justification: creating an instance of a java lib class; this is what the doc says: throw.
-      @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-      override def adjustInto(t: Temporal): Temporal = t match {
-        case ld: LocalDate => ld |> adjust
-        case _ =>
-          throw new DateTimeException(
-            s"only args of type LocalDate are accepted; found ${t.getClass.toString}"
-          )
+    def apply(adjust: HMLD): TemporalAdjuster =
+      new TemporalAdjuster {
+        // justification: creating an instance of a java lib class; this is what the doc says: throw.
+        @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+        override def adjustInto(t: Temporal): Temporal =
+          t match {
+            case ld: LocalDate => ld |> adjust
+            case _ =>
+              throw new DateTimeException(
+                s"only args of type LocalDate are accepted; found ${t.getClass.toString}"
+              )
+          }
       }
-    }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def unapply(ta: jtt.TemporalAdjuster): Option[HM[LocalDate]] =
@@ -133,12 +136,14 @@ trait api {
     // in other words: A TQ[LocalDate => LocalDate] Query produces an Adjuster from a LocalDate
     type TA = TQ[TemporalAdjuster.HMLD]
 
-    def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] = new TemporalQuery[Option[R]] {
-      override def queryFrom(ta: TemporalAccessor): Option[R] = ta match {
-        case ld: LocalDate => (ld |> tq).some
-        case _             => none
+    def asTemporalQuery[R](tq: TQ[R]): TemporalQuery[Option[R]] =
+      new TemporalQuery[Option[R]] {
+        override def queryFrom(ta: TemporalAccessor): Option[R] =
+          ta match {
+            case ld: LocalDate => (ld |> tq).some
+            case _             => none
+          }
       }
-    }
 
     def chronology: TQ[Option[Chronology]]  = lift(_ query TQs.chronology)
     def precision: TQ[Option[TemporalUnit]] = lift(_ query TQs.precision)
@@ -148,11 +153,12 @@ trait api {
 
     def offset: TQ[Option[ZoneOffset]] = lift(_ query TQs.offset)
     def zoneId: TQ[Option[ZoneId]]     = lift(_ query TQs.zoneId)
-    def zone: TQ[Either[Option[ZoneOffset], ZoneId]] = _ query TQs.zone match {
-      case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
-      case zid if zid != null => zid.asRight // actual ZoneId
-      case _                  => none.asLeft // not applicable - zone makes no sense
-    }
+    def zone: TQ[Either[Option[ZoneOffset], ZoneId]] =
+      _ query TQs.zone match {
+        case zo: ZoneOffset     => zo.some.asLeft // (sic) ZoneOffset <: ZoneId – too clever...
+        case zid if zid != null => zid.asRight // actual ZoneId
+        case _                  => none.asLeft // not applicable - zone makes no sense
+      }
 
     private def lift[R](tq: TQ[R]): TQ[Option[R]] = ta => Option(ta |> tq)
   }
@@ -169,9 +175,9 @@ trait api {
 
   def localDateTime(iso8601: String) = LocalDate parse iso8601
 
-  def localDateTime(s: String, fmt: DateTimeFormatter) = LocalDate parse (s, fmt)
+  def localDateTime(s: String, fmt: DateTimeFormatter) = LocalDate.parse(s, fmt)
 
-  def localDateTime(ld: LocalDate, lt: LocalTime) = LocalDateTime of (ld, lt)
+  def localDateTime(ld: LocalDate, lt: LocalTime) = LocalDateTime.of(ld, lt)
 
   object LocalDateTimeOf {
     def unapply(dt: LocalDateTime) = Option((dt.toLocalDate, dt.toLocalTime))
@@ -187,10 +193,10 @@ trait api {
 
   def localDate(ta: TemporalAccessor)              = LocalDate from ta
   def localDate(iso8601: String)                   = LocalDate parse iso8601
-  def localDate(fmt: DateTimeFormatter)(s: String) = LocalDate parse (s, fmt)
+  def localDate(fmt: DateTimeFormatter)(s: String) = LocalDate.parse(s, fmt)
 
-  def localDate(year: Int, month: Month, day: Int) = LocalDate of (year, month, day)
-  def localDate(year: Int, month: Int, day: Int)   = LocalDate of (year, month, day)
+  def localDate(year: Int, month: Month, day: Int) = LocalDate.of(year, month, day)
+  def localDate(year: Int, month: Int, day: Int)   = LocalDate.of(year, month, day)
 
   object LocalDateOf {
     def unapply(ld: LocalDate) = Option((ld.year, ld.month, ld.dayOfMonth))
@@ -204,10 +210,10 @@ trait api {
   def localTime(zone: ZoneId) = LocalTime now zone
 
   def localTime(hour: Int, minute: Int, second: Int): LocalTime =
-    LocalTime of (hour, minute, second, 0)
+    LocalTime.of(hour, minute, second, 0)
 
   def localTime(hour: Int, minute: Int, second: Int, nano: Int): LocalTime =
-    LocalTime of (hour, minute, second, nano)
+    LocalTime.of(hour, minute, second, nano)
 
   object LocalTimeOf {
     def unapply(lt: LocalTime): Option[(Int, Int, Int, Int)] =
@@ -220,7 +226,7 @@ trait api {
   type ZonedDateTime = java.time.ZonedDateTime
 
   def zonedDateTime(ld: LocalDate, lt: LocalTime, zone: ZoneId) =
-    ZonedDateTime of (ld, lt, zone)
+    ZonedDateTime.of(ld, lt, zone)
 
   type Instant = java.time.Instant
 
@@ -228,7 +234,7 @@ trait api {
   def instant(clock: Clock)     = Instant now clock
   def instant(epochMilli: Long) = Instant ofEpochMilli epochMilli
   def instant(epochSecond: Long, nanoAdjustment: Long) =
-    Instant ofEpochSecond (epochSecond, nanoAdjustment)
+    Instant.ofEpochSecond(epochSecond, nanoAdjustment)
   def instant(text: CharSequence) = Instant parse text
 
   type Year = java.time.Year
@@ -238,7 +244,7 @@ trait api {
   def year(zone: ZoneId) = Year now zone
 
   def year(s: String)                         = Year parse s
-  def year(s: String, fmt: DateTimeFormatter) = Year parse (s, fmt)
+  def year(s: String, fmt: DateTimeFormatter) = Year.parse(s, fmt)
 
   def year(isoYear: Int)               = Year of isoYear
   def year(temporal: TemporalAccessor) = Year from temporal
@@ -254,10 +260,10 @@ trait api {
   def yearMonth(zone: ZoneId) = YearMonth now zone
 
   def yearMonth(s: String)                         = YearMonth parse s
-  def yearMonth(s: String, fmt: DateTimeFormatter) = YearMonth parse (s, fmt)
+  def yearMonth(s: String, fmt: DateTimeFormatter) = YearMonth.parse(s, fmt)
 
-  def yearMonth(year: Int, month: Int)      = YearMonth of (year, month)
-  def yearMonth(year: Int, month: Month)    = YearMonth of (year, month)
+  def yearMonth(year: Int, month: Int)      = YearMonth.of(year, month)
+  def yearMonth(year: Int, month: Month)    = YearMonth.of(year, month)
   def yearMonth(temporal: TemporalAccessor) = YearMonth from temporal
 
   object YearMonthOf {
@@ -271,8 +277,8 @@ trait api {
 
   def zoneId                                           = ZoneId.systemDefault()
   def zoneId(s: String)                                = ZoneId of s
-  def zoneId(s: String, aliasMap: Map[String, String]) = ZoneId of (s, aliasMap.asJava)
-  def zoneId(prefix: String, offset: ZoneOffset)       = ZoneId ofOffset (prefix, offset)
+  def zoneId(s: String, aliasMap: Map[String, String]) = ZoneId.of(s, aliasMap.asJava)
+  def zoneId(prefix: String, offset: ZoneOffset)       = ZoneId.ofOffset(prefix, offset)
   def zoneId(ta: TemporalAccessor)                     = ZoneId from ta
 
   final lazy val zoneIdMap: Map[String, String] = ZoneId.SHORT_IDS.asScala.toMap

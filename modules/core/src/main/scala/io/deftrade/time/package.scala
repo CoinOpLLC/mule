@@ -43,11 +43,12 @@ import jtt._
 package object time extends time.api {
 
   implicit class ClockOps(val base: Clock) extends AnyVal {
-    def offset(d: Duration) = Clock offset (base, d)
-    def tick(d: Duration)   = Clock tick (base, d)
+    def offset(d: Duration) = Clock.offset(base, d)
+    def tick(d: Duration)   = Clock.tick(base, d)
   }
 
-  /** */
+  /**
+    */
   implicit class LongOps(val n: Long) extends AnyVal {
 
     def hour: Duration    = time.hours(n)
@@ -62,7 +63,8 @@ package object time extends time.api {
     def nanos: Duration   = time.nanos(n)
   }
 
-  /** */
+  /**
+    */
   implicit class IntOps(val n: Int) extends AnyVal {
 
     def day: Period    = time.days(n)
@@ -75,7 +77,8 @@ package object time extends time.api {
     def years: Period  = time.years(n)
   }
 
-  /** */
+  /**
+    */
   implicit class LocalDateTimeOps(val ldt: LocalDateTime) extends AnyVal {
 
     def year: Int              = ldt.getYear
@@ -95,11 +98,12 @@ package object time extends time.api {
     def +(amount: Duration): LocalDateTime = ldt plus amount
     def -(amount: Duration): LocalDateTime = ldt minus amount
 
-    def -(end: LocalDateTime): Duration = Duration between (ldt, end)
+    def -(end: LocalDateTime): Duration = Duration.between(ldt, end)
 
   }
 
-  /** */
+  /**
+    */
   implicit class LocalDateOps(val ld: LocalDate) extends AnyVal {
 
     def year: Int              = ld.getYear
@@ -120,7 +124,8 @@ package object time extends time.api {
     def -(end: LocalDate): Period = ld until end
   }
 
-  /** */
+  /**
+    */
   implicit class LocalTimeOps(val lt: LocalTime) extends AnyVal {
 
     def hour: Int   = lt.getHour
@@ -132,7 +137,8 @@ package object time extends time.api {
     def -(duration: Duration): LocalTime = lt minus duration
   }
 
-  /** */
+  /**
+    */
   implicit class ZonedDateTimeOps(val zdt: ZonedDateTime) extends AnyVal {
     def year: Int            = zdt.getYear
     def dayOfMonth: Int      = zdt.getDayOfMonth
@@ -156,12 +162,13 @@ package object time extends time.api {
     def +(d: Duration): ZonedDateTime = zdt plus d
     def -(d: Duration): ZonedDateTime = zdt minus d
 
-    def -(other: ZonedDateTime): Duration = Duration between (zdt, other)
+    def -(other: ZonedDateTime): Duration = Duration.between(zdt, other)
 
     def chronology: Chronology = zdt.getChronology
   }
 
-  /** */
+  /**
+    */
   implicit class DurationOps(val d: Duration) extends AnyVal {
 
     import scala.concurrent.duration.{ FiniteDuration, NANOSECONDS, SECONDS }
@@ -187,7 +194,8 @@ package object time extends time.api {
       }
   }
 
-  /** */
+  /**
+    */
   implicit class PeriodOps(val p: Period) extends AnyVal {
 
     def days: Int                 = p.getDays
@@ -200,7 +208,8 @@ package object time extends time.api {
     def *(scalar: Int): Period           = p multipliedBy scalar
   }
 
-  /** */
+  /**
+    */
   implicit class YearOps(val y: Year) extends AnyVal {
     def year: Int = y get ChronoField.YEAR
 
@@ -208,7 +217,8 @@ package object time extends time.api {
     def +(amount: Period) = y plus amount
   }
 
-  /** */
+  /**
+    */
   implicit class YearMonthOps(val ym: YearMonth) extends AnyVal {
 
     def year: Int       = ym.getYear
@@ -230,7 +240,8 @@ package object time extends time.api {
     // override def compare(that: Instant): Int = i compareTo that
   }
 
-  /** */
+  /**
+    */
   implicit class WithToAdjusted(val value: Temporal) extends AnyVal {
     def adjusted(ta: TemporalAdjuster) = value `with` ta
   }

@@ -52,7 +52,7 @@ import spire.math.{ Fractional, Integral, Rational }
   * relief rates (varying between 9/400 and 1/40 in the late 1990s) and a special tax rate of
   * 22.5/77.5. This implies the need for the fractionItemType in XBRL (where the numerator and
   * denominator are always exact).
-
+  *
   * Also:
   * > 7.4 Representing Exact Currency Amounts
   *
@@ -61,10 +61,12 @@ import spire.math.{ Fractional, Integral, Rational }
   */
 trait Financial[N] extends Fractional[N] { self =>
 
-  /**  */
+  /**
+    */
   implicit def positiveSemigroup: Semigroup[N Refined Positive]
 
-  /**  */
+  /**
+    */
   implicit def nonNegativeMonoid: Monoid[N Refined NonNegative]
 
   /**
@@ -75,32 +77,37 @@ trait Financial[N] extends Fractional[N] { self =>
     * TODO: Revisit this.
     */
   final def round[C](n: N)(implicit C: Currency[C]): N = {
-    def round(bd: BigDecimal): BigDecimal = bd setScale (C.fractionDigits, C.rounding)
+    def round(bd: BigDecimal): BigDecimal = bd.setScale(C.fractionDigits, C.rounding)
     n |> toBigDecimal |> round |> fromBigDecimal
   }
 
   /** section: `spire.math.Fractional` aliases */
   final def commutativeGroup: CommutativeGroup[N] = additive
 
-  /**  */
+  /**
+    */
   final def from[T: Financial](t: T): N = fromType[T](t)(Financial[T])
 
-  /**  */
+  /**
+    */
   final def to[R: Financial](n: N): R = toType[R](n)(Financial[R])
 
-  /**  */
+  /**
+    */
   def parse(s: String): Result[N]
 
-  /**  FIXME test */
+  /** FIXME test */
   final type WholeInt = N Refined IsWhole[Int]
 
   /** Phantom type for `Validate` predicate indicating a whole number (fractional part is zero). */
   sealed abstract class IsWhole[I] private ()
 
-  /**  */
+  /**
+    */
   object IsWhole {
 
-    /**  */
+    /**
+      */
     implicit lazy val N: Fractional[N] = self
 
     /**
@@ -116,64 +123,79 @@ trait Financial[N] extends Fractional[N] { self =>
         if (n === roundTrip) i.some else none
       } else none
 
-    /**  */
+    /**
+      */
     private def apply[I]: IsWhole[I] = new IsWhole[I]() {}
 
-    /**  */
+    /**
+      */
     implicit def wholeValidate[I: Integral]: Validate.Plain[N, IsWhole[I]] = {
       val p: N => Boolean = n => IsWhole.unapply[I](n).fold(false)(_ => true)
-      Validate fromPredicate (p, t => s"${t.toString} isn't a whole number", IsWhole[I])
+      Validate.fromPredicate(p, t => s"${t.toString} isn't a whole number", IsWhole[I])
     }
   }
 }
 
-/**  */
+/**
+  */
 object Financial {
 
   implicit class Ops[X](val x: X) extends AnyVal {
     def to[Y: Financial](implicit X: Financial[X]) = X.to[Y](x)
   }
 
-  /**  */
+  /**
+    */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
   implicit object DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
 
-    /**  */ // odd that these can be declared both not implicit, and override... ;?
+    /**
+      */ // odd that these can be declared both not implicit, and override... ;?
     override def nonNegativeMonoid = Monoid[Double Refined NonNegative]
 
-    /**  */
+    /**
+      */
     override def positiveSemigroup = Semigroup[Double Refined Positive]
 
-    /**  */
+    /**
+      */
     def parse(s: String) = Result safe [Double] { java.lang.Double parseDouble s }
   }
 
-  /**  */
+  /**
+    */
   implicit object BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
 
-    /**  */
+    /**
+      */
     def nonNegativeMonoid: Monoid[BigDecimal Refined NonNegative] = ??? // Monoid[BigDecimal Refined NonNegative]
 
-    /**  */
+    /**
+      */
     def positiveSemigroup: Semigroup[BigDecimal Refined Positive] = ??? // Semigroup[BigDecimal Refined Positive]
 
-    /**  */
+    /**
+      */
     def parse(s: String) = Result safe { BigDecimal apply s }
   }
 
-  /** */
+  /**
+    */
   sealed abstract class RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
 
-    /**  */
+    /**
+      */
     def nonNegativeMonoid: Monoid[Rational Refined NonNegative] = ??? // Monoid[Rational Refined NonNegative]
 
-    /**  */
+    /**
+      */
     def positiveSemigroup: Semigroup[Rational Refined Positive] = ??? //Semigroup[Rational Refined Positive]
 
     def parse(s: String) = Result safe { Rational apply s }
   }
 
-  /**  */
+  /**
+    */
   implicit object RationalIsFinancial extends RationalIsFinancial
 }

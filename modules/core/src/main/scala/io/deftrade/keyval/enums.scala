@@ -30,24 +30,27 @@ trait CsvEnum[E <: EnumEntry] { self: Enum[E] =>
 
   import CsvEnum._
 
-  /** */
+  /**
+    */
   implicit lazy val get: Get[E] = enumGet(self)
 
-  /** */
+  /**
+    */
   implicit lazy val put: Put[E] = enumPut
 }
 
-/**  Integrates Enumeratum with Cormorant (CSV) */
+/** Integrates Enumeratum with Cormorant (CSV) */
 object CsvEnum {
 
   /** Use these methods to create implicits per Enum. */
   def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] =
-    Get tryOrMessage (
-      field => scala.util.Try { e withName field.x },
-      field => s"Failed to decode Enum: ${e.toString}: Received ${field.toString}"
+    Get.tryOrMessage(
+      field => scala.util.Try(e withName field.x),
+      field => s"Failed to decode Enum: ${e.toString}: raw was `${field.toString}`"
     )
 
-  /** */
+  /**
+    */
   def enumPut[E <: EnumEntry]: Put[E] = stringPut contramap (_.toString)
 }
 
@@ -70,7 +73,8 @@ trait DtEnum[E <: EnumEntry] extends Enum[E] with CatsEnum[E] with CsvEnum[E] {
   def unapply(key: EnumEntry): Option[E] =
     if (values contains key) key.asInstanceOf[E].some else none
 
-  /** */
+  /**
+    */
   def collect: PartialFunction[EnumEntry, E] = Function unlift unapply
 }
 

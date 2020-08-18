@@ -18,6 +18,10 @@ import refined.numeric.Interval
   */
 trait Accounts { self: Ledger with ModuleTypes =>
 
+  type Contact
+
+  val Contact: WithId.Aux[SADT.Aux[Contact]]
+
   /**
     * Predicate defining a very conventional looking account numbering scheme.
     */
@@ -68,7 +72,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromRoster[F[_]](roster: Roster): F[Account.Id] =
       ???
 
-    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
@@ -221,7 +225,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
         case Tax.Ein(ein) => LegalEntity(name, ein, meta)
       }
 
-    implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
+    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
     implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
   }
 
@@ -250,7 +254,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
+    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
     implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
   }
 
@@ -278,7 +282,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
+    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
     implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
   }
 
