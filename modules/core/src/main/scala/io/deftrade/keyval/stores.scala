@@ -29,7 +29,7 @@ import eu.timepit.refined
 import refined.api.Refined
 import refined.cats.refTypeOrder
 
-import fs2.{ Stream }
+import fs2.{ Pipe, Stream }
 
 import scala.collection.immutable.SortedMap
 
@@ -105,7 +105,23 @@ trait Store[F[_], W[_] <: WithValue, V] {
     *
     * FIXME: not thread safe, put a queue in front of single thread-contained appender?
     */
-  protected def append(row: Row, rows: Row*): F[Id]
+  final protected def append(row: Row, rows: Row*): F[Id] =
+    for {
+      id <- F delay nextId(row, rows: _*)
+      rs <- F delay (row +: rows).toList
+      _ <- (Stream evals (F delay (rs map { r =>
+            cache(id, r)
+            (id, r)
+          })) through persist).compile.drain
+    } yield id
+
+  /**
+    */
+  protected def cache(id: Id, row: Row): Unit
+
+  /**
+    */
+  protected def persist: Pipe[F, (Id, Row), Unit]
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
@@ -220,8 +236,7 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
     */
   def putNem[K2: Order, V2](
       k2v2s: NonEmptyMap[K2, V2]
-  )(implicit
-    asValue: (K2, V2) <~< Value): F[(Id, Boolean)] =
+  )(implicit asValue: (K2, V2) <~< Value): F[(Id, Boolean)] =
     putNel(k2v2s.toNel map (asValue coerce _))
 }
 
@@ -300,8 +315,7 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
     */
   def selectMap[K2: Order, V2](
       key: Key
-  )(implicit
-    asK2V2: Value <~< (K2, V2)): F[Map[K2, V2]] =
+  )(implicit asK2V2: Value <~< (K2, V2)): F[Map[K2, V2]] =
     for (values <- selectList(key))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
@@ -315,8 +329,7 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
   def upsertNem[K2: Order, V2](
       key: Key,
       k2v2s: NonEmptyMap[K2, V2]
-  )(implicit
-    asValue: (K2, V2) <~< Value): F[Id] =
+  )(implicit asValue: (K2, V2) <~< Value): F[Id] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
 }
 

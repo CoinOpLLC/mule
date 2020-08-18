@@ -105,20 +105,13 @@ trait CsvStore[
   final def idZippedRows: Stream[F, (Id, Row)] =
     (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
-  /**
+  /** nop
     */
-  final def append(row: Row, rows: Row*): F[Id] =
-    for {
-      id <- F delay nextId(row, rows: _*)
-      rs <- F delay (row +: rows).toList
-      _ <- (Stream evals (F delay (rs map { r =>
-            updateCache(r)
-            (id, r)
-          })) through idRowToCSV through appendingSink).compile.drain
-    } yield id
+  protected def cache(id: Id, row: Row) = ()
 
-  /** Default no-op imlementation. */
-  protected def updateCache(row: Row) = ()
+  /** csv
+    */
+  protected def persist: Pipe[F, (Id, Row), Unit] = idRowToCSV andThen appendingSink
 
   /**
     */
@@ -305,8 +298,9 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
   self: CsvStore[F, W, V, HV] with CsvStoreTypes.Aux[F, W, V, HV] =>
 
-  /**
-    */
+  // cache stuff
+  //  - this is where it matters whether we have single or multi value api
+  //
   // final protected var table: Map[V.Index, V.Value]                  = Map.empty
   // final protected var tableNel: Map[V.Index, NonEmptyList[V.Value]] = Map.empty
   // final protected def tableNem[K2: Order, V2: Eq](
@@ -335,7 +329,7 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
     Stream resource (for {
       blocker <- Blocker[F]
-      handle  <- FileHandle fromPath (path, blocker, openOptions)
+      handle  <- FileHandle.fromPath(path, blocker, openOptions)
     } yield handle)
   }
 
