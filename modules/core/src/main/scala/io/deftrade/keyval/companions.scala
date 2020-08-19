@@ -63,17 +63,19 @@ protected sealed trait WithValue {
     */
   type Value
 
-  /** A permanent identifier (eg auto-increment in a db col) */
+  /** `Id`s are all secure hashes of some kind
+    */
   final type Id = Sha
+
+  /** The full type of the [[Id]] column.
+    */
+  final type IdField = FieldType[id.T, Id]
 
   /**
     * Think spreadsheet or relational table,
     * keeping in mind that [[Value]]s are can be, and often are, compound.
     */
   type Row
-
-  /** The full type of the [[Id]] column. */
-  final type IdField = FieldType[id.T, Id]
 }
 
 /**

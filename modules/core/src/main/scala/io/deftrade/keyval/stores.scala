@@ -60,7 +60,6 @@ trait StoreTypes {
   /**
     */
   implicit def X: ContextShift[EffectType]
-
 }
 
 /**
@@ -74,9 +73,8 @@ object StoreTypes {
   )(implicit override val F: Sync[F], override val X: ContextShift[F])
       extends StoreTypes {
 
-    final override type ValueCompanionType[x] = W[x]
     final type EffectType[x]                  = F[x]
-    final type ValueType                      = V
+    final override type ValueCompanionType[x] = W[x]
   }
 }
 
@@ -90,10 +88,41 @@ trait Store[F[_], W[_] <: WithValue, V] {
 
   import V._
 
+  final type ValueType = V
+
+  final type Record  = (Id, Row)
+  final type Records = StreamF[Record]
+
+  /** In memoru representation; useful for caches.
+    */
+  type Repr
+
+  /**
+    */
+  type Shape[_]
+
+  /**
+    */
+  type Spec
+
+  /** What the api client should picture. (And can get a copy of).
+    */
+  final type Model = Shape[Spec]
+
+  /**
+    */
+  def load: Records => Repr = _ => ???
+  def save: Repr => Records = _ => ???
+
+  /**
+    */
+  def ingest: Model => Repr   = _ => ???
+  def snapshot: Repr => Model = _ => ???
+
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     */
-  protected def idZippedRows: Stream[F, (Id, Row)]
+  protected def records: Records
 
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
@@ -110,9 +139,9 @@ trait Store[F[_], W[_] <: WithValue, V] {
       id <- F delay nextId(row, rows: _*)
       rs <- F delay (row +: rows).toList
       _ <- (Stream evals (F delay (rs map { r =>
-            cache(id, r)
-            (id, r)
-          })) through persist).compile.drain
+               cache(id, r)
+               (id, r)
+             })) through persist).compile.drain
     } yield id
 
   /**
@@ -137,17 +166,17 @@ trait Store[F[_], W[_] <: WithValue, V] {
 
   /**
     */
-  def rows: Stream[F, Row] = idZippedRows map (_._2)
+  def rows: StreamF[Row] = records map (_._2)
 
   /**
     */
   def has(id: Id): F[Boolean] =
-    (idZippedRows exists (_._1 === id)).compile.lastOrError
+    (records exists (_._1 === id)).compile.lastOrError
 
   /**
     */
   def get(id: Id): F[Option[Row]] =
-    (idZippedRows filter (_._1 === id) map (_._2)).compile.last
+    (records filter (_._1 === id) map (_._2)).compile.last
 
   /**
     */
@@ -159,8 +188,8 @@ trait Store[F[_], W[_] <: WithValue, V] {
     *
     * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
     */
-  def gets(id: Id): Stream[F, Row] =
-    idZippedRows filter (_._1 === id) map (_._2)
+  def gets(id: Id): StreamF[Row] =
+    records filter (_._1 === id) map (_._2)
 
   /**
     * Put `Seq`.
@@ -177,9 +206,14 @@ trait Store[F[_], W[_] <: WithValue, V] {
   }
 }
 
-/**
+/** Types that represent the items that can be stored at the API level.
   */
 object Store {
+
+  final type SpecV[V]       = V
+  final type SpecL[V]       = NonEmptyList[V]
+  final type SpecM[K2, V2]  = Map[K2, V2]
+  final type SpecML[K2, V2] = Map[K2, NonEmptyList[V2]]
 
   /**
     */
@@ -196,16 +230,18 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
 
   import V._
 
+  final type Repr = Map[Id, Value]
+
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
-  def getList(id: Id): Stream[F, List[Row]] =
+  def getList(id: Id): StreamF[List[Row]] =
     gets(id) through Store.listPipe
 
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.Map Map[K2, V2]]]
     */
-  def getMap[K2: Order, V2](id: Id)(implicit asK2V2: V <~< (K2, V2)): Stream[F, Map[K2, V2]] =
+  def getMap[K2: Order, V2](id: Id)(implicit asK2V2: V <~< (K2, V2)): StreamF[Map[K2, V2]] =
     for (values <- getList(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
@@ -240,8 +276,19 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
     putNel(k2v2s.toNel map (asValue coerce _))
 }
 
-/** placeholder */
-object ValueStore
+/**
+  */
+object ValueStore {
+
+  /** Shape of content addressed `Model`.
+    */
+  final type ShapeCA[x] = Set[x]
+
+  /** Shape of chain addressed `Model`.
+    */
+  final type ShapeCH[x] = List[x]
+
+}
 
 /**
   */
@@ -252,13 +299,21 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
 
   import V._, Key._
 
+  final type Repr = Map[Key, NonEmptyList[(Id, Value)]]
+
+  /** Key Value stores ''must'' use chained addresses.
+    *
+    * (This is down to semantics, not crypto.)
+    */
+  final type Shape[x] = KeyValueStore.ShapeCH[Key, x]
+
   @inline private def idiomize: ((Id, Boolean)) => Option[Id] = {
     case (id, true) => id.some
     case _          => none
   }
 
-  protected def idZippedRowsWith(key: Key): Stream[F, (Id, Row)] =
-    idZippedRows filter (_._2._1 === key)
+  protected def recordsWith(key: Key): StreamF[(Id, Row)] =
+    records filter (_._2._1 === key)
 
   /** TODO: revisit the implementation, which is tricky
     */
@@ -297,13 +352,13 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
 
   /**
     */
-  def existsAll(key: Key): Stream[F, Id] =
-    idZippedRowsWith(key) map (_._1)
+  def existsAll(key: Key): StreamF[Id] =
+    recordsWith(key) map (_._1)
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
-  def selectAll(key: Key): Stream[F, Value] =
+  def selectAll(key: Key): StreamF[Value] =
     for {
-      value <- (idZippedRowsWith(key) map (_._2._2)).unNoneTerminate
+      value <- (recordsWith(key) map (_._2._2)).unNoneTerminate
     } yield value
 
   /**
@@ -333,5 +388,11 @@ trait KeyValueStore[F[_], K, V] extends Store[F, WithKey.Aux[K, *], V] {
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
 }
 
-/** placeholder */
-object KeyValueStore {}
+/**
+  */
+object KeyValueStore {
+
+  /** Shape of chain addressed `Model` (only legal choice for KeyValueStores).
+    */
+  final type ShapeCH[K, v] = Map[K, v]
+}

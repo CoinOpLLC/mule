@@ -102,7 +102,7 @@ trait CsvStore[
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  final def idZippedRows: Stream[F, (Id, Row)] =
+  final def records: Stream[F, (Id, Row)] =
     (readLines through csvToIdRow).rethrow handleErrorWith (_ => Stream.empty)
 
   /** nop
@@ -154,8 +154,7 @@ trait CsvValueStore[
 
   /**
     */
-  implicit final def writeIdRow(
-      implicit
+  implicit final def writeIdRow(implicit
       llw: Lazy[LabelledWrite[HValue]]
   ): LabelledWrite[(Id, Row)] =
     new LabelledWrite[(Id, Row)] {
@@ -170,8 +169,7 @@ trait CsvValueStore[
 
   /**
     */
-  implicit final def readIdRow(
-      implicit
+  implicit final def readIdRow(implicit
       llr: Lazy[LabelledRead[HV]]
   ): LabelledRead[(Id, Row)] =
     new LabelledRead[(Id, Row)] {
@@ -184,8 +182,7 @@ trait CsvValueStore[
 
   /**
     */
-  final protected def deriveCsvDecoderV(
-      implicit
+  final protected def deriveCsvDecoderV(implicit
       llr: Lazy[LabelledRead[HV]]
   ): Pipe[F, String, Result[(Id, Row)]] =
     readLabelledCompleteSafe[F, (Id, Row)] andThen
@@ -194,8 +191,7 @@ trait CsvValueStore[
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderV(
-      implicit
+  final protected def deriveCsvEncoderV(implicit
       llw: Lazy[LabelledWrite[HV]]
   ): Pipe[F, (Id, Row), String] = writeLabelled(printer)
 }
@@ -256,7 +252,7 @@ trait CsvKeyValueStore[
         row match {
 
           case CSV.Row(
-              NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
             lrhpr.read(row, headers) map { hpr =>
               (hpr.head, (hpr.tail.head, none))
@@ -273,8 +269,9 @@ trait CsvKeyValueStore[
   /**
     */
   final protected def deriveCsvDecoderKv(implicit
-                                         llr: Lazy[LabelledRead[HV]],
-                                         lgetk: Lazy[Get[Key]]): Pipe[F, String, Result[(Id, Row)]] = {
+      llr: Lazy[LabelledRead[HV]],
+      lgetk: Lazy[Get[Key]]
+  ): Pipe[F, String, Result[(Id, Row)]] = {
     implicit def lrhv = llr.value
     implicit def getk = lgetk.value
     readLabelledCompleteSafe[F, (Id, Row)] andThen
@@ -340,15 +337,14 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
     for {
       handle <- appendHandles
       s      <- _
-    } yield
-      pulls
-        .writeAllToFileHandle(
-          Stream eval
-            (F pure s) through
-            text.utf8Encode,
-          handle
-        )
-        .stream |> discardValue // nota bene this is intentional and necessary
+    } yield pulls
+      .writeAllToFileHandle(
+        Stream eval
+          (F pure s) through
+          text.utf8Encode,
+        handle
+      )
+      .stream |> discardValue // nota bene this is intentional and necessary
   // WriteCursor(out, 0).writeAll(in).void
 
   /**

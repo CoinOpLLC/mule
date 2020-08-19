@@ -38,14 +38,18 @@ import java.security.MessageDigest
   */
 sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
 
-  /** */
+  /**
+    */
   def nextAll(j: K, v: V, vs: V*): K =
     vs.foldLeft(next(j, v))(next)
 }
 
+/**
+  */
 object Fresh {
 
-  /** */
+  /**
+    */
   def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
   /**
@@ -78,12 +82,10 @@ object Fresh {
 
     val md = MessageDigest getInstance Sha.Algo
 
-    new Fresh[Sha, V](
-      (j, v) => {
-        md update (Sha toByteVector j).toArray
-        md update (v.toString getBytes "UTF-8")
-        Refined unsafeApply ByteVector(md.digest).toBase58
-      }
-    ) {}
+    new Fresh[Sha, V]((j, v) => {
+      md update (Sha toByteVector j).toArray
+      md update (v.toString getBytes "UTF-8")
+      Refined unsafeApply ByteVector(md.digest).toBase58
+    }) {}
   }
 }
