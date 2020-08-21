@@ -51,7 +51,11 @@ trait StoreTypes {
 
   /**
     */
-  final type StreamF[x] = Stream[EffectType, x]
+  final type StreamF[A] = Stream[EffectType, A]
+
+  /**
+    */
+  final type PipeF[A, B] = Pipe[EffectType, A, B]
 
   /**
     */
@@ -90,10 +94,9 @@ trait Store[F[_], W[_] <: WithValue, V] {
 
   final type ValueType = V
 
-  final type Record  = (Id, Row)
-  final type Records = StreamF[Record]
+  final type Record = (Id, Row)
 
-  /** In memoru representation; useful for caches.
+  /** In-memory representation; useful for caches.
     */
   type Repr
 
@@ -111,8 +114,8 @@ trait Store[F[_], W[_] <: WithValue, V] {
 
   /**
     */
-  def load: Records => Repr = _ => ???
-  def save: Repr => Records = _ => ???
+  def load: StreamF[Record] => Repr = _ => ???
+  def save: Repr => StreamF[Record] = _ => ???
 
   /**
     */
@@ -122,7 +125,7 @@ trait Store[F[_], W[_] <: WithValue, V] {
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     */
-  protected def records: Records
+  protected def records: StreamF[Record]
 
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
@@ -180,8 +183,20 @@ trait Store[F[_], W[_] <: WithValue, V] {
 
   /**
     */
-  def put(row: Row): F[(Id, Boolean)] =
-    puts(row)
+  def put(row: Row): F[(Id, Boolean)] = {
+    val id = nextId(row)
+    for {
+      x   <- has(id)
+      ret <- if (x) (id, false).pure[F] else append(row) map ((_, true))
+    } yield ret
+  }
+}
+
+sealed trait StoreM[F[_], W[_] <: WithValue, V] extends Store[F, W, V] {
+
+  self: StoreTypes.Aux[F, W, V] =>
+
+  import V._
 
   /**
     * Get `Stream`.
@@ -204,6 +219,7 @@ trait Store[F[_], W[_] <: WithValue, V] {
       ret <- if (x) (id, false).pure[F] else append(row, rows: _*) map ((_, true))
     } yield ret
   }
+
 }
 
 /** Types that represent the items that can be stored at the API level.
@@ -231,6 +247,18 @@ trait ValueStore[F[_], V] extends Store[F, WithId.Aux, V] {
   import V._
 
   final type Repr = Map[Id, Value]
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreM[F[_], V] extends StoreM[F, WithId.Aux, V] {
+
+  self: StoreTypes.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  // final type Repr = { Map[Id, NEL[Value]], Map[Id, Map[K2, V2]] }
 
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]

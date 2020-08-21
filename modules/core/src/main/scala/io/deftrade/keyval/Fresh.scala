@@ -17,6 +17,7 @@
 package io.deftrade
 package keyval
 
+import cats.implicits._
 import cats.Show
 
 import refinements.{ Sha }
@@ -65,26 +66,30 @@ object Fresh {
   }
 
   /**
-    * Simple content-addressed `Id` generation using secure hash (`Sha`) on a
-    * canonical Json object.
+    * Simple content-addressed `Id` generation using secure hash (`Sha`)
     */
-  def shaContentAddress: Fresh[Sha, Json] =
-    apply { (_, json) =>
-      Refined unsafeApply (
-        ByteVector(
-          json.noSpacesSortKeys getBytes "UTF-8"
-        ) digest Sha.Algo
-      ).toBase58
-    }
+  def shaContent[V: Show]: Fresh[Sha, V] = {
+    val md = MessageDigest getInstance Sha.Algo
 
-  /** Stitch the previous `Id` into the `sha` for the next `Id`. */
-  def shaChain[V]: Fresh[Sha, V] = {
+    new Fresh[Sha, V]((_, v) => {
+      md update (v.show getBytes "UTF-8")
+      Refined unsafeApply ByteVector(md.digest).toBase58
+    }) {}
+
+  }
+
+  /** Stitch the previous `Id` into the `sha` for the next `Id`.
+    *
+    * FIXME: the `Show` thing is just a hack; use scodec and CBOR
+    * and pay attention to canonicalization
+    */
+  def shaChain[V: Show]: Fresh[Sha, V] = {
 
     val md = MessageDigest getInstance Sha.Algo
 
     new Fresh[Sha, V]((j, v) => {
       md update (Sha toByteVector j).toArray
-      md update (v.toString getBytes "UTF-8")
+      md update (v.show getBytes "UTF-8")
       Refined unsafeApply ByteVector(md.digest).toBase58
     }) {}
   }

@@ -78,7 +78,7 @@ trait WithValue[V] {
 
   type Repr    = Map[Id, Row]
   type Record  = (Id, Row)
-  type Records = fs2.Stream[cats.effect.IO, Record] // for example
+  type StreamF[Record] = fs2.Stream[cats.effect.IO, Record] // for example
 
   type Model  = Shape[Spec]
 }
@@ -491,12 +491,5 @@ def toValues[A](a: A): List[Value]
 - use foldMap to implement `snapshot` on all, `CQRS/ES` style
 - `snapshot` effectively preserves cryptographic history 
     - by chaining `snapshot` results into the source stream
-
-
-
-
-
-
-
 
 

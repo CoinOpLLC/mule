@@ -24,7 +24,7 @@ import cats._
 import cats.kernel.CommutativeGroup
 
 /**
-  * Records and computations defining a layered set of financial domain models and services.
+  * StreamF[Record] and computations defining a layered set of financial domain models and services.
   *
   * This package object is where the policy decision to choose generic tax accounting
   * for entities treated as partnerships.
@@ -39,7 +39,7 @@ import cats.kernel.CommutativeGroup
 package object model
 /*
   All layers and augments need to agree on certain types:
-     */
+ */
     extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,
       /* type Quantity       = */ Double

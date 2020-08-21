@@ -3,7 +3,8 @@ package keyval
 
 import impl._
 
-import cats.Eq
+import cats.implicits._
+import cats.{ Eq, Show }
 import cats.effect.{ ContextShift, Sync }
 
 import shapeless.{ HList, LabelledGeneric, Lazy }
@@ -28,69 +29,44 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
     /**
       */
-    def ofChainAddressed[V: Eq, HV <: HList](
+    def ofChainAddressed[V: Eq: Show, HV <: HList](
         v: WithId.Aux[V]
     )(implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[MemFileValueStore[F, V, HV]] =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[MemFileValueStore[F, V, HV]] =
       Result safe {
-        new MemFileValueStore[F, V, HV](v) {
+        new MemFileValueStore[F, V, HV](v, Paths get p) {
 
           import V._
 
-          /**
-            */
-          final override def path = Paths get p
-
-          /**
-            */
-          final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderV
-
-          /**
-            */
-          final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderV
-
-          /**
-            */
           final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
         }
       }
 
     /**
       */
-    def ofContentAddressed[V: Eq, HV <: HList](
+    def ofContentAddressed[V: Eq: Show, HV <: HList](
         v: WithId.Aux[V]
     )(implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[MemFileValueStore[F, V, HV]] =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[MemFileValueStore[F, V, HV]] =
       Result safe {
-        new MemFileValueStore[F, V, HV](v) {
+        new MemFileValueStore[F, V, HV](v, Paths get p) {
 
           import V._
 
-          /**
-            */
-          final override def path = Paths get p
-
-          /**
-            */
-          final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderV
-
-          /**
-            */
-          final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderV
-
-          /** FIXME implementation is wrong */
-          // final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-          final protected lazy val fresh: Fresh[Id, Row] = ??? // Fresh.shaContentAddress[Row]
+          final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaContent[Row]
         }
       }
   }
 }
 
 /** dsl for key value stores: `of` clause */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 final case class KvsOps[F[_]: Sync: ContextShift]() {
 
   /**
@@ -102,29 +78,20 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
 
     /**
       */
-    def ofChainAddressed[K, V: Eq, HV <: HList](
+    def ofChainAddressed[K: Show, V: Eq: Show, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]],
-      lgetk: Lazy[Get[K]],
-      lputk: Lazy[Put[K]]): Result[MemFileKeyValueStore[F, K, V, HV]] =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]],
+        lgetk: Lazy[Get[K]],
+        lputk: Lazy[Put[K]]
+    ): Result[MemFileKeyValueStore[F, K, V, HV]] =
       Result safe {
-        new MemFileKeyValueStore[F, K, V, HV](kv) { self =>
+        implicit def kGet = lgetk.value
+        implicit def kPut = lputk.value
+        new MemFileKeyValueStore(kv, Paths get p) { self =>
           import V._
-
-          /**
-            */
-          final override def path = Paths get p
-
-          /**
-            */
-          final lazy val idRowToCSV: Pipe[F, (Id, Row), String] = deriveCsvEncoderKv
-
-          /**
-            */
-          final lazy val csvToIdRow: Pipe[F, String, Result[(Id, Row)]] = deriveCsvDecoderKv
 
           /**
             */
