@@ -27,44 +27,40 @@ import cats.data.{ NonEmptyList }
 import cats.effect.{ Blocker, ContextShift, Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
-import shapeless.labelled._
+import shapeless.labelled.field
 
 import fs2.{ text, Pipe, Stream }
-import fs2.io.file.{ pulls, FileHandle /*, ReadCursor, WriteCursor */ }
+import fs2.io.file
+import file.{ pulls, FileHandle }
 
 // import scodec.bits.ByteVector
 
 import io.chrisdavenport.cormorant
-import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Put }
-import cormorant.generic.semiauto._
-// import cormorant.refined._
 import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
+import cormorant._
+import cormorant.generic.semiauto._
 
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class CsvStore[F[_], W[_] <: WithValue, V, HV <: HList](
+abstract class CsvStore[F[_], W[_] <: WithValue, V](
     override val V: W[V]
 )(implicit
     final override val F: Sync[F],
-    final override val X: ContextShift[F],
-    final val lgv: LabelledGeneric.Aux[V, HV]
-) extends StoreTypes.Aux[F, W, V](V)
+    final override val X: ContextShift[F]
+) extends StoreTypes.Aux(V)
     with Store[F, W, V]
     with CsvImplicits {
 
-  final type HValue = HV // === lgv.Repr  test / validate / assume ?!?
-
-  implicit final lazy val idPut: Put[V.Id] = Put[V.Id]
-  implicit final lazy val idGet: Get[V.Id] = Get[V.Id]
-
   import V._
 
-  /**
-    */
-  type HRow <: HList
+  import cormorant.refined._
+  import cormorant.implicits._
+
+  protected implicit def idPut = Put[Id]
+  protected implicit def idGet = Get[Id]
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -74,14 +70,6 @@ abstract class CsvStore[F[_], W[_] <: WithValue, V, HV <: HList](
     */
   final def records: StreamF[Record] =
     (readLines through csvToRecord).rethrow handleErrorWith (_ => Stream.empty)
-
-  /** nop
-    */
-  protected def cache(id: Id, row: Row) = ()
-
-  /** nop
-    */
-  protected def lookup(id: Id): List[Row] = List.empty
 
   /** csv
     */
@@ -112,62 +100,74 @@ abstract class CsvStore[F[_], W[_] <: WithValue, V, HV <: HList](
   * [[io.chrisdavenport.cormorant.LabelledRead]] and
   * [[io.chrisdavenport.cormorant.LabelledWrite]] instances for type `Record`.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class CsvValueStore[
     F[_]: Sync: ContextShift,
-    V,
-    HV <: HList
-](v: WithId.Aux[V])(implicit lgv_ : LabelledGeneric.Aux[V, HV])
-    extends CsvStore[F, WithId.Aux, V, HV](v)
+    V
+](v: WithId.Aux[V])
+    extends CsvStore[F, WithId.Aux, V](v)
     with ValueStore[F, V] {
 
   import V._
 
   /**
     */
-  final type HRow = HV
-
-  /**
-    */
-  implicit final def writeIdRow(implicit
-      llw: Lazy[LabelledWrite[HV]]
+  implicit def writeRecord[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledWrite[HV]]
   ): LabelledWrite[Record] =
     new LabelledWrite[Record] {
-      implicit val lwhpr       = LabelledWrite[IdField :: HRow]
+
+      private val lwhpr = LabelledWrite[IdField :: HV]
+
       def headers: CSV.Headers = lwhpr.headers
-      override def write(pr: Record): CSV.Row =
+
+      def write(pr: Record): CSV.Row =
         pr match {
-          case (i, v) =>
-            lwhpr write field[id.T](i) :: (lgv to v)
+          case (i, v) => lwhpr write field[id.T](i) :: (lgav to v)
         }
     }
 
   /**
     */
-  implicit final def readIdRow(implicit
-      llr: Lazy[LabelledRead[HV]]
+  final protected def deriveCsvEncoderV[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledWrite[HV]]
+  ): Pipe[F, Record, String] =
+    writeLabelled(printer)
+
+  /**
+    */
+  implicit def readRecord[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledRead[HV]]
   ): LabelledRead[Record] =
     new LabelledRead[Record] {
-      implicit val lrhpr = LabelledRead[IdField :: HRow]
+
+      implicit val lrhr = LabelledRead[IdField :: HV]
+
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
-        lrhpr.read(row, headers) map { hpr =>
-          (hpr.head, lgv from hpr.tail)
+        lrhr.read(row, headers) map { hr =>
+          (hr.head, lgav from hr.tail)
         }
     }
 
   /**
     */
-  final protected def deriveCsvDecoderV(implicit
-      llr: Lazy[LabelledRead[HV]]
+  final protected def deriveCsvDecoderV[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledRead[HV]]
   ): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
-
-  /**
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderV(implicit
-      llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[F, Record, String] = writeLabelled(printer)
 }
 
 /**
@@ -175,10 +175,9 @@ abstract class CsvValueStore[
 abstract class CsvKeyValueStore[
     F[_]: Sync: ContextShift,
     K,
-    V,
-    HV <: HList
-](v: WithKey.Aux[K, V])(implicit lgv_ : LabelledGeneric.Aux[V, HV])
-    extends CsvStore[F, WithKey.Aux[K, *], V, HV](v)
+    V
+](v: WithKey.Aux[K, V])
+    extends CsvStore[F, WithKey.Aux[K, *], V](v)
     with KeyValueStore[F, K, V] {
 
   import V._
@@ -193,94 +192,83 @@ abstract class CsvKeyValueStore[
 
   /**
     */
-  final type HRow = KeyField :: HValue
-
-  /**
-    */
-  final type HEmptyRow = IdField :: KeyField :: HNil
-
-  // /** */
-  // protected def valueFrom(row: Row): Value =
-  //   row match {
-  //     case (_, Some(value)) => value
-  //   }
-
-  /**
-    */
-  implicit final def writeIdRow(implicit
-      llw: LabelledWrite[HV]
+  implicit final def writeRecord[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledWrite[HV]]
   ): LabelledWrite[Record] =
-    // implicit final def writeIdRow: LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
-      private val lwhpr = LabelledWrite[IdField :: HRow]
-      // private val lwhpr = LabelledWrite[IdField :: HRow]
-      private val lwher = LabelledWrite[HEmptyRow]
+      private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]
+      private val lwher = LabelledWrite[IdField :: KeyField :: HNil]
 
       def headers: CSV.Headers = lwhpr.headers
 
       def write(pr: Record): CSV.Row =
         pr match {
-          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgv to v)
+          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgav to v)
           case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
         }
     }
 
   /**
     */
-  implicit final def readIdRow(implicit
-      llr: LabelledRead[HV]
+  implicit def readRecord[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledRead[HV]]
   ): LabelledRead[Record] =
     new LabelledRead[Record] {
 
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] = {
+      val lrhr = LabelledRead[IdField :: KeyField :: HV]
 
-        val lrhpr = LabelledRead[IdField :: HRow]
-
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
         row match {
 
           case CSV.Row(
                 NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
-            lrhpr.read(row, headers) map { hpr =>
-              (hpr.head, (hpr.tail.head, none))
+            lrhr.read(row, headers) map { hr =>
+              (hr.head, (hr.tail.head, none))
             }
 
           case _ =>
-            lrhpr.read(row, headers) map { hpr =>
-              (hpr.head, (hpr.tail.head, (lgv from hpr.tail.tail).some))
+            lrhr.read(row, headers) map { hr =>
+              (hr.head, (hr.tail.head, (lgav from hr.tail.tail).some))
             }
         }
-      }
     }
 
   /**
     */
-  final protected def deriveCsvDecoderKv(implicit
+  final protected def deriveCsvDecoderKv[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
       llr: Lazy[LabelledRead[HV]]
-  ): Pipe[F, String, Result[Record]] = {
-
-    implicit def lrhv = llr.value
+  ): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
-  }
 
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final protected def deriveCsvEncoderKv(implicit
+  final protected def deriveCsvEncoderKv[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
       llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[F, Record, String] = {
-    implicit def lwhv = llw.value
+  ): Pipe[F, Record, String] =
     writeLabelled(printer)
-  }
 }
 
 /**
   */
 protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
-  self: CsvStore[F, W, V, HV] =>
+  self: CsvStore[F, W, V] =>
 
   // cache stuff
   //  - this is where it matters whether we have single or multi value api
@@ -339,7 +327,7 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def readLines: Stream[F, String] =
     (Stream resource Blocker[F]) flatMap { blocker =>
-      fs2.io.file.readAll[F](path, blocker, 1024 * 1024)
+      file.readAll[F](path, blocker, 1024 * 1024)
     } through
       text.utf8Decode through
       text.lines
@@ -347,15 +335,9 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
 
 /**
   */
-trait MemFileKV[F[_], K, V, HV <: HList]
-    extends MemFileV[
-      F,
-      WithKey.Aux[K, *],
-      V,
-      HV
-    ] {
+trait MemFileKV[F[_], K, V, HV <: HList] extends MemFileV[F, WithKey.Aux[K, *], V, HV] {
 
-  self: CsvStore[F, WithKey.Aux[K, *], V, HV] =>
+  self: CsvStore[F, WithKey.Aux[K, *], V] =>
 }
 
 /**
@@ -369,10 +351,10 @@ abstract case class MemFileValueStore[
     v: WithId.Aux[V],
     final override val path: Path
 )(implicit
-    lgv_ : LabelledGeneric.Aux[V, HV],
+    lgv: LabelledGeneric.Aux[V, HV],
     llr: Lazy[LabelledRead[HV]],
     llw: Lazy[LabelledWrite[HV]]
-) extends CsvValueStore[F, V, HV](v)
+) extends CsvValueStore(v)
     with MemFileV[F, WithId.Aux, V, HV] {
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
@@ -391,12 +373,12 @@ abstract case class MemFileKeyValueStore[
     v: WithKey.Aux[K, V],
     final override val path: Path
 )(implicit
-    lgv_ : LabelledGeneric.Aux[V, HV],
+    lgv: LabelledGeneric.Aux[V, HV],
     final override val kGet: Get[K],
     final override val kPut: Put[K],
     llr: Lazy[LabelledRead[HV]],
     llw: Lazy[LabelledWrite[HV]]
-) extends CsvKeyValueStore[F, K, V, HV](v)
+) extends CsvKeyValueStore(v)
     with MemFileKV[F, K, V, HV] {
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv

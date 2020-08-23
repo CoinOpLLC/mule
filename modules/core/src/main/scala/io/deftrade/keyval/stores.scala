@@ -147,9 +147,13 @@ trait Store[F[_], W[_] <: WithValue, V] {
              })) through persist).compile.drain
     } yield id
 
-  /**
+  /** overrideable with default nop
     */
-  protected def cache(id: Id, row: Row): Unit
+  protected def cache(id: Id, row: Row): Unit = ()
+
+  /** overrideable with default nop
+    */
+  protected def lookup(id: Id): List[Row] = List.empty
 
   /**
     */

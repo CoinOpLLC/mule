@@ -186,7 +186,7 @@ package keyval {
 
     /**
       */
-    implicit def miscGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
+    implicit def sadtGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
       new Get[SADT.Aux[T]] {
 
         import io.circe.parser._
@@ -201,7 +201,7 @@ package keyval {
 
     /**
       */
-    implicit lazy val miscPut: Put[SADT] =
+    implicit lazy val sadtPut: Put[SADT] =
       stringPut contramap (_.canoncicalString)
 
   }
