@@ -21,7 +21,6 @@ package impl
 import syntax._
 
 import cats.implicits._
-import cats.{ Eq }
 import cats.data.{ NonEmptyList }
 
 import cats.effect.{ Blocker, ContextShift, Sync }
@@ -112,6 +111,31 @@ abstract class CsvValueStore[
 
   /**
     */
+  implicit final protected def readRecord[HV <: HList](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledRead[HV]]
+  ): LabelledRead[Record] =
+    new LabelledRead[Record] {
+
+      implicit val lrhr = LabelledRead[IdField :: HV]
+
+      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
+        lrhr.read(row, headers) map { hr =>
+          (hr.head, lgav from hr.tail)
+        }
+    }
+
+  /**
+    */
+  final protected def deriveCsvDecoderV[HV <: HList](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledRead[HV]]
+  ): String PipeF Result[Record] =
+    readLabelledCompleteSafe[F, Record] andThen
+      (_ map (_ leftMap errorToFail))
+
+  /**
+    */
   implicit def writeRecord[
       HV <: HList
   ](implicit
@@ -137,80 +161,21 @@ abstract class CsvValueStore[
   ](implicit
       lgav: LabelledGeneric.Aux[V, HV],
       llhv: Lazy[LabelledWrite[HV]]
-  ): Pipe[F, Record, String] =
+  ): Record PipeF String =
     writeLabelled(printer)
-
-  /**
-    */
-  implicit def readRecord[
-      HV <: HList
-  ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledRead[HV]]
-  ): LabelledRead[Record] =
-    new LabelledRead[Record] {
-
-      implicit val lrhr = LabelledRead[IdField :: HV]
-
-      def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
-        lrhr.read(row, headers) map { hr =>
-          (hr.head, lgav from hr.tail)
-        }
-    }
-
-  /**
-    */
-  final protected def deriveCsvDecoderV[
-      HV <: HList
-  ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledRead[HV]]
-  ): Pipe[F, String, Result[Record]] =
-    readLabelledCompleteSafe[F, Record] andThen
-      (_ map (_ leftMap errorToFail))
 }
 
 /**
   */
 abstract class CsvKeyValueStore[
     F[_]: Sync: ContextShift,
-    K,
+    K: Get: Put,
     V
 ](v: WithKey.Aux[K, V])
     extends CsvStore[F, WithKey.Aux[K, *], V](v)
     with KeyValueStore[F, K, V] {
 
   import V._
-
-  /**
-    */
-  implicit def kGet: Get[K]
-
-  /**
-    */
-  implicit def kPut: Put[K]
-
-  /**
-    */
-  implicit final def writeRecord[
-      HV <: HList
-  ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledWrite[HV]]
-  ): LabelledWrite[Record] =
-    new LabelledWrite[Record] {
-
-      private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]
-      private val lwher = LabelledWrite[IdField :: KeyField :: HNil]
-
-      def headers: CSV.Headers = lwhpr.headers
-
-      def write(pr: Record): CSV.Row =
-        pr match {
-          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgav to v)
-          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
-        }
-    }
 
   /**
     */
@@ -254,6 +219,28 @@ abstract class CsvKeyValueStore[
 
   /**
     */
+  implicit final def writeRecord[
+      HV <: HList
+  ](implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledWrite[HV]]
+  ): LabelledWrite[Record] =
+    new LabelledWrite[Record] {
+
+      private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]
+      private val lwher = LabelledWrite[IdField :: KeyField :: HNil]
+
+      def headers: CSV.Headers = lwhpr.headers
+
+      def write(pr: Record): CSV.Row =
+        pr match {
+          case (i, (k, Some(v))) => lwhpr write field[id.T](i) :: field[key.T](k) :: (lgav to v)
+          case (i, (k, None))    => lwher write field[id.T](i) :: field[key.T](k) :: HNil
+        }
+    }
+
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def deriveCsvEncoderKv[
       HV <: HList
@@ -266,7 +253,7 @@ abstract class CsvKeyValueStore[
 
 /**
   */
-protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
+sealed trait MemFile[F[_], W[_] <: WithValue, V] {
 
   self: CsvStore[F, W, V] =>
 
@@ -333,9 +320,14 @@ protected trait MemFileV[F[_], W[_] <: WithValue, V, HV <: HList] {
       text.lines
 }
 
+sealed trait MemFileV[F[_], V] extends MemFile[F, WithId.Aux, V] {
+
+  self: CsvStore[F, WithId.Aux, V] =>
+}
+
 /**
   */
-trait MemFileKV[F[_], K, V, HV <: HList] extends MemFileV[F, WithKey.Aux[K, *], V, HV] {
+sealed trait MemFileKV[F[_], K, V] extends MemFile[F, WithKey.Aux[K, *], V] {
 
   self: CsvStore[F, WithKey.Aux[K, *], V] =>
 }
@@ -345,7 +337,7 @@ trait MemFileKV[F[_], K, V, HV <: HList] extends MemFileV[F, WithKey.Aux[K, *], 
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract case class MemFileValueStore[
     F[_]: Sync: ContextShift,
-    V: Eq,
+    V,
     HV <: HList
 ](
     v: WithId.Aux[V],
@@ -355,7 +347,7 @@ abstract case class MemFileValueStore[
     llr: Lazy[LabelledRead[HV]],
     llw: Lazy[LabelledWrite[HV]]
 ) extends CsvValueStore(v)
-    with MemFileV[F, WithId.Aux, V, HV] {
+    with MemFileV[F, V] {
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
@@ -366,20 +358,18 @@ abstract case class MemFileValueStore[
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract case class MemFileKeyValueStore[
     F[_]: Sync: ContextShift,
-    K,
-    V: Eq,
+    K: Get: Put,
+    V,
     HV <: HList
 ](
     v: WithKey.Aux[K, V],
     final override val path: Path
 )(implicit
     lgv: LabelledGeneric.Aux[V, HV],
-    final override val kGet: Get[K],
-    final override val kPut: Put[K],
     llr: Lazy[LabelledRead[HV]],
     llw: Lazy[LabelledWrite[HV]]
 ) extends CsvKeyValueStore(v)
-    with MemFileKV[F, K, V, HV] {
+    with MemFileKV[F, K, V] {
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv
