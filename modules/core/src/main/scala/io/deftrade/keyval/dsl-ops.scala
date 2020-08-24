@@ -107,6 +107,6 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
   /**
     */
   sealed case class TypeOps(final val V: WithKey) {
-    final type StoreType = KeyValueStore[F, V.Key, V.Value]
+    final type StoreType = KeyValueStoreV[F, V.Key, V.Value]
   }
 }

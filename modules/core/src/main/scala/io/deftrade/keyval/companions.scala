@@ -112,7 +112,8 @@ object WithId {
 
     /**
       */
-    final type Store[F[_]] = ValueStore[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
+    final type Store[F[_]]  = ValueStoreV[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
+    final type StoreM[F[_]] = ValueStoreM[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
   }
 }
 
@@ -148,7 +149,7 @@ object WithKey {
 
     /**
       */
-    final type Store[F[_]] = KeyValueStore[F, Key, Value]
+    final type Store[F[_]] = KeyValueStoreV[F, Key, Value]
   }
 
   /** Key type companion base class. */

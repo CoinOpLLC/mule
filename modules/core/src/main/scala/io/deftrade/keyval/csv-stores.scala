@@ -50,7 +50,7 @@ abstract class CsvStore[F[_], W[_] <: WithValue, V](
     final override val F: Sync[F],
     final override val X: ContextShift[F]
 ) extends StoreTypes.Aux(V)
-    with Store[F, W, V]
+    with StoreV[F, W, V]
     with CsvImplicits {
 
   import V._
@@ -105,7 +105,7 @@ abstract class CsvValueStore[
     V
 ](v: WithId.Aux[V])
     extends CsvStore[F, WithId.Aux, V](v)
-    with ValueStore[F, V] {
+    with ValueStoreV[F, V] {
 
   import V._
 
@@ -173,7 +173,7 @@ abstract class CsvKeyValueStore[
     V
 ](v: WithKey.Aux[K, V])
     extends CsvStore[F, WithKey.Aux[K, *], V](v)
-    with KeyValueStore[F, K, V] {
+    with KeyValueStoreV[F, K, V] {
 
   import V._
 
