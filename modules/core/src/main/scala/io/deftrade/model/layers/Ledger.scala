@@ -24,6 +24,7 @@ import cats.implicits._
 
 import cats.kernel.{ Monoid }
 import cats.{ Eq, Order, Show }
+import cats.data.NonEmptyMap
 import cats.derived.{ auto, semi }
 import cats.effect.{ Sync }
 
@@ -181,6 +182,10 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     type Table = Map[Key, Value]
+
+    /**
+      */
+    type NonEmptyTable = NonEmptyMap[Key, Value]
   }
 
   /**
@@ -270,7 +275,7 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /** A [[Folio]] in motion. */
-  type Trade = Entry.Table
+  type Trade = Entry.NonEmptyTable
 
   /**
     * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
@@ -279,11 +284,7 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    def apply(l: Leg, ls: Leg*): Trade = indexAndSum(l :: ls.toList)
-
-    /**
-      */
-    def empty: Trade = Map.empty
+    def apply(l: Leg, ls: Leg*): Trade = indexAndSum(l, ls: _*)
 
     /**
       * Enables package deals, or portfolio valuation informed by covariance,
@@ -314,7 +315,7 @@ trait Ledger { module: ModuleTypes =>
         instance { trade =>
           val lp = Leg.Pricer[F, C]
           val prices = for {
-            leg   <- Stream evals (Sync[F] delay trade.toList)
+            leg   <- Stream evals (Sync[F] delay trade.toNel)
             price <- lp price leg
           } yield price
           prices foldMap identity
@@ -418,7 +419,7 @@ trait Ledger { module: ModuleTypes =>
       for {
         tid <- trades putNem trade
         mid <- metas put (SADT from meta) map (_._1)
-      } yield Transaction(instant, from, to, tid.fold(???)(_._1), mid)
+      } yield Transaction(instant, from, to, tid._1, mid)
 
     /**
       */
@@ -504,7 +505,7 @@ trait Ledger { module: ModuleTypes =>
     /**
       * For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
       */
-    def unsettled[F[_]]: Transaction.Id => Stream[F, Confirmation.Id] => F[Trade] =
+    def unsettled[F[_]]: Transaction.Id => Stream[F, Confirmation.Id] => F[Folio] =
       ???
 
     /**
@@ -513,7 +514,7 @@ trait Ledger { module: ModuleTypes =>
       * Nota Bene - '''memoize''' these if need be
       */
     def settled[F[_]: cats.Functor]: Transaction.Id => Stream[F, Confirmation.Id] => F[Boolean] =
-      xn => cs => unsettled(xn)(cs) map (_ === Trade.empty)
+      xn => cs => unsettled(xn)(cs) map (_ === Folio.empty)
 
   }
 

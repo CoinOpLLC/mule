@@ -32,10 +32,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     def ofChainAddressed[V: Eq: Show, HV <: HList](
         v: WithId.Aux[V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[MemFileValueStore[F, V, HV]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[MemFileValueStore[F, V, HV]] =
       Result safe {
         new MemFileValueStore[F, V, HV](v, Paths get p) {
 
@@ -50,10 +49,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     def ofContentAddressed[V: Eq: Show, HV <: HList](
         v: WithId.Aux[V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[MemFileValueStore[F, V, HV]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[MemFileValueStore[F, V, HV]] =
       Result safe {
         new MemFileValueStore[F, V, HV](v, Paths get p) {
 
@@ -81,12 +79,11 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
     def ofChainAddressed[K: Show, V: Eq: Show, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]],
-        lgetk: Lazy[Get[K]],
-        lputk: Lazy[Put[K]]
-    ): Result[MemFileKeyValueStore[F, K, V, HV]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]],
+      lgetk: Lazy[Get[K]],
+      lputk: Lazy[Put[K]]): Result[MemFileKeyValueStore[F, K, V, HV]] =
       Result safe {
         implicit def kGet = lgetk.value
         implicit def kPut = lputk.value

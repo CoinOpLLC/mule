@@ -422,7 +422,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       * TODO: this is so minimal as to be of questionable viablity... but is correct
       */
     def quoteTrade[F[_]: Monad, C: Currency](trade: Trade): F[Money[C]] =
-      trade.toList foldMapM quoteLeg[F, C]
+      trade.toNel foldMapM quoteLeg[F, C]
   }
 
   /** FIXME: normalize fields? */

@@ -133,9 +133,9 @@ trait StoreV[F[_], W[_] <: WithValue, V] {
       id <- F delay nextId(row)
       r  <- F delay row
       _ <- (Stream eval F.delay {
-               cache(id, r)
-               (id, r)
-             } through persist).compile.drain
+            cache(id, r)
+            (id, r)
+          } through persist).compile.drain
     } yield id
 
   /** overrideable with default nop
@@ -191,9 +191,9 @@ sealed trait StoreM[F[_], W[_] <: WithValue, V] extends StoreV[F, W, V] {
       id <- F delay nextId(row, rows: _*)
       rs <- F delay (row +: rows).toList
       _ <- (Stream evals (F delay (rs map { r =>
-               cache(id, r)
-               (id, r)
-             })) through persist).compile.drain
+            cache(id, r)
+            (id, r)
+          })) through persist).compile.drain
     } yield id
 }
 
