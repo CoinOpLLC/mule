@@ -112,8 +112,8 @@ object WithId {
 
     /**
       */
-    final type Store[F[_]]  = ValueStoreV[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
-    final type StoreM[F[_]] = ValueStoreM[F, V] with StoreTypes.Aux[F, WithId.Aux, V]
+    final type Store[F[_]]  = ValueStoreV[F, V] with Store.AuxV[F, WithId.Aux, V]
+    final type StoreM[F[_]] = ValueStoreM[F, V] with Store.AuxL[F, WithId.Aux, V]
   }
 }
 

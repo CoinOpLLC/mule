@@ -34,8 +34,15 @@ import fs2.{ Pipe, Stream }
 import scala.collection.immutable.SortedMap
 
 /**
+  * Note the only way to get an Id is as the result of an effectful mutation or probe.
   */
-trait StoreTypes {
+trait Store {
+
+  /**
+    */
+  val V: WithValue
+
+  import V._
 
   /**
     */
@@ -56,48 +63,18 @@ trait StoreTypes {
   /**
     */
   implicit def X: ContextShift[EffectType]
-}
-
-/**
-  */
-object StoreTypes {
-
-  /**
-    */
-  abstract class Aux[F[_], W[_] <: WithValue, V](
-      val V: W[V]
-  )(implicit override val F: Sync[F], override val X: ContextShift[F])
-      extends StoreTypes {
-
-    final type EffectType[x] = F[x]
-  }
-}
-
-/**
-  * Note the only way to get an Id is as the result of an effectful mutation or probe.
-  */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait StoreV[F[_], W[_] <: WithValue, V] {
-
-  self: StoreTypes.Aux[F, W, V] =>
-
-  import V._
 
   /**
     */
   type Spec
 
-  /**
+  /** What the api client can get a copy of.
     */
   type Shape[_]
 
   /** Complete In-memory representation.
     */
-  type Repr
-
-  /** What the api client can get a copy of.
-    */
-  final type Model = Shape[Spec]
+  type Repr[_]
 
   /**
     */
@@ -105,13 +82,13 @@ trait StoreV[F[_], W[_] <: WithValue, V] {
 
   /**
     */
-  def load: StreamF[Record] => Repr = _ => ???
-  def save: Repr => StreamF[Record] = _ => ???
+  def load: StreamF[Record] => Repr[Spec] = _ => ???
+  def save: Repr[Spec] => StreamF[Record] = _ => ???
 
   /**
     */
-  def ingest: Model => Repr   = _ => ???
-  def snapshot: Repr => Model = _ => ???
+  def ingest: Shape[Spec] => Repr[Spec]   = _ => ???
+  def snapshot: Repr[Spec] => Shape[Spec] = _ => ???
 
   /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -128,14 +105,15 @@ trait StoreV[F[_], W[_] <: WithValue, V] {
     *
     * FIXME: not thread safe, put a queue in front of single thread-contained appender?
     */
-  final protected def append(row: Row): F[Id] =
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  final protected def append(row: Row): EffectType[Id] =
     for {
       id <- F delay nextId(row)
       r  <- F delay row
       _ <- (Stream eval F.delay {
-            cache(id, r)
-            (id, r)
-          } through persist).compile.drain
+               cache(id, r)
+               (id, r)
+             } through persist).compile.drain
     } yield id
 
   /** overrideable with default nop
@@ -148,7 +126,7 @@ trait StoreV[F[_], W[_] <: WithValue, V] {
 
   /**
     */
-  protected def persist: Pipe[F, (Id, Row), Unit]
+  protected def persist: Pipe[EffectType, (Id, Row), Unit]
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
@@ -167,39 +145,52 @@ trait StoreV[F[_], W[_] <: WithValue, V] {
   def rows: StreamF[Row] = records map (_._2)
 }
 
-/**
-  */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
-sealed trait StoreM[F[_], W[_] <: WithValue, V] extends StoreV[F, W, V] {
-
-  self: StoreTypes.Aux[F, W, V] =>
-
-  import V._
-
-  /**
-    * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
-    *
-    * This feature - the ability to assign multiple rows a single `Id` computed over those all
-    * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
-    *
-    * Appends to the backing store whether or not there is a duplicate (no checking).
-    *
-    * FIXME: not thread safe, put a queue in front of single thread-contained appender?
-    */
-  final protected def appends(row: Row, rows: Row*): F[Id] =
-    for {
-      id <- F delay nextId(row, rows: _*)
-      rs <- F delay (row +: rows).toList
-      _ <- (Stream evals (F delay (rs map { r =>
-            cache(id, r)
-            (id, r)
-          })) through persist).compile.drain
-    } yield id
-}
-
 /** Types that represent the items that can be stored at the API level.
   */
 object Store {
+
+  /**
+    */
+  abstract class AuxV[F[_], W[_] <: WithValue, V](
+      final val V: W[V]
+  )(implicit
+      final val F: Sync[F],
+      final val X: ContextShift[F]
+  ) extends Store {
+
+    final type EffectType[x] = F[x]
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  abstract class AuxL[F[_], W[_] <: WithValue, V](
+      final val V: W[V]
+  )(implicit
+      final val F: Sync[F],
+      final val X: ContextShift[F]
+  ) extends Store {
+
+    final type EffectType[x] = F[x]
+
+    /**
+      * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
+      *
+      * This feature - the ability to assign multiple rows a single `Id` computed over those all
+      * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
+      *
+      * Appends to the backing store whether or not there is a duplicate (no checking).
+      *
+      * FIXME: not thread safe, put a queue in front of single thread-contained appender?
+      */
+    final protected def appends(row: V.Row, rows: V.Row*): F[V.Id] =
+      for {
+        id <- F delay nextId(row, rows: _*)
+        rs <- F delay (row +: rows).toList
+        _ <- (Stream evals (F delay (rs map { r =>
+                 cache(id, r)
+                 (id, r)
+               })) through persist).compile.drain
+      } yield id
+  }
 
   /**
     */
@@ -210,15 +201,15 @@ object Store {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreV[F[_], V] extends StoreV[F, WithId.Aux, V] {
+trait ValueStoreV[F[_], V] {
 
-  self: StoreTypes.Aux[F, WithId.Aux, V] =>
+  self: Store.AuxV[F, WithId.Aux, V] =>
 
   import V._
 
   final type Spec = cats.Id[V]
 
-  final type Repr = Map[Id, Spec]
+  final type Repr[A] = Map[Id, A]
 
   /**
     */
@@ -235,8 +226,9 @@ trait ValueStoreV[F[_], V] extends StoreV[F, WithId.Aux, V] {
   def put(row: Row): F[(Id, Boolean)] = {
     val id = nextId(row)
     for {
-      x   <- has(id)
-      ret <- if (x) (id, false).pure[F] else append(row) map ((_, true))
+      x <- has(id)
+      ret <- if (x) (id, false).pure[F]
+             else append(row) map ((_, true))
     } yield ret
   }
 }
@@ -244,9 +236,9 @@ trait ValueStoreV[F[_], V] extends StoreV[F, WithId.Aux, V] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreM[F[_], V] extends StoreM[F, WithId.Aux, V] {
+trait ValueStoreM[F[_], V] {
 
-  self: StoreTypes.Aux[F, WithId.Aux, V] =>
+  self: Store.AuxL[F, WithId.Aux, V] =>
 
   import V._
 
@@ -258,7 +250,7 @@ trait ValueStoreM[F[_], V] extends StoreM[F, WithId.Aux, V] {
   protected final type SpecMV[K2, V2] = NonEmptyMap[K2, cats.Id[V2]]
   protected final type SpecML[K2, V2] = NonEmptyMap[K2, NonEmptyList[V2]]
 
-  final type Repr = Map[Id, Spec]
+  final type Repr[A] = Map[Id, A]
 
   /**
     * Get `Stream`.
@@ -310,36 +302,30 @@ trait ValueStoreM[F[_], V] extends StoreM[F, WithId.Aux, V] {
 
 /**
   */
-object ValueStore {
-
-  /** Shape of content addressed `Model`.
-    */
-  final type ShapeCA[x] = Set[x]
-
-  /** Shape of chain addressed `Model`.
-    */
-  final type ShapeCH[x] = List[x]
-
-}
+object ValueStore
 
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait KeyValueStoreV[F[_], K, V] extends StoreV[F, WithKey.Aux[K, *], V] {
+trait KeyValueStoreV[F[_], K, V] {
 
-  self: StoreTypes.Aux[F, WithKey.Aux[K, *], V] =>
+  self: Store.AuxV[F, WithKey.Aux[K, *], V] =>
 
   import V._, Key._
 
+  /**
+    */
   final type Spec = Option[V]
 
-  final type Repr = Map[K, (Id, Spec)]
+  /**
+    */
+  final type Repr[A] = Map[K, (Id, A)]
 
   /** Key Value stores ''must'' use chained addresses.
     *
     * (This is down to semantics, not crypto.)
     */
-  final type Shape[x] = KeyValueStore.ShapeCH[Key, x]
+  final type Shape[A] = Map[Key, A]
 
   protected def recordsWith(key: Key): StreamF[(Id, Row)] =
     records filter (_._2._1 === key)
@@ -394,9 +380,9 @@ trait KeyValueStoreV[F[_], K, V] extends StoreV[F, WithKey.Aux[K, *], V] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait KeyValueStoreM[F[_], K, V] extends StoreM[F, WithKey.Aux[K, *], V] {
+trait KeyValueStoreM[F[_], K, V] {
 
-  self: StoreTypes.Aux[F, WithKey.Aux[K, *], V] =>
+  self: Store.AuxL[F, WithKey.Aux[K, *], V] =>
 
   import V._, Key._
 
@@ -404,7 +390,7 @@ trait KeyValueStoreM[F[_], K, V] extends StoreM[F, WithKey.Aux[K, *], V] {
   protected final type SpecM[K2, V2]  = Map[K2, Option[V2]]
   protected final type SpecML[K2, V2] = Map[K2, List[V2]]
 
-  final type Repr = Map[K, (Id, Spec)]
+  final type Repr[A] = Map[K, (Id, A)]
 
   /** Key Value stores ''must'' use chained addresses.
     *
@@ -440,7 +426,6 @@ trait KeyValueStoreM[F[_], K, V] extends StoreM[F, WithKey.Aux[K, *], V] {
       k2v2s: NonEmptyMap[K2, V2]
   )(implicit asValue: (K2, V2) <~< Value): F[Id] =
     upsertNel(key, k2v2s.toNel map (asValue coerce _))
-
 }
 
 /**
@@ -449,5 +434,5 @@ object KeyValueStore {
 
   /** Shape of chain addressed `Model` (only legal choice for KeyValueStores).
     */
-  final type ShapeCH[K, v] = Map[K, v]
+  final type ShapeCH[k, v] = Map[k, v]
 }
