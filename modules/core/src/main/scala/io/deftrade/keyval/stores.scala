@@ -36,6 +36,7 @@ import scala.collection.immutable.SortedMap
 /**
   * Note the only way to get an Id is as the result of an effectful mutation or probe.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Store {
 
   /**
@@ -91,6 +92,11 @@ trait Store {
   def snapshot: Repr[Spec] => Shape[Spec] = _ => ???
 
   /**
+    */
+  def has(id: Id): EffectType[Boolean] =
+    (records exists (_._1 === id)).compile.lastOrError
+
+  /**
     * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     */
   protected def records: StreamF[Record]
@@ -105,7 +111,6 @@ trait Store {
     *
     * FIXME: not thread safe, put a queue in front of single thread-contained appender?
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final protected def append(row: Row): EffectType[Id] =
     for {
       id <- F delay nextId(row)
@@ -119,10 +124,6 @@ trait Store {
   /** overrideable with default nop
     */
   protected def cache(id: Id, row: Row): Unit = ()
-
-  /** overrideable with default nop
-    */
-  protected def lookup(id: Id): List[Row] = List.empty
 
   /**
     */
@@ -196,6 +197,7 @@ object Store {
     */
   def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
     _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
+
 }
 
 /**
@@ -207,23 +209,23 @@ trait ValueStoreV[F[_], V] {
 
   import V._
 
-  final type Spec = cats.Id[V]
-
   final type Repr[A] = Map[Id, A]
 
-  /**
+  /** overrideable
     */
-  def has(id: Id): F[Boolean] =
-    (records exists (_._1 === id)).compile.lastOrError
+  protected def lookup(id: Id): EffectType[Option[Row]] = none.pure[EffectType]
 
   /**
     */
-  def get(id: Id): F[Option[Row]] =
-    (records filter (_._1 === id) map (_._2)).compile.last
+  def get(id: Id): EffectType[Option[Row]] =
+    for {
+      cache <- lookup(id)
+      store <- (records filter (_._1 === id) map (_._2)).compile.last
+    } yield cache.fold(store)(_ => cache) // lawful evil
 
   /**
     */
-  def put(row: Row): F[(Id, Boolean)] = {
+  def put(row: Row): EffectType[(Id, Boolean)] = {
     val id = nextId(row)
     for {
       x <- has(id)
@@ -242,15 +244,13 @@ trait ValueStoreM[F[_], V] {
 
   import V._
 
-  /** FIXME: dedupe
-    */
-  def has(id: Id): F[Boolean] = ???
-
-  protected final type SpecL          = NonEmptyList[V]
-  protected final type SpecMV[K2, V2] = NonEmptyMap[K2, cats.Id[V2]]
-  protected final type SpecML[K2, V2] = NonEmptyMap[K2, NonEmptyList[V2]]
+  // import syntax._
 
   final type Repr[A] = Map[Id, A]
+
+  /**
+    */
+  protected def lookups(id: Id): StreamF[Row] = Stream.empty
 
   /**
     * Get `Stream`.
@@ -258,20 +258,36 @@ trait ValueStoreM[F[_], V] {
     * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
     */
   def gets(id: Id): StreamF[Row] =
-    records filter (_._1 === id) map (_._2)
+    for {
+      cache  <- lookups(id).noneTerminate
+      misses <- records filter (_._1 === id) map (_._2)
+    } yield cache.fold(misses)(identity)
 
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
-  def getList(id: Id): StreamF[List[Row]] =
+  def getl(id: Id): StreamF[List[Row]] =
     gets(id) through Store.listPipe
 
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.Map Map[K2, V2]]]
     */
-  def getMap[K2: Order, V2](id: Id)(implicit asK2V2: V <~< (K2, V2)): StreamF[Map[K2, V2]] =
-    for (values <- getList(id))
+  def getm[K2: Order, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): StreamF[Map[K2, V2]] =
+    for (values <- getl(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
+
+  /**
+    * Like [[getm]], but for `Map[K2, NEL[V2]]`
+    */
+  def getml[K2: Order, V2](
+      id: Id
+  )(implicit
+      asK2V2: V <~< (K2, V2)
+  ): StreamF[Map[K2, List[V2]]] =
+    for (values <- getl(id))
+      yield values.groupBy(v => (asK2V2 coerce v)._1) map {
+        case (k2, vs) => (k2, vs map (v => (asK2V2 coerce v)._2))
+      }
 
   /**
     * Put `Seq`.
@@ -282,22 +298,35 @@ trait ValueStoreM[F[_], V] {
   def puts(row: Row, rows: Row*): F[(Id, Boolean)] = {
     val id = nextId(row, rows: _*)
     for {
-      x   <- has(id)
-      ret <- if (x) (id, false).pure[F] else appends(row, rows: _*) map ((_, true))
+      haz <- has(id)
+      ret <- if (haz) (id, false).pure[F]
+             else appends(row, rows: _*) map ((_, true))
     } yield ret
   }
 
   /**
     */
-  def putNel(values: NonEmptyList[Value]): F[(Id, Boolean)] =
+  def putl(values: NonEmptyList[V]): F[(Id, Boolean)] =
     puts(values.head, values.tail: _*)
 
   /**
     */
-  def putNem[K2: Order, V2](
+  def putm[K2: Order, V2](
       k2v2s: NonEmptyMap[K2, V2]
-  )(implicit asValue: (K2, V2) <~< Value): F[(Id, Boolean)] =
-    putNel(k2v2s.toNel map (asValue coerce _))
+  )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
+    putl(k2v2s.toNel map (asV coerce _))
+
+  /** FIXME: evidently need a way to encode Option[V2] fuuUUUUuu
+    */
+  def putml[K2: Order, V2](
+      k2lv2s: NonEmptyMap[K2, List[V2]]
+  )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
+    putl(k2lv2s.toNel flatMap {
+      case (k2, hv2 :: tv2s) =>
+        NonEmptyList(asV coerce k2 -> hv2, tv2s drop 1 map (v2 => asV coerce k2 -> v2))
+      case (k2, Nil) =>
+        NonEmptyList one (asV coerce k2 -> ???)
+    })
 }
 
 /**
@@ -315,19 +344,11 @@ trait KeyValueStoreV[F[_], K, V] {
 
   /**
     */
-  final type Spec = Option[V]
+  final type Repr[A] = Map[K, Option[(Id, A)]]
 
   /**
     */
-  final type Repr[A] = Map[K, (Id, A)]
-
-  /** Key Value stores ''must'' use chained addresses.
-    *
-    * (This is down to semantics, not crypto.)
-    */
-  final type Shape[A] = Map[Key, A]
-
-  protected def recordsWith(key: Key): StreamF[(Id, Row)] =
+  protected def recordsWith(key: Key): StreamF[Record] =
     records filter (_._2._1 === key)
 
   /** TODO: revisit the implementation, which is tricky
@@ -346,34 +367,34 @@ trait KeyValueStoreV[F[_], K, V] {
     existsAll(key).compile.last
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
-  def selectAll(key: Key): StreamF[Value] =
+  def gets(key: Key): StreamF[Value] =
     for {
       value <- (recordsWith(key) map (_._2._2)).unNoneTerminate
     } yield value
 
   /**
     */
-  def select(key: Key): F[Option[Value]] =
-    selectAll(key).compile.last
+  def get(key: Key): F[Option[Value]] =
+    gets(key).compile.last
 
   /**
     */
-  def insert(key: Key, value: Value): F[Option[Id]] =
+  def let(key: Key, value: Value): F[Option[Id]] =
     exists(key) flatMap (_.fold(append(key -> value.some) map (_.some))(_ => none.pure[F]))
 
   /**
     */
-  def update(key: Key, value: Value): F[Option[Id]] =
+  def set(key: Key, value: Value): F[Option[Id]] =
     updateExistingKey(key, value.some)
 
   /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`!
     */
-  def delete(key: Key): F[Option[Id]] =
+  def del(key: Key): F[Option[Id]] =
     updateExistingKey(key, none)
 
   /**
     */
-  def upsert(key: Key, value: Value): F[Id] =
+  def put(key: Key, value: Value): F[Id] =
     append(key -> value.some)
 }
 
@@ -384,55 +405,40 @@ trait KeyValueStoreM[F[_], K, V] {
 
   self: Store.AuxL[F, WithKey.Aux[K, *], V] =>
 
-  import V._, Key._
+  import V._
 
-  protected final type SpecL          = List[V]
-  protected final type SpecM[K2, V2]  = Map[K2, Option[V2]]
-  protected final type SpecML[K2, V2] = Map[K2, List[V2]]
-
-  final type Repr[A] = Map[K, (Id, A)]
-
-  /** Key Value stores ''must'' use chained addresses.
-    *
-    * (This is down to semantics, not crypto.)
-    */
-  final type Shape[x] = KeyValueStore.ShapeCH[Key, x]
+  final type Repr[A] = Map[Key, (Id, A)]
 
   /** FIXME: dedupe */
-  def selectAll(key: Key): StreamF[Value] = ???
+  def gets(key: Key): StreamF[Value] = ???
 
   /**
     */
-  def selectList(key: Key): F[List[Value]] =
-    selectAll(key).compile.toList
+  def getl(key: Key): F[List[Value]] =
+    gets(key).compile.toList
 
   /**
     */
-  def selectMap[K2: Order, V2](
+  def getm[K2: Order, V2](
       key: Key
   )(implicit asK2V2: Value <~< (K2, V2)): F[Map[K2, V2]] =
-    for (values <- selectList(key))
+    for (values <- getl(key))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
   /**
     */
-  def upsertNel(key: Key, values: NonEmptyList[Value]): F[Id] =
+  def putl(key: Key, values: NonEmptyList[Value]): F[Id] =
     appends((key -> values.head.some), (values.tail map (key -> _.some)): _*)
 
   /**
     */
-  def upsertNem[K2: Order, V2](
+  def putm[K2: Order, V2](
       key: Key,
       k2v2s: NonEmptyMap[K2, V2]
   )(implicit asValue: (K2, V2) <~< Value): F[Id] =
-    upsertNel(key, k2v2s.toNel map (asValue coerce _))
+    putl(key, k2v2s.toNel map (asValue coerce _))
 }
 
 /**
   */
-object KeyValueStore {
-
-  /** Shape of chain addressed `Model` (only legal choice for KeyValueStores).
-    */
-  final type ShapeCH[k, v] = Map[k, v]
-}
+object KeyValueStore

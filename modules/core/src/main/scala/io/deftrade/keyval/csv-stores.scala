@@ -21,7 +21,7 @@ package impl
 import syntax._
 
 import cats.implicits._
-import cats.data.{ NonEmptyList }
+import cats.data.{ NonEmptyList, NonEmptyMap }
 
 import cats.effect.{ Blocker, ContextShift, Sync }
 
@@ -324,6 +324,11 @@ abstract case class MemFileValueStore[
     extends CsvValueStore(v)
     with MemFileV[F, V] {
 
+  final type Spec           = cats.Id[V]
+  final type SpecL          = NonEmptyList[V]
+  final type SpecMV[K2, V2] = NonEmptyMap[K2, cats.Id[V2]]
+  final type SpecML[K2, V2] = NonEmptyMap[K2, NonEmptyList[V2]]
+
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
 }
@@ -342,6 +347,13 @@ abstract case class MemFileKeyValueStore[
 )(implicit lgv: LabelledGeneric.Aux[V, HV], llr: Lazy[LabelledRead[HV]], llw: Lazy[LabelledWrite[HV]])
     extends CsvKeyValueStore(v)
     with MemFileKV[F, K, V] {
+
+  /**
+    */
+  final type Spec           = Option[V]
+  final type SpecL          = List[V]
+  final type SpecM[K2, V2]  = Map[K2, Option[V2]]
+  final type SpecML[K2, V2] = Map[K2, List[V2]]
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv

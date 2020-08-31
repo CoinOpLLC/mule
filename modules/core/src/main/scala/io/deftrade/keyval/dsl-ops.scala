@@ -98,6 +98,12 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
 
         new MemFileKeyValueStore(kv, Paths get p) {
 
+          /** Key Value stores ''must'' use chained addresses.
+            *
+            * (This is down to semantics, not crypto.)
+            */
+          final type Shape[A] = Map[V.Key, A]
+
           final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaChain[V.Row]
         }
       }
