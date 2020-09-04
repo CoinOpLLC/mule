@@ -32,6 +32,7 @@ import refined.cats.refTypeOrder
 import fs2.{ Pipe, Stream }
 
 import scala.collection.immutable.SortedMap
+import cats.effect.Effect
 
 /**
   * Note the only way to get an Id is as the result of an effectful mutation or probe.
@@ -180,7 +181,7 @@ object Store {
       *
       * Appends to the backing store whether or not there is a duplicate (no checking).
       *
-      * FIXME: not thread safe, put a queue in front of single thread-contained appender?
+      * FIXME: not thread safe: put a `Ref` based queue in front
       */
     final protected def appends(row: V.Row, rows: V.Row*): F[V.Id] =
       for {
@@ -197,7 +198,6 @@ object Store {
     */
   def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
     _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
-
 }
 
 /**
@@ -266,13 +266,13 @@ trait ValueStoreM[F[_], V] {
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
-  def getl(id: Id): StreamF[List[Row]] =
-    gets(id) through Store.listPipe
+  def getl(id: Id): EffectType[List[Row]] =
+    (gets(id) through Store.listPipe).compile.lastOrError
 
   /**
     * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.Map Map[K2, V2]]]
     */
-  def getm[K2: Order, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): StreamF[Map[K2, V2]] =
+  def getm[K2: Order, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): EffectType[Map[K2, V2]] =
     for (values <- getl(id))
       yield SortedMap(values map (asK2V2 coerce _): _*)
 
@@ -283,7 +283,7 @@ trait ValueStoreM[F[_], V] {
       id: Id
   )(implicit
       asK2V2: V <~< (K2, V2)
-  ): StreamF[Map[K2, List[V2]]] =
+  ): EffectType[Map[K2, List[V2]]] =
     for (values <- getl(id))
       yield values.groupBy(v => (asK2V2 coerce v)._1) map {
         case (k2, vs) => (k2, vs map (v => (asK2V2 coerce v)._2))
@@ -306,6 +306,31 @@ trait ValueStoreM[F[_], V] {
 
   /**
     */
+  def putl[V2](values: List[V2])(implicit asV: Option[V2] <~< V): F[(Id, Boolean)] =
+    values match {
+      case Nil     => puts(asV coerce none)
+      case v :: vs => puts(asV coerce v.some, (vs map (asV coerce _.some)): _*)
+    }
+
+  /**
+    */
+  def putm[K2: Order, V2](
+      k2v2s: Map[K2, V2]
+  )(implicit asV: Option[(K2, V2)] <~< V): F[(Id, Boolean)] =
+    putl(k2v2s.toList)
+
+  /**
+    */
+  def putml[K2: Order, V2](
+      k2lv2s: Map[K2, List[V2]]
+  )(implicit asV: Option[(K2, Option[V2])] <~< V): F[(Id, Boolean)] =
+    putl[(K2, Option[V2])](k2lv2s.toList flatMap {
+      case (k2, Nil) => List(k2 -> none)
+      case (k2, v2s) => v2s map (v2 => k2 -> v2.some)
+    })
+
+  /**
+    */
   def putl(values: NonEmptyList[V]): F[(Id, Boolean)] =
     puts(values.head, values.tail: _*)
 
@@ -316,16 +341,16 @@ trait ValueStoreM[F[_], V] {
   )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
     putl(k2v2s.toNel map (asV coerce _))
 
-  /** FIXME: evidently need a way to encode Option[V2] fuuUUUUuu
+  /**
     */
   def putml[K2: Order, V2](
       k2lv2s: NonEmptyMap[K2, List[V2]]
-  )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
+  )(implicit asV: (K2, Option[V2]) <~< V): F[(Id, Boolean)] =
     putl(k2lv2s.toNel flatMap {
       case (k2, hv2 :: tv2s) =>
-        NonEmptyList(asV coerce k2 -> hv2, tv2s drop 1 map (v2 => asV coerce k2 -> v2))
+        NonEmptyList(asV coerce k2 -> hv2.some, tv2s map (v2 => asV coerce k2 -> v2.some))
       case (k2, Nil) =>
-        NonEmptyList one (asV coerce k2 -> ???)
+        NonEmptyList one (asV coerce k2 -> none)
     })
 }
 

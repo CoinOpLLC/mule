@@ -417,7 +417,7 @@ trait Ledger { module: ModuleTypes =>
         meta: Meta
     ): F[Transaction] =
       for {
-        tid <- trades putNem trade
+        tid <- trades putm trade
         mid <- metas put (SADT from meta) map (_._1)
       } yield Transaction(instant, from, to, tid._1, mid)
 
