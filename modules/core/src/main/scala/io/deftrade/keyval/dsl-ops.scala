@@ -40,8 +40,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
         new MemFileValueStore[F, V, HV](v, Paths get p) {
 
-          final type Shape[x] = Set[x]
-
           final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaContent[V.Row]
         }
       }
@@ -58,8 +56,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
       Result safe {
 
         new MemFileValueStore[F, V, HV](v, Paths get p) {
-
-          final type Shape[x] = List[x]
 
           final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaChain[V.Row]
         }

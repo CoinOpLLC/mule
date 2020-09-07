@@ -395,7 +395,7 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     def singleLeg[F[_]: Sync](
-        trades: Trade.StoreM[F],
+        trades: Trade.StoreNEM[F, Entry.Key, Entry.Value],
         metas: Meta.Store[F]
     )(
         from: Folio.Key,
@@ -408,7 +408,7 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     def multiLeg[F[_]: Sync](
-        trades: Trade.StoreM[F],
+        trades: Trade.StoreNEM[F, Entry.Key, Entry.Value],
         metas: Meta.Store[F]
     )(
         from: Folio.Key,
@@ -417,7 +417,7 @@ trait Ledger { module: ModuleTypes =>
         meta: Meta
     ): F[Transaction] =
       for {
-        tid <- trades putm trade
+        tid <- trades put trade
         mid <- metas put (SADT from meta) map (_._1)
       } yield Transaction(instant, from, to, tid._1, mid)
 

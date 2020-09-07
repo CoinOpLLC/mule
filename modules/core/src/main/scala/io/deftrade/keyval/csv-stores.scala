@@ -46,7 +46,7 @@ import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class CsvStore[F[_]: Sync: ContextShift, W[_] <: WithValue, V](
     v: W[V]
-) extends Store.AuxV(v)
+) extends Store.Aux(v)
     with CsvImplicits {
 
   import V._
@@ -324,11 +324,6 @@ abstract case class MemFileValueStore[
     extends CsvValueStore(v)
     with MemFileV[F, V] {
 
-  final type Spec           = cats.Id[V]
-  final type SpecL          = NonEmptyList[V]
-  final type SpecMV[K2, V2] = NonEmptyMap[K2, cats.Id[V2]]
-  final type SpecML[K2, V2] = NonEmptyMap[K2, NonEmptyList[V2]]
-
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
 }
@@ -350,8 +345,8 @@ abstract case class MemFileKeyValueStore[
 
   /**
     */
-  final type Spec           = Option[V]
-  final type SpecL          = List[V]
+  final type SpecV[A]       = Option[A]
+  final type SpecL[A]       = List[A]
   final type SpecM[K2, V2]  = Map[K2, Option[V2]]
   final type SpecML[K2, V2] = Map[K2, List[V2]]
 

@@ -33,6 +33,7 @@ import fs2.{ Pipe, Stream }
 
 import scala.collection.immutable.SortedMap
 import cats.effect.Effect
+import io.getquill.ast.Val
 
 /**
   * Note the only way to get an Id is as the result of an effectful mutation or probe.
@@ -45,6 +46,10 @@ trait Store {
   val V: WithValue
 
   import V._
+
+  /**
+    */
+  final type Record = (Id, Row)
 
   /**
     */
@@ -66,13 +71,9 @@ trait Store {
     */
   implicit def X: ContextShift[EffectType]
 
-  /**
+  /** Spec[V] => type function of V specifying what is returned from a `get` or stored by a `put`
     */
   type Spec
-
-  /** What the api client can get a copy of.
-    */
-  type Shape[_]
 
   /** Complete In-memory representation.
     */
@@ -80,17 +81,14 @@ trait Store {
 
   /**
     */
-  final type Record = (Id, Row)
+  def loadSpec: StreamF[Record] => (Spec, StreamF[Record]) = ???
+  def load: Record PipeF Spec                              = _ => ???
 
-  /**
-    */
-  def load: StreamF[Record] => Repr[Spec] = _ => ???
-  def save: Repr[Spec] => StreamF[Record] = _ => ???
+  def saveSpec: Spec => StreamF[Record] = _ => ???
+  def save: Spec PipeF Record           = _ => ???
 
-  /**
-    */
-  def ingest: Shape[Spec] => Repr[Spec]   = _ => ???
-  def snapshot: Repr[Spec] => Shape[Spec] = _ => ???
+  def view: StreamF[Spec] => Repr[Spec] = _ => ???
+  def dump: Repr[Spec] => StreamF[Spec] = _ => ???
 
   /**
     */
@@ -102,6 +100,10 @@ trait Store {
     */
   protected def records: StreamF[Record]
 
+  // /**
+  //   */
+  // final protected def append(row: Row): EffectType[Id] = append(row)
+
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
     *
@@ -110,25 +112,25 @@ trait Store {
     *
     * Appends to the backing store whether or not there is a duplicate (no checking).
     *
-    * FIXME: not thread safe, put a queue in front of single thread-contained appender?
+    * FIXME: not thread safe: put a `Ref` based queue in front
     */
-  final protected def append(row: Row): EffectType[Id] =
+  final protected def append(row: Row, rows: Row*): EffectType[Id] =
     for {
-      id <- F delay nextId(row)
-      r  <- F delay row
-      _ <- (Stream eval F.delay {
+      id <- F delay nextId(row, rows: _*)
+      rs <- F delay (row +: rows).toList
+      _ <- (Stream evals (F delay (rs map { r =>
                cache(id, r)
                (id, r)
-             } through persist).compile.drain
+             })) through persist).compile.drain
     } yield id
 
   /** overrideable with default nop
     */
-  protected def cache(id: Id, row: Row): Unit = ()
+  protected def cache(id: Id, row: Row, rows: Row*): Unit = ()
 
   /**
     */
-  protected def persist: Pipe[EffectType, (Id, Row), Unit]
+  protected def persist: Record PipeF Unit
 
   /** FIXME obviously... this works, not obvously, that's the problem */
   protected var prev: Id =
@@ -153,18 +155,7 @@ object Store {
 
   /**
     */
-  abstract class AuxV[F[_], W[_] <: WithValue, V](
-      final val V: W[V]
-  )(implicit
-      final val F: Sync[F],
-      final val X: ContextShift[F]
-  ) extends Store {
-
-    final type EffectType[x] = F[x]
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  abstract class AuxL[F[_], W[_] <: WithValue, V](
+  abstract class Aux[F[_], W[_] <: WithValue, V](
       final val V: W[V]
   )(implicit
       final val F: Sync[F],
@@ -174,202 +165,376 @@ object Store {
     final type EffectType[x] = F[x]
 
     /**
-      * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
-      *
-      * This feature - the ability to assign multiple rows a single `Id` computed over those all
-      * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
-      *
-      * Appends to the backing store whether or not there is a duplicate (no checking).
-      *
-      * FIXME: not thread safe: put a `Ref` based queue in front
       */
-    final protected def appends(row: V.Row, rows: V.Row*): F[V.Id] =
-      for {
-        id <- F delay nextId(row, rows: _*)
-        rs <- F delay (row +: rows).toList
-        _ <- (Stream evals (F delay (rs map { r =>
-                 cache(id, r)
-                 (id, r)
-               })) through persist).compile.drain
-      } yield id
+    def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
+      _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
   }
-
-  /**
-    */
-  def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
-    _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
 }
 
-/**
-  */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreV[F[_], V] {
-
-  self: Store.AuxV[F, WithId.Aux, V] =>
+trait ValueStore[F[_], V] {
+  self: Store.Aux[F, WithId.Aux, V] =>
 
   import V._
 
-  final type Repr[A] = Map[Id, A]
+  /**
+    * Binds `Repr`, but not `Spec`
+    */
+  final type Repr[SP] = Map[Id, SP]
 
   /** overrideable
     */
-  protected def lookup(id: Id): EffectType[Option[Row]] = none.pure[EffectType]
+  protected def lookup(id: Id): EffectType[List[Row]] = // lookups(id).compile.toList
+    List.empty.pure[EffectType]
 
-  /**
+  /** define whichever is easer
     */
-  def get(id: Id): EffectType[Option[Row]] =
-    for {
-      cache <- lookup(id)
-      store <- (records filter (_._1 === id) map (_._2)).compile.last
-    } yield cache.fold(store)(_ => cache) // lawful evil
-
-  /**
-    */
-  def put(row: Row): EffectType[(Id, Boolean)] = {
-    val id = nextId(row)
-    for {
-      x <- has(id)
-      ret <- if (x) (id, false).pure[F]
-             else append(row) map ((_, true))
-    } yield ret
-  }
-}
-
-/**
-  */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreM[F[_], V] {
-
-  self: Store.AuxL[F, WithId.Aux, V] =>
-
-  import V._
-
-  // import syntax._
-
-  final type Repr[A] = Map[Id, A]
-
-  /**
-    */
-  protected def lookups(id: Id): StreamF[Row] = Stream.empty
+  protected def lookups(id: Id): StreamF[Row] = Stream evalSeq lookup(id)
+  // Stream.empty
 
   /**
     * Get `Stream`.
     *
     * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
     */
-  def gets(id: Id): StreamF[Row] =
+  final protected def rows(id: Id): StreamF[Row] =
     for {
       cache  <- lookups(id).noneTerminate
       misses <- records filter (_._1 === id) map (_._2)
     } yield cache.fold(misses)(identity)
 
   /**
-    * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.List List]]
     */
-  def getl(id: Id): EffectType[List[Row]] =
-    (gets(id) through Store.listPipe).compile.lastOrError
+  def get(id: Id): EffectType[Option[Spec]]
 
   /**
-    * Like [[get]], but returns `Row`s as a [[scala.collection.immutable.Map Map[K2, V2]]]
     */
-  def getm[K2: Order, V2](id: Id)(implicit asK2V2: Value <~< (K2, V2)): EffectType[Map[K2, V2]] =
-    for (values <- getl(id))
-      yield SortedMap(values map (asK2V2 coerce _): _*)
+  def put(spec: Spec): EffectType[(Id, Boolean)]
+}
+
+// protected final type SpecNEM[K2, V2]  = NonEmptyMap[K2, V2]
+// protected final type SpecML[K2, V2]   = Map[K2, List[V2]]
+// protected final type SpecNEML[K2, V2] = NonEmptyMap[K2, List[V2]]
+
+/**
+  */
+object ValueStore {}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreV[F[_], V] extends ValueStore[F, V] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
 
   /**
-    * Like [[getm]], but for `Map[K2, NEL[V2]]`
     */
-  def getml[K2: Order, V2](
-      id: Id
-  )(implicit
-      asK2V2: V <~< (K2, V2)
-  ): EffectType[Map[K2, List[V2]]] =
-    for (values <- getl(id))
-      yield values.groupBy(v => (asK2V2 coerce v)._1) map {
-        case (k2, vs) => (k2, vs map (v => (asK2V2 coerce v)._2))
-      }
+  final type Spec = Value
 
   /**
-    * Put `Seq`.
-    *
-    * TODO: Ugly double hash calc can be optimized later.
-    * Also, is ''never'' necessary for chained hash.
     */
-  def puts(row: Row, rows: Row*): F[(Id, Boolean)] = {
-    val id = nextId(row, rows: _*)
+  def get(id: Id): EffectType[Option[Spec]] =
     for {
-      haz <- has(id)
-      ret <- if (haz) (id, false).pure[F]
-             else appends(row, rows: _*) map ((_, true))
+      cache <- lookup(id)
+      store <- (records filter (_._1 === id) map (_._2)).compile.last
+    } yield cache.headOption.fold(store)(_ => cache.headOption) // lawful evil
+
+  /**
+    */
+  def put(spec: Spec): EffectType[(Id, Boolean)] = {
+    val id = nextId(spec)
+    for {
+      x <- has(id)
+      ret <- if (x) (id, false).pure[F]
+             else append(spec) map ((_, true))
     } yield ret
   }
+}
+
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+protected trait VSnel[F[_], V] extends ValueStore[F, V] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
 
   /**
     */
-  def putl[V2](values: List[V2])(implicit asV: Option[V2] <~< V): F[(Id, Boolean)] =
-    values match {
-      case Nil     => puts(asV coerce none)
-      case v :: vs => puts(asV coerce v.some, (vs map (asV coerce _.some)): _*)
-    }
+  protected def getNel(id: Id): EffectType[Option[NonEmptyList[V]]] =
+    for {
+      cache <- lookups(id).compile.toList
+      store <- rows(id).compile.toList
+    } yield cache.headOption.fold(store.toNel)(_ => cache.toNel) // lawful evil
 
   /**
     */
-  def putm[K2: Order, V2](
-      k2v2s: Map[K2, V2]
-  )(implicit asV: Option[(K2, V2)] <~< V): F[(Id, Boolean)] =
-    putl(k2v2s.toList)
-
-  /**
-    */
-  def putml[K2: Order, V2](
-      k2lv2s: Map[K2, List[V2]]
-  )(implicit asV: Option[(K2, Option[V2])] <~< V): F[(Id, Boolean)] =
-    putl[(K2, Option[V2])](k2lv2s.toList flatMap {
-      case (k2, Nil) => List(k2 -> none)
-      case (k2, v2s) => v2s map (v2 => k2 -> v2.some)
-    })
-
-  /**
-    */
-  def putl(values: NonEmptyList[V]): F[(Id, Boolean)] =
-    puts(values.head, values.tail: _*)
-
-  /**
-    */
-  def putm[K2: Order, V2](
-      k2v2s: NonEmptyMap[K2, V2]
-  )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
-    putl(k2v2s.toNel map (asV coerce _))
-
-  /**
-    */
-  def putml[K2: Order, V2](
-      k2lv2s: NonEmptyMap[K2, List[V2]]
-  )(implicit asV: (K2, Option[V2]) <~< V): F[(Id, Boolean)] =
-    putl(k2lv2s.toNel flatMap {
-      case (k2, hv2 :: tv2s) =>
-        NonEmptyList(asV coerce k2 -> hv2.some, tv2s map (v2 => asV coerce k2 -> v2.some))
-      case (k2, Nil) =>
-        NonEmptyList one (asV coerce k2 -> none)
-    })
+  protected def putNel(spec: NonEmptyList[V]): EffectType[(Id, Boolean)] = {
+    val id = nextId(spec.head, spec.tail: _*)
+    for {
+      x <- has(id)
+      ret <- if (x) (id, false).pure[F]
+             else append(spec.head, spec.tail: _*) map ((_, true))
+    } yield ret
+  }
 }
 
 /**
   */
-object ValueStore
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreNEL[F[_], V] extends VSnel[F, V] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  /**
+    */
+  final type Spec = NonEmptyList[Value]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    getNel(id)
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    putNel(spec)
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreNEM[F[_], K2, V2] extends VSnel[F, (K2, V2)] {
+
+  self: Store.Aux[F, WithId.Aux, (K2, V2)] =>
+
+  import V._
+
+  implicit def k2v2AsV: (K2, V2) === Value =
+    Is unsafeFromPredef implicitly[(K2, V2) =:= Value]
+
+  /**
+    */
+  final type Spec = NonEmptyMap[K2, V2]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    ??? // getNel(id)
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    ??? // putNel(spec)
+  //     /**
+  //   */
+  // def putm[K2: Order, V2](
+  //     k2v2s: NonEmptyMap[K2, V2]
+  // )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
+  //   putl(k2v2s.toNel map (asV coerce _))
+
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreNEML[F[_], K2, V2] extends VSnel[F, (K2, Option[V2])] {
+
+  self: Store.Aux[F, WithId.Aux, (K2, Option[V2])] =>
+
+  import V._
+
+  implicit def k2lv2AsV: (K2, Option[V2]) === Value =
+    Is unsafeFromPredef implicitly[(K2, Option[V2]) =:= Value]
+
+  /**
+    */
+  final type Spec = NonEmptyMap[K2, List[V2]]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    ??? // getNel(id)
+  // def getml[K2: Order, V2](
+  //     id: Id
+  // )(implicit
+  //     asK2V2: V <~< (K2, V2)
+  // ): EffectType[Map[K2, List[V2]]] =
+  //   for (values <- getl(id))
+  //     yield values.groupBy(v => (asK2V2 coerce v)._1) map {
+  //       case (k2, vs) => (k2, vs map (v => (asK2V2 coerce v)._2))
+  //     }
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    ??? // putNel(spec)
+  //     /**
+  //   */
+  // def putml[K2: Order, V2](
+  //     k2lv2s: NonEmptyMap[K2, List[V2]]
+  // )(implicit asV: (K2, Option[V2]) <~< V): F[(Id, Boolean)] =
+  //   putl(k2lv2s.toNel flatMap {
+  //     case (k2, hv2 :: tv2s) =>
+  //       NonEmptyList(asV coerce k2 -> hv2.some, tv2s map (v2 => asV coerce k2 -> v2.some))
+  //     case (k2, Nil) =>
+  //       NonEmptyList one (asV coerce k2 -> none)
+  //   })
+
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+protected trait VSlist[F[_], V, V2] extends ValueStore[F, V] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  /**
+    */
+  protected implicit def IsV: Option[V2] === V
+
+  /**
+    */
+  protected def getList(id: Id): EffectType[Option[List[V2]]] =
+    for {
+      cache <- lookups(id).compile.toList
+      store <- rows(id).compile.toList
+    } yield (cache.headOption.fold(store)(_ => cache) map IsV.flip.coerce).sequence
+
+  /** FIXME: abstract the duplicate folding
+    */
+  protected def putList(spec: List[V2]): EffectType[(Id, Boolean)] = {
+    val id = spec.headOption.fold(
+      nextId(IsV coerce none[V2])
+    )(h => nextId(IsV coerce h.some, spec drop 1 map (IsV coerce _.some): _*))
+    for {
+      x <- has(id)
+      ret <- if (x) (id, false).pure[F]
+             else
+               spec.headOption.fold(
+                 append(IsV coerce none[V2])
+               )(h => append(IsV coerce h.some, spec drop 1 map (IsV coerce _.some): _*)) map {
+                 (_, true)
+               }
+    } yield ret
+  }
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreL[F[_], V, V2] extends VSlist[F, V, V2] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  /**
+    */
+  final type Spec = List[V2]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    getList(id)
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    putList(spec)
+}
+
+/** `Option[(K2, V2)] === V`
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreM[F[_], V, K2, V2] extends VSlist[F, V, (K2, V2)] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  implicit def K2: Order[K2]
+
+  /**
+    */
+  final type Spec = Map[K2, V2]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    getList(id) map {
+      _ map { SortedMap(_: _*) }
+    }
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    putList(spec.toList)
+}
+
+/** Option[(K2, Option[V2])] === V
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+trait ValueStoreML[F[_], V, K2, V2] extends VSlist[F, V, (K2, Option[V2])] {
+
+  self: Store.Aux[F, WithId.Aux, V] =>
+
+  import V._
+
+  /**
+    */
+  final type Spec = Map[K2, List[V2]]
+
+  /**
+    */
+  @inline final def get(id: Id): EffectType[Option[Spec]] =
+    ??? // getList(id)
+
+  /**
+    */
+  @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
+    ??? // putList(spec)
+  // /**
+  //   */
+  // def putml[K2: Order, V2](
+  //     k2lv2s: Map[K2, List[V2]]
+  // )(implicit asV: Option[(K2, Option[V2])] <~< V): F[(Id, Boolean)] =
+  //   putl[(K2, Option[V2])](k2lv2s.toList flatMap {
+  //     case (k2, Nil) => List(k2 -> none)
+  //     case (k2, v2s) => v2s map (v2 => k2 -> v2.some)
+  //   })
+}
 
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStoreV[F[_], K, V] {
 
-  self: Store.AuxV[F, WithKey.Aux[K, *], V] =>
+  self: Store.Aux[F, WithKey.Aux[K, *], V] =>
 
   import V._, Key._
 
   /**
     */
   final type Repr[A] = Map[K, Option[(Id, A)]]
+
+  /** What the api client can get a copy of.
+    */
+  type Shape[_]
+
+  /**
+    */
+  def snapshot: Shape[Spec] => StreamF[Spec] = _ => ???
+
+  /**
+    */
+  def spinup: StreamF[Spec] => Shape[Spec] = _ => ???
 
   /**
     */
@@ -428,7 +593,7 @@ trait KeyValueStoreV[F[_], K, V] {
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait KeyValueStoreM[F[_], K, V] {
 
-  self: Store.AuxL[F, WithKey.Aux[K, *], V] =>
+  self: Store.Aux[F, WithKey.Aux[K, *], V] =>
 
   import V._
 
@@ -453,7 +618,7 @@ trait KeyValueStoreM[F[_], K, V] {
   /**
     */
   def putl(key: Key, values: NonEmptyList[Value]): F[Id] =
-    appends((key -> values.head.some), (values.tail map (key -> _.some)): _*)
+    append((key -> values.head.some), (values.tail map (key -> _.some)): _*)
 
   /**
     */
