@@ -29,8 +29,6 @@ import eu.timepit.refined
 import refined.api.{ Refined }
 import scodec.bits.ByteVector
 
-import io.circe.Json
-
 import java.security.MessageDigest
 
 /**

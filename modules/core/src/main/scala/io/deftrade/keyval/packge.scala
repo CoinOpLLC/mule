@@ -16,12 +16,6 @@
 
 package io.deftrade
 
-import money._
-
-import cats.implicits._
-import cats.data.{ NonEmptyList }
-import cats.effect.{ ContextShift, Sync }
-
 import eu.timepit.refined
 import refined.api.Refined
 
@@ -83,7 +77,7 @@ import refined.api.Refined
   *
   * TODO: Postgres / Mongo / Kafka integration
   */
-package object keyval {
+package object keyval extends keyval.dsl {
 
   import shapeless.syntax.singleton._
 
@@ -102,107 +96,4 @@ package object keyval {
 
   /** Just an alias. */
   type OpaqueKey[K, V] = Refined[K, V]
-
-  /**
-    */
-  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
-
-  /**
-    */
-  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
-}
-
-package keyval {
-
-  import io.circe.{ Decoder, Encoder }
-
-  import io.chrisdavenport.cormorant
-  import cormorant.implicits.stringPut
-  import cormorant.{ CSV, Error, Get, Printer, Put }
-
-  import io.chrisdavenport.fuuid
-  import fuuid.FUUID
-
-  trait CsvImplicits {
-
-    private[keyval] lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
-
-    /**
-      */
-    private[keyval] def printer: Printer = Printer.default
-
-    /**
-      */
-    private val toDecodeFailure: Throwable => Error.DecodeFailure =
-      fail => Error.DecodeFailure(NonEmptyList one fail.toString)
-
-    /**
-      */
-    implicit def fuuidGet: Get[FUUID] =
-      new Get[FUUID] {
-
-        /**
-          */
-        def get(field: CSV.Field): Either[Error.DecodeFailure, FUUID] =
-          FUUID fromString field.x leftMap toDecodeFailure
-      }
-
-    /**
-      */
-    implicit def fuuidPut: Put[FUUID] =
-      stringPut contramap (_.show)
-
-    /**
-      */
-    implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
-      new Get[Mny[N, C]] {
-
-        /**
-          */
-        def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
-          Mny parse field.x leftMap toDecodeFailure
-      }
-
-    /**
-      */
-    implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
-      stringPut contramap Mny.format[N, C]
-
-    /**
-      */
-    implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
-      new Get[N] {
-
-        /**
-          */
-        def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
-          N parse field.x leftMap toDecodeFailure
-      }
-
-    /**
-      */
-    implicit def financialPut[N: Financial]: Put[N] =
-      stringPut contramap (Financial[N] toString _)
-
-    /**
-      */
-    implicit def sadtGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
-      new Get[SADT.Aux[T]] {
-
-        import io.circe.parser._
-
-        /**
-          */
-        def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
-          for {
-            json <- parse(field.x) leftMap toDecodeFailure
-          } yield SADT[T](json)
-      }
-
-    /**
-      */
-    implicit lazy val sadtPut: Put[SADT] =
-      stringPut contramap (_.canoncicalString)
-
-  }
 }

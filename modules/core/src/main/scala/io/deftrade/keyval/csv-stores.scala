@@ -21,6 +21,7 @@ package impl
 import syntax._
 
 import cats.implicits._
+import cats.Show
 import cats.data.{ NonEmptyList, NonEmptyMap }
 
 import cats.effect.{ Blocker, ContextShift, Sync }
@@ -42,12 +43,12 @@ import cormorant.generic.semiauto._
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
 /**
+  * Value parameter `V` carries type members specific to `type V`.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class CsvStore[F[_]: Sync: ContextShift, W[_] <: WithValue, V](
-    v: W[V]
-) extends Store.Aux(v)
-    with CsvImplicits {
+sealed trait CsvStore[F[_], W[_] <: WithValue, V] extends CsvImplicits {
+
+  self: Store.Aux[F, W, V] =>
 
   import V._
 
@@ -88,20 +89,14 @@ abstract class CsvStore[F[_]: Sync: ContextShift, W[_] <: WithValue, V](
 }
 
 /**
-  * Value parameter `V` carries type members specific to `type V`.
-  *
-  * Cormorant CSV is integrated by implementing implicit methods
-  * [[writeIdRow]], [[readIdRow]], providing access to
-  * [[io.chrisdavenport.cormorant.LabelledRead]] and
-  * [[io.chrisdavenport.cormorant.LabelledWrite]] instances for type `Record`.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class CsvValueStore[
+sealed abstract class CsvValueStore[
     F[_]: Sync: ContextShift,
     V
 ](v: WithId.Aux[V])
-    extends CsvStore[F, WithId.Aux, V](v)
-    with ValueStoreV[F, V] {
+    extends ValueStore.Aux[F, V](v)
+    with CsvStore[F, WithId.Aux, V] {
 
   import V._
 
@@ -157,13 +152,13 @@ abstract class CsvValueStore[
 
 /**
   */
-abstract class CsvKeyValueStore[
+sealed abstract class CsvKeyValueStore[
     F[_]: Sync: ContextShift,
     K: Get: Put,
     V
 ](v: WithKey.Aux[K, V])
-    extends CsvStore[F, WithKey.Aux[K, *], V](v)
-    with KeyValueStoreV[F, K, V] {
+    extends KeyValueStore.Aux[F, K, V](v)
+    with CsvStore[F, WithKey.Aux[K, *], V] {
 
   import V._
 
@@ -229,11 +224,14 @@ abstract class CsvKeyValueStore[
     writeLabelled(printer)
 }
 
-/**
+/** no part of this implementation tree depends on Spec
   */
-sealed trait MemFile[F[_], W[_] <: WithValue, V] {
+sealed protected trait MemFile[F[_], W[_] <: WithValue, V] {
 
   self: CsvStore[F, W, V] =>
+
+  implicit def F: Sync[F]
+  implicit def X: ContextShift[F]
 
   // cache stuff
   //  - this is where it matters whether we have single or multi value api
@@ -299,30 +297,56 @@ sealed trait MemFile[F[_], W[_] <: WithValue, V] {
 }
 
 sealed trait MemFileV[F[_], V] extends MemFile[F, WithId.Aux, V] {
-
-  self: CsvStore[F, WithId.Aux, V] =>
+  self: CsvValueStore[F, V] =>
 }
 
 /**
   */
 sealed trait MemFileKV[F[_], K, V] extends MemFile[F, WithKey.Aux[K, *], V] {
-
-  self: CsvStore[F, WithKey.Aux[K, *], V] =>
+  self: CsvKeyValueStore[F, K, V] =>
 }
 
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract case class MemFileValueStore[
+abstract case class CaMfValueStore[
     F[_]: Sync: ContextShift,
-    V,
+    V: Show,
     HV <: HList
 ](
     v: WithId.Aux[V],
     final override val path: Path
-)(implicit lgv: LabelledGeneric.Aux[V, HV], llr: Lazy[LabelledRead[HV]], llw: Lazy[LabelledWrite[HV]])
-    extends CsvValueStore(v)
+)(implicit
+    lgv: LabelledGeneric.Aux[V, HV],
+    llr: Lazy[LabelledRead[HV]],
+    llw: Lazy[LabelledWrite[HV]]
+) extends CsvValueStore(v)
     with MemFileV[F, V] {
+
+  final override lazy val fresh = Fresh.shaContent[V.Row]
+
+  final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
+  final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+}
+
+/**
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
+abstract case class ChMfValueStore[
+    F[_]: Sync: ContextShift,
+    V: Show,
+    HV <: HList
+](
+    v: WithId.Aux[V],
+    final override val path: Path
+)(implicit
+    lgv: LabelledGeneric.Aux[V, HV],
+    llr: Lazy[LabelledRead[HV]],
+    llw: Lazy[LabelledWrite[HV]]
+) extends CsvValueStore(v)
+    with MemFileV[F, V] {
+
+  final override lazy val fresh = Fresh.shaChain[V.Row]
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
@@ -334,7 +358,7 @@ abstract case class MemFileValueStore[
 abstract case class MemFileKeyValueStore[
     F[_]: Sync: ContextShift,
     K: Get: Put,
-    V,
+    V: Show,
     HV <: HList
 ](
     v: WithKey.Aux[K, V],
@@ -342,13 +366,6 @@ abstract case class MemFileKeyValueStore[
 )(implicit lgv: LabelledGeneric.Aux[V, HV], llr: Lazy[LabelledRead[HV]], llw: Lazy[LabelledWrite[HV]])
     extends CsvKeyValueStore(v)
     with MemFileKV[F, K, V] {
-
-  /**
-    */
-  final type SpecV[A]       = Option[A]
-  final type SpecL[A]       = List[A]
-  final type SpecM[K2, V2]  = Map[K2, Option[V2]]
-  final type SpecML[K2, V2] = Map[K2, List[V2]]
 
   final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
   final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv

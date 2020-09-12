@@ -32,11 +32,12 @@ import refined.cats.refTypeOrder
 import fs2.{ Pipe, Stream }
 
 import scala.collection.immutable.SortedMap
-import cats.effect.Effect
-import io.getquill.ast.Val
 
 /**
   * Note the only way to get an Id is as the result of an effectful mutation or probe.
+  *
+  * FIXME: `trait` implementation necessitates duplication of the Spec[K2, V2] === V defninitions
+  * for all the `Spec`s, in the form of self type restrictions. Eliminate or prove we can't.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Store {
@@ -166,7 +167,7 @@ object Store {
 
     /**
       */
-    def listPipe[F[_], A]: Stream[F, A] => Stream[F, List[A]] =
+    def listPipe[A]: A PipeF List[A] =
       _.fold(List.empty[A])((vs, v) => v :: vs) map (_.reverse)
   }
 }
@@ -218,14 +219,22 @@ trait ValueStore[F[_], V] {
 
 /**
   */
-object ValueStore {}
+object ValueStore {
+
+  /**
+    */
+  abstract class Aux[F[_]: Sync: ContextShift, V](
+      v: WithId.Aux[V]
+  ) extends Store.Aux[F, WithId.Aux, V](v)
+      with ValueStore[F, V]
+}
 
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait ValueStoreV[F[_], V] extends ValueStore[F, V] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, V] =>
 
   import V._
 
@@ -256,7 +265,7 @@ trait ValueStoreV[F[_], V] extends ValueStore[F, V] {
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 protected trait VSnel[F[_], V] extends ValueStore[F, V] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, V] =>
 
   import V._
 
@@ -283,15 +292,15 @@ protected trait VSnel[F[_], V] extends ValueStore[F, V] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreNEL[F[_], V] extends VSnel[F, V] {
+trait ValueStoreNELV[F[_], V] extends VSnel[F, V] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, V] =>
 
   import V._
 
   /**
     */
-  final type Spec = NonEmptyList[Value]
+  final type Spec = NonEmptyList[V]
 
   /**
     */
@@ -307,9 +316,9 @@ trait ValueStoreNEL[F[_], V] extends VSnel[F, V] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreNEM[F[_], K2, V2] extends VSnel[F, (K2, V2)] {
+trait ValueStoreNEMK2V2[F[_], K2, V2] extends VSnel[F, (K2, V2)] {
 
-  self: Store.Aux[F, WithId.Aux, (K2, V2)] =>
+  self: ValueStore.Aux[F, (K2, V2)] =>
 
   import V._
 
@@ -341,9 +350,9 @@ trait ValueStoreNEM[F[_], K2, V2] extends VSnel[F, (K2, V2)] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreNEML[F[_], K2, V2] extends VSnel[F, (K2, Option[V2])] {
+trait ValueStoreNEMK2LV2[F[_], K2, V2] extends VSnel[F, (K2, Option[V2])] {
 
-  self: Store.Aux[F, WithId.Aux, (K2, Option[V2])] =>
+  self: ValueStore.Aux[F, (K2, Option[V2])] =>
 
   import V._
 
@@ -389,15 +398,15 @@ trait ValueStoreNEML[F[_], K2, V2] extends VSnel[F, (K2, Option[V2])] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-protected trait VSlist[F[_], V, V2] extends ValueStore[F, V] {
+trait VSlist[F[_], V2] extends ValueStore[F, Option[V2]] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, Option[V2]] =>
 
   import V._
 
   /**
     */
-  protected implicit def IsV: Option[V2] === V
+  protected implicit def IsV: Option[V2] === Value
 
   /**
     */
@@ -429,9 +438,9 @@ protected trait VSlist[F[_], V, V2] extends ValueStore[F, V] {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreL[F[_], V, V2] extends VSlist[F, V, V2] {
+trait ValueStoreLV[F[_], V2] extends VSlist[F, V2] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, Option[V2]] =>
 
   import V._
 
@@ -453,9 +462,9 @@ trait ValueStoreL[F[_], V, V2] extends VSlist[F, V, V2] {
 /** `Option[(K2, V2)] === V`
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreM[F[_], V, K2, V2] extends VSlist[F, V, (K2, V2)] {
+trait ValueStoreMK2V2[F[_], K2, V2] extends VSlist[F, (K2, V2)] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, Option[(K2, V2)]] =>
 
   import V._
 
@@ -481,9 +490,9 @@ trait ValueStoreM[F[_], V, K2, V2] extends VSlist[F, V, (K2, V2)] {
 /** Option[(K2, Option[V2])] === V
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait ValueStoreML[F[_], V, K2, V2] extends VSlist[F, V, (K2, Option[V2])] {
+trait ValueStoreMK2LV2[F[_], K2, V2] extends VSlist[F, (K2, Option[V2])] {
 
-  self: Store.Aux[F, WithId.Aux, V] =>
+  self: ValueStore.Aux[F, Option[(K2, Option[V2])]] =>
 
   import V._
 
@@ -509,6 +518,18 @@ trait ValueStoreML[F[_], V, K2, V2] extends VSlist[F, V, (K2, Option[V2])] {
   //     case (k2, Nil) => List(k2 -> none)
   //     case (k2, v2s) => v2s map (v2 => k2 -> v2.some)
   //   })
+}
+
+trait KeyValueStore[F[_], K, V] {}
+
+object KeyValueStore {
+
+  /**
+    */
+  abstract class Aux[F[_]: Sync: ContextShift, K, V](
+      v: WithKey.Aux[K, V]
+  ) extends Store.Aux[F, WithKey.Aux[K, *], V](v)
+      with KeyValueStore[F, K, V]
 }
 
 /**
@@ -628,7 +649,3 @@ trait KeyValueStoreM[F[_], K, V] {
   )(implicit asValue: (K2, V2) <~< Value): F[Id] =
     putl(key, k2v2s.toNel map (asValue coerce _))
 }
-
-/**
-  */
-object KeyValueStore
