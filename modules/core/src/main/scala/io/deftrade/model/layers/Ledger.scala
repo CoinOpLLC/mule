@@ -332,6 +332,8 @@ trait Ledger { module: ModuleTypes =>
       } yield (trade, amount)
   }
 
+  object Trades extends ValueStore.Param.NEMKV.DependentTypeThunk(Trade)
+
   /**
     * Root of the transaction metadata abstract datatype.
     */
@@ -349,6 +351,10 @@ trait Ledger { module: ModuleTypes =>
     * lineage of the contract.
     */
   val Meta: WithSADT[Meta]
+
+  /**
+    */
+  object Metas extends ValueStore.Param.V.DependentTypeThunk(Meta)
 
   /**
     * The concrete record for `Ledger` updates.
@@ -395,8 +401,8 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     def singleLeg[F[_]: Sync](
-        trades: Trade.StoreNEM[F, Entry.Key, Entry.Value],
-        metas: Meta.Store[F]
+        trades: Trades.ValueStore[F],
+        metas: Metas.ValueStore[F]
     )(
         from: Folio.Key,
         to: Folio.Key,
@@ -408,8 +414,8 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     def multiLeg[F[_]: Sync](
-        trades: Trade.StoreNEM[F, Entry.Key, Entry.Value],
-        metas: Meta.Store[F]
+        trades: Trades.ValueStore[F],
+        metas: Metas.ValueStore[F]
     )(
         from: Folio.Key,
         to: Folio.Key,
@@ -552,7 +558,7 @@ trait Ledger { module: ModuleTypes =>
     *   @return `Stream` effect will effectively subtract amount from the `against` folio
     */
   final def payment[F[_]: Sync, C: Currency](
-      trades: Trade.Store[F]
+      trades: Trades.ValueStore[F]
   )(
       payCash: Folio.Key => Money[C] => Stream[F, Result[Folio.Id]]
   )(

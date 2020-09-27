@@ -48,7 +48,7 @@ import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 sealed trait CsvStore[F[_], W[_] <: WithValue, V] extends CsvImplicits {
 
-  self: Store.Aux[F, W, V] =>
+  self: Store[F, W, V] =>
 
   import V._
 
@@ -95,7 +95,7 @@ sealed abstract class CsvValueStore[
     F[_]: Sync: ContextShift,
     V
 ](v: WithId.Aux[V])
-    extends ValueStore.Aux[F, V](v)
+    extends ValueStore[F, V](v)
     with CsvStore[F, WithId.Aux, V] {
 
   import V._
@@ -157,7 +157,7 @@ sealed abstract class CsvKeyValueStore[
     K: Get: Put,
     V
 ](v: WithKey.Aux[K, V])
-    extends KeyValueStore.Aux[F, K, V](v)
+    extends KeyValueStore[F, K, V](v)
     with CsvStore[F, WithKey.Aux[K, *], V] {
 
   import V._

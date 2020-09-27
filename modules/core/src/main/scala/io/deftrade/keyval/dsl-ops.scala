@@ -4,7 +4,7 @@ package keyval
 import impl._
 
 import cats.implicits._
-import cats.{ Eq, Show }
+import cats.{ Eq, Order, Show }
 import cats.effect.{ ContextShift, Sync }
 import cats.evidence._
 
@@ -15,6 +15,7 @@ import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
 import java.nio.file.{ Paths }
+import scala.tools.asm.Label
 
 trait KVSspec
 object KVSspec {
@@ -37,7 +38,6 @@ trait dsl {
   /**
     */
   def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
-
 }
 
 /** dsl for value stores
@@ -56,42 +56,64 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
     /**
       */
-    def ofContentAddressed[V: Eq: Show, HV <: HList, K2: Show, V2: Show](
-        v: WithId.Aux[V]
-    )(
-        vs: v.VsSpec.Aux[K2, V2]
+    def ofContentAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
+        v: WithId.Aux[V],
+        p: ValueStore.Param
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV], // use `wut` to coerce `lgv` to the right type
+        IsV: p.ValueSpec[K2, V2] === v.Value,
+        thunk: p.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
+        // thunk: ValueStore.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
+        lgv: LabelledGeneric.Aux[V, HV],
         llr: Lazy[LabelledRead[HV]],
         llw: Lazy[LabelledWrite[HV]]
-    ): Result[ValueStore[F, V]] =
+    ): Result[thunk.ValueStore[F]] =
       Result safe {
-        import VsParam._
-        vs.param match {
+        // FIXME: put this in VsSpec?
+        implicit val lgvs: LabelledGeneric.Aux[p.ValueSpec[K2, V2], HV] =
+          IsV.flip substitute [LabelledGeneric.Aux[*, HV]] lgv
+
+        implicit val vsShow = IsV.flip substitute [Show] Show[v.Value]
+
+        import ValueStore.Param._
+
+        p match {
           case V =>
-            new CaMfValueStore[F, V, HV](v, path) with ValueStoreV[F, V] {}
-          case LV => ???
-          // new CaMfValueStore[F, Option[V2], HV](v, path) with ValueStoreLV[F, V2] {}
-          // case VsSpec.MK2V2    => new CaMfValueStore[F, V, HV](v, path) with ValueStoreMK2V2[F, V] {}
-          // case VsSpec.MK2LV2   => new CaMfValueStore[F, V, HV](v, path) with ValueStoreMK2LV2[F, V] {}
-          // case VsSpec.NELV     => new CaMfValueStore[F, V, HV](v, path) with ValueStoreNELV[F, V] {}
-          // case VsSpec.NEMK2V2  => new CaMfValueStore[F, V, HV](v, path) with ValueStoreNEMK2V2[F, V] {}
-          // case VsSpec.NEMK2LV2 => new CaMfValueStore[F, V, HV](v, path) with ValueStoreNEMK2LV2[F, V] {}
+            new CaMfValueStore[F, v.Value, HV](
+              v,
+              path
+            ) with thunk.ValueStore[F] {}
+          case LV =>
+            new CaMfValueStore[F, v.Value, HV](
+              v,
+              path
+            ) with thunk.ValueStore[F] {}
+          case MKV    => ???
+          case MKLV   => ???
+          case NELV   => ???
+          case NEMKV  => ???
+          case NEMKLV => ???
         }
       }
 
     /** `of` clause
       */
-    def ofChainAddressed[V: Eq: Show, HV <: HList](
-        v: WithId.Aux[V]
+    def ofChainAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
+        v: WithId.Aux[V],
+        p: ValueStore.Param
     )(implicit
+        IsV: p.ValueSpec[K2, V2] === v.Value,
+        thunk: p.DependentTypeThunk[V, K2, V2], // = p.thunk[V, K2, V2](v, p)
         lgv: LabelledGeneric.Aux[V, HV],
         llr: Lazy[LabelledRead[HV]],
         llw: Lazy[LabelledWrite[HV]]
     ): Result[ValueStore[F, V]] =
       Result safe {
 
-        new ChMfValueStore[F, V, HV](v, path) with ValueStoreV[F, V] {}
+        implicit val vsShow = IsV.flip substitute [Show] Show[v.Value]
+
+        import ValueStore.Param._
+
+        new ChMfValueStore[F, V, HV](v, path) with thunk.ValueStore[F] {}
       }
   }
 }

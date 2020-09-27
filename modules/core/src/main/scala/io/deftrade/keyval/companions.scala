@@ -21,7 +21,7 @@ import refinements.Sha
 
 import cats.implicits._
 import cats.evidence._
-import cats.{ Order, Show }
+import cats.{ Eq, Order, Show }
 import cats.data.{ NonEmptyList, NonEmptyMap }
 
 import eu.timepit.refined
@@ -97,112 +97,11 @@ protected object WithValue {
 
 /**
   */
-private[keyval] sealed trait VsParam
-
-/**
-  */
-private[keyval] object VsParam {
-  case object V        extends VsParam
-  case object LV       extends VsParam
-  case object MK2V2    extends VsParam
-  case object MK2LV2   extends VsParam
-  case object NELV     extends VsParam
-  case object NEMK2V2  extends VsParam
-  case object NEMK2LV2 extends VsParam
-}
-
-/**
-  */
-sealed trait WithId extends WithValue {
+sealed trait WithId extends WithValue { outer =>
 
   /**
     */
   final type Row = Value
-
-  /**
-    */
-  sealed trait VsSpec {
-
-    val param: VsParam
-
-    type Kappa
-
-    type Vega
-
-    type Spec
-
-    type ValueSpec
-
-    type Store[F[_]] <: ValueStore.Aux[F, ValueSpec]
-
-    implicit def AsV: ValueSpec === Value
-  }
-
-  /**
-    */
-  object VsSpec {
-
-    sealed abstract class Aux[K2, V2](final override val param: VsParam) extends VsSpec {
-      final type Kappa = K2
-      final type Vega  = V2
-    }
-  }
-
-  def v(implicit asV: Value === Value): VsSpec.Aux[Nothing, Value] =
-    new VsSpec.Aux[Nothing, Value](VsParam.V) {
-      final type Spec        = Vega
-      final type ValueSpec   = Vega
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreV[F, Vega]
-      final implicit def AsV = asV
-    }
-
-  def lv[V2](implicit asV: Option[V2] === Value): VsSpec =
-    new VsSpec.Aux[Nothing, V2](VsParam.LV) {
-      final type Spec        = List[Vega]
-      final type ValueSpec   = Option[Vega]
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreLV[F, Vega]
-      final implicit def AsV = asV
-    }
-
-  def mk2v2[K2, V2](implicit asV: Option[(K2, V2)] === Value): VsSpec =
-    new VsSpec.Aux[K2, V2](VsParam.MK2V2) {
-      final type Spec        = Map[Kappa, Vega]
-      final type ValueSpec   = Option[(Kappa, Vega)]
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreMK2V2[F, Kappa, Vega]
-      final implicit def AsV = asV
-    }
-
-  def mk2lv2[K2, V2](implicit asV: Option[(K2, Option[V2])] === Value): VsSpec =
-    new VsSpec.Aux[K2, V2](VsParam.MK2LV2) {
-      final type Spec        = Map[Kappa, List[Vega]]
-      final type ValueSpec   = Option[(Kappa, Option[Vega])]
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreMK2LV2[F, Kappa, Vega]
-      final implicit def AsV = asV
-    }
-
-  def nelv(implicit asV: Value === Value): VsSpec =
-    new VsSpec.Aux[Nothing, Value](VsParam.NELV) {
-      final type Spec        = NonEmptyList[Vega]
-      final type ValueSpec   = Vega
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreNELV[F, Vega]
-      final implicit def AsV = asV
-    }
-
-  def nemk2v2[K2, V2](implicit asV: (K2, V2) === Value): VsSpec =
-    new VsSpec.Aux[K2, V2](VsParam.NEMK2V2) {
-      final type Spec        = NonEmptyMap[Kappa, Vega]
-      final type ValueSpec   = (Kappa, Vega)
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreNEMK2V2[F, Kappa, Vega]
-      final implicit def AsV = asV
-    }
-
-  def nemk2lv2[K2, V2](implicit asV: (K2, Option[V2]) === Value): VsSpec =
-    new VsSpec.Aux[K2, V2](VsParam.NEMK2LV2) {
-      final type Spec        = NonEmptyMap[Kappa, List[Vega]]
-      final type ValueSpec   = (Kappa, Option[Vega])
-      final type Store[F[_]] = ValueStore.Aux[F, ValueSpec] with ValueStoreNEMK2LV2[F, Kappa, Vega]
-      final implicit def AsV = asV
-    }
 }
 
 /**
@@ -246,7 +145,7 @@ object WithKey {
 
     /**
       */
-    final type Store[F[_]] = KeyValueStoreV[F, Key, Value]
+    type Store[F[_]] <: KeyValueStore[F, Key, Value]
   }
 
   /** Key type companion base class. */
