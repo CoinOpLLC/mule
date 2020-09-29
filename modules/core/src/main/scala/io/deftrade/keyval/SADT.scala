@@ -32,12 +32,14 @@ sealed class SADT private (protected val json: Json) {
     json.as[ADT] leftMap (x => Fail fromString x.toString)
 
   /** TODO: revisit this */
-  final def canoncicalString: String = json.noSpacesSortKeys
+  final def canonicalString: String = json.noSpacesSortKeys
 }
 
 /**
   */
 object SADT {
+
+  implicit def sadtShow[T]: Show[Aux[T]] = ???
 
   /**
     */
@@ -74,7 +76,7 @@ object SADT {
   * Note this value is forgery resistant (up to the strength of the `sha`).
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class WithSADT[T] extends WithId.Aux[SADT.Aux[T]] {
+abstract class WithSADT[T: Show] extends WithId.Aux[SADT.Aux[T]] {
 
   /**
     * Every `ADT` shall decode `braces` as the legal and unique `empty: T`

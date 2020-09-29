@@ -103,9 +103,8 @@ sealed abstract class CsvValueStore[
   /**
     */
   implicit final protected def readRecord[HV <: HList](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledRead[HV]]
-  ): LabelledRead[Record] =
+                                                       lgav: LabelledGeneric.Aux[V, HV],
+                                                       llhv: Lazy[LabelledRead[HV]]): LabelledRead[Record] =
     new LabelledRead[Record] {
 
       implicit val lrhr = LabelledRead[IdField :: HV]
@@ -119,9 +118,8 @@ sealed abstract class CsvValueStore[
   /**
     */
   final protected def deriveCsvDecoderV[HV <: HList](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledRead[HV]]
-  ): String PipeF Result[Record] =
+                                                     lgav: LabelledGeneric.Aux[V, HV],
+                                                     llhv: Lazy[LabelledRead[HV]]): String PipeF Result[Record] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -175,7 +173,7 @@ sealed abstract class CsvKeyValueStore[
         row match {
 
           case CSV.Row(
-                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+              NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
             lrhr.read(row, headers) map { hr =>
               (hr.head, (hr.tail.head, none))
@@ -275,14 +273,15 @@ sealed protected trait MemFile[F[_], W[_] <: WithValue, V] {
     for {
       handle <- appendHandles
       s      <- _
-    } yield pulls
-      .writeAllToFileHandle(
-        Stream eval
-          (F pure s) through
-          text.utf8Encode,
-        handle
-      )
-      .stream |> discardValue // nota bene this is intentional and necessary
+    } yield
+      pulls
+        .writeAllToFileHandle(
+          Stream eval
+            (F pure s) through
+            text.utf8Encode,
+          handle
+        )
+        .stream |> discardValue // nota bene this is intentional and necessary
   // WriteCursor(out, 0).writeAll(in).void
 
   /**
@@ -317,10 +316,10 @@ abstract case class CaMfValueStore[
     v: WithId.Aux[V],
     final override val path: Path
 )(implicit
-    lgv: LabelledGeneric.Aux[V, HV],
-    llr: Lazy[LabelledRead[HV]],
-    llw: Lazy[LabelledWrite[HV]]
-) extends CsvValueStore(v)
+  lgv: LabelledGeneric.Aux[V, HV],
+  llr: Lazy[LabelledRead[HV]],
+  llw: Lazy[LabelledWrite[HV]])
+    extends CsvValueStore(v)
     with MemFileV[F, V] {
 
   final override lazy val fresh = Fresh.shaContent[V.Row]
@@ -340,10 +339,10 @@ abstract case class ChMfValueStore[
     v: WithId.Aux[V],
     final override val path: Path
 )(implicit
-    lgv: LabelledGeneric.Aux[V, HV],
-    llr: Lazy[LabelledRead[HV]],
-    llw: Lazy[LabelledWrite[HV]]
-) extends CsvValueStore(v)
+  lgv: LabelledGeneric.Aux[V, HV],
+  llr: Lazy[LabelledRead[HV]],
+  llw: Lazy[LabelledWrite[HV]])
+    extends CsvValueStore(v)
     with MemFileV[F, V] {
 
   final override lazy val fresh = Fresh.shaChain[V.Row]

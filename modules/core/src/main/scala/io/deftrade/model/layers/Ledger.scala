@@ -33,6 +33,7 @@ import refined.cats._
 
 import fs2.{ Pipe, Stream }
 import io.deftrade.keyval.WithKey.KeyCompanion
+import io.getquill.ast.Value
 
 /**
   * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
@@ -178,14 +179,6 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     type Value = Quantity
-
-    /**
-      */
-    type Table = Map[Key, Value]
-
-    /**
-      */
-    type NonEmptyTable = NonEmptyMap[Key, Value]
   }
 
   /**
@@ -248,7 +241,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * A `Folio` can also be thought of as a "sheet" in a spreadsheet.
     */
-  type Folio = Entry.Table
+  type Folio = Map[Entry.Key, Entry.Value]
 
   /**
     * A `Folio` key value store holds (open) [[Trade]]s,
@@ -274,11 +267,12 @@ trait Ledger { module: ModuleTypes =>
     def empty: Folio = Map.empty
   }
 
-  /** A [[Folio]] in motion. */
-  type Trade = Entry.NonEmptyTable
+  /**
+    * A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
+    */
+  type Trade = NonEmptyMap[Entry.Key, Entry.Value]
 
   /**
-    * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     */
   object Trade extends WithId.Aux[Leg] {
 
@@ -332,7 +326,10 @@ trait Ledger { module: ModuleTypes =>
       } yield (trade, amount)
   }
 
-  object Trades extends ValueStore.Param.NEMKV.DependentTypeThunk(Trade)
+  /**
+    * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
+    */
+  final lazy val Trades = ValueStore(Trade, ValueStore.Param.NEMKV).deriveKV[Entry.Key, Entry.Value]
 
   /**
     * Root of the transaction metadata abstract datatype.
@@ -354,7 +351,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  object Metas extends ValueStore.Param.V.DependentTypeThunk(Meta)
+  final lazy val Metas = ValueStore(Meta, ValueStore.Param.V).deriveV[SADT.Aux[Meta]]
 
   /**
     * The concrete record for `Ledger` updates.
@@ -378,7 +375,7 @@ trait Ledger { module: ModuleTypes =>
   )
 
   /**
-    * Because `Transaction`s are immutable, we model them as pure value classes
+    * Because `Transaction`s are immutable, we model them as pure values.
     *
     * No `Transaction` is created except within the context
     * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
@@ -435,6 +432,10 @@ trait Ledger { module: ModuleTypes =>
       */
     implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
   }
+
+  /**
+    */
+  final lazy val Transactions = ValueStore(Transaction, ValueStore.Param.V).deriveV[Transaction]
 
   /** Realize that `Folio { type UpdatedEvent = Id }`.
     *
@@ -552,26 +553,22 @@ trait Ledger { module: ModuleTypes =>
     *   - NOTE: it is up to the payCash function to effectfully subtract the amount
     *     from the cash position
     *   - TODO: ensure the `payCash` update is atomic (should return zero or one `Folio.Id`)
-    *   - TODO: is is possible or desirable to generalize fungability
-    *     to asset classes other than currencies
     *
     *   @return `Stream` effect will effectively subtract amount from the `against` folio
     */
   final def payment[F[_]: Sync, C: Currency](
       trades: Trades.ValueStore[F]
   )(
-      payCash: Folio.Key => Money[C] => Stream[F, Result[Folio.Id]]
+      payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
   )(
       drawOn: Folio.Key
-  ): Pipe[F, (Trade, Money[C]), Result[Trade.Id]] =
-    _ flatMap {
-      case (trade, amount) =>
-        // for {
-        //   id <- trades putMap trade
-        //   _  <- payCash(drawOn)(amount)
-        // } yield Result(id.some)
-        ???
-    }
+  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
+    case (trade, amount) =>
+      for {
+        idb <- trades put trade
+        _   <- payCash(drawOn)(amount)
+      } yield Result(idb._1.some)
+  }
 
   /** wip
     */

@@ -40,10 +40,7 @@ import scala.collection.immutable.SortedMap
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class Store[F[_], W[_] <: WithValue, V](
     final val V: W[V]
-)(implicit
-    final val F: Sync[F],
-    final val X: ContextShift[F]
-) {
+)(implicit final val F: Sync[F], final val X: ContextShift[F]) {
 
   import V._
 
@@ -203,6 +200,11 @@ object ValueStore {
 
   /**
     */
+  def apply[V: Show](v: WithId.Aux[V], p: Param) =
+    new p.DependentTypeThunk(v) {}
+
+  /**
+    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed trait Param { param =>
 
@@ -216,15 +218,15 @@ object ValueStore {
 
     /**
       */
-    def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]]
+    def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]]
 
     /**
       */
-    def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]
+    def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]
 
     /**
       */
-    final def toSpecOption[K, V](vs: List[ValueSpec[K, V]]): Option[Spec[K, V]] =
+    final def toSpecOption[K: Order, V](vs: List[ValueSpec[K, V]]): Option[Spec[K, V]] =
       vs match {
         case Nil    => none
         case h :: t => toSpec(NonEmptyList(h, t)).some
@@ -232,58 +234,74 @@ object ValueStore {
 
     /**
       */
-    abstract class DependentTypeThunk[V, K2, V2](
+    sealed abstract class DependentTypeThunk[V](
         v: WithId.Aux[V]
-    )(implicit
-        IsV: param.ValueSpec[K2, V2] === V
     ) {
+
+      /**  lawful evil
+        */
+      implicit def nothingOrder: Order[Nothing] = ???
 
       /**
         */
-      trait ValueStore[F[_]] { self: keyval.ValueStore[F, V] =>
+      def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) =
+        new SubThunk[Nothing, V2] {}
 
-        import V._
+      /**
+        */
+      def deriveKV[K2: Order: Show, V2: Show](implicit isV: param.ValueSpec[K2, V2] === V) =
+        new SubThunk[K2, V2] {}
 
-        final type Spec = param.Spec[K2, V2]
-
-        /**
-          */
-        def get(id: Id): F[Option[Spec]] =
-          for {
-            cache <- lookup(id)
-            store <- (records filter (_._1 === id) map (_._2)).compile.toList
-          } yield param toSpecOption (IsV.flip substitute cache.headOption.fold(store)(_ => cache))
+      /**
+        */
+      abstract class SubThunk[K2: Order, V2]()(implicit IsV: param.ValueSpec[K2, V2] === V) {
 
         /**
           */
-        def put(spec: Spec): F[(Id, Boolean)] = {
-          val NonEmptyList(h, t) = param fromSpec spec map (IsV coerce _)
-          val id                 = nextId(h, t: _*)
-          for {
-            x <- has(id)
-            ret <- if (x) (id, false).pure[F]
-                   else append(h, t: _*) map ((_, true))
-          } yield ret
+        trait ValueStore[F[_]] { self: keyval.ValueStore[F, V] =>
+
+          import V._
+
+          final type Spec = param.Spec[K2, V2]
+
+          /**
+            */
+          def get(id: Id): F[Option[Spec]] =
+            for {
+              cache <- lookup(id)
+              store <- (records filter (_._1 === id) map (_._2)).compile.toList
+            } yield param toSpecOption (IsV.flip substitute cache.headOption.fold(store)(_ => cache))
+
+          /**
+            */
+          def put(spec: Spec): F[(Id, Boolean)] = {
+            val NonEmptyList(h, t) = param fromSpec spec map (IsV coerce _)
+            val id                 = nextId(h, t: _*)
+            for {
+              x <- has(id)
+              ret <- if (x) (id, false).pure[F]
+                     else append(h, t: _*) map ((_, true))
+            } yield ret
+          }
         }
       }
     }
-
   }
 
   /**
     */
   object Param {
 
-    /**
+    /** Values
       */
     case object V extends Param {
       final type Spec[K, V]      = V
       final type ValueSpec[K, V] = V
 
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
         NonEmptyList one s
 
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
         vs match {
           case NonEmptyList(v, Nil) => v
           case _                    => ???
@@ -292,54 +310,114 @@ object ValueStore {
 
     /**
       */
+    def v[V: Eq: Show, V2: Eq: Show](
+        v: WithId.Aux[V]
+    )(implicit isV: V.ValueSpec[Nothing, V2] === V) = ValueStore(v, V).deriveV[V2]
+
+    /** Lists of Values
+      */
     case object LV extends Param {
       final type Spec[K, V]      = List[V]
       final type ValueSpec[K, V] = Option[V]
 
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
         s match {
           case Nil    => NonEmptyList one none
           case h :: t => NonEmptyList(h.some, t map (_.some))
         }
 
       /**
-        * FIXME: the typing is subtle here: only 2 cases
-        * - List.empty[None]
-        * - List(x.some... y.some)
-        * => This feels like `Stream.unNone`
+        * FIXME: get rid of hole - the typing is subtle here: only 2 cases
+        * - Nel(None)
+        * - Nel(x.some, ...)
+        *
+        * feels like `Stream.unNone`
         */
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
-        vs.toList map {
-          case Some(v) => v
-          case _       => ???
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        vs match {
+          case NonEmptyList(None, Nil) => List.empty
+          case nel                     => nel.toList map (_.fold(???)(identity))
         }
     }
 
     /**
       */
+    def lv[V: Eq: Show, V2: Eq: Show](
+        v: WithId.Aux[V]
+    )(implicit isV: LV.ValueSpec[Nothing, V2] === V) =
+      ValueStore(v, LV).deriveV[V2]
+
+    /** Maps of (Key -> Values)s
+      */
     case object MKV extends Param {
       final type Spec[K, V]      = Map[K, V]
       final type ValueSpec[K, V] = Option[(K, V)]
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] = ???
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]  = ???
+
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+        LV fromSpec s.toList
+
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        (LV toSpec vs).toMap
     }
 
     /**
       */
+    def mkv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
+        v: WithId.Aux[V]
+    )(implicit isV: MKV.ValueSpec[K2, V2] === V) =
+      ValueStore(v, MKV).deriveKV[K2, V2]
+
+    /** Maps of (Key -> List[Value])s
+      */
     case object MKLV extends Param {
       final type Spec[K, V]      = Map[K, List[V]]
       final type ValueSpec[K, V] = Option[(K, Option[V])]
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] = ???
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]  = ???
+
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+        LV fromSpec s.toList flatMap {
+          (_: Option[(K, List[V])]) match {
+            case None           => NonEmptyList one none
+            case Some((k, Nil)) => NonEmptyList one (k -> none).some
+            case Some((k, h :: t)) =>
+              NonEmptyList(
+                (k -> h.some).some,
+                t map (v => (k -> v.some).some)
+              )
+          }
+        }
+
+      /**
+        * FIXME: disposition the hole
+        */
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        LV toSpec vs groupBy (_._1) map {
+          case (k, Nil) => k -> Nil
+          case (k, kvos) =>
+            k -> kvos.map {
+              case (_, Some(v)) => v
+              case _            => ???
+            }
+        }
     }
+
+    /**
+      */
+    def mklv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
+        v: WithId.Aux[V]
+    )(implicit isV: MKLV.ValueSpec[K2, V2] === V) =
+      ValueStore(v, MKLV).deriveKV[K2, V2]
 
     /**
       */
     case object NELV extends Param {
       final type Spec[K, V]      = NonEmptyList[V]
       final type ValueSpec[K, V] = V
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] = ???
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]  = ???
+
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+        s
+
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        vs
     }
 
     /**
@@ -347,281 +425,38 @@ object ValueStore {
     case object NEMKV extends Param {
       final type Spec[K, V]      = NonEmptyMap[K, V]
       final type ValueSpec[K, V] = (K, V)
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] = ???
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]  = ???
+
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+        NELV fromSpec s.toNel
+
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        NELV toSpec vs match {
+          case NonEmptyList(h, t) => NonEmptyMap(h, SortedMap(t: _*))
+        }
     }
 
     /**
       */
     case object NEMKLV extends Param {
-      final type Spec[K, V]      = NonEmptyMap[K, V]
+      final type Spec[K, V]      = NonEmptyMap[K, List[V]]
       final type ValueSpec[K, V] = (K, Option[V])
-      final def fromSpec[K, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] = ???
-      final def toSpec[K, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V]  = ???
+
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+        NELV fromSpec s.toNel flatMap {
+          (_: (K, List[V])) match {
+            case (k, Nil) => NonEmptyList one (k -> none)
+            case (k, h :: t) =>
+              NonEmptyList(
+                (k -> h.some),
+                t map (v => (k -> v.some))
+              )
+          }
+        }
+
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] = ???
     }
   }
-
-  /**
-    */
-  def thunk[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-      v: WithId.Aux[V],
-      p: Param
-  )(implicit
-      isV: p.ValueSpec[K2, V2] === V
-  ) =
-    new p.DependentTypeThunk(v) { lazy val IsV: p.ValueSpec[K2, V2] === V = isV }
-
-  import Param._
-
-  /**
-    */
-  def v[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-      v: WithId.Aux[V]
-  )(implicit
-      isV: V.ValueSpec[K2, V2] === V
-  ) = thunk[V, K2, V2](v, V)
-
-  /**
-    */
-  def lv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-      v: WithId.Aux[V]
-  )(implicit
-      isV: LV.ValueSpec[K2, V2] === V
-  ) = thunk[V, K2, V2](v, LV)
-
-  /**
-    */
-  def mkv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-      v: WithId.Aux[V]
-  )(implicit
-      isV: MKV.ValueSpec[K2, V2] === V
-  ) = thunk[V, K2, V2](v, MKV)
-
 }
-// trait Wut {
-
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   protected trait VSnel[F[_], X] extends ValueStore[F] {
-
-//     protected implicit def IsV: X === Value
-
-//     type Yuft[x] = EffectType[Option[NonEmptyList[x]]]
-
-//     /**
-//       */
-//     protected def getNel(id: Id): EffectType[Option[NonEmptyList[X]]] =
-//       IsV.flip substitute [Yuft] (for {
-//         cache <- lookups(id).compile.toList
-//         store <- rows(id).compile.toList
-//       } yield cache.headOption.fold(store.toNel)(_ => cache.toNel)) // lawful evil
-
-//     /**
-//       */
-//     protected def putNel(spec: NonEmptyList[X]): EffectType[(Id, Boolean)] = {
-//       val id = nextId(IsV coerce spec.head, IsV substitute spec.tail: _*)
-//       for {
-//         x <- has(id)
-//         ret <- if (x) (id, false).pure[F]
-//                else append(IsV coerce spec.head, IsV substitute spec.tail: _*) map ((_, true))
-//       } yield ret
-//     }
-//   }
-
-//   /**
-//     */
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   trait ValueStoreNELV[F[_]] extends VSnel[F, Vega] {
-
-//     /**
-//       */
-//     final type Spec = NonEmptyList[Vega]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       getNel(id)
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       putNel(spec)
-//   }
-
-//   /**
-//     */
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   trait ValueStoreNEMK2V2[F[_]] extends VSnel[F, (Kappa, Vega)] {
-
-//     /**
-//       */
-//     final type Spec = NonEmptyMap[K2, V2]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       ??? // getNel(id)
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       ??? // putNel(spec)
-//     //     /**
-//     //   */
-//     // def putm[K2: Order, V2](
-//     //     k2v2s: NonEmptyMap[K2, V2]
-//     // )(implicit asV: (K2, V2) <~< V): F[(Id, Boolean)] =
-//     //   putl(k2v2s.toNel map (asV coerce _))
-
-//   }
-
-//   /**
-//     */
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   trait ValueStoreNEMK2LV2[F[_]] extends VSnel[F, (Kappa, Option[Vega])] {
-
-//     /**
-//       */
-//     final type Spec = NonEmptyMap[Kappa, List[Vega]]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       ??? // getNel(id)
-//     // def getml[K2: Order, V2](
-//     //     id: Id
-//     // )(implicit
-//     //     asK2V2: V <~< (K2, V2)
-//     // ): EffectType[Map[K2, List[V2]]] =
-//     //   for (values <- getl(id))
-//     //     yield values.groupBy(v => (asK2V2 coerce v)._1) map {
-//     //       case (k2, vs) => (k2, vs map (v => (asK2V2 coerce v)._2))
-//     //     }
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       ??? // putNel(spec)
-//     //     /**
-//     //   */
-//     // def putml[K2: Order, V2](
-//     //     k2lv2s: NonEmptyMap[K2, List[V2]]
-//     // )(implicit asV: (K2, Option[V2]) <~< V): F[(Id, Boolean)] =
-//     //   putl(k2lv2s.toNel flatMap {
-//     //     case (k2, hv2 :: tv2s) =>
-//     //       NonEmptyList(asV coerce k2 -> hv2.some, tv2s map (v2 => asV coerce k2 -> v2.some))
-//     //     case (k2, Nil) =>
-//     //       NonEmptyList one (asV coerce k2 -> none)
-//     //   })
-
-//   }
-
-//   /**
-//     */
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   trait VSlist[F[_], X] extends ValueStore[F] {
-
-//     /**
-//       */
-//     protected implicit def IsV: Option[X] === Value
-
-//     /**
-//       */
-//     protected def getList(id: Id): EffectType[Option[List[X]]] =
-//       for {
-//         cache <- lookups(id).compile.toList
-//         store <- rows(id).compile.toList
-//       } yield (cache.headOption.fold(store)(_ => cache) map IsV.flip.coerce).sequence
-
-//     /** FIXME: abstract the duplicate folding
-//       */
-//     protected def putList(spec: List[X]): EffectType[(Id, Boolean)] = {
-//       val id = spec.headOption.fold(
-//         nextId(IsV coerce none[X])
-//       )(h => nextId(IsV coerce h.some, spec drop 1 map (IsV coerce _.some): _*))
-//       for {
-//         x <- has(id)
-//         ret <- if (x) (id, false).pure[F]
-//                else
-//                  spec.headOption.fold(
-//                    append(IsV coerce none[X])
-//                  )(h => append(IsV coerce h.some, spec drop 1 map (IsV coerce _.some): _*)) map {
-//                    (_, true)
-//                  }
-//       } yield ret
-//     }
-//   }
-
-//   /**
-//     */
-//   trait ValueStoreLV[F[_]] extends VSlist[F, Vega] {
-
-//     /**
-//       */
-//     final type Spec = List[Vega]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       getList(id)
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       putList(spec)
-//   }
-
-//   /** `Option[(K2, V2)] === V`
-//     */
-//   trait ValueStoreMK2V2[F[_]] extends VSlist[F, (Kappa, Vega)] {
-
-//     implicit def K2: Order[Kappa]
-
-//     /**
-//       */
-//     final type Spec = Map[Kappa, Vega]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       getList(id) map {
-//         _ map { SortedMap(_: _*) }
-//       }
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       putList(spec.toList)
-//   }
-
-//   /** Option[(K2, Option[V2])] === V
-//     */
-//   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-//   trait ValueStoreMK2LV2[F[_]] extends VSlist[F, (Kappa, Option[Vega])] {
-
-//     /**
-//       */
-//     final type Spec = Map[K2, List[V2]]
-
-//     /**
-//       */
-//     @inline final def get(id: Id): EffectType[Option[Spec]] =
-//       ??? // getList(id)
-
-//     /**
-//       */
-//     @inline final def put(spec: Spec): EffectType[(Id, Boolean)] =
-//       ??? // putList(spec)
-//     // /**
-//     //   */
-//     // def putml[K2: Order, V2](
-//     //     k2lv2s: Map[K2, List[V2]]
-//     // )(implicit asV: Option[(K2, Option[V2])] <~< V): F[(Id, Boolean)] =
-//     //   putl[(K2, Option[V2])](k2lv2s.toList flatMap {
-//     //     case (k2, Nil) => List(k2 -> none)
-//     //     case (k2, v2s) => v2s map (v2 => k2 -> v2.some)
-//     //   })
-//   }
-
 //   /**
 //     */
 //   @SuppressWarnings(Array("org.wartremover.warts.Any"))

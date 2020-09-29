@@ -94,6 +94,6 @@ protected trait CsvImplicits {
   /**
     */
   implicit lazy val sadtPut: Put[SADT] =
-    stringPut contramap (_.canoncicalString)
+    stringPut contramap (_.canonicalString)
 
 }

@@ -40,7 +40,8 @@ import cats.kernel.CommutativeGroup
 package object model
 /*
   All layers and augments need to agree on certain types:
-     */ extends ModuleTypes.Aux[
+     */
+    extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,
       /* type Quantity       = */ Double
     ]

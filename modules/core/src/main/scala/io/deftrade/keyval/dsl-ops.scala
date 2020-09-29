@@ -60,13 +60,12 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         v: WithId.Aux[V],
         p: ValueStore.Param
     )(implicit
-        IsV: p.ValueSpec[K2, V2] === v.Value,
-        thunk: p.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
-        // thunk: ValueStore.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[thunk.ValueStore[F]] =
+      IsV: p.ValueSpec[K2, V2] === v.Value,
+      thunk: p.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
+      // thunk: ValueStore.DependentTypeThunk[V, K2, V2], // = ValueStore.thunk[V, K2, V2](v, p)
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[thunk.ValueStore[F]] =
       Result safe {
         // FIXME: put this in VsSpec?
         implicit val lgvs: LabelledGeneric.Aux[p.ValueSpec[K2, V2], HV] =
@@ -101,12 +100,11 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         v: WithId.Aux[V],
         p: ValueStore.Param
     )(implicit
-        IsV: p.ValueSpec[K2, V2] === v.Value,
-        thunk: p.DependentTypeThunk[V, K2, V2], // = p.thunk[V, K2, V2](v, p)
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[ValueStore[F, V]] =
+      IsV: p.ValueSpec[K2, V2] === v.Value,
+      thunk: p.DependentTypeThunk[V, K2, V2], // = p.thunk[V, K2, V2](v, p)
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[ValueStore[F, V]] =
       Result safe {
 
         implicit val vsShow = IsV.flip substitute [Show] Show[v.Value]
@@ -136,12 +134,11 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
     def ofChainAddressed[K: Show, V: Eq: Show, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]],
-        lgetk: Lazy[Get[K]],
-        lputk: Lazy[Put[K]]
-    ): Result[MemFileKeyValueStore[F, K, V, HV]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]],
+      lgetk: Lazy[Get[K]],
+      lputk: Lazy[Put[K]]): Result[MemFileKeyValueStore[F, K, V, HV]] =
       Result safe {
 
         implicit val kGet = lgetk.value
