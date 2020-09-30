@@ -200,11 +200,6 @@ object ValueStore {
 
   /**
     */
-  def apply[V: Show](v: WithId.Aux[V], p: Param) =
-    new p.DependentTypeThunk(v) {}
-
-  /**
-    */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   sealed trait Param { param =>
 
@@ -238,14 +233,13 @@ object ValueStore {
         v: WithId.Aux[V]
     ) {
 
-      /**  lawful evil
-        */
-      implicit def nothingOrder: Order[Nothing] = ???
-
       /**
         */
-      def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) =
+      def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) = {
+        implicit def nothingOrder: Order[Nothing] = ???
+
         new SubThunk[Nothing, V2] {}
+      }
 
       /**
         */
@@ -308,12 +302,6 @@ object ValueStore {
         }
     }
 
-    /**
-      */
-    def v[V: Eq: Show, V2: Eq: Show](
-        v: WithId.Aux[V]
-    )(implicit isV: V.ValueSpec[Nothing, V2] === V) = ValueStore(v, V).deriveV[V2]
-
     /** Lists of Values
       */
     case object LV extends Param {
@@ -340,13 +328,6 @@ object ValueStore {
         }
     }
 
-    /**
-      */
-    def lv[V: Eq: Show, V2: Eq: Show](
-        v: WithId.Aux[V]
-    )(implicit isV: LV.ValueSpec[Nothing, V2] === V) =
-      ValueStore(v, LV).deriveV[V2]
-
     /** Maps of (Key -> Values)s
       */
     case object MKV extends Param {
@@ -354,18 +335,11 @@ object ValueStore {
       final type ValueSpec[K, V] = Option[(K, V)]
 
       final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
-        LV fromSpec s.toList
+        LV fromSpec [Nothing, (K, V)] s.toList
 
       final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
-        (LV toSpec vs).toMap
+        (LV toSpec [Nothing, (K, V)] vs).toMap
     }
-
-    /**
-      */
-    def mkv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-        v: WithId.Aux[V]
-    )(implicit isV: MKV.ValueSpec[K2, V2] === V) =
-      ValueStore(v, MKV).deriveKV[K2, V2]
 
     /** Maps of (Key -> List[Value])s
       */
@@ -374,7 +348,7 @@ object ValueStore {
       final type ValueSpec[K, V] = Option[(K, Option[V])]
 
       final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
-        LV fromSpec s.toList flatMap {
+        LV fromSpec [Nothing, (K, List[V])] s.toList flatMap {
           (_: Option[(K, List[V])]) match {
             case None           => NonEmptyList one none
             case Some((k, Nil)) => NonEmptyList one (k -> none).some
@@ -387,10 +361,9 @@ object ValueStore {
         }
 
       /**
-        * FIXME: disposition the hole
         */
       final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
-        LV toSpec vs groupBy (_._1) map {
+        LV toSpec [Nothing, (K, Option[V])] vs groupBy (_._1) map {
           case (k, Nil) => k -> Nil
           case (k, kvos) =>
             k -> kvos.map {
@@ -400,14 +373,7 @@ object ValueStore {
         }
     }
 
-    /**
-      */
-    def mklv[V: Eq: Show, K2: Order: Show, V2: Eq: Show](
-        v: WithId.Aux[V]
-    )(implicit isV: MKLV.ValueSpec[K2, V2] === V) =
-      ValueStore(v, MKLV).deriveKV[K2, V2]
-
-    /**
+    /** Non Empty Lists of Values
       */
     case object NELV extends Param {
       final type Spec[K, V]      = NonEmptyList[V]
@@ -420,42 +386,82 @@ object ValueStore {
         vs
     }
 
-    /**
+    /** Non Empty Maps of (Key -> Values)s
       */
     case object NEMKV extends Param {
       final type Spec[K, V]      = NonEmptyMap[K, V]
       final type ValueSpec[K, V] = (K, V)
 
       final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
-        NELV fromSpec s.toNel
+        NELV fromSpec [Nothing, (K, V)] s.toNel
 
       final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
-        NELV toSpec vs match {
+        NELV toSpec [Nothing, (K, V)] vs match {
           case NonEmptyList(h, t) => NonEmptyMap(h, SortedMap(t: _*))
         }
     }
 
-    /**
+    /** Non Empty Maps of (Key -> List[Value])s
       */
     case object NEMKLV extends Param {
       final type Spec[K, V]      = NonEmptyMap[K, List[V]]
       final type ValueSpec[K, V] = (K, Option[V])
 
       final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
-        NELV fromSpec s.toNel flatMap {
+        NELV fromSpec [Nothing, (K, List[V])] s.toNel flatMap {
           (_: (K, List[V])) match {
-            case (k, Nil) => NonEmptyList one (k -> none)
-            case (k, h :: t) =>
-              NonEmptyList(
-                (k -> h.some),
-                t map (v => (k -> v.some))
-              )
+            case (k, Nil)    => NonEmptyList one (k -> none)
+            case (k, h :: t) => NonEmptyList((k -> h.some), t map (v => (k -> v.some)))
           }
         }
 
-      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] = ???
+      final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
+        NELV toSpec [Nothing, (K, Option[V])] vs match {
+          case NonEmptyList((k, None), Nil)    => NonEmptyMap(k -> Nil, SortedMap.empty)
+          case NonEmptyList((k, Some(v)), Nil) => NonEmptyMap(k -> List(v), SortedMap.empty)
+          case _                               => ??? // fixme daddy
+        }
+
     }
   }
+
+  /**
+    */
+  def apply[V: Show](v: WithId.Aux[V], p: Param) =
+    new p.DependentTypeThunk(v) {}
+
+  import Param._
+  implicit def nothingOrder: Order[Nothing] = ???
+  implicit def nothingShow: Show[Nothing]   = ???
+
+  /**
+    */
+  def v[V: Show, V2: Show](
+      v: WithId.Aux[V]
+  )(implicit isV: V.ValueSpec[Nothing, V2] === V) =
+    ValueStore(v, V).deriveKV[Nothing, V2]
+
+  /**
+    */
+  def lv[V: Show, V2: Show](
+      v: WithId.Aux[V]
+  )(implicit isV: LV.ValueSpec[Nothing, V2] === V) =
+    ValueStore(v, LV).deriveKV[Nothing, V2]
+
+  /**
+    */
+  def mkv[V: Show, K2: Order: Show, V2: Show](
+      v: WithId.Aux[V]
+  )(implicit isV: MKV.ValueSpec[K2, V2] === V) =
+    ValueStore(v, MKV).deriveKV[K2, V2]
+
+  /**
+    */
+  def mklv[V: Show, K2: Order: Show, V2: Show](
+      v: WithId.Aux[V]
+  )(implicit isV: MKLV.ValueSpec[K2, V2] === V) =
+    ValueStore(v, MKLV).deriveKV[K2, V2]
+
 }
 //   /**
 //     */
