@@ -56,18 +56,25 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
     /**
       */
+    // def ofContentAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
+    //     v: WithId.Aux[V],
+    //     p: ValueStore.Param
     def ofContentAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        v: WithId.Aux[V],
-        p: ValueStore.Param
+        p: ValueStore.Param,
+        v: WithId.Aux[V]
+    )(
+        thunk: p.DependentTypeThunk[V]
+    )(
+        subThunk: thunk.SubThunk[K2, V2]
     )(implicit
         IsV: p.ValueSpec[K2, V2] === v.Value,
         lgv: LabelledGeneric.Aux[V, HV],
         llr: Lazy[LabelledRead[HV]],
         llw: Lazy[LabelledWrite[HV]]
-    ): Result[ValueStore[F, V]] =
+    ): Result[subThunk.ValueStore[F]] =
       Result safe {
 
-        val thunk = ValueStore(v, p).deriveKV[K2, V2]
+        // val thunk = ValueStore(v, p).deriveKV[K2, V2]
 
         implicit val lgvs: LabelledGeneric.Aux[p.ValueSpec[K2, V2], HV] =
           IsV.flip substitute [LabelledGeneric.Aux[*, HV]] lgv
@@ -81,12 +88,12 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
             new CaMfValueStore[F, v.Value, HV](
               v,
               path
-            ) with thunk.ValueStore[F] {}
+            ) with subThunk.ValueStore[F] {}
           case LV =>
             new CaMfValueStore[F, v.Value, HV](
               v,
               path
-            ) with thunk.ValueStore[F] {}
+            ) with subThunk.ValueStore[F] {}
           case MKV    => ???
           case MKLV   => ???
           case NELV   => ???
@@ -100,21 +107,23 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     def ofChainAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
         v: WithId.Aux[V],
         p: ValueStore.Param
+    )(
+        thunk: p.DependentTypeThunk[V]
+    )(
+        subThunk: thunk.SubThunk[K2, V2]
     )(implicit
         IsV: p.ValueSpec[K2, V2] === v.Value,
         lgv: LabelledGeneric.Aux[V, HV],
         llr: Lazy[LabelledRead[HV]],
         llw: Lazy[LabelledWrite[HV]]
-    ): Result[ValueStore[F, V]] =
+    ): Result[subThunk.ValueStore[F]] =
       Result safe {
-
-        val thunk = ValueStore(v, p).deriveKV[K2, V2]
 
         implicit val vsShow = IsV.flip substitute [Show] Show[v.Value]
 
         import ValueStore.Param._
 
-        new ChMfValueStore[F, V, HV](v, path) with thunk.ValueStore[F] {}
+        new ChMfValueStore[F, V, HV](v, path) with subThunk.ValueStore[F] {}
       }
   }
 }
@@ -147,17 +156,17 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
 
         implicit val kGet = lgetk.value
         implicit val kPut = lputk.value
+        ???
+        // new MemFileKeyValueStore(kv, Paths get p) {
 
-        new MemFileKeyValueStore(kv, Paths get p) {
+        //   /** Key Value stores ''must'' use chained addresses.
+        //     *
+        //     * (This is down to semantics, not crypto.)
+        //     */
+        //   final type Shape[A] = Map[V.Key, A]
 
-          /** Key Value stores ''must'' use chained addresses.
-            *
-            * (This is down to semantics, not crypto.)
-            */
-          final type Shape[A] = Map[V.Key, A]
-
-          final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaChain[V.Row]
-        }
+        //   final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaChain[V.Row]
+        // }
       }
   }
 }
