@@ -165,7 +165,7 @@ abstract class ValueStore[F[_]: Sync: ContextShift, V](
   /**
     * Binds `Repr`, but not `Spec`
     */
-  final type Repr[SP] = Map[Id, SP]
+  final type Repr[SP] = EffectType[Map[Id, SP]]
 
   final protected def value(row: Row): Option[Value] =
     row.some
@@ -260,20 +260,40 @@ object ValueStore {
 
         /**
           */
-        trait ValueStore[F[_]] { self: keyval.ValueStore[F, V] =>
+        trait ValueStore[F[_]] {
+
+          self: keyval.ValueStore[F, V] =>
 
           import V._
 
           final type Spec      = param.Spec[K2, V2]
           final type ValueSpec = param.ValueSpec[K2, V2]
 
-          /**
-            */
-          def repr: StreamF[Record] => Repr[Spec] = ???
+          implicit def magicke: CommutativeGroup[Spec] = ???
 
           /**
             */
-          def derp: Repr[Spec] => StreamF[Record] = ???
+          final def repr: StreamF[Record] => Repr[Spec] =
+            _.groupAdjacentBy(_._1)
+              .map {
+                case (id, chunks) =>
+                  Map(
+                    id -> (param toSpecOption (IsV.flip substitute (chunks map (_._2)).toList))
+                      .fold(???)(identity)
+                  )
+              }
+              .compile
+              .foldMonoid
+
+          /**
+            */
+          final def derp: Repr[Spec] => StreamF[Record] =
+            (repr: F[Map[Id, Spec]]) =>
+              Stream evals (for {
+                specs <- repr
+              } yield specs.toList flatMap {
+                case (id, spec) => IsV substitute fromSpec(spec).toList map (id -> _)
+              })
 
           /**
             */
@@ -521,7 +541,7 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   /**
     * Binds `Repr`, but not `Spec`
     */
-  final type Repr[SP] = Map[K, (Id, SP)]
+  final type Repr[SP] = EffectType[Map[K, (Id, SP)]]
 
   /**
     */
@@ -672,28 +692,28 @@ object KeyValueStore {
 
           /**
             */
-          def peek(id: Id): Option[(Key, Spec)] = ???
+          final def peek(id: Id): Option[(Key, Spec)] = ???
           // (records filter (_._1 === id) map (_._2)).compile.toList
 
           /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
-          def getAll(key: Key): StreamF[Spec] = ???
+          final def getAll(key: Key): StreamF[Spec] = ???
           // for {
           //   rz <- (rowz(key) map (_._2)).unNoneTerminate
           // } yield spec
 
           /**
             */
-          def let(key: Key, spec: Spec): F[Option[Id]] = ???
+          final def let(key: Key, spec: Spec): F[Option[Id]] = ???
           // exists(key) flatMap (_.fold(append(key -> spec.some) map (_.some))(_ => none.pure[F]))
 
           /**
             */
-          def put(key: Key, spec: Spec): F[Id] = ???
+          final def put(key: Key, spec: Spec): F[Id] = ???
           // append(key -> spec.some)
 
           /** TODO: revisit the implementation, which is tricky
             */
-          protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]] = ???
+          final protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]] = ???
           // exists(key) flatMap (_.fold(none[Id].pure[F])(_ => append(key -> maybe) map (_.some)))
 
         }
