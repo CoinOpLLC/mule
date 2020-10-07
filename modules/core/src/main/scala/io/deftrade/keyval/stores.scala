@@ -243,7 +243,9 @@ object ValueStore {
 
       /**
         */
-      def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) = {
+      def deriveV[V2: Show](implicit
+          isV: param.ValueSpec[Nothing, V2] === V
+      ) = {
         implicit def nothingOrder: Order[Nothing] = ???
 
         new SubThunk[Nothing, V2] {}
@@ -251,12 +253,16 @@ object ValueStore {
 
       /**
         */
-      def deriveKV[K2: Order: Show, V2: Show](implicit isV: param.ValueSpec[K2, V2] === V) =
+      def deriveKV[K2: Order: Show, V2: Show](implicit
+          isV: param.ValueSpec[K2, V2] === V
+      ) =
         new SubThunk[K2, V2] {}
 
       /**
         */
-      abstract class SubThunk[K2: Order, V2]()(implicit IsV: param.ValueSpec[K2, V2] === V) {
+      abstract class SubThunk[K2: Order, V2]()(implicit
+          IsV: param.ValueSpec[K2, V2] === V
+      ) {
 
         /**
           */
@@ -268,8 +274,6 @@ object ValueStore {
 
           final type Spec      = param.Spec[K2, V2]
           final type ValueSpec = param.ValueSpec[K2, V2]
-
-          implicit def magicke: CommutativeGroup[Spec] = ???
 
           /**
             */
@@ -283,7 +287,7 @@ object ValueStore {
                   )
               }
               .compile
-              .foldMonoid
+              .fold(Map.empty[Id, Spec])(_ ++ _)
 
           /**
             */
@@ -553,7 +557,7 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   def peek(id: Id): Option[(Key, Spec)]
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
-  def getAll(key: Key): StreamF[Spec]
+  def getAll(key: Key): F[Option[NelSpec]]
 
   /**
     */
@@ -569,23 +573,23 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /**
     */
-  final def existsAll(key: Key): StreamF[Id] =
-    rowz(key) map (_._1)
+  final def existsAll(key: Key): F[List[Id]] =
+    rowz(key) map (_ map (_._1))
 
   /**
     */
   final def exists(key: Key): F[Option[Id]] =
-    existsAll(key).compile.last
+    existsAll(key) map (_.headOption)
 
   /**
     */
-  final def get(key: Key): F[Option[Spec]] =
-    getAll(key).compile.last
+  final def get(key: Key): F[Option[Spec]] = ???
+  // lookups(key).headOption //fold(rows(key))(identity)
 
-  /**
+  /** `Commutative Group` requirement is intentional overkill here.
     */
-  final def sum(key: Key)(implicit CGS: CommutativeGroup[Spec]): F[Spec] =
-    getAll(key).compile.foldMonoid
+  final def sum(key: Key)(implicit CGS: CommutativeGroup[Spec]): F[Spec] = ???
+  // (rowz(key) map (_._2)).unNoneTerminate.compile.foldMonoid
 
   /**
     */
@@ -599,23 +603,18 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /** overrideable
     */
-  protected def lookup(key: Key): F[List[(Id, Value)]] =
-    // lookups(id).compile.toList
-    List.empty.pure[F]
-
-  /** define whichever is easer
-    */
-  protected def lookups(key: Key): StreamF[(Id, Value)] =
-    Stream evalSeq lookup(key)
-  // Stream.empty
+  protected def lookup(key: Key): F[List[(Id, Option[Value])]] =
+    List.empty[(Id, Option[Value])].pure[F]
 
   /**
     */
-  final protected def rowz(key: Key): StreamF[(Id, Option[Value])] =
+  final protected def rowz(key: Key): F[List[(Id, Option[Value])]] =
     for {
-      cache  <- lookups(key).noneTerminate
-      misses <- records filter (_._2._1 === key) map (r => r._1 -> r._2._2)
-    } yield cache.fold(misses) { case (k, v) => k -> v.some }
+      hit <- lookup(key)
+      miss <- (records filter (_._2._1 === key) map {
+                  case (id, (_, v)) => id -> v
+                }).compile.toList
+    } yield hit.headOption.fold(miss)(_ => hit)
 }
 
 /**
@@ -629,21 +628,15 @@ object KeyValueStore {
     type Spec[K2, V2]
     type ValueSpec[K2, V2]
 
-    /**
+    /** `NonEmptyList[Option[ValueSpec[K, V]]]` is ideom for a natural number of csv rows
       */
-    def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]]
+    def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[Option[ValueSpec[K, V]]]
 
     /**
       */
-    protected def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Option[Spec[K, V]]
-
-    /**
-      */
-    final def toSpecOption[K: Order, V](vs: List[ValueSpec[K, V]]): Option[Spec[K, V]] =
-      vs match {
-        case Nil    => none
-        case h :: t => toSpec(NonEmptyList(h, t))
-      }
+    def toSpec[K: Order, V](
+        vs: NonEmptyList[Option[ValueSpec[K, V]]]
+    ): Option[Spec[K, V]]
 
     final type NelSpec[K2, V2] = param.Spec[K2, NonEmptyList[V2]]
 
@@ -653,18 +646,18 @@ object KeyValueStore {
         v: WithKey.Aux[K, V]
     ) { thunk =>
 
-      // /**
-      //   */
-      // def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) = {
-      //   implicit def nothingOrder: Order[Nothing] = ???
+      /**
+        */
+      def deriveV[V2: Show](implicit isV: param.ValueSpec[Nothing, V2] === V) = {
+        implicit def nothingOrder: Order[Nothing] = ???
 
-      //   new SubThunk[Nothing, V2] {}
-      // }
+        new SubThunk[Nothing, V2] {}
+      }
 
-      // /**
-      //   */
-      // def deriveKV[K2: Order: Show, V2: Show](implicit isV: param.ValueSpec[K2, V2] === V) =
-      //   new SubThunk[K2, V2] {}
+      /**
+        */
+      def deriveKV[K2: Order: Show, V2: Show](implicit isV: param.ValueSpec[K2, V2] === V) =
+        new SubThunk[K2, V2] {}
 
       /**
         */
@@ -729,28 +722,34 @@ object KeyValueStore {
 
     case object V extends Param {
       final type Spec[K2, V2]      = V2
-      final type ValueSpec[K2, V2] = Option[V2]
+      final type ValueSpec[K2, V2] = V2
 
-      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[Option[ValueSpec[K, V]]] =
         NonEmptyList(s.some, Nil)
 
-      final protected def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Option[Spec[K, V]] =
+      final def toSpec[K: Order, V](
+          vs: NonEmptyList[Option[ValueSpec[K, V]]]
+      ): Option[Spec[K, V]] =
         vs match {
-          case NonEmptyList(h, _) => h
+          case NonEmptyList(None, Nil) => none
+          case NonEmptyList(h, Nil)    => h
+          case _                       => ???
         }
     }
 
     case object MKV extends Param {
       final type Spec[K2, V2]      = Map[K2, V2]
-      final type ValueSpec[K2, V2] = Option[(K2, V2)]
+      final type ValueSpec[K2, V2] = (K2, V2)
 
-      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
+      final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[Option[ValueSpec[K, V]]] =
         s.toList match {
           case Nil       => NonEmptyList(none[(K, V)], Nil)
           case kv :: kvs => NonEmptyList(kv.some, kvs map (_.some))
         }
 
-      final protected def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Option[Spec[K, V]] =
+      def toSpec[K: Order, V](
+          vs: NonEmptyList[Option[ValueSpec[K, V]]]
+      ): Option[Spec[K, V]] =
         SortedMap(vs.toList map (_.fold(???)(identity)): _*).some
     }
   }
