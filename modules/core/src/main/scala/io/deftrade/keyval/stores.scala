@@ -96,10 +96,6 @@ abstract class Store[F[_], W[_] <: WithValue, V](
     */
   protected def records: StreamF[Record]
 
-  // /**
-  //   */
-  // final protected def append(row: Row): EffectType[Id] = append(row)
-
   /**
     * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
     *
@@ -114,15 +110,14 @@ abstract class Store[F[_], W[_] <: WithValue, V](
     for {
       id <- F delay nextId(row, rows: _*)
       rs <- F delay (row +: rows).toList
-      _ <- (Stream evals (F delay (rs map { r =>
-               cache(id, r)
-               (id, r)
-             })) through persist).compile.drain
+      _  <- (Stream evals (F delay cache(id, rs)) through persist).compile.drain
     } yield id
 
-  /** overrideable with default nop
+  /** overrideable with default nop (but note invocation chaining)
+    * empty List entails `del`etion (only applicable to [[KeyValueStore]])
     */
-  protected def cache(id: Id, row: Row, rows: Row*): Unit = ()
+  protected def cache(id: Id, rows: List[Row]): List[Record] =
+    rows map (id -> _)
 
   /**
     */
@@ -181,25 +176,18 @@ abstract class ValueStore[F[_]: Sync: ContextShift, V](
   /** overrideable
     */
   protected def lookup(id: Id): EffectType[List[Row]] =
-    // lookups(id).compile.toList
     List.empty.pure[EffectType]
-
-  /** define whichever is easer
-    */
-  protected def lookups(id: Id): StreamF[Row] =
-    Stream evalSeq lookup(id)
-  // Stream.empty
 
   /**
     * Get `Stream`.
     *
     * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
     */
-  final protected def rows(id: Id): StreamF[Row] =
+  final protected def rows(id: Id): EffectType[List[Row]] =
     for {
-      cache  <- lookups(id).noneTerminate
-      misses <- records filter (_._1 === id) map (_._2)
-    } yield cache.fold(misses)(identity)
+      hit  <- lookup(id)
+      miss <- (records filter (_._1 === id) map (_._2)).compile.toList
+    } yield hit.headOption.fold(cache(id, miss) map (_._2))(_ => hit)
 }
 
 /**
@@ -556,7 +544,8 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
     */
   def peek(id: Id): Option[(Key, Spec)]
 
-  /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
+  /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
+    */
   def getAll(key: Key): F[Option[NelSpec]]
 
   /**
@@ -567,14 +556,10 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
     */
   def put(key: Key, spec: Spec): F[Id]
 
-  /** TODO: revisit the implementation, which is tricky
-    */
-  protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]]
-
   /**
     */
   final def existsAll(key: Key): F[List[Id]] =
-    rowz(key) map (_ map (_._1))
+    krecs(key) map (_ map (_._1))
 
   /**
     */
@@ -589,7 +574,7 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   /** `Commutative Group` requirement is intentional overkill here.
     */
   final def sum(key: Key)(implicit CGS: CommutativeGroup[Spec]): F[Spec] = ???
-  // (rowz(key) map (_._2)).unNoneTerminate.compile.foldMonoid
+  // (krecs(key) map (_._2)).unNoneTerminate.compile.foldMonoid
 
   /**
     */
@@ -606,15 +591,22 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   protected def lookup(key: Key): F[List[(Id, Option[Value])]] =
     List.empty[(Id, Option[Value])].pure[F]
 
-  /**
+  /** FIXME: not lazy enough? Need to belay the order to make the miss strict. Is it enough that
+    * the fold(miss) expression is by-name?
     */
-  final protected def rowz(key: Key): F[List[(Id, Option[Value])]] =
+  final protected def krecs(key: Key): F[List[(Id, Option[Value])]] =
     for {
-      hit <- lookup(key)
-      miss <- (records filter (_._2._1 === key) map {
-                  case (id, (_, v)) => id -> v
-                }).compile.toList
-    } yield hit.headOption.fold(miss)(_ => hit)
+      hit  <- lookup(key)
+      miss <- (records filter (_._2._1 === key) map { case (id, (_, v)) => id -> v }).compile.toList
+    } yield hit.headOption.fold {
+      miss.groupMap(_._1)(key -> _._2).toList flatMap {
+        case (id, rs) => cache(id, rs)
+      } map { case (id, (_, ov)) => id -> ov }
+    }(_ => hit)
+
+  /** TODO: revisit the implementation, which is tricky
+    */
+  protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]]
 }
 
 /**
@@ -630,7 +622,9 @@ object KeyValueStore {
 
     /** `NonEmptyList[Option[ValueSpec[K, V]]]` is ideom for a natural number of csv rows
       */
-    def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[Option[ValueSpec[K, V]]]
+    def fromSpec[K: Order, V](
+        s: Spec[K, V]
+    ): NonEmptyList[Option[ValueSpec[K, V]]]
 
     /**
       */
@@ -691,7 +685,7 @@ object KeyValueStore {
           /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`. */
           final def getAll(key: Key): StreamF[Spec] = ???
           // for {
-          //   rz <- (rowz(key) map (_._2)).unNoneTerminate
+          //   rz <- (krecs(key) map (_._2)).unNoneTerminate
           // } yield spec
 
           /**
@@ -717,8 +711,6 @@ object KeyValueStore {
   /**
     */
   object Param {
-
-    import io.deftrade.syntax._
 
     case object V extends Param {
       final type Spec[K2, V2]      = V2
