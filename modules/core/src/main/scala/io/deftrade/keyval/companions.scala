@@ -97,7 +97,7 @@ protected object WithValue {
 
 /**
   */
-sealed trait WithId extends WithValue { outer =>
+sealed trait WithId extends WithValue {
 
   /**
     */
@@ -136,7 +136,8 @@ trait WithKey extends WithValue {
   */
 object WithKey {
 
-  /** The `Key` type member is assigned type parameter `K`. */
+  /**
+    */
   abstract class Aux[K, V] extends WithValue.Aux[V] with WithKey {
 
     /**

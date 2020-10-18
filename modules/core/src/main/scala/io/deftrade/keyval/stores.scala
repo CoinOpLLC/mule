@@ -231,7 +231,8 @@ object ValueStore {
 
       /**
         */
-      def deriveV[V2: Show](implicit
+      def deriveV[V2: Show](
+          implicit
           isV: param.ValueSpec[Nothing, V2] === V
       ) = {
         implicit def nothingOrder: Order[Nothing] = ???
@@ -241,14 +242,16 @@ object ValueStore {
 
       /**
         */
-      def deriveKV[K2: Order: Show, V2: Show](implicit
+      def deriveKV[K2: Order: Show, V2: Show](
+          implicit
           isV: param.ValueSpec[K2, V2] === V
       ) =
         new SubThunk[K2, V2] {}
 
       /**
         */
-      abstract class SubThunk[K2: Order, V2]()(implicit
+      abstract class SubThunk[K2: Order, V2]()(
+          implicit
           IsV: param.ValueSpec[K2, V2] === V
       ) {
 
@@ -283,9 +286,10 @@ object ValueStore {
             (repr: F[Map[Id, Spec]]) =>
               Stream evals (for {
                 specs <- repr
-              } yield specs.toList flatMap {
-                case (id, spec) => IsV substitute fromSpec(spec).toList map (id -> _)
-              })
+              } yield
+                specs.toList flatMap {
+                  case (id, spec) => IsV substitute fromSpec(spec).toList map (id -> _)
+                })
 
           /**
             */
@@ -293,9 +297,10 @@ object ValueStore {
             for {
               cache <- lookup(id)
               store <- (records filter (_._1 === id) map (_._2)).compile.toList
-            } yield param toSpecOption (
-              IsV.flip substitute cache.headOption.fold(store)(_ => cache)
-            )
+            } yield
+              param toSpecOption (
+                IsV.flip substitute cache.headOption.fold(store)(_ => cache)
+              )
 
           /**
             */
@@ -305,7 +310,7 @@ object ValueStore {
             for {
               x <- has(id)
               ret <- if (x) (id, false).pure[F]
-                     else append(h, t: _*) map ((_, true))
+                    else append(h, t: _*) map ((_, true))
             } yield ret
           }
         }
@@ -598,11 +603,12 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
     for {
       hit  <- lookup(key)
       miss <- (records filter (_._2._1 === key) map { case (id, (_, v)) => id -> v }).compile.toList
-    } yield hit.headOption.fold {
-      miss.groupMap(_._1)(key -> _._2).toList flatMap {
-        case (id, rs) => cache(id, rs)
-      } map { case (id, (_, ov)) => id -> ov }
-    }(_ => hit)
+    } yield
+      hit.headOption.fold {
+        miss.groupMap(_._1)(key -> _._2).toList flatMap {
+          case (id, rs)            => cache(id, rs)
+        } map { case (id, (_, ov)) => id -> ov }
+      }(_ => hit)
 
   /** TODO: revisit the implementation, which is tricky
     */
@@ -655,7 +661,8 @@ object KeyValueStore {
 
       /**
         */
-      abstract class SubThunk[K2: Order, V2]()(implicit
+      abstract class SubThunk[K2: Order, V2]()(
+          implicit
           IsV: param.ValueSpec[K2, V2] === V
       ) { subThunk =>
 

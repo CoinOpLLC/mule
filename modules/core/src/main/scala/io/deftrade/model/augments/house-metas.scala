@@ -2,8 +2,8 @@ package io.deftrade
 package model
 package augments
 
-import keyval._
-import layers._
+import keyval._, layers._
+import refinements.Label
 
 import cats.implicits._
 import cats.{ Eq, Show }
@@ -23,14 +23,14 @@ trait DefaultMetas { self: ModuleTypes with Ledger =>
   sealed abstract class Meta
 
   /** TODO: evolve to something less trival */
-  final case class Memo(memo: refinements.Label) extends Meta
+  final case class Memo(memo: Label) extends Meta
+
+  implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
+  implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
 
   /**
     */
   final override object Meta extends WithSADT[Meta] {
-
-    implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
-    implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
 
     import io.circe.generic.semiauto._
 
