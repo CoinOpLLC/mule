@@ -73,8 +73,6 @@ import refined.api.Refined
   *       - which can be stored / indexed as binary in Mongo and Postgres
   *       - which can be projected to create true `satellite` views.
   *
-  * TODO: snapshots
-  *
   * TODO: Postgres / Mongo / Kafka integration
   */
 package object keyval extends keyval.dsl {

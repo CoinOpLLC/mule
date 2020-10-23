@@ -8,7 +8,7 @@ import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Json }
 
 /**
-  * Serialized Abstract Data Type.
+  * Serialized Algebraic Data Type.
   *
   * All such semistructured data - to use an antiquated term - is encoded as `json` (for now).
   *

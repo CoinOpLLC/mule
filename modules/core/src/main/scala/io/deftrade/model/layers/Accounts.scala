@@ -6,12 +6,14 @@ import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.data.{ NonEmptySet }
+import cats.data.{ NonEmptyList, NonEmptySet }
 import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
 import refined.cats._
 import refined.numeric.Interval
+
+import io.chrisdavenport.fuuid.FUUID
 
 /**
   * Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
@@ -72,7 +74,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromRoster[F[_]](roster: Roster): F[Account.Id] =
       ???
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
@@ -123,10 +125,19 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
   }
 
+  // FIXME: there is some kind of issue with deriving tuples; work around.
+  case class RosterValue(pk: Party.Key, r: Role, q: Option[Quantity])
+  // final type RosterValue = (Party.Key, Role, Quantity)
+  // final type RosterValue = (Party.Key, Role, Option[Quantity])
+  // final type RosterValue = (Party.Key, Role, Option[Double])
+  implicit def valueShow: Show[RosterValue] = { import auto.show._; semi.show }
+
   /**
     * Creation patterns for account management teams.
     */
   object Roster extends WithId.Aux[(Party.Key, Role, Option[Quantity])] {
+
+    implicit def valueEq: Eq[Value] = { import auto.eq._; semi.eq }
 
     private[deftrade] def apply(
         principals: UnitPartition[Party.Key, Quantity],
@@ -134,7 +145,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     ): Roster =
       new Roster(principals, nonPrincipals) {}
 
-    private[deftrade] def fromValues(vs: List[Value]): Roster = {
+    private[deftrade] def to(vs: NonEmptyList[Value]): Roster = {
       import Role.{ NonPrincipal, Principal }
       val (xs, nonPrincipals) = vs.foldLeft(
         (List.empty[(Party.Key, Quantity)], Map.empty[NonPrincipal, NonEmptySet[Party.Key]])
@@ -150,9 +161,9 @@ trait Accounts { self: Ledger with ModuleTypes =>
       Roster(principals, nonPrincipals)
     }
 
-    private[deftrade] def toValues(roster: Roster): List[Value] = {
-      val ps = roster.principals.kvs.toSortedMap.toList.foldLeft(List.empty[Value]) {
-        case (vs, (party, share)) => (party, (Role.Principal: Role), share.value.some) :: vs
+    private[deftrade] def from(roster: Roster): NonEmptyList[Value] = {
+      val ps = roster.principals.kvs.toNel map {
+        case (party, share) => (party, Role.principal, share.value.some)
       }
       val nps = for {
         role  <- Role.nonPrincipals
@@ -165,8 +176,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def from(
         principals: UnitPartition[Party.Key, Quantity],
         nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
-    ): Roster =
-      apply(
+    ) =
+      Roster(
         principals,
         nonPrincipals withDefault { _ =>
           NonEmptySet(principals.keys.head, principals.keys.tail)
@@ -195,9 +206,15 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    implicit def eq: Eq[Roster]     = ??? // { import auto.eq._; semi.eq }
-    implicit def show: Show[Roster] = ??? // { import auto.show._; semi.show }
+    implicit def eq: Eq[Roster] = { import auto.eq._; semi.eq }
+    implicit def show: Show[Roster] = { import auto.show._; semi.show }
   }
+
+  // final lazy val Rosters =
+  //   ValueStore(
+  //     Roster,
+  //     ValueStore.Param.Aux(Roster.from, Roster.to)
+  //   ).deriveV[]
 
   /**
     * Models financial market participants.
@@ -225,7 +242,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
         case Tax.Ein(ein) => LegalEntity(name, ein, meta)
       }
 
-    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
+    implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
     implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
   }
 
@@ -254,7 +271,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
+    implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
     implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
   }
 
@@ -282,7 +299,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
+    implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
     implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
   }
 

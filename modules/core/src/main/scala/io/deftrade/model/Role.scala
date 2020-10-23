@@ -35,7 +35,8 @@ sealed trait Role extends EnumEntry
   */
 object Role extends DtEnum[Role] {
 
-  /** */
+  /**
+    */
   sealed trait Principal extends Role
 
   /**
@@ -56,25 +57,31 @@ object Role extends DtEnum[Role] {
     /**
       * A test for all `Role`s ''other than'' `Princple`.
       */
-    def unapply(role: Role): Option[Principal] = role match {
-      case p: Principal => p.some
-      case _            => none
-    }
+    def unapply(role: Role): Option[Principal] =
+      role match {
+        case p: Principal => p.some
+        case _            => none
+      }
   }
 
-  /** */
+  @inline final def principal: Role = Principal
+
+  /**
+    */
   sealed trait NonPrincipal extends Role
 
-  /** */
+  /**
+    */
   object NonPrincipal {
 
     /**
       * A test for all `Role`s ''other than'' `Princple`.
       */
-    def unapply(role: Role): Option[NonPrincipal] = role match {
-      case Principal        => none
-      case np: NonPrincipal => np.some
-    }
+    def unapply(role: Role): Option[NonPrincipal] =
+      role match {
+        case Principal        => none
+        case np: NonPrincipal => np.some
+      }
   }
 
   /**
@@ -90,7 +97,6 @@ object Role extends DtEnum[Role] {
     * `Party`(s) with responsibility for, and authority over,
     * the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions
     * which will result in `Transaction`s settling to the `Account`.
-    *
     */
   case object Manager extends NonPrincipal
 
@@ -117,6 +123,7 @@ object Role extends DtEnum[Role] {
   /** The `findValues` macro collects all `value`s in the order written. */
   lazy val values = findValues
 
-  /** */
-  lazy val nonPrincipals = values collect { case NonPrincipal(np) => np }
+  /**
+    */
+  lazy val nonPrincipals = (values collect { case NonPrincipal(np) => np }).toList
 }
