@@ -759,4 +759,14 @@ object KeyValueStore {
         SortedMap(vs.toList map (_.fold(???)(identity)): _*).some
     }
   }
+
+  /**
+    */
+  def apply[K, V: Show](v: WithKey.Aux[K, V], p: Param) =
+    new p.DependentTypeThunk(v) {}
+
+  import Param._
+  implicit def nothingOrder: Order[Nothing] = ???
+  implicit def nothingShow: Show[Nothing]   = ???
+
 }

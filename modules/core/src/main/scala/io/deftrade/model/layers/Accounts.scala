@@ -125,18 +125,16 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
   }
 
-  // FIXME: there is some kind of issue with deriving tuples; work around.
-  case class RosterValue(pk: Party.Key, r: Role, q: Option[Quantity])
-  // final type RosterValue = (Party.Key, Role, Quantity)
-  // final type RosterValue = (Party.Key, Role, Option[Quantity])
-  // final type RosterValue = (Party.Key, Role, Option[Double])
-  implicit def valueShow: Show[RosterValue] = { import auto.show._; semi.show }
+  /** TODO: revert this to a tuple.
+    */
+  case class RosterValue(party: Party.Key, role: Role, quantity: Option[Quantity])
 
   /**
     * Creation patterns for account management teams.
     */
-  object Roster extends WithId.Aux[(Party.Key, Role, Option[Quantity])] {
+  object Roster extends WithId.Aux[RosterValue] {
 
+    implicit def valueShow: Show[Value] = { import auto.show._; semi.show }
     implicit def valueEq: Eq[Value] = { import auto.eq._; semi.eq }
 
     private[deftrade] def apply(
@@ -152,8 +150,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
       ) {
         case ((us, nps), value) =>
           value match {
-            case (p, Principal, Some(u)) => ((p, u) :: us, nps)
-            case (p, NonPrincipal(r), None) =>
+            case RosterValue(p, Principal, Some(u)) => ((p, u) :: us, nps)
+            case RosterValue(p, NonPrincipal(r), None) =>
               (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
           }
       }
@@ -163,12 +161,12 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     private[deftrade] def from(roster: Roster): NonEmptyList[Value] = {
       val ps = roster.principals.kvs.toNel map {
-        case (party, share) => (party, Role.principal, share.value.some)
+        case (party, share) => RosterValue(party, Role.principal, share.value.some)
       }
       val nps = for {
         role  <- Role.nonPrincipals
         party <- roster.nonPrincipals(role).toList
-      } yield (party, role, None)
+      } yield RosterValue(party, role, None)
       ps ++ nps
     }
 
@@ -210,11 +208,13 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def show: Show[Roster] = { import auto.show._; semi.show }
   }
 
-  // final lazy val Rosters =
-  //   ValueStore(
-  //     Roster,
-  //     ValueStore.Param.Aux(Roster.from, Roster.to)
-  //   ).deriveV[]
+  import Roster._
+
+  /**
+    */
+  final lazy val Rosters =
+    ValueStore(Roster, ValueStore.Param.Aux(Roster.from, Roster.to))
+      .deriveV[RosterValue]
 
   /**
     * Models financial market participants.
@@ -235,11 +235,12 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   object Party extends WithFuuidKey[Party] {
 
-    /** TODO: this is sketchy and probably not needed */
-    def apply(name: Label, taxNo: Tax.No, meta: Meta.Id): Party =
+    /**
+      */
+    def apply(name: Label, taxNo: Tax.No, contact: Contact.Id): Party =
       taxNo match {
-        case Tax.Ssn(ssn) => NaturalPerson(name, ssn, meta)
-        case Tax.Ein(ein) => LegalEntity(name, ein, meta)
+        case Tax.Ssn(ssn) => NaturalPerson(name, ssn, contact)
+        case Tax.Ein(ein) => LegalEntity(name, ein, contact)
       }
 
     implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
@@ -274,6 +275,11 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
     implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
   }
+
+  /**
+    */
+  final lazy val NaturalPersons =
+    KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
 
   /**
     */
