@@ -278,8 +278,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  final lazy val NaturalPersons =
-    KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
+  final lazy val NaturalPersons = ???
+  // KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
 
   /**
     */
