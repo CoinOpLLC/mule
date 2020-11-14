@@ -510,10 +510,10 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   final def exists(key: Key): F[Option[Id]] =
     existsAll(key) map (_.headOption)
 
-  /**
+  /** Nota Bene - Uncached.
     */
   final def existsAll(key: Key): F[List[Id]] =
-    kiValues(key) map (_ map (_._1))
+    rawMiss(key) map { _ map { case (id, _) => id } }
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
     */
@@ -537,43 +537,38 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /**
     */
-  final def set(key: Key, spec: Spec): F[Option[Id]] =
-    updateExistingKey(key, spec.some)
+  def set(key: Key, spec: Spec): F[Option[Id]]
 
   /** Empty `Value` memorializes (persists) `delete` for a given `key` - this row gets an `Id`!
     */
-  final def del(key: Key): F[Option[Id]] =
-    updateExistingKey(key, none)
-
-  /**
-    */
-  protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]]
+  def del(key: Key): F[Option[Id]]
 
   /** Default behavior of "always miss" is overrideable.
     */
-  protected def lookup(key: Key): F[List[(Id, List[Value])]] =
-    List.empty.pure[F]
+  protected def lookup(key: Key): F[Option[Spec]] = // F[List[(Id, List[Value])]] =
+    none.pure[F]
 
-  /** TODO: ensure miss path is lazy enough.
-    * Is it enough that the fold(miss) expression is by-name?
-    */
-  final protected def kiValues(key: Key): F[List[(Id, List[Value])]] =
-    for {
-      hit  <- lookup(key)
-      miss <- kiMiss(key)
-    } yield hit.headOption.fold(miss)(_ => hit)
+  // /** TODO: ensure miss path is lazy enough.
+  //   * Is it enough that the fold(miss) expression is by-name?
+  //   */
+  // final protected def kiValues(key: Key): F[List[(Id, List[Value])]] =
+  //   for {
+  //     hit  <- lookup(key)
+  //     miss <- rawMiss(key)
+  //   } yield hit.headOption.fold(miss)(_ => hit)
 
   /** miss path only
     */
-  final protected def kiMiss(key: Key): F[List[(Id, List[Value])]] =
+  final protected def rawMiss(key: Key): F[List[(Id, List[Value])]] =
     records
-      .filter(_._2._1 === key)
-      .groupAdjacentBy(_._1)
-      .fold(List.empty[(Id, List[Value])]) { (acc, ics) =>
-        ics._2.map(_._2._2).toList match {
-          case None :: Nil => List.empty[(Id, List[Value])]
-          case ovs         => (ics._1, ovs map (_.fold(???)(identity))) :: acc
-        }
+      .filter { case (_, (k, _)) => k === key }
+      .groupAdjacentBy({ case (id, _) => id })
+      .fold(List.empty[(Id, List[Value])]) {
+        case (acc, (id, chunks)) =>
+          chunks.map { case (_, (_, ov)) => ov }.toList match {
+            case None :: Nil => List.empty[(Id, List[Value])]
+            case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc
+          }
       }
       .compile
       .lastOrError
@@ -612,7 +607,7 @@ object KeyValueStore {
 
     /** Whether we return a `Some`thing or a `Nothing` depends on the `Spec`.
       */
-    def empty[K2, V2]: Option[Spec[K2, V2]]
+    def empty[K2: Order, V2]: Option[Spec[K2, V2]]
 
     /**
       */
@@ -659,64 +654,80 @@ object KeyValueStore {
             rows(id) map {
               case Nil => none
               case ((h @ (k, _)) :: t) =>
-                (k ->
-                  (param toSpec (NonEmptyList(h, t) map {
-                    case (_, Some(v)) => IsV.flip coerce v
-                  }))).some
+                (k -> (param toSpec (NonEmptyList(h, t) map {
+                  case (_, Some(v)) => IsV.flip coerce v
+                  case _            => ???
+                }))).some
             }
 
           /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
             */
           final def getAll(key: Key): F[Option[NelSpec]] =
             for {
-              rz <- kiValues(key)
+              rz <- rawMiss(key)
             } yield rz match {
               case Nil => none
               case (_, Nil) :: Nil =>
-                param.empty.fold(none[NelSpec])((spec: Spec) => (param toNelSpec spec).some)
+                param.empty[K2, V2].fold(none[NelSpec])(spec => (param toNelSpec spec).some)
               case h :: t =>
                 val specs = NonEmptyList(h, t) map {
                   _._2 match {
+                    case Nil    => ??? // won't reach here: see List[V] === Nil case above
                     case h :: t => param toSpec (IsV.flip substitute NonEmptyList(h, t))
                   }
                 }
                 specs.map(param toNelSpec _).fold.some
             }
 
-          /**
+          /** Nota Bene: Cached.
             */
           final def get(key: Key): F[Option[Spec]] =
             for {
-              rz <- kiValues(key)
-            } yield rz match {
+              hit <- lookup(key)
+              rz  <- rawMiss(key)
+            } yield hit.fold(rz match {
               case Nil              => none
-              case (_, Nil) :: Nil  => param.empty
+              case (_, Nil) :: Nil  => param.empty[K2, V2]
               case (_, h :: t) :: _ => (param toSpec (IsV.flip substitute NonEmptyList(h, t))).some
-            }
+              case _ :: _           => ??? // hole
+            })(_ => hit)
 
-          /** `Commutative Group` requirement is intentional overkill here.
+          /** Nota Bene: Uncached.TODO: revisit this.
             */
-          final def sum(key: Key)(implicit CGS: CommutativeGroup[Spec]): F[Spec] = ???
+          final def let(key: Key, spec: Spec): F[Option[Id]] =
+            exists(key)
+              .flatMap {
+                case None    => put(key, spec) map (_.some)
+                case Some(_) => none.pure[F]
+              }
 
-          /**
-            */
-          final def let(key: Key, spec: Spec): F[Option[Id]] = ???
-          // exists(key) flatMap (_.fold(append(key -> spec.some) map (_.some))(_ => none.pure[F]))
-
-          /**
+          /** Nota Bene: Fast. No uncached reads in the path.
             */
           final def put(key: Key, spec: Spec): F[Id] = {
-            val NonEmptyList(h, t) = param fromSpec spec.some
-            append(
-              key -> (IsV substitute h),
-              (t map (ov => key -> (IsV substitute ov))): _*
-            )
+            val NonEmptyList(h, t) = IsV.lift substitute (param fromSpec spec.some)
+            append(key -> h, (t map (key -> _)): _*)
           }
 
-          /**
+          /** Nota Bene: Uncached.TODO: revisit this.
             */
-          final protected def updateExistingKey(key: Key, maybe: Option[Spec]): F[Option[Id]] = ???
-          // exists(key) flatMap (_.fold(none[Id].pure[F])(_ => append(key -> maybe) map (_.some)))
+          final def set(key: Key, spec: Spec): F[Option[Id]] =
+            exists(key)
+              .flatMap {
+                case None    => none.pure[F]
+                case Some(_) => put(key, spec) map (_.some)
+              }
+
+          /** Empty `Value` memorializes (persists) `delete` for a given `key`:
+            * this row gets an `Id`!
+            *
+            * Nota Bene: Uncached.TODO: revisit this.
+            */
+          final def del(key: Key): F[Option[Id]] =
+            exists(key)
+              .flatMap {
+                case None    => none.pure[F]
+                case Some(_) => append(key -> none) map (_.some)
+              }
         }
       }
     }
@@ -753,8 +764,11 @@ object KeyValueStore {
       final def toNelSpec[K2: Order, V2](spec: Spec[K2, V2]): NelSpec[K2, V2] =
         NonEmptyList one spec
 
-      def empty[K2, V2]: Option[Spec[K2, V2]]                               = ???
-      implicit protected def nelSpecMonoid[K2, V2]: Monoid[NelSpec[K2, V2]] = ???
+      final def empty[K2: Order, V2]: Option[Spec[K2, V2]] =
+        none
+
+      final implicit protected def nelSpecMonoid[K2, V2]: Monoid[NelSpec[K2, V2]] =
+        Monoid[NonEmptyList[V2]]
     }
 
     /** Map of `K2`s and `V2`s
@@ -784,8 +798,11 @@ object KeyValueStore {
       final def toNelSpec[K2: Order, V2](spec: Spec[K2, V2]): NelSpec[K2, V2] =
         spec map { case (k, v) => k -> (NonEmptyList one v) }
 
-      def empty[K2, V2]: Option[Spec[K2, V2]]                               = ???
-      implicit protected def nelSpecMonoid[K2, V2]: Monoid[NelSpec[K2, V2]] = ???
+      final def empty[K2: Order, V2]: Option[Spec[K2, V2]] =
+        SortedMap.empty[K2, V2].some
+
+      final implicit protected def nelSpecMonoid[K2, V2]: Monoid[NelSpec[K2, V2]] =
+        Monoid[Map[K2, NonEmptyList[V2]]]
     }
   }
 
