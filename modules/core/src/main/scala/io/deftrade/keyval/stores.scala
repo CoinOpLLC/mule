@@ -507,12 +507,12 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /**
     */
-  final def exists(key: Key): F[Option[Id]] =
-    existsAll(key) map (_.headOption)
+  final def probe(key: Key): F[Option[Id]] =
+    probeAll(key) map (_.headOption)
 
   /** Nota Bene - Uncached.
     */
-  final def existsAll(key: Key): F[List[Id]] =
+  final def probeAll(key: Key): F[List[Id]] =
     rawMiss(key) map { _ map { case (id, _) => id } }
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
@@ -523,9 +523,9 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
     */
   def get(key: Key): F[Option[Spec]]
 
-  /** `Commutative Group` requirement is intentional overkill here.
+  /** Could also call this method `subscribe`, where [[put]] would be the corresponding `publish`.
     */
-  def sum(key: Key)(implicit CGS: CommutativeGroup[Spec]): F[Spec]
+  def out(key: Key): StreamF[Option[Spec]]
 
   /**
     */
@@ -545,19 +545,10 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /** Default behavior of "always miss" is overrideable.
     */
-  protected def lookup(key: Key): F[Option[Spec]] = // F[List[(Id, List[Value])]] =
-    none.pure[F]
+  protected def lookup(key: Key): F[List[(Id, List[Value])]] = // F[Option[Spec]] =
+    List.empty.pure[F]
 
-  // /** TODO: ensure miss path is lazy enough.
-  //   * Is it enough that the fold(miss) expression is by-name?
-  //   */
-  // final protected def kiValues(key: Key): F[List[(Id, List[Value])]] =
-  //   for {
-  //     hit  <- lookup(key)
-  //     miss <- rawMiss(key)
-  //   } yield hit.headOption.fold(miss)(_ => hit)
-
-  /** miss path only
+  /**
     */
   final protected def rawMiss(key: Key): F[List[(Id, List[Value])]] =
     records
@@ -645,7 +636,7 @@ object KeyValueStore {
           final type ValueSpec = param.ValueSpec[K2, V2]
           final type NelSpec   = param.NelSpec[K2, V2]
 
-          /** Does not lookup in cache or affect (or effect) the cache in any way.
+          /** Uncached.
             *
             * Note: `peek` cannot be used to distinguish whether an `Id` was never written,
             * or has been written and subsequently [[delete]]d. Both cases return `F[None]`.
@@ -656,16 +647,19 @@ object KeyValueStore {
               case ((h @ (k, _)) :: t) =>
                 (k -> (param toSpec (NonEmptyList(h, t) map {
                   case (_, Some(v)) => IsV.flip coerce v
-                  case _            => ???
+                  case _            => ??? // trusting the write path
                 }))).some
             }
 
-          /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
+          /**
+            * Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
+            *
+            * Uncached.
             */
           final def getAll(key: Key): F[Option[NelSpec]] =
             for {
-              rz <- rawMiss(key)
-            } yield rz match {
+              ivs <- rawMiss(key)
+            } yield ivs match {
               case Nil => none
               case (_, Nil) :: Nil =>
                 param.empty[K2, V2].fold(none[NelSpec])(spec => (param toNelSpec spec).some)
@@ -679,39 +673,49 @@ object KeyValueStore {
                 specs.map(param toNelSpec _).fold.some
             }
 
-          /** Nota Bene: Cached.
+          /** Cached.
             */
           final def get(key: Key): F[Option[Spec]] =
             for {
-              hit <- lookup(key)
-              rz  <- rawMiss(key)
-            } yield hit.fold(rz match {
-              case Nil              => none
-              case (_, Nil) :: Nil  => param.empty[K2, V2]
-              case (_, h :: t) :: _ => (param toSpec (IsV.flip substitute NonEmptyList(h, t))).some
-              case _ :: _           => ??? // hole
-            })(_ => hit)
+              hit  <- lookup(key)
+              miss <- rawMiss(key)
+            } yield hit.headOption.fold {
+              miss.headOption.fold(List.empty[V]) {
+                case (id, vs) =>
+                  cache(id, vs map (key -> _.some))
+                  vs
+              }
+            }(_._2) match {
+              case Nil    => param.empty[K2, V2]
+              case h :: t => (param toSpec (IsV.flip substitute NonEmptyList(h, t))).some
+            }
 
-          /** Nota Bene: Uncached.TODO: revisit this.
+          /**
+            */
+          final def out(key: Key): StreamF[Spec] = ???
+
+          /** Uncached.
+            *
+            * TODO: revisit this. Could do cheap in-memory set inclusion for `key`s.
             */
           final def let(key: Key, spec: Spec): F[Option[Id]] =
-            exists(key)
+            probe(key)
               .flatMap {
                 case None    => put(key, spec) map (_.some)
                 case Some(_) => none.pure[F]
               }
 
-          /** Nota Bene: Fast. No uncached reads in the path.
+          /** Fast. No uncached reads in the path.
             */
           final def put(key: Key, spec: Spec): F[Id] = {
             val NonEmptyList(h, t) = IsV.lift substitute (param fromSpec spec.some)
             append(key -> h, (t map (key -> _)): _*)
           }
 
-          /** Nota Bene: Uncached.TODO: revisit this.
+          /** Uncached. TODO: revisit this.
             */
           final def set(key: Key, spec: Spec): F[Option[Id]] =
-            exists(key)
+            probe(key)
               .flatMap {
                 case None    => none.pure[F]
                 case Some(_) => put(key, spec) map (_.some)
@@ -720,10 +724,10 @@ object KeyValueStore {
           /** Empty `Value` memorializes (persists) `delete` for a given `key`:
             * this row gets an `Id`!
             *
-            * Nota Bene: Uncached.TODO: revisit this.
+            * Uncached. TODO: revisit this.
             */
           final def del(key: Key): F[Option[Id]] =
-            exists(key)
+            probe(key)
               .flatMap {
                 case None    => none.pure[F]
                 case Some(_) => append(key -> none) map (_.some)
@@ -786,7 +790,7 @@ object KeyValueStore {
       final def fromSpec[K2: Order, V2](
           os: Option[Spec[K2, V2]]
       ): NonEmptyList[Option[ValueSpec[K2, V2]]] = {
-        val delNel = NonEmptyList(none[(K2, V2)], Nil) // idiom for `delete` command memo
+        def delNel = NonEmptyList(none[(K2, V2)], Nil) // idiom for `delete` command memo
         os.fold(delNel) {
           _.toList match {
             case Nil       => delNel
