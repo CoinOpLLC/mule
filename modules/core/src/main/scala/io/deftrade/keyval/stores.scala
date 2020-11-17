@@ -20,7 +20,7 @@ package keyval
 import refinements.IsSha
 
 import cats.implicits._
-import cats.{ Eq, Order, Show }
+import cats.{ Contravariant, Eq, Order, Show }
 import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyList, NonEmptyMap }
 import cats.evidence._
@@ -438,52 +438,71 @@ object ValueStore {
 
   /**
     */
-  def v[V: Show, V2: Show](
+  def v[V, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: V.ValueSpec[Nothing, V2] === V) =
+  )(implicit isV: V.ValueSpec[Nothing, V2] === V) = {
+    implicit def showV = Contravariant[Show].contramap(Show[V2])(isV.flip coerce _)
     ValueStore(v, V).deriveKV[Nothing, V2]
+  }
 
   /**
     */
-  def lv[V: Show, V2: Show](
+  def lv[V, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: LV.ValueSpec[Nothing, V2] === V) =
+  )(implicit isV: LV.ValueSpec[Nothing, V2] === V) = {
+    implicit def showV: Show[V] =
+      Contravariant[Show].contramap(Show[LV.ValueSpec[Nothing, V2]])(isV.flip coerce _)
     ValueStore(v, LV).deriveKV[Nothing, V2]
+  }
 
   /**
     */
-  def mkv[V: Show, K2: Order: Show, V2: Show](
+  def mkv[V, K2: Order: Show, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: MKV.ValueSpec[K2, V2] === V) =
+  )(implicit isV: MKV.ValueSpec[K2, V2] === V) = {
+    implicit def showV = Contravariant[Show].contramap(Show[Option[(K2, V2)]])(isV.flip coerce _)
     ValueStore(v, MKV).deriveKV[K2, V2]
+  }
 
   /**
     */
-  def mklv[V: Show, K2: Order: Show, V2: Show](
+  def mklv[V, K2: Order: Show, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: MKLV.ValueSpec[K2, V2] === V) =
+  )(implicit isV: MKLV.ValueSpec[K2, V2] === V) = {
+    implicit def showV: Show[V] =
+      Contravariant[Show].contramap(Show[MKLV.ValueSpec[K2, V2]])(isV.flip coerce _)
     ValueStore(v, MKLV).deriveKV[K2, V2]
+  }
 
   /**
     */
-  def nelv[V: Show, V2: Show](
+  def nelv[V, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: NELV.ValueSpec[Nothing, V2] === V) =
+  )(implicit isV: NELV.ValueSpec[Nothing, V2] === V) = {
+    implicit def showV: Show[V] =
+      Contravariant[Show].contramap(Show[NELV.ValueSpec[Nothing, V2]])(isV.flip coerce _)
     ValueStore(v, NELV).deriveKV[Nothing, V2]
+  }
 
   /**
     */
-  def nemkv[V: Show, K2: Order: Show, V2: Show](
+  def nemkv[V, K2: Order: Show, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: NEMKV.ValueSpec[K2, V2] === V) =
+  )(implicit isV: NEMKV.ValueSpec[K2, V2] === V) = {
+    implicit def showV: Show[V] =
+      Contravariant[Show].contramap(Show[NEMKV.ValueSpec[K2, V2]])(isV.flip coerce _)
     ValueStore(v, NEMKV).deriveKV[K2, V2]
+  }
 
   /**
     */
-  def nemklv[V: Show, K2: Order: Show, V2: Show](
+  def nemklv[V, K2: Order: Show, V2: Show](
       v: WithId.Aux[V]
-  )(implicit isV: NEMKLV.ValueSpec[K2, V2] === V) =
+  )(implicit isV: NEMKLV.ValueSpec[K2, V2] === V) = {
+    implicit def showV: Show[V] =
+      Contravariant[Show].contramap(Show[NEMKLV.ValueSpec[K2, V2]])(isV.flip coerce _)
     ValueStore(v, NEMKLV).deriveKV[K2, V2]
+  }
 }
 
 /**
@@ -810,6 +829,31 @@ object KeyValueStore {
     }
   }
 
-  implicit def nothingOrder: Order[Nothing] = ???
-  implicit def nothingShow: Show[Nothing]   = ???
+  /**
+    */
+  def apply[K: Order: Show, V: Show](v: WithKey.Aux[K, V], p: Param) =
+    new p.DependentTypeThunk(v) {}
+
+  import Param._
+
+  implicit def nothingOrder: Order[Nothing] = ??? // type combinator shim, never called
+  implicit def nothingShow: Show[Nothing]   = ??? // type combinator shim, never called
+
+  /**
+    */
+  def v[K: Order: Show, V, V2: Show](
+      v: WithKey.Aux[K, V]
+  )(implicit isV: V.ValueSpec[Nothing, V2] === V) = {
+    implicit def showV = Contravariant[Show].contramap(Show[V2])(isV.flip coerce _)
+    KeyValueStore(v, V).deriveKV[Nothing, V2]
+  }
+
+  /**
+    */
+  def mkv[K: Order: Show, V, K2: Order: Show, V2: Show](
+      v: WithKey.Aux[K, V]
+  )(implicit isV: MKV.ValueSpec[K2, V2] === V) = {
+    implicit def showV = Contravariant[Show].contramap(Show[(K2, V2)])(isV.flip coerce _)
+    KeyValueStore(v, MKV).deriveKV[K2, V2]
+  }
 }
