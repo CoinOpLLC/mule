@@ -76,6 +76,8 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
   * Abstract Data Type (ADT) representing [[contracts.Contract]] parameters and state.
   *
   * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
+  *
+  * TODO: `Preamble`? `Exhibit`s? Other kinds of (linked or embedded) metadata?
   */
 sealed abstract class Form extends Product with Serializable {
 
@@ -205,7 +207,7 @@ object layers {
         coupon: Double, // per 100 face
         issued: Instant,
         matures: ZonedDateTime,
-        paidCoupons: LazyList[Instant], // most recent first
+        paidCoupons: LazyList[Instant],        // most recent first
         unpaidCoupons: LazyList[ZonedDateTime] // soonest due first
     ) extends Form
         with Maturity {
@@ -408,16 +410,16 @@ import layers._
 object forms
     extends PrimaryCapital  // nececssary
     with VanillaDerivatives // fun
-    with Lending // as one does
+    with Lending            // as one does
 // with Fx                 // WIP
 // with Exotics            // primarily for hedge funds
 // with Ibor               // primariy for banks
 
-/** Necessary annotations for data loaded from external sources. */
-private[deftrade] trait Provenance {
-  def sourcedAt: Instant
-  def sourcedFrom: String Refined Url
-}
+// /** Necessary annotations for data loaded from external sources. */
+// private[deftrade] trait Provenance {
+//   def sourcedAt: Instant
+//   def sourcedFrom: String Refined Url
+// }
 
 /**
   * Links which model `Instrument` lifecycle transformation acts
@@ -438,6 +440,8 @@ private[deftrade] trait Provenance {
   *
   * - You will need to be able to walk the graph back in time.
   * - `Novation`s are the link relations that connect [[Instrument]]s in that graph.
+  *
+  * TODO: `Provenance` factorization
   *
   * TODO: `Novation`s can represent `Contract`:
   * - Issuance
@@ -464,5 +468,5 @@ final case class Novation(
 object Novation extends WithId.Aux[Novation] {
 
   implicit def novationOrder: Order[Novation] = { import auto.order._; semi.order }
-  implicit def novationShow: Show[Novation]   = { import auto.show._; semi.show }
+  implicit def novationShow: Show[Novation] = { import auto.show._; semi.show }
 }

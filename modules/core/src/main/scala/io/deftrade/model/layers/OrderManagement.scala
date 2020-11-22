@@ -44,16 +44,9 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
   /** Namespace placeholder */
   object Allocation
 
-  /** `link` table */
-  case class OMSmarkets(market: Market.Key)
-
   /**
     */
-  object OMSmarkets extends WithId.Aux[OMSmarkets]
-
-  /**
-    */
-  type OMSrecord = (LegalEntity.Key, Folio.Key, Folio.Key, OMSmarkets.Id)
+  type OMSrecord = (LegalEntity.Key, Folio.Key, Folio.Key, Market.Key)
 
   /**
     * `OMS` := Order Management System. Ubiquitous domain acronym.
@@ -88,12 +81,13 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       * TODO: revisit parent/child orders
       */
-    sealed abstract case class Order(
-        ts: Instant,
+    sealed abstract case class Order private (
+        at: Instant,
         market: Market.Key,
         trade: Trade.Id,
         currency: CurrencyLike,
-        limit: Option[MonetaryAmount]
+        limit: Option[MonetaryAmount],
+        goodTill: Option[Instant]
     )
 
     /**
@@ -106,12 +100,12 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         * Note that currency is required even for market orders.
         */
       def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
-        new Order(instant, market, trade, Currency[C], none) {}
+        new Order(instant, market, trade, Currency[C], none, none) {}
 
       /**
         */
       def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Money[C]): Order =
-        new Order(instant, market, trade, Currency[C], limit.amount.some) {}
+        new Order(instant, market, trade, Currency[C], limit.amount.some, none) {}
     }
 
     /**
@@ -119,6 +113,8 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       * Multiple partial executions reference the same `Order`
       * and end up as multiple [[Transaction]]s.
+      *
+      * FIXME: is this where we signal [[Order]] cancellation? How?
       */
     sealed abstract case class Execution(
         at: Instant,
@@ -129,7 +125,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * `Execution`s are pure values (do not evolve.)
       *
-      * So-called "broken trades" require explicit modelling.
+      * Implication for domain modellers: so-called "broken trades" require explicit modelling.
       */
     object Execution extends WithId.Aux[Execution] {}
 
@@ -137,10 +133,11 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     def trade: Order ToStreamOf Execution
 
-    /** Bind allocations at the beginning of processing. The order processing ppipe need know
+    /** FIXME: change api to
+      * bind allocations at the beginning of processing. The order processing ppipe need know
       * nothing about the details of the account and the sub accounts.
       *
-      * FIXME: implement (it's a system affortance)
+      * FIXME: implement (it's a system affordance)
       */
     final def allocate(a: Allocation): Execution ToStreamOf Execution = ???
 
@@ -160,7 +157,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       */
     final def process(allocation: Allocation): Order ToStreamOf Confirmation =
       riskCheck andThen trade andThen allocate(allocation) andThen settle
-
   }
 
   /**

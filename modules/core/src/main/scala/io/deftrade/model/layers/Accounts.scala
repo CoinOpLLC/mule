@@ -20,9 +20,21 @@ import io.chrisdavenport.fuuid.FUUID
   */
 trait Accounts { self: Ledger with ModuleTypes =>
 
+  /**
+    */
   type Contact
 
+  /** #FIXME implement
+    */
+  implicit def contactShow: Show[Contact] = ???
+
+  /**
+    */
   val Contact: WithId.Aux[SADT.Aux[Contact]]
+
+  /**
+    */
+  final lazy val Contacts = ValueStore(Contact, ValueStore.Param.V).deriveV[SADT.Aux[Contact]]
 
   /**
     * Predicate defining a very conventional looking account numbering scheme.
@@ -79,6 +91,10 @@ trait Accounts { self: Ledger with ModuleTypes =>
   }
 
   /**
+    */
+  final lazy val Accounts = KeyValueStore(Account, KeyValueStore.Param.V).deriveV[Account]
+
+  /**
     * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
     * and their crew.
     *
@@ -127,7 +143,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /** TODO: revert this to a tuple.
     */
-  case class RosterValue(party: Party.Key, role: Role, quantity: Option[Quantity])
+  case class RosterValue(party: Party.Key, role: Role, stake: Option[Quantity])
 
   /**
     * Creation patterns for account management teams.
@@ -278,8 +294,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  final lazy val NaturalPersons = ???
-  // KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
+  final lazy val NaturalPersons =
+    KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
 
   /**
     */
@@ -309,4 +325,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
   }
 
+  /**
+    */
+  final lazy val LegalEntities =
+    KeyValueStore(LegalEntity, KeyValueStore.Param.V).deriveV[LegalEntity]
 }

@@ -268,6 +268,11 @@ trait Ledger { module: ModuleTypes =>
   }
 
   /**
+    */
+  final lazy val Folios =
+    KeyValueStore(Folio, KeyValueStore.Param.MKV).deriveKV[Entry.Key, Entry.Value]
+
+  /**
     * A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
   type Trade = NonEmptyMap[Entry.Key, Entry.Value]
@@ -328,6 +333,8 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
+    *
+    * Data Vault Classification:
     */
   final lazy val Trades = ValueStore(Trade, ValueStore.Param.NEMKV).deriveKV[Entry.Key, Entry.Value]
 
@@ -472,7 +479,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * TODO: get this to work across nodes in a cluster
     */
-  sealed abstract case class Confirmation private (from: Folio.Id, to: Folio.Id)
+  sealed abstract case class Confirmation private (at: Instant, from: Folio.Id, to: Folio.Id)
 
   /** TODO: implement the ''No deletion'' policy for this `KeyValueStore`
     */
@@ -480,8 +487,8 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    private[model] def apply(from: Folio.Id, to: Folio.Id): Confirmation =
-      new Confirmation(from, to) {}
+    private[model] def apply(at: Instant, from: Folio.Id, to: Folio.Id): Confirmation =
+      new Confirmation(at, from, to) {}
 
     /**
       */
@@ -524,6 +531,11 @@ trait Ledger { module: ModuleTypes =>
       xn => cs => unsettled(xn)(cs) map (_ === Folio.empty)
 
   }
+
+  /**
+    */
+  final lazy val Confirmations =
+    KeyValueStore(Confirmation, KeyValueStore.Param.V).deriveV[Confirmation]
 
   /**
     * '''Cash''' is:

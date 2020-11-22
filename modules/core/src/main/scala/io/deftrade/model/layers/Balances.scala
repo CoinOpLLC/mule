@@ -392,8 +392,10 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     * Placeholder
+    *
+    * TODO: Footnotes table or column?
     */
-  object Report extends WithId.Aux[(Folio.Id, Report)] {
+  object Report extends WithId.Aux[(Folio.Key, Report)] {
 
     /**
       */

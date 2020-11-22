@@ -491,5 +491,3 @@ def toValues[A](a: A): List[Value]
 - use foldMap to implement `snapshot` on all, `CQRS/ES` style
 - `snapshot` effectively preserves cryptographic history 
     - by chaining `snapshot` results into the source stream
-
-

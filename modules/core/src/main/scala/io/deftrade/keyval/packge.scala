@@ -40,7 +40,7 @@ import refined.api.Refined
   *       - typeclass instances for `Eq`, and `Show`.
   *       - Map methods enabled when `Value <~< (K2: Order, V2: Eq)`
   *
-  * A `type Foo` may not contain instances of, nor even depend upon, type `Foo.Key`.
+  * A `type Foo` may not contain instances of, nor depend upon, type `Foo.Key`.
   *
   * Point being: there will be no `id: Id` or `key: Key` fields within domain types!
   * These are stored separately (e.g. `key`s in an in-memory [[scala.collection.Map]])
@@ -58,16 +58,15 @@ import refined.api.Refined
   *   - A: "Real business keys only change when the business changes!"
   *   - Q: What is an "essential attribute"?
   *   - A: Some attributes are like `business keys`: necessary everywhere in the same form
-  *       - essential
-  *       - universal
-  *       - canonical
+  *       - ubiquitous
+  *       - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
   *
-  * Implications for `essential attribute`s.
-  *   - such attributes are non-nullable
-  *   - subject to tactical denormalization
+  * Special treatment for `essential attribute`s.
+  *   - subject to ''tactical denormalization''
   *       - deviates from strict Data Vault methodology
   *       - mixes `satelite` fields in with `link` or `hub` shaped relations
-  *    - nullable / polymorphic fields are modelled as `SADT.Aux[ADT]`
+  *       - essential attributes are ubiquitous (therefore don'tadd redundancy by denormalizing)
+  *    - polymorphic fields are modelled as `SADT.Aux[ADT]`
   *       - `ADT` := Algebraic Data Type
   *       - [[io.circe.Json Json]] `encoder`s and `decoder`s
   *       - which can be stored / indexed as binary in Mongo and Postgres

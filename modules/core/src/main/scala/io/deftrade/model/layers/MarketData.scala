@@ -33,10 +33,12 @@ import spire.syntax.field._
 
 import eu.timepit.refined
 import refined.api.Refined
-import refined.boolean.{ And }
+import refined.boolean.{ And, Or }
 import refined.collection.{ Size }
 import refined.numeric.{ GreaterEqual, LessEqual }
 import refined.string.{ Trimmed, Uuid => IsUuid }
+
+import scala.collection.immutable.SortedSet
 
 import refined.cats._
 
@@ -84,7 +86,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new Quoted(quote) {}
 
     implicit def qOrder: Order[Quoted] = { import auto.order._; semi.order }
-    implicit def qShow: Show[Quoted]   = { import auto.show._; semi.show }
+    implicit def qShow: Show[Quoted] = { import auto.show._; semi.show }
   }
 
   /**
@@ -281,7 +283,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object TickData extends WithId.Aux[TickData] {
+  object TickData extends WithRefinedKey[String, IsLabel, TickData] {
 
     /**
       */
@@ -289,7 +291,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new TickData(at, tick, price, size) {}
 
     implicit def tdOrder: Order[TickData] = { import auto.order._; semi.order }
-    implicit def tdShow: Show[TickData]   = { import auto.show._; semi.show }
+    implicit def tdShow: Show[TickData] = { import auto.show._; semi.show }
 
     /**
       * {{{
@@ -338,13 +340,17 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - "reverse polarity" when we enter a short position.
     *   - indexAndSum settled positions for reconcilliation
     */
-  sealed trait Market { def host: Party.Key; def contra: Folio.Key }
+  sealed trait Market { def host: Party.Key; def contra: Folio.Key; def meta: Meta.Id }
 
-  /** Since its members are evolvable entities, `Market`s may be modelled as immutable values. */
-  object Market extends WithRefinedKey[String, IsLabel, Market] {
+  /** Markets evolve.
+    */
+  object Market extends WithRefinedKey[String, IsUuid Or IsMic, Market] {
 
-    /** beware this is below domain semantics and not what it says */
-    implicit def marketOrder: Order[Market] = ??? // { import auto.order._; semi.order }
+    /** beware - naming here follows machine semantics not domain semantics!!!
+      *
+      * Invariant: Markets are assigned unique `contra` Folios.
+      */
+    implicit def marketOrder: Order[Market] = Order by (_.contra)
   }
 
   /**
@@ -355,17 +361,18 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Counterparty(
       final val host: Party.Key,
-      final val contra: Folio.Key
+      final val contra: Folio.Key,
+      final val meta: Meta.Id
   ) extends Market
 
   /**
     */
   object Counterparty extends WithRefinedKey[String, IsUuid, Counterparty] {
 
-    def apply(host: Party.Key, contra: Folio.Key): Counterparty =
-      new Counterparty(host, contra) {}
+    def apply(host: Party.Key, contra: Folio.Key, meta: Meta.Id): Counterparty =
+      new Counterparty(host, contra, meta) {}
 
-    implicit def cpOrder: Order[Counterparty] = { import auto.order._; semi.order }
+    def mk[F[_]](metas: Metas.ValueStore[F])(host: Party.Key, meta: Meta): F[Counterparty] = ???
 
     implicit def cpShow: Show[Counterparty] = { import auto.show._; semi.show }
   }
@@ -378,7 +385,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Exchange private (
       final val host: Party.Key,
-      final val contra: Folio.Key
+      final val contra: Folio.Key,
+      final val meta: Meta.Id
   ) extends Market
 
   /**
@@ -387,19 +395,25 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     /**
       */
-    protected[deftrade] def apply(host: Party.Key, contra: Folio.Key): Exchange =
-      new Exchange(host, contra) {}
+    protected[deftrade] def apply(host: Party.Key, contra: Folio.Key, meta: Meta.Id): Exchange =
+      new Exchange(host, contra, meta) {}
 
     /**
       */
     def withEntity(host: Party.Key): Exchange => Exchange =
-      x => Exchange(host, x.contra)
+      x => Exchange(host, x.contra, x.meta)
+
+    implicit def exShow: Show[Exchange] = { import auto.show._; semi.show }
   }
 
   /**
     * MDS := Market Data Source.
     */
-  sealed abstract case class MDS(markets: NonEmptySet[Market]) {
+  sealed abstract case class MDS private (
+      provider: Party.Key,
+      markets: NonEmptySet[Market.Key],
+      meta: Meta.Id
+  ) {
 
     /** `Currency`-specific quote factory. */
     def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
@@ -428,16 +442,17 @@ trait MarketData { self: Ledger with ModuleTypes =>
   /** FIXME: normalize fields? */
   object MDS extends WithRefinedKey[String, IsLabel, MDS] {
 
-    private[deftrade] def apply(markets: NonEmptySet[Market]): MDS =
-      new MDS(markets) {
+    private[deftrade] def apply(
+        provider: Party.Key,
+        meta: Meta.Id,
+        market: Market.Key,
+        markets: Market.Key*
+    ): MDS =
+      new MDS(provider, NonEmptySet(market, SortedSet(markets: _*)), meta) {
 
         /** FIXME: how do we specialize? */
         def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
       }
-
-    /**
-      */
-    def single(m: Market) = MDS(NonEmptySet one m)
   }
 
   /** placeholder */
