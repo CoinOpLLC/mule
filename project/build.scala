@@ -4,31 +4,31 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.13.3"
+  val Scala = "2.13.4"
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Cats       = "2.1.1"
-  val Kittens    = "2.1.0"
-  val CatsEffect = "2.1.3"
+  val Cats       = "2.2.0" // "2.1.1"
+  val Kittens    = "2.2.0" // "2.1.0"
+  val CatsEffect = "2.2.0" // "2.1.3"
 
-  val Spire = "0.17.0-M1"
+  val Spire = "0.17.0"
   val Shapeless  = "2.3.3"
-  val Refined    = "0.9.14"
+  val Refined    = "0.9.18"
 
   val Enumeratum = "1.6.1"
   val Fuiid      = "0.3.0"
 
   val Circe = "0.13.0"
-  val PureConfig = "0.12.3"
+  val PureConfig = "0.14.0" // "0.12.3"
   val TypesafeConfig = "1.3.3"
   val Slf4j       = "1.7.30"
 
-  // val Fs2   = "2.3.0"
-  val Fs2   = "2.4.2"
+  // val Fs2   = "2.4.2"
+  val Fs2   = "3.0-5795280"
   val Cormorant  = "0.3.0"
 
-  val Http4s      = "0.21.4"
+  val Http4s      = "1.0.0-M8" // "0.21.4"
   val Doobie      = "0.9.0"
 
   val Fansi       = "0.2.7"
