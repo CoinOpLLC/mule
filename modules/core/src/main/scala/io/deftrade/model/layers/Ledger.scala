@@ -212,8 +212,9 @@ trait Ledger { module: ModuleTypes =>
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance { case (instrument, quantity) =>
-          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance {
+          case (instrument, quantity) =>
+            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
@@ -553,11 +554,12 @@ trait Ledger { module: ModuleTypes =>
       payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
   )(
       drawOn: Folio.Key
-  ): (Trade, Money[C]) => F[Result[Trade.Id]] = { case (trade, amount) =>
-    for {
-      idb <- trades put trade
-      _   <- payCash(drawOn)(amount)
-    } yield Result(idb._1.some)
+  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
+    case (trade, amount) =>
+      for {
+        idb <- trades put trade
+        _   <- payCash(drawOn)(amount)
+      } yield Result(idb._1.some)
   }
 
   /** wip

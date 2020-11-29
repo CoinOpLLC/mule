@@ -52,11 +52,10 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     )(
         subThunk: thunk.SubThunk[K2, V2]
     )(implicit
-        // IsV: p.ValueSpec[K2, V2] === v.Value,
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[subThunk.ValueStore[F]] =
+      // IsV: p.ValueSpec[K2, V2] === v.Value,
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[subThunk.ValueStore[F]] =
       Result safe {
         new CaMfValueStore[F, v.Value, HV](
           v,
@@ -74,11 +73,10 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     )(
         subThunk: thunk.SubThunk[K2, V2]
     )(implicit
-        // IsV: p.ValueSpec[K2, V2] === v.Value,
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[subThunk.ValueStore[F]] =
+      // IsV: p.ValueSpec[K2, V2] === v.Value,
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[subThunk.ValueStore[F]] =
       Result safe {
         new ChMfValueStore[F, V, HV](v, path) with subThunk.ValueStore[F] {}
       }
@@ -103,12 +101,11 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
     def ofChainAddressed[K: Show, V: Eq: Show, HV <: HList](
         kv: WithKey.Aux[K, V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]],
-        lgetk: Lazy[Get[K]],
-        lputk: Lazy[Put[K]]
-    ): Result[MemFileKeyValueStore[F, K, V, HV]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]],
+      lgetk: Lazy[Get[K]],
+      lputk: Lazy[Put[K]]): Result[MemFileKeyValueStore[F, K, V, HV]] =
       Result safe {
 
         implicit val kGet = lgetk.value

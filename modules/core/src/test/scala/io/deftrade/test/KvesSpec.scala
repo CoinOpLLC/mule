@@ -80,14 +80,16 @@ object mvt {
     def mk(
         metas: Metas.ValueStore[IO],
         bars: Bars.KeyValueStore[IO]
-    )(nut: Nut, bar: Bar, contact: Contact, meta: Meta): IO[Foo] =
+    )(
+        nut: Nut,
+        bar: Bar,
+        contact: Contact,
+        meta: Meta
+    ): IO[Foo] =
       for {
         key <- FUUIDGen[IO].random
         ret <- metas.put(SADT from meta)
-        _ <- bars.put(
-               ???, // key, // FIXME
-               bar
-             )
+        _   <- bars.put(key, bar)
       } yield {
         val Right(r) =
           refineV[`[0,1)`](bar.show.size / (bar.show.size + meta.show.size).toDouble)
