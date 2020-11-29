@@ -148,7 +148,9 @@ object Financial {
     */
   def apply[N](implicit N: Financial[N]): Financial[N] = N
 
-  implicit object DoubleIsFinancial extends spire.math.DoubleIsFractionalHack with Financial[Double] {
+  implicit object DoubleIsFinancial
+      extends spire.math.DoubleIsFractionalHack
+      with Financial[Double] {
 
     /**
       */ // odd that these can be declared both not implicit, and override... ;?
@@ -165,15 +167,19 @@ object Financial {
 
   /**
     */
-  implicit object BigDecimalIsFinancial extends spire.math.BigDecimalIsFractionalHack with Financial[BigDecimal] {
+  implicit object BigDecimalIsFinancial
+      extends spire.math.BigDecimalIsFractionalHack
+      with Financial[BigDecimal] {
 
     /**
       */
-    def nonNegativeMonoid: Monoid[BigDecimal Refined NonNegative] = ??? // Monoid[BigDecimal Refined NonNegative]
+    def nonNegativeMonoid: Monoid[BigDecimal Refined NonNegative] =
+      ??? // Monoid[BigDecimal Refined NonNegative]
 
     /**
       */
-    def positiveSemigroup: Semigroup[BigDecimal Refined Positive] = ??? // Semigroup[BigDecimal Refined Positive]
+    def positiveSemigroup: Semigroup[BigDecimal Refined Positive] =
+      ??? // Semigroup[BigDecimal Refined Positive]
 
     /**
       */
@@ -182,15 +188,19 @@ object Financial {
 
   /**
     */
-  sealed abstract class RationalIsFinancial extends spire.math.RationalIsFractionalHack with Financial[Rational] {
+  sealed abstract class RationalIsFinancial
+      extends spire.math.RationalIsFractionalHack
+      with Financial[Rational] {
 
     /**
       */
-    def nonNegativeMonoid: Monoid[Rational Refined NonNegative] = ??? // Monoid[Rational Refined NonNegative]
+    def nonNegativeMonoid: Monoid[Rational Refined NonNegative] =
+      ??? // Monoid[Rational Refined NonNegative]
 
     /**
       */
-    def positiveSemigroup: Semigroup[Rational Refined Positive] = ??? //Semigroup[Rational Refined Positive]
+    def positiveSemigroup: Semigroup[Rational Refined Positive] =
+      ??? //Semigroup[Rational Refined Positive]
 
     def parse(s: String) = Result safe { Rational apply s }
   }

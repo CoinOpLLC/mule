@@ -86,7 +86,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromRoster[F[_]](roster: Roster): F[Account.Id] =
       ???
 
-    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
@@ -151,7 +151,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
   object Roster extends WithId.Aux[RosterValue] {
 
     implicit def valueShow: Show[Value] = { import auto.show._; semi.show }
-    implicit def valueEq: Eq[Value] = { import auto.eq._; semi.eq }
+    implicit def valueEq: Eq[Value]     = { import auto.eq._; semi.eq }
 
     private[deftrade] def apply(
         principals: UnitPartition[Party.Key, Quantity],
@@ -220,7 +220,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    implicit def eq: Eq[Roster] = { import auto.eq._; semi.eq }
+    implicit def eq: Eq[Roster]     = { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = { import auto.show._; semi.show }
   }
 
@@ -259,7 +259,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
         case Tax.Ein(ein) => LegalEntity(name, ein, contact)
       }
 
-    implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
+    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
     implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
   }
 
@@ -288,7 +288,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
+    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
     implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
   }
 
@@ -321,7 +321,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     import refined.cats._
 
-    implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
+    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
     implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
   }
 

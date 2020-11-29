@@ -86,7 +86,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new Quoted(quote) {}
 
     implicit def qOrder: Order[Quoted] = { import auto.order._; semi.order }
-    implicit def qShow: Show[Quoted] = { import auto.show._; semi.show }
+    implicit def qShow: Show[Quoted]   = { import auto.show._; semi.show }
   }
 
   /**
@@ -291,7 +291,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new TickData(at, tick, price, size) {}
 
     implicit def tdOrder: Order[TickData] = { import auto.order._; semi.order }
-    implicit def tdShow: Show[TickData] = { import auto.show._; semi.show }
+    implicit def tdShow: Show[TickData]   = { import auto.show._; semi.show }
 
     /**
       * {{{

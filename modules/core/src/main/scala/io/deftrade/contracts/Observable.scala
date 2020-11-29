@@ -51,7 +51,8 @@ object Observable {
   import Binary.{ Op => BinOp, _ }
 
   /**  */
-  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Observable[A], oR: Observable[A]) extends Observable[B]
+  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Observable[A], oR: Observable[A])
+      extends Observable[B]
 
   /**  */
   object Binary {
@@ -99,8 +100,9 @@ object Observable {
 
     def unary_! : Observable[Boolean] = not(oL)
 
-    def branch(cT: => Contract)(cF: => Contract): Contract                   = contracts.branch(oL)(cT)(cF)
-    def branch[A](oT: => Observable[A])(oF: => Observable[A]): Observable[A] = new Branch(oL, oT, oF) {}
+    def branch(cT: => Contract)(cF: => Contract): Contract = contracts.branch(oL)(cT)(cF)
+    def branch[A](oT: => Observable[A])(oF: => Observable[A]): Observable[A] =
+      new Branch(oL, oT, oF) {}
 
     def and(oR: Observable[Boolean]): Observable[Boolean] = new Binary(And, oL, oR)  {}
     def or(oR: Observable[Boolean]): Observable[Boolean]  = new Binary(Or, oL, oR)   {}

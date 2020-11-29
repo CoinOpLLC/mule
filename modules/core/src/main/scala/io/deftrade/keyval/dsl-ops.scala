@@ -17,18 +17,6 @@ import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 import java.nio.file.{ Paths }
 import scala.tools.asm.Label
 
-trait KVSspec
-object KVSspec {
-
-  // V:=Value; L:=List; M:=Map; R:=Replace; S:=Sum; C:=Cat;
-  case object VRLC  extends KVSspec
-  case object VSLC  extends KVSspec
-  case object LVRC  extends KVSspec
-  case object MVRLC extends KVSspec
-  case object MVSLC extends KVSspec
-  case object MLVRC extends KVSspec
-}
-
 trait dsl {
 
   /**

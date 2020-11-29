@@ -35,8 +35,7 @@ import fs2.{ Pipe, Stream }
 import io.deftrade.keyval.WithKey.KeyCompanion
 import io.getquill.ast.Value
 
-/**
-  * Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
+/** Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Ledger { module: ModuleTypes =>
@@ -67,8 +66,7 @@ trait Ledger { module: ModuleTypes =>
     implicit val C: Currency[CurrencyTag]
   }
 
-  /**
-    * TODO: The different kinds of `Pricer`, listed in order of abstraction (most to least):
+  /** TODO: The different kinds of `Pricer`, listed in order of abstraction (most to least):
     *
     *   - `Model`: reports a ''fair value'' modelled price
     *     - may depend on `market data` for callibration
@@ -100,8 +98,7 @@ trait Ledger { module: ModuleTypes =>
         final override val price: capital.Instrument.Key => Stream[F, Money[C]]
     ) extends Pricer.Aux[F, capital.Instrument.Key, C](price)
 
-    /**
-      * Deploy `Pricer`s by creating search paths per `Currency` and instantiating
+    /** Deploy `Pricer`s by creating search paths per `Currency` and instantiating
       * these pricers in the implicit context.
       */
     object Instrument {
@@ -122,8 +119,7 @@ trait Ledger { module: ModuleTypes =>
       def empty[F[_], C: Currency]: Instrument[F, C] =
         instance(_ => Stream.empty[F])
 
-      /**
-        * @return an `Instrument` which be functions as a two element search path
+      /** @return an `Instrument` which be functions as a two element search path
         * of `Pricer.Instrument`s.
         *
         * TODO: Looks like `Pricer.Instrument` is a [[cats.Monoid]]
@@ -167,8 +163,7 @@ trait Ledger { module: ModuleTypes =>
     object Book
   }
 
-  /**
-    * Entry as in ''double entry''. This object serves as the root of a dependent type tree.
+  /** This object serves as the root of a dependent type tree.
     */
   object Entry {
 
@@ -181,14 +176,13 @@ trait Ledger { module: ModuleTypes =>
     type Value = Quantity
   }
 
-  /**
+  /** Generic `ledger entry`.
     * Any kind of `ledger entry` must carry with it a `key`:
-    * `value`s are assumed fungeable within `key`s, but not across them.
+    * `value`s are '''fungeable''' ''within'' `key`s, but not ''across'' them.
     */
   type Entry = (Entry.Key, Entry.Value)
 
-  /**
-    * How much of a given [[capital.Instrument]] is held.
+  /** How much of a given [[capital.Instrument]] is held.
     *
     * Can also be thought of as a [[Trade]] [[Leg]] at rest.
     */
@@ -218,9 +212,8 @@ trait Ledger { module: ModuleTypes =>
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance {
-          case (instrument, quantity) =>
-            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance { case (instrument, quantity) =>
+          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
@@ -233,8 +226,7 @@ trait Ledger { module: ModuleTypes =>
     */
   lazy val Leg = Position
 
-  /**
-    * A set of (open) [[Position]]s.
+  /** A set of (open) [[Position]]s.
     *
     * A `Folio` can be thought of as a "flat" portfolio",
     * i.e. a portfolio without sub portfolios.
@@ -243,8 +235,7 @@ trait Ledger { module: ModuleTypes =>
     */
   type Folio = Map[Entry.Key, Entry.Value]
 
-  /**
-    * A `Folio` key value store holds (open) [[Trade]]s,
+  /** A `Folio` key value store holds (open) [[Trade]]s,
     * indexed by opaque [[Account]] identifiers.
     *
     * Specifically: a `Map` of `Map`s, which, normalized and written out as a list,
@@ -254,8 +245,7 @@ trait Ledger { module: ModuleTypes =>
     */
   object Folio extends WithFuuidKey[Position] {
 
-    /**
-      * Conceptually, lifts all the [[Position]]s into `Map`s,
+    /** Conceptually, lifts all the [[Position]]s into `Map`s,
       * and sums them as the `Map`s form commutative groups.
       *
       * Implementation differs, for efficiency.
@@ -272,8 +262,7 @@ trait Ledger { module: ModuleTypes =>
   final lazy val Folios =
     KeyValueStore(Folio, KeyValueStore.Param.MKV).deriveKV[Entry.Key, Entry.Value]
 
-  /**
-    * A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
+  /** A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
   type Trade = NonEmptyMap[Entry.Key, Entry.Value]
 
@@ -285,8 +274,7 @@ trait Ledger { module: ModuleTypes =>
       */
     def apply(l: Leg, ls: Leg*): Trade = indexAndSum(l, ls: _*)
 
-    /**
-      * Enables package deals, or portfolio valuation informed by covariance,
+    /** Enables package deals, or portfolio valuation informed by covariance,
       * or other holistic methodology.
       */
     sealed abstract case class Pricer[F[_], C: Currency] private (
@@ -331,20 +319,17 @@ trait Ledger { module: ModuleTypes =>
       } yield (trade, amount)
   }
 
-  /**
-    * In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
+  /** In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     *
     * Data Vault Classification:
     */
   final lazy val Trades = ValueStore(Trade, ValueStore.Param.NEMKV).deriveKV[Entry.Key, Entry.Value]
 
-  /**
-    * Root of the transaction metadata abstract datatype.
+  /** Root of the transaction metadata abstract datatype.
     */
   type Meta
 
-  /**
-    * Persisted as an [[keyval.SADT]].
+  /** Persisted as an [[keyval.SADT]].
     *
     * Nota Bene: By exploiting the `content addressed` nature of the `store` and
     * recording the `Id` of an `SADT` instance, the [[Transaction]] record affords a
@@ -360,8 +345,7 @@ trait Ledger { module: ModuleTypes =>
     */
   final lazy val Metas = ValueStore(Meta, ValueStore.Param.V).deriveV[SADT.Aux[Meta]]
 
-  /**
-    * The concrete record for `Ledger` updates.
+  /** The concrete record for `Ledger` updates.
     *
     * Do we mean `Transaction` in the ''business'' sense, or the ''computer science'' sense?
     * '''Yes''': both parties must agree upon the result, under all semantics for the term.
@@ -381,8 +365,7 @@ trait Ledger { module: ModuleTypes =>
       meta: Meta.Id
   )
 
-  /**
-    * Because `Transaction`s are immutable, we model them as pure values.
+  /** Because `Transaction`s are immutable, we model them as pure values.
     *
     * No `Transaction` is created except within the context
     * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
@@ -505,8 +488,7 @@ trait Ledger { module: ModuleTypes =>
       */
     implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
 
-    /**
-      * Drives the exchange of [[Trade]]s between [[Folio]]s.
+    /** Drives the exchange of [[Trade]]s between [[Folio]]s.
       *
       * FIXME: define and implement
       */
@@ -516,14 +498,12 @@ trait Ledger { module: ModuleTypes =>
       */
     object Agent
 
-    /**
-      * For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
+    /** For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
       */
     def unsettled[F[_]]: Transaction.Id => Stream[F, Confirmation.Id] => F[Folio] =
       ???
 
-    /**
-      * Monotonic, in that [[Transaction]]s are never observed to "unsettle".
+    /** Monotonic, in that [[Transaction]]s are never observed to "unsettle".
       *
       * Nota Bene - '''memoize''' these if need be
       */
@@ -537,8 +517,7 @@ trait Ledger { module: ModuleTypes =>
   final lazy val Confirmations =
     KeyValueStore(Confirmation, KeyValueStore.Param.V).deriveV[Confirmation]
 
-  /**
-    * '''Cash''' is:
+  /** '''Cash''' is:
     *   - ''fungable''
     *   - ''self-pricing''
     *
@@ -574,12 +553,11 @@ trait Ledger { module: ModuleTypes =>
       payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
   )(
       drawOn: Folio.Key
-  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
-    case (trade, amount) =>
-      for {
-        idb <- trades put trade
-        _   <- payCash(drawOn)(amount)
-      } yield Result(idb._1.some)
+  ): (Trade, Money[C]) => F[Result[Trade.Id]] = { case (trade, amount) =>
+    for {
+      idb <- trades put trade
+      _   <- payCash(drawOn)(amount)
+    } yield Result(idb._1.some)
   }
 
   /** wip

@@ -73,7 +73,8 @@ object Contract {
     final def until(b: Observable[Boolean], c: => Contract): Contract = new Until(b, later(c)) {}
 
     /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
-    final def anytime(b: Observable[Boolean])(c: => Contract): Contract = new Anytime(b, later(c)) {}
+    final def anytime(b: Observable[Boolean])(c: => Contract): Contract =
+      new Anytime(b, later(c)) {}
 
     /** Party immediately receives both `c1` and `c2`. */
     final def both(c1: => Contract, c2: => Contract): Contract = new Both(later(c1), later(c2)) {}

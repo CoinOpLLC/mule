@@ -297,7 +297,8 @@ trait api {
   type UnsupportedTemporalTypeException = java.time.temporal.UnsupportedTemporalTypeException
   type ZoneRulesException               = java.time.zone.ZoneRulesException
 
-  abstract class FormatShowHashOrder[CTA <: TemporalAccessor, TA <: TemporalAccessor with Comparable[CTA]](
+  abstract class FormatShowHashOrder[CTA <: TemporalAccessor,
+                                     TA <: TemporalAccessor with Comparable[CTA]](
       val formatter: DateTimeFormatter,
       tq: TemporalAccessor => TA
   )(implicit asCTA: TA <~< CTA)
