@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import time._, money._, keyval._
+import time._, money._, keyval._, model.{ Contact, Contacts, Meta, Metas }
 import Currency.{ USD }
 import currencies._
 import refinements.{ IsLabel, IsUnitInterval, Label }
@@ -77,36 +77,49 @@ object mvt {
 
     /**
       */
-    def mk(nut: Nut, bar: Bar, contact: Contact, meta: SADT): Stream[IO, Foo] = {
-      val Right(r) =
-        refineV[`[0,1)`](bar.show.size / (bar.show.size + meta.show.size).toDouble)
+    def mk(
+        metas: Metas.ValueStore[IO],
+        bars: Bars.KeyValueStore[IO]
+    )(
+        nut: Nut,
+        bar: Bar,
+        contact: Contact,
+        meta: Meta
+    ): IO[Foo] =
       for {
-        bk <- Stream eval FUUIDGen[IO].random
-        mi <- metas append meta
-        _  <- bars insert (bk, bar)
+        key <- FUUIDGen[IO].random
+        ret <- metas.put(SADT from meta)
+        _   <- bars.put(key, bar)
       } yield {
-        val Right(label) = refineV[IsLabel](s"${nut.show}::${bk.show}:${mi.show}")
-        Foo(nut, bk, label, r, mi)
+        val Right(r) =
+          refineV[`[0,1)`](bar.show.size / (bar.show.size + meta.show.size).toDouble)
+        val Right(label) = refineV[IsLabel](s"${nut.show}::${key.show}:${ret._1.show}")
+        Foo(nut, key, label, r, ret._1)
       }
-    }
 
     /** FIXME factor this shyte with applicative and zip and whatnot */
     def mkPipe(
+        metas: Metas.ValueStore[IO],
+        bars: Bars.KeyValueStore[IO]
+    )(
         nuts: Stream[IO, Nut],
-        bars: Stream[IO, Bar],
-        metas: Stream[IO, Contact]
+        bs: Stream[IO, Bar],
+        contacts: Stream[IO, Contact],
+        ms: Stream[IO, Meta]
     ): Stream[IO, Foo] =
-      for {
-        nut  <- nuts
-        bar  <- bars
-        meta <- metas
-        foo  <- mk(nut, bar, meta)
-      } yield foo
+      (for {
+        nut     <- nuts
+        bar     <- bs
+        contact <- contacts
+        meta    <- ms
+      } yield (nut, bar, contact, meta)) evalMap (mk(metas, bars) _).tupled
   }
+
+  lazy val Foos = KeyValueStore(Foo, KeyValueStore.Param.V).deriveV[Foo]
 
   /**
     */
-  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: SADT.Id)
+  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: Meta.Id)
 
   /**
     */
@@ -114,37 +127,43 @@ object mvt {
 
     /**
       */
-    def apply(z: Instant, amount: Dollars, mi: SADT.Id): Bar =
+    def apply(z: Instant, amount: Dollars, mi: Meta.Id): Bar =
       new Bar(z, amount, mi) {}
 
     /**
       */
-    def mk(amount: Dollars, meta: SADT): Stream[IO, Bar] =
+    def mk(metas: Metas.ValueStore[IO])(amount: Dollars, meta: Meta): IO[Bar] =
       for {
-        mi <- metas append meta
-      } yield Bar(instant, amount, mi)
+        ret <- metas put (SADT from meta)
+      } yield {
+        val (mi, _) = ret
+        Bar(instant, amount, mi)
+      }
 
-    def mkPipe(amounts: Stream[IO, Dollars], metas: Stream[IO, SADT]): Stream[IO, Bar] =
+    def mkPipe(metas: Metas.ValueStore[IO])(
+        amounts: Stream[IO, Dollars],
+        metaStream: Stream[IO, Meta]
+    ): Stream[IO, Bar] =
       for {
         amount <- amounts
-        meta   <- metas
-        bar    <- mk(amount, meta)
+        meta   <- metaStream
+        bar    <- Stream eval mk(metas)(amount, meta)
       } yield bar
 
     implicit def barEq: Eq[Bar] = { import auto.eq._; semi.eq }
     implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  import shapeless.labelled._
-
-  lazy val Right(foos)  = keyValueStore[IO] at "target/foos.csv" ofChainAddressed Foo
-  lazy val Right(bars)  = keyValueStore[IO] at "target/bars.csv" ofChainAddressed Bar
-  lazy val Right(metas) = valueStore[IO] at "target/metas.csv" ofContentAddressed SADT
+  lazy val Bars = KeyValueStore(Bar, KeyValueStore.Param.V).deriveV[Bar]
+  // lazy val Right(foos) = keyValueStore[IO] at "target/foos.csv" ofChainAddressed Foo
+  // lazy val Right(bars) = keyValueStore[IO] at "target/bars.csv" ofChainAddressed Bar
+  // lazy val Right(metas) = ???
+  // valueStore[IO] at "target/metas.csv" ofContentAddressed SADT
 }
 
 object arbitraryMvt {
 
-  import keval.{ SADT }
+  import keyval.{ WithSADT }
   import model.{ Money }
 
   import Jt8Gen._
@@ -153,23 +172,29 @@ object arbitraryMvt {
   def drift[A](aa: Gen[A]): Gen[Stream[IO, A]] =
     for (a <- aa) yield Stream eval (IO delay a)
 
-  implicit def FIXME: Arbitrary[SADT] = ???
+  implicit def FIXME_0: Arbitrary[Meta]    = ???
+  implicit def FIXME_1: Arbitrary[Contact] = ???
+  implicit def FIXME_2: Arbitrary[Bar]     = ???
+
+  def metas: Metas.ValueStore[IO]  = ???
+  def bars: Bars.KeyValueStore[IO] = ???
 
   implicit def arbitraryFoo: Arbitrary[Stream[IO, Foo]] =
     Arbitrary {
       for {
-        bars  <- arbitrary[Stream[IO, Bar]]
-        nuts  <- drift(arbitrary[Nut])
-        metas <- drift(arbitrary[SADT])
-      } yield Foo mkPipe (nuts, bars, metas)
+        bs       <- drift(arbitrary[Bar])
+        nuts     <- drift(arbitrary[Nut])
+        contacts <- drift(arbitrary[Contact])
+        ms       <- drift(arbitrary[Meta])
+      } yield Foo.mkPipe(metas, bars)(nuts, bs, contacts, ms)
     }
 
-  implicit def arbitraryBar: Arbitrary[Stream[IO, Bar]] =
+  implicit def arbitraryBar: Arbitrary[IO[Bar]] =
     Arbitrary {
       for {
         amount <- arbitrary[Money[USD]]
-        meta   <- arbitrary[SADT]
-      } yield Bar mk (amount, meta)
+        meta   <- arbitrary[Meta]
+      } yield Bar.mk(metas)(amount, meta)
     }
 }
 

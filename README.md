@@ -76,9 +76,12 @@ Results of these computations should be recomputable by replaying the event stre
     - `aggregate entities` are maintained by `Stream` based computations
     - this is `CQRS/ES` and can be used to replicate / restore application or session state
 
-Why scala 2.13?  
-- Map is less broken
-- type level is less broken
+### Why `scala 2.13`?  
+- `LazyList` for better Haskell porting 
+- `Map` is less broken 
+- literal singleton types
+- `cats.evidence` integration
+
 
 A project of [CoinOpLLC](https://coinopllc.com).
 

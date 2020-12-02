@@ -1,16 +1,12 @@
-resolvers += Resolver.bintrayRepo("virtuslab", "graphbuddy")
-addCompilerPlugin("com.virtuslab.semanticgraphs" % "scalac-plugin" % "0.2.2" cross CrossVersion.full)
+// resolvers += Resolver.bintrayRepo("virtuslab", "graphbuddy")
+// addCompilerPlugin("com.virtuslab.semanticgraphs" % "scalac-plugin" % "0.2.2" cross CrossVersion.full)
 scalacOptions += "-Yrangepos"
 
 resolvers += Resolver.sonatypeRepo("releases")
 
-// addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
-
-// addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0")
-
 // addCompilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch)
 
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+// addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
 scalafmtOnCompile in ThisBuild := true // all projects
 

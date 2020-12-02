@@ -35,8 +35,7 @@ import fs2.{ Pipe, Stream }
 import scala.collection.immutable.SortedMap
 import cats.kernel.Monoid
 
-/**
-  * FIXME: `trait` implementation necessitates duplication of the Spec[K2, V2] === V defninitions
+/** FIXME: `trait` implementation necessitates duplication of the Spec[K2, V2] === V defninitions
   * for all the `Spec`s, in the form of self type restrictions. Eliminate or prove we can't.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -56,15 +55,11 @@ abstract class Store[F[_], W[_] <: WithValue, V](
 
   /**
     */
-  final type EffectType[A] = F[A]
+  final type StreamF[A] = Stream[F, A]
 
   /**
     */
-  final type StreamF[A] = Stream[EffectType, A]
-
-  /**
-    */
-  final type PipeF[A, B] = Pipe[EffectType, A, B]
+  final type PipeF[A, B] = Pipe[F, A, B]
 
   /**
     */
@@ -73,19 +68,18 @@ abstract class Store[F[_], W[_] <: WithValue, V](
 
   /**
     */
-  def hasId(id: Id): EffectType[Boolean] =
+  def hasId(id: Id): F[Boolean] =
     (records exists (_._1 === id)).compile.lastOrError
 
-  /**
-    * Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
+  /** Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
     */
   protected def records: StreamF[Record]
 
   /** overrideable with default nop
     * empty List entails `del`etion (only applicable to [[KeyValueStore]])
     */
-  protected def cache(id: Id, rows: List[Row]): Unit =
-    ()
+  protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
+    ().pure[F]
 
   /**
     */
@@ -105,8 +99,7 @@ abstract class Store[F[_], W[_] <: WithValue, V](
   protected def nextId(row: Row, rows: Row*): Id =
     fresh.nextAll(prev, row, rows: _*)
 
-  /**
-    * Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
+  /** Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
     *
     * This feature - the ability to assign multiple rows a single `Id` computed over those all
     * of those rows - is why ''this'' method is the abstract primitive (and not [[append]]).
@@ -115,20 +108,17 @@ abstract class Store[F[_], W[_] <: WithValue, V](
     *
     * FIXME: not thread safe: put a `Ref` based queue in front
     */
-  final protected def append(row: Row, rows: Row*): EffectType[Id] =
+  final protected def append(row: Row, rows: Row*): F[Id] =
     for {
       id <- F delay nextId(row, rows: _*)
       rs <- F delay (row +: rows).toList
+      _  <- cacheFill(id, rs)
       _  <- (Stream evals (F delay { rs map (id -> _) }) through persist).compile.drain
-    } yield {
-      cache(id, rs)
-      id
-    }
+    } yield id
 
-  /**
-    * Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
+  /** Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
     */
-  final protected def rows(id: Id): EffectType[List[Row]] =
+  final protected def rows(id: Id): F[List[Row]] =
     (records filter (_._1 === id) map (_._2)).compile.toList
 }
 
@@ -136,8 +126,7 @@ abstract class Store[F[_], W[_] <: WithValue, V](
   */
 object Store {}
 
-/**
-  * Note the only way to get an Id is as the result of an effectful mutation
+/** Note the only way to get an Id is as the result of an effectful mutation
   * or [[KeyValueStore#peek]].
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -149,27 +138,25 @@ abstract class ValueStore[F[_]: Sync: ContextShift, V](
 
   /**
     */
-  def get(id: Id): EffectType[Option[Spec]]
+  def get(id: Id): F[Option[Spec]]
 
   /**
     */
-  def put(spec: Spec): EffectType[(Id, Boolean)]
+  def put(spec: Spec): F[(Id, Boolean)]
 
   /** overrideable
     */
-  protected def lookup(id: Id): EffectType[List[Row]] =
-    List.empty.pure[EffectType]
+  protected def cacheLookup(id: Id): F[List[Row]] =
+    List.empty.pure[F]
 
-  /** interrogates and fills cache
+  /** interrogates and fills cacheFill
     */
-  final protected def cachedRows(id: Id): EffectType[List[Row]] =
+  final protected def cachedRows(id: Id): F[List[Row]] =
     for {
-      hit  <- lookup(id)
+      hit  <- cacheLookup(id)
       miss <- rows(id)
-    } yield hit.headOption.fold {
-      cache(id, miss)
-      miss
-    }(_ => hit)
+      _    <- if (hit.isEmpty) cacheFill(id, miss) else ().pure[F]
+    } yield if (hit.nonEmpty) hit else miss
 }
 
 /**
@@ -316,8 +303,7 @@ object ValueStore {
           case h :: t => NonEmptyList(h.some, t map (_.some))
         }
 
-      /**
-        * FIXME: get rid of hole - the typing is subtle here: only 2 cases
+      /** FIXME: get rid of hole - the typing is subtle here: only 2 cases
         * - Nel(None)
         * - Nel(x.some, ...)
         *
@@ -532,7 +518,7 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
   /** Nota Bene - Uncached.
     */
   final def probeAll(key: Key): F[List[Id]] =
-    rawMiss(key) map { _ map { case (id, _) => id } }
+    storeLookup(key) map { _ map { case (id, _) => id } }
 
   /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
     */
@@ -564,21 +550,20 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /** Default behavior of "always miss" is overrideable.
     */
-  protected def lookup(key: Key): F[List[(Id, List[Value])]] = // F[Option[Spec]] =
-    List.empty.pure[F]
+  protected def cacheLookup(key: Key): F[Option[(Id, List[Value])]] = // F[Option[Spec]] =
+    none.pure[F]
 
   /**
     */
-  final protected def rawMiss(key: Key): F[List[(Id, List[Value])]] =
+  final protected def storeLookup(key: Key): F[List[(Id, List[Value])]] =
     records
       .filter { case (_, (k, _)) => k === key }
       .groupAdjacentBy({ case (id, _) => id })
-      .fold(List.empty[(Id, List[Value])]) {
-        case (acc, (id, chunks)) =>
-          chunks.map { case (_, (_, ov)) => ov }.toList match {
-            case None :: Nil => List.empty[(Id, List[Value])]
-            case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc
-          }
+      .fold(List.empty[(Id, List[Value])]) { case (acc, (id, chunks)) =>
+        chunks.map { case (_, (_, ov)) => ov }.toList match {
+          case None :: Nil => List.empty[(Id, List[Value])]                // buh bye
+          case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc // reverses order
+        }
       }
       .compile
       .lastOrError
@@ -622,8 +607,10 @@ object KeyValueStore {
     /**
       */
     sealed abstract class DependentTypeThunk[K, V](
-        v: WithKey.Aux[K, V]
+        final val V: WithKey.Aux[K, V]
     ) { thunk =>
+
+      import V._
 
       /**
         */
@@ -646,10 +633,7 @@ object KeyValueStore {
 
         /**
           */
-        @SuppressWarnings(Array("org.wartremover.warts.Any"))
-        trait KeyValueStore[F[_]] { self: keyval.KeyValueStore[F, K, V] =>
-
-          import V._
+        trait KeyValueStore[F[_]] { self: keyval.KeyValueStore[F, Key, V] =>
 
           final type Spec      = param.Spec[K2, V2]
           final type ValueSpec = param.ValueSpec[K2, V2]
@@ -663,21 +647,22 @@ object KeyValueStore {
           final def peek(id: Id): F[Option[(Key, Spec)]] =
             rows(id) map {
               case Nil => none
-              case ((h @ (k, _)) :: t) =>
-                (k -> (param toSpec (NonEmptyList(h, t) map {
+              // case ((h @ (k, _)) :: t) =>
+              //   (k -> (param toSpec (NonEmptyList(h, t) map {
+              case ((h @ (_, _)) :: t) =>
+                (h._1 -> (param toSpec (NonEmptyList(h, t) map {
                   case (_, Some(v)) => IsV.flip coerce v
                   case _            => ??? // trusting the write path
                 }))).some
             }
 
-          /**
-            * Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
+          /** Returns '''all''' un-[[delete]]d `Value`s for the given `Key`.
             *
             * Uncached.
             */
           final def getAll(key: Key): F[Option[NelSpec]] =
             for {
-              ivs <- rawMiss(key)
+              ivs <- storeLookup(key)
             } yield ivs match {
               case Nil => none
               case (_, Nil) :: Nil =>
@@ -694,20 +679,25 @@ object KeyValueStore {
 
           /** Cached.
             */
-          final def get(key: Key): F[Option[Spec]] =
-            for {
-              hit  <- lookup(key)
-              miss <- rawMiss(key)
-            } yield hit.headOption.fold {
-              miss.headOption.fold(List.empty[V]) {
-                case (id, vs) =>
-                  cache(id, vs map (key -> _.some))
-                  vs
-              }
-            }(_._2) match {
+          final def get(key: Key): F[Option[Spec]] = {
+            val mkSpec: List[V] => Option[Spec] = {
               case Nil    => param.empty[K2, V2]
-              case h :: t => (param toSpec (IsV.flip substitute NonEmptyList(h, t))).some
+              case h :: t => param.toSpec(IsV.flip substitute NonEmptyList(h, t)).some
             }
+            for {
+              hit  <- cacheLookup(key)
+              miss <- storeLookup(key)
+              last = if (hit.isEmpty) miss.headOption else none
+              _ <- last match {
+                     case Some((id, vs @ (_ :: _))) => cacheFill(id, vs map (key -> _.some))
+                     case _                         => ().pure[F]
+                   }
+            } yield hit
+              .map(_._2)
+              .fold {
+                miss.map(_._2).reduceLeftOption((r, _) => r).fold(param.empty[K2, V2])(mkSpec)
+              }(mkSpec)
+          }
 
           /**
             */
