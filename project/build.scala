@@ -4,15 +4,15 @@ import Keys._
 
 object Version {
 
-  val Scala = "2.13.3"
+  val Scala = "2.13.4"
   // val Scala = "2.12.10"
   val Xml   = "1.2.0"
 
-  val Cats       = "2.1.1"
-  val Kittens    = "2.1.0"
-  val CatsEffect = "2.1.3"
+  val Cats       = "2.3.0"// "2.1.1"
+  val Kittens    = "2.2.0"// "2.1.0"
+  val CatsEffect = "2.3.0"// "2.1.3"
 
-  val Spire = "0.17.0-M1"
+  val Spire = "0.17.0"
   val Shapeless  = "2.3.3"
   val Refined    = "0.9.14"
 

@@ -46,7 +46,7 @@ lazy val core = module(
   "core",
   """foundational finance value types and functions"""
 ).settings(common)
-  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
+  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full))
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
@@ -54,7 +54,7 @@ lazy val core = module(
 lazy val demo = module("demo", "something to run")
   .dependsOn(core)
   .settings(common)
-  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full))
+  .settings(addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full))
   .settings(
     libraryDependencies ++= pureConfigs ++ funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
