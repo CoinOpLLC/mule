@@ -97,3 +97,7 @@ protected trait CsvImplicits {
     stringPut contramap (_.canonicalString)
 
 }
+
+/**
+  */
+object CsvImplicits extends CsvImplicits

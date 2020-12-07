@@ -200,7 +200,8 @@ object ValueStore {
 
       /**
         */
-      def deriveV[V2: Show](implicit
+      def deriveV[V2: Show](
+          implicit
           isV: param.ValueSpec[Nothing, V2] === V
       ) = {
         implicit def nothingOrder: Order[Nothing] = ???
@@ -210,14 +211,16 @@ object ValueStore {
 
       /**
         */
-      def deriveKV[K2: Order: Show, V2: Show](implicit
+      def deriveKV[K2: Order: Show, V2: Show](
+          implicit
           isV: param.ValueSpec[K2, V2] === V
       ) =
         new SubThunk[K2, V2] {}
 
       /**
         */
-      abstract class SubThunk[K2: Order, V2]()(implicit
+      abstract class SubThunk[K2: Order, V2]()(
+          implicit
           IsV: param.ValueSpec[K2, V2] === V
       ) {
 
@@ -247,7 +250,7 @@ object ValueStore {
             for {
               x <- hasId(id)
               ret <- if (x) (id, false).pure[F]
-                     else append(h, t: _*) map ((_, true))
+                    else append(h, t: _*) map ((_, true))
             } yield ret
           }
         }
@@ -259,7 +262,9 @@ object ValueStore {
     */
   object Param {
 
-    case class Aux[T, U](
+    /**
+      */
+    sealed abstract class Aux[T, U] private[Param] (
         f: T => NonEmptyList[U],
         g: NonEmptyList[U] => T
     ) extends Param {
@@ -271,6 +276,28 @@ object ValueStore {
 
       final def toSpec[K: Order, V](vs: NonEmptyList[ValueSpec[K, V]]): Spec[K, V] =
         g(vs)
+    }
+
+    /**
+      */
+    case object Aux {
+      def apply[T, U](f: T => NonEmptyList[U], g: NonEmptyList[U] => T): Aux[T, U] =
+        new Aux(f, g) {}
+    }
+
+    /** Serialized ADTs
+      */
+    sealed abstract class SADT[V] private (final val V: WithSADT[V])
+        extends Aux[V, keyval.SADT.Aux[V]](
+          v => NonEmptyList one { import V._; keyval.SADT from v },
+          nel => V from nel.head
+        )
+
+    /**
+      */
+    case object SADT {
+      def apply[V](v: WithSADT[V]): SADT[V] =
+        new SADT(v) {}
     }
 
     /** Values
@@ -300,7 +327,7 @@ object ValueStore {
       final def fromSpec[K: Order, V](s: Spec[K, V]): NonEmptyList[ValueSpec[K, V]] =
         s match {
           case Nil    => NonEmptyList one none
-          case h :: t => NonEmptyList(h.some, t map (_.some))
+          case h :: t => NonEmptyList(h, t) map (_.some)
         }
 
       /** FIXME: get rid of hole - the typing is subtle here: only 2 cases
@@ -530,7 +557,7 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
 
   /** Could also call this method `subscribe`, where [[put]] would be the corresponding `publish`.
     */
-  def out(key: Key): StreamF[Option[Spec]]
+  def out(key: Key): StreamF[Spec]
 
   /**
     */
@@ -559,11 +586,12 @@ abstract class KeyValueStore[F[_]: Sync: ContextShift, K, V](
     records
       .filter { case (_, (k, _)) => k === key }
       .groupAdjacentBy({ case (id, _) => id })
-      .fold(List.empty[(Id, List[Value])]) { case (acc, (id, chunks)) =>
-        chunks.map { case (_, (_, ov)) => ov }.toList match {
-          case None :: Nil => List.empty[(Id, List[Value])]                // buh bye
-          case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc // reverses order
-        }
+      .fold(List.empty[(Id, List[Value])]) {
+        case (acc, (id, chunks)) =>
+          chunks.map { case (_, (_, ov)) => ov }.toList match {
+            case None :: Nil => List.empty[(Id, List[Value])] // buh bye
+            case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc // reverses order
+          }
       }
       .compile
       .lastOrError
@@ -606,9 +634,9 @@ object KeyValueStore {
 
     /**
       */
-    sealed abstract class DependentTypeThunk[K, V](
+    sealed abstract class DependentTypeThunk[K, V] private (
         final val V: WithKey.Aux[K, V]
-    ) { thunk =>
+    ) { dtt =>
 
       import V._
 
@@ -627,9 +655,12 @@ object KeyValueStore {
 
       /** Dervives `K2` and `V2`.
         */
-      abstract class SubThunk[K2: Order, V2]()(implicit
+      abstract class SubThunk[K2: Order, V2]()(
+          implicit
           IsV: param.ValueSpec[K2, V2] === V
       ) { subThunk =>
+
+        def kv = V
 
         /**
           */
@@ -647,7 +678,7 @@ object KeyValueStore {
           final def peek(id: Id): F[Option[(Key, Spec)]] =
             rows(id) map {
               case Nil => none
-              // case ((h @ (k, _)) :: t) =>
+              // case ((h @ (k, _)) :: t) =>  // FIXME: triggers `scalac` bug!
               //   (k -> (param toSpec (NonEmptyList(h, t) map {
               case ((h @ (_, _)) :: t) =>
                 (h._1 -> (param toSpec (NonEmptyList(h, t) map {
@@ -663,19 +694,18 @@ object KeyValueStore {
           final def getAll(key: Key): F[Option[NelSpec]] =
             for {
               ivs <- storeLookup(key)
-            } yield ivs match {
-              case Nil => none
-              case (_, Nil) :: Nil =>
-                param.empty[K2, V2].fold(none[NelSpec])(spec => (param toNelSpec spec).some)
-              case h :: t =>
-                val specs = NonEmptyList(h, t) map {
-                  _._2 match {
-                    case Nil    => ??? // won't reach here: see List[V] === Nil case above
-                    case h :: t => param toSpec (IsV.flip substitute NonEmptyList(h, t))
+            } yield
+              ivs match {
+                case Nil => none
+                case (_, Nil) :: Nil =>
+                  param.empty[K2, V2].fold(none[NelSpec])(spec => (param toNelSpec spec).some)
+                case h :: t =>
+                  def specs = NonEmptyList(h, t) map {
+                    case (_, Nil)    => ??? // won't reach here: see List[V] === Nil case above
+                    case (_, h :: t) => param toSpec (IsV.flip substitute NonEmptyList(h, t))
                   }
-                }
-                specs.map(param toNelSpec _).fold.some
-            }
+                  specs.map(param toNelSpec _).fold.some
+              }
 
           /** Cached.
             */
@@ -689,17 +719,18 @@ object KeyValueStore {
               miss <- storeLookup(key)
               last = if (hit.isEmpty) miss.headOption else none
               _ <- last match {
-                     case Some((id, vs @ (_ :: _))) => cacheFill(id, vs map (key -> _.some))
-                     case _                         => ().pure[F]
-                   }
-            } yield hit
-              .map(_._2)
-              .fold {
-                miss.map(_._2).reduceLeftOption((r, _) => r).fold(param.empty[K2, V2])(mkSpec)
-              }(mkSpec)
+                    case Some((id, vs @ (_ :: _))) => cacheFill(id, vs map (key -> _.some))
+                    case _                         => ().pure[F]
+                  }
+            } yield
+              hit
+                .map(_._2)
+                .fold {
+                  miss.map(_._2).reduceLeftOption((r, _) => r).fold(param.empty[K2, V2])(mkSpec)
+                }(mkSpec)
           }
 
-          /**
+          /** TODO: define and implement
             */
           final def out(key: Key): StreamF[Spec] = ???
 
@@ -744,16 +775,17 @@ object KeyValueStore {
         }
       }
     }
+
+    object DependentTypeThunk {
+      def apply[K, V](kv: WithKey.Aux[K, V]): DependentTypeThunk[K, V] =
+        new DependentTypeThunk(kv) {}
+    }
+
   }
 
   /** What kind of values are we storing in our [[KeyValueStore]]?
     */
   object Param {
-
-    /**
-      */
-    def apply[K, V: Show](v: WithKey.Aux[K, V], p: Param) =
-      new p.DependentTypeThunk(v) {}
 
     /** (Single, scalar) `Value`
       */
@@ -822,7 +854,7 @@ object KeyValueStore {
   /**
     */
   def apply[K: Order: Show, V: Show](v: WithKey.Aux[K, V], p: Param) =
-    new p.DependentTypeThunk(v) {}
+    p.DependentTypeThunk(v)
 
   import Param._
 

@@ -344,7 +344,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  final lazy val Metas = ValueStore(Meta, ValueStore.Param.V).deriveV[SADT.Aux[Meta]]
+  final lazy val Metas = ValueStore(Meta, ValueStore.Param.SADT(Meta)).deriveV[SADT.Aux[Meta]]
 
   /** The concrete record for `Ledger` updates.
     *
@@ -372,8 +372,6 @@ trait Ledger { module: ModuleTypes =>
     * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
     */
   object Transaction extends WithId.Aux[Transaction] {
-
-    import Meta._
 
     /**
       */
@@ -412,7 +410,7 @@ trait Ledger { module: ModuleTypes =>
     ): F[Transaction] =
       for {
         tid <- trades put trade
-        mid <- metas put (SADT from meta) map (_._1)
+        mid <- metas put meta map (_._1)
       } yield Transaction(instant, from, to, tid._1, mid)
 
     /**

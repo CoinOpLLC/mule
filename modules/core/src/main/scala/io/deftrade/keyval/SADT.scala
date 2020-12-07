@@ -7,8 +7,7 @@ import cats.{ Eq, Show }
 import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Json }
 
-/**
-  * Serialized Algebraic Data Type.
+/** Serialized Algebraic Data Type.
   *
   * All such semistructured data - to use an antiquated term - is encoded as `json` (for now).
   *
@@ -20,7 +19,7 @@ import io.circe.{ Decoder, Encoder, Json }
   *   - protobuf
   *   - etc
   */
-sealed class SADT private (protected val json: Json) {
+sealed abstract class SADT private (protected val json: Json) {
 
   /**
     */
@@ -67,19 +66,16 @@ object SADT {
   implicit lazy val miscShow: Show[SADT] = Show show (_.json.show)
 }
 
-/**
-  * A `SADT` store is content-addressed: entries are indexed with their own `sha`.
+/** A `SADT` store is content-addressed: entries are indexed with their own `sha`.
   *
   * Therefore, if you have a `sha` (from a [[model.Transaction]], for instance) ''and'' access to
   * a `SADT` key value store containing the value, you have access to the value itself.
   *
   * Note this value is forgery resistant (up to the strength of the `sha`).
   */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class WithSADT[T: Show] extends WithId.Aux[SADT.Aux[T]] {
 
-  /**
-    * Every `ADT` shall decode `braces` as the legal and unique `empty: T`
+  /** Every `ADT` shall decode `braces` as the legal and unique `empty: T`
     * FIXME: test this lmao
     */
   final def empty: T = {

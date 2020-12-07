@@ -21,20 +21,26 @@ import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
+import cats.derived.{ auto, semi }
 import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
 
-/**
-  * The House Contact class.
+import refined.cats._
+
+import io.circe.{ Decoder, Encoder };
+import io.circe.refined._
+import io.circe.generic.semiauto._
+
+/** The House Contact class.
   */
 trait Contacts {
 
   /**
     */
-  final case class Contact(
+  sealed abstract case class Contact private (
       name: Contact.Name,
       address: Contact.USAddress,
       cell: Contact.USPhone,
@@ -53,24 +59,30 @@ trait Contacts {
       ???
   }
 
+  implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semi.eq }
+  implicit lazy val contactShow: Show[Contact] = { import auto.show._; semi.show }
+
   /**
     */
-  object Contact extends WithId.Aux[SADT.Aux[Contact]] {
+  object Contact extends WithSADT[Contact] {
 
-    import cats.derived
-    import refined.cats._
-
-    implicit lazy val contactEq: Eq[Contact]     = derived.semi.eq
-    implicit lazy val contactShow: Show[Contact] = derived.semi.show
-
-    import io.circe._, io.circe.refined._, io.circe.generic.semiauto._
+    /**
+      */
+    def apply(
+        name: Contact.Name,
+        address: Contact.USAddress,
+        cell: Contact.USPhone,
+        email: Contact.Email,
+        url: Option[String Refined Url]
+    ): Contact =
+      new Contact(name, address, cell, email, url) {}
 
     implicit lazy val decoder: Decoder[Contact] = deriveDecoder
     implicit lazy val encoder: Encoder[Contact] = deriveEncoder
 
     /**
       */
-    final case class Name(
+    case class Name(
         first: Label,
         middle: Option[Label],
         last: Label
@@ -80,8 +92,8 @@ trait Contacts {
       */
     object Name {
 
-      implicit lazy val nameEq: Eq[Name]     = derived.semi.eq
-      implicit lazy val nameShow: Show[Name] = derived.semi.show
+      implicit lazy val nameEq: Eq[Name]     = semi.eq
+      implicit lazy val nameShow: Show[Name] = semi.show
 
       implicit lazy val decoder: Decoder[Name] = deriveDecoder
       implicit lazy val encoder: Encoder[Name] = deriveEncoder
@@ -89,7 +101,7 @@ trait Contacts {
 
     /**
       */
-    final case class USAddress(
+    case class USAddress(
         street: Label,
         street2: Option[Label],
         city: Label,
@@ -101,8 +113,8 @@ trait Contacts {
       */
     object USAddress {
 
-      implicit lazy val usAddressEq: Eq[USAddress]     = derived.semi.eq
-      implicit lazy val usAddressShow: Show[USAddress] = derived.semi.show
+      implicit lazy val usAddressEq: Eq[USAddress]     = semi.eq
+      implicit lazy val usAddressShow: Show[USAddress] = semi.show
 
       implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
       implicit lazy val encoder: Encoder[USAddress] = deriveEncoder

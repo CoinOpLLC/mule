@@ -24,8 +24,8 @@ object Version {
   val TypesafeConfig = "1.3.3"
   val Slf4j          = "1.7.30"
 
-  // val Fs2   = "2.4.2"
-  val Fs2       = "3.0-5795280"
+  val Fs2 = "2.4.2"
+  // val Fs2       = "3.0-5795280"
   val Cormorant = "0.3.0"
 
   val Http4s = "1.0.0-M8" // "0.21.4"

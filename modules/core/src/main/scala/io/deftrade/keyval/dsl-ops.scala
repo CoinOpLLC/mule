@@ -6,7 +6,6 @@ import impl._
 import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.effect.{ ContextShift, Sync }
-import cats.evidence._
 
 import shapeless.{ HList, LabelledGeneric, Lazy }
 // import shapeless.labelled._
@@ -15,22 +14,21 @@ import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
 import java.nio.file.{ Paths }
-import scala.tools.asm.Label
 
 trait dsl {
 
   /**
     */
-  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
+  def valueStore[F[_]: Sync: ContextShift](param: ValueStore.Param) = VsOps[F](param)
 
   /**
     */
-  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
+  def keyValueStore[F[_]: Sync: ContextShift](param: KeyValueStore.Param) = KvsOps[F](param)
 }
 
 /** dsl for value stores
   */
-final case class VsOps[F[_]: Sync: ContextShift]() {
+final case class VsOps[F[_]: Sync: ContextShift](final val param: ValueStore.Param) {
 
   /** `at` clause
     */
@@ -45,10 +43,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     /**
       */
     def ofContentAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        p: ValueStore.Param,
         v: WithId.Aux[V]
     )(
-        thunk: p.DependentTypeThunk[V]
+        thunk: param.DependentTypeThunk[V]
     )(
         subThunk: thunk.SubThunk[K2, V2]
     )(implicit
@@ -66,10 +63,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
     /** `of` clause
       */
     def ofChainAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        v: WithId.Aux[V],
-        p: ValueStore.Param
+        v: WithId.Aux[V]
     )(
-        thunk: p.DependentTypeThunk[V]
+        thunk: param.DependentTypeThunk[V]
     )(
         subThunk: thunk.SubThunk[K2, V2]
     )(implicit
@@ -86,7 +82,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-final case class KvsOps[F[_]: Sync: ContextShift]() {
+final case class KvsOps[F[_]: Sync: ContextShift](param: KeyValueStore.Param) {
 
   /**
     */
@@ -96,31 +92,53 @@ final case class KvsOps[F[_]: Sync: ContextShift]() {
     */
   sealed case class AddressOps(p: String) {
 
+    def ofKeyChained[K: Show, V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
+        subThunk: param.DependentTypeThunk[K, V]#SubThunk[K2, V2]
+    )(implicit
+      // isV: param.ValueSpec[K2, V2] === V,
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]],
+      lgetk: Lazy[Get[K]],
+      lputk: Lazy[Put[K]]) =
+      Result safe {
+
+        implicit val kGet = lgetk.value
+        implicit val kPut = lputk.value
+
+        new MemFileKeyValueStore(subThunk.kv, Paths get p) with subThunk.KeyValueStore[F] {
+
+          import V._
+          final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+        }
+      }
+
+    // K2: Order: Show, V2: Eq: Show
+
     /**
       */
-    def ofChainAddressed[K: Show, V: Eq: Show, HV <: HList](
+    def ofChainAddressed[K: Show, V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
         kv: WithKey.Aux[K, V]
+    )(
+        thunk: param.DependentTypeThunk[K, V]
+    )(
+        subThunk: thunk.SubThunk[K2, V2]
     )(implicit
       lgv: LabelledGeneric.Aux[V, HV],
       llr: Lazy[LabelledRead[HV]],
       llw: Lazy[LabelledWrite[HV]],
       lgetk: Lazy[Get[K]],
-      lputk: Lazy[Put[K]]): Result[MemFileKeyValueStore[F, K, V, HV]] =
+      lputk: Lazy[Put[K]]): Result[subThunk.KeyValueStore[F]] =
       Result safe {
 
         implicit val kGet = lgetk.value
         implicit val kPut = lputk.value
-        ???
-        // new MemFileKeyValueStore(kv, Paths get p) {
 
-        //   /** Key Value stores ''must'' use chained addresses.
-        //     *
-        //     * (This is down to semantics, not crypto.)
-        //     */
-        //   final type Shape[A] = Map[V.Key, A]
+        new MemFileKeyValueStore(kv, Paths get p) with subThunk.KeyValueStore[F] {
 
-        //   final protected lazy val fresh: Fresh[V.Id, V.Row] = Fresh.shaChain[V.Row]
-        // }
+          import V._
+          final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+        }
       }
   }
 }

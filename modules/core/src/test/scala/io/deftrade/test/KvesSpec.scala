@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import time._, money._, keyval._, model.{ Contact, Contacts, Meta, Metas }
+import time._, money._, keyval._, model.{ Contact, Meta, Metas, Money }
 import Currency.{ USD }
 import currencies._
 import refinements.{ IsLabel, IsUnitInterval, Label }
@@ -9,7 +9,8 @@ import IsUnitInterval._
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.effect.{ ContextShift, IO }
+import cats.derived.{ auto, semi }
+import cats.effect.{ ContextShift, IO, Sync }
 
 import eu.timepit.refined
 import refined.{ refineV }
@@ -20,8 +21,13 @@ import refined.auto._
 
 import fs2.{ Stream }
 
+import shapeless.{ HList, LabelledGeneric, Lazy }
+
 import io.chrisdavenport.cormorant
-import cormorant.generic.auto._
+import cormorant._
+// import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
+import cormorant.generic.semiauto._
+// import cormorant.parser._
 import cormorant.implicits._
 
 import io.chrisdavenport.fuuid
@@ -36,16 +42,13 @@ import Arbitrary.arbitrary
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import java.nio.file.{ Paths }
+
 // import io.circe.Json
 
-// import java.util.UUID
-
+/**
+  */
 object mvt {
-
-  import _root_.cats.derived.{ auto, semi }
-  import cormorant.refined._
-
-  import model.Contact
 
   implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
 
@@ -63,9 +66,11 @@ object mvt {
     */
   object Foo extends WithRefinedKey[String, IsLabel, Foo] {
 
-    implicit def fooEq: Eq[Foo] = { import auto.eq._; semi.eq }
+    implicit def fooEq: Eq[Foo]     = { import auto.eq._; semi.eq }
     implicit def fooShow: Show[Foo] = { import auto.show._; semi.show }
 
+    /**
+      */
     def apply(
         nut: Nut,
         bar: Bar.Key,
@@ -88,7 +93,7 @@ object mvt {
     ): IO[Foo] =
       for {
         key <- FUUIDGen[IO].random
-        ret <- metas.put(SADT from meta)
+        ret <- metas put meta
         _   <- bars.put(key, bar)
       } yield {
         val Right(r) =
@@ -107,12 +112,14 @@ object mvt {
         contacts: Stream[IO, Contact],
         ms: Stream[IO, Meta]
     ): Stream[IO, Foo] =
-      (for {
-        nut     <- nuts
-        bar     <- bs
-        contact <- contacts
-        meta    <- ms
-      } yield (nut, bar, contact, meta)) evalMap (mk(metas, bars) _).tupled
+      (
+        for {
+          n <- nuts
+          b <- bs
+          c <- contacts
+          m <- ms
+        } yield (n, b, c, m)
+      ) evalMap (mk(metas, bars) _).tupled
   }
 
   lazy val Foos = KeyValueStore(Foo, KeyValueStore.Param.V).deriveV[Foo]
@@ -134,7 +141,7 @@ object mvt {
       */
     def mk(metas: Metas.ValueStore[IO])(amount: Dollars, meta: Meta): IO[Bar] =
       for {
-        ret <- metas put (SADT from meta)
+        ret <- metas put meta
       } yield {
         val (mi, _) = ret
         Bar(instant, amount, mi)
@@ -150,23 +157,72 @@ object mvt {
         bar    <- Stream eval mk(metas)(amount, meta)
       } yield bar
 
-    implicit def barEq: Eq[Bar] = { import auto.eq._; semi.eq }
+    implicit def barEq: Eq[Bar]     = { import auto.eq._; semi.eq }
     implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  lazy val Bars = KeyValueStore(Bar, KeyValueStore.Param.V).deriveV[Bar]
+  sealed abstract case class Zorp private (i: Int, s: String)
+
+  object Zorp extends WithFuuidKey[Zorp] {
+    def apply(i: Int, s: String): Zorp =
+      new Zorp(i, s) {}
+    implicit def zorpEq: Eq[Zorp]     = { import auto.eq._; semi.eq }
+    implicit def zorpShow: Show[Zorp] = { import auto.show._; semi.show }
+  }
+
+  lazy val Zorps = KeyValueStore(Zorp, KeyValueStore.Param.V).deriveV[Zorp]
+
+  def zorps[F[_]: Sync: ContextShift]: Result[Zorps.KeyValueStore[F]] =
+    Result safe {
+
+      import Zorp._
+
+      // implicit val lga = LabelledGeneric[Zorp]
+
+      val p = "target/bars.csv"
+
+      // implicit val llr: LabelledRead[Zorp]  = deriveLabelledRead
+      // implicit val llw: LabelledWrite[Zorp] = deriveLabelledWrite
+
+      // Get[io.chrisdavenport.fuuid.FUUID]
+
+      import CsvImplicits.{ fuuidGet, fuuidPut }
+
+      new impl.MemFileKeyValueStore(Zorp, Paths get p) with Zorps.KeyValueStore[F] {
+        // import V._
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+      }
+    }
+
+  lazy val BarsDTT = KeyValueStore(Bar, KeyValueStore.Param.V)
+  lazy val Bars    = BarsDTT.deriveV[Bar]
+  def bars[F[_]: Sync: ContextShift]: Result[Bars.KeyValueStore[F]] =
+    Result safe {
+
+      // implicit val lga                     = LabelledGeneric[Bar]
+
+      // implicit val llr: LabelledRead[Bar]  = deriveLabelledRead
+      // implicit val llw: LabelledWrite[Bar] = deriveLabelledWrite
+
+      ???
+      // new impl.MemFileKeyValueStore(Bar, Paths get p) with Bars.KeyValueStore[F] {
+      //   import V._
+      //   final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+      // }
+    }
+
+  // keyValueStore[IO](KeyValueStore.Param.V) at "target/bars.csv" ofKeyChained Bars
+  // want this syntax:
+  // Bar keyValueStore[IO](KeyValueStore.Param.V) at "target/bars.csv" // chained is implied
+
   // lazy val Right(foos) = keyValueStore[IO] at "target/foos.csv" ofChainAddressed Foo
-  // lazy val Right(bars) = keyValueStore[IO] at "target/bars.csv" ofChainAddressed Bar
   // lazy val Right(metas) = ???
   // valueStore[IO] at "target/metas.csv" ofContentAddressed SADT
 }
 
 object arbitraryMvt {
 
-  import keyval.{ WithSADT }
-  import model.{ Money }
-
-  import Jt8Gen._
+  // import Jt8Gen._
   import mvt._
 
   def drift[A](aa: Gen[A]): Gen[Stream[IO, A]] =
@@ -197,10 +253,9 @@ object arbitraryMvt {
       } yield Bar.mk(metas)(amount, meta)
     }
 }
-
 class KvesPropSpec extends AnyPropSpec with ScalaCheckDrivenPropertyChecks {
-  import mvt._
-  import arbitraryMvt.arbitraryBar
+  // import mvt._
+  // import arbitraryMvt.arbitraryBar
 
   property("some property") {
 

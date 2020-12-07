@@ -13,10 +13,7 @@ import eu.timepit.refined
 import refined.cats._
 import refined.numeric.Interval
 
-import io.chrisdavenport.fuuid.FUUID
-
-/**
-  * Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
+/** Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
   */
 trait Accounts { self: Ledger with ModuleTypes =>
 
@@ -24,25 +21,20 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   type Contact
 
-  /** #FIXME implement
+  /**
     */
-  implicit def contactShow: Show[Contact] = ???
+  val Contact: WithSADT[Contact]
 
   /**
     */
-  val Contact: WithId.Aux[SADT.Aux[Contact]]
+  final lazy val Contacts =
+    ValueStore(Contact, ValueStore.Param.SADT(Contact)).deriveV[SADT.Aux[Contact]]
 
-  /**
-    */
-  final lazy val Contacts = ValueStore(Contact, ValueStore.Param.V).deriveV[SADT.Aux[Contact]]
-
-  /**
-    * Predicate defining a very conventional looking account numbering scheme.
+  /** Predicate defining a very conventional looking account numbering scheme.
     */
   type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
 
-  /**
-    * `Account`s consist of:
+  /** `Account`s consist of:
     *   - a `Folio` of settled [[Ledger.Transaction]]s
     *   - a `Folio` of `Transaction`s not yet settled
     *
@@ -57,13 +49,11 @@ trait Accounts { self: Ledger with ModuleTypes =>
       expected: Folio.Key
   )
 
-  /**
-    * Accounts are modelled as long lived entities that can evolve over time.
+  /** Accounts are modelled as long lived entities that can evolve over time.
     */
   object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
 
-    /**
-      *   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
+    /**   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
       */
     protected[deftrade] def freshFolioKey = Folio.Key.random
 
@@ -94,8 +84,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   final lazy val Accounts = KeyValueStore(Account, KeyValueStore.Param.V).deriveV[Account]
 
-  /**
-    * Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
+  /** Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
     * and their crew.
     *
     * Note: [[Party]]s '''must''' be specified for each [[Role.NonPrincipal non principal role]]
@@ -145,8 +134,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   case class RosterValue(party: Party.Key, role: Role, stake: Option[Quantity])
 
-  /**
-    * Creation patterns for account management teams.
+  /** Creation patterns for account management teams.
     */
   object Roster extends WithId.Aux[RosterValue] {
 
@@ -177,7 +165,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     private[deftrade] def from(roster: Roster): NonEmptyList[Value] = {
       val ps = roster.principals.kvs.toNel map {
-        case (party, share) => RosterValue(party, Role.principal, share.value.some)
+        case (party, share) =>
+          RosterValue(party, Role.principal, share.value.some)
       }
       val nps = for {
         role  <- Role.nonPrincipals
@@ -198,8 +187,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
         }
       )
 
-    /**
-      * By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
+    /** By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
       * regardless of their share of the principle pie.
       */
     def fromPrinciples(principals: UnitPartition[Party.Key, Quantity]): Roster =
@@ -210,8 +198,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def single(entity: Party.Key): Roster =
       fromPrinciples(principals = UnitPartition single entity)
 
-    /**
-      * Splits partition equally among [[Role.Principal]]s.
+    /** Splits partition equally among [[Role.Principal]]s.
       */
     def equalSplitFrom(ps: Party.Key*): Result[Roster] =
       for {
@@ -232,22 +219,20 @@ trait Accounts { self: Ledger with ModuleTypes =>
     ValueStore(Roster, ValueStore.Param.Aux(Roster.from, Roster.to))
       .deriveV[RosterValue]
 
-  /**
-    * Models financial market participants.
+  /** Models financial market participants.
     *
     * Presumed real world actors under the aegis of, and registered with, real world
     * juristictions.
     *
     * Small step towards privacy by design: `Tax.No`'s are not used as `Key`s.
     */
-  sealed trait Party {
+  sealed abstract class Party {
     def name: Label
     def taxNo: Tax.No
     def contact: Contact.Id
   }
 
-  /**
-    * Players that are recognized by the system (ours).
+  /** Players that are recognized by the system (ours).
     */
   object Party extends WithFuuidKey[Party] {
 
@@ -263,8 +248,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
   }
 
-  /**
-    * `NaturalPerson`s are `Party`s.
+  /** `NaturalPerson`s are `Party`s.
     */
   sealed abstract case class NaturalPerson(
       name: Label,

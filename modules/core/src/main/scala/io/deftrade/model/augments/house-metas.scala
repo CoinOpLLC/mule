@@ -15,15 +15,21 @@ import refined.cats._
 import io.circe.{ Decoder, Encoder };
 import io.circe.refined._
 
-/**
-  * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
+/** House defaults.
   */
 trait DefaultMetas { self: ModuleTypes with Ledger =>
 
+  /** Root is unconstrained, enables disjunctive evolution.
+    */
   sealed abstract class Meta
 
-  /** TODO: evolve to something less trival */
-  final case class Memo(memo: Label) extends Meta
+  /** TODO: evolve to something less trival
+    */
+  sealed abstract case class Memo private (memo: Label) extends Meta
+
+  /**
+    */
+  object Memo { def apply(memo: Label): Memo = new Memo(memo) {} }
 
   implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
   implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
