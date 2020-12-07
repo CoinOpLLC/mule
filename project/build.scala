@@ -14,7 +14,7 @@ object Version {
 
   val Spire     = "0.17.0"
   val Shapeless = "2.3.3"
-  val Refined   = "0.9.18"
+  val Refined   = "0.9.14"
 
   val Enumeratum = "1.6.1"
   val Fuiid      = "0.3.0"
