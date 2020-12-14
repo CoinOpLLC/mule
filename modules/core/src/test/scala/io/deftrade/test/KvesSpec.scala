@@ -21,13 +21,9 @@ import refined.auto._
 
 import fs2.{ Stream }
 
-import shapeless.{ HList, LabelledGeneric, Lazy }
-
 import io.chrisdavenport.cormorant
-import cormorant._
-// import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 import cormorant.generic.semiauto._
-// import cormorant.parser._
+import cormorant.refined._
 import cormorant.implicits._
 
 import io.chrisdavenport.fuuid
@@ -66,7 +62,7 @@ object mvt {
     */
   object Foo extends WithRefinedKey[String, IsLabel, Foo] {
 
-    implicit def fooEq: Eq[Foo]     = { import auto.eq._; semi.eq }
+    implicit def fooEq: Eq[Foo] = { import auto.eq._; semi.eq }
     implicit def fooShow: Show[Foo] = { import auto.show._; semi.show }
 
     /**
@@ -124,9 +120,26 @@ object mvt {
 
   lazy val Foos = KeyValueStore(Foo, KeyValueStore.Param.V).deriveV[Foo]
 
+  def foos[F[_]: Sync: ContextShift]: Result[Foos.KeyValueStore[F]] =
+    Result safe {
+
+      import Foo._
+      import CsvImplicits._
+
+      val p = "target/foos.csv"
+
+      new impl.MemFileKeyValueStore(Foo, Paths get p) with Foos.KeyValueStore[F] {
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+      }
+    }
+
   /**
     */
-  sealed abstract case class Bar private (z: Instant, amount: Dollars, mi: Meta.Id)
+  sealed abstract case class Bar private (
+      z: Instant,
+      amount: Dollars,
+      mi: Meta.Id
+  )
 
   /**
     */
@@ -157,16 +170,45 @@ object mvt {
         bar    <- Stream eval mk(metas)(amount, meta)
       } yield bar
 
-    implicit def barEq: Eq[Bar]     = { import auto.eq._; semi.eq }
+    implicit def barEq: Eq[Bar] = { import auto.eq._; semi.eq }
     implicit def barShow: Show[Bar] = { import auto.show._; semi.show }
   }
 
-  sealed abstract case class Zorp private (i: Int, s: String)
+  lazy val Bars = KeyValueStore(Bar, KeyValueStore.Param.V).deriveV[Bar]
+
+  def bars[F[_]: Sync: ContextShift]: Result[Bars.KeyValueStore[F]] =
+    Result safe {
+
+      import Bar._
+      import CsvImplicits._
+
+      val p = "target/bars.csv"
+
+      new impl.MemFileKeyValueStore(Bar, Paths get p) with Bars.KeyValueStore[F] {
+        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+      }
+    }
+
+  sealed abstract case class Zorp private (
+      z: Instant,
+      a: Dollars,
+      i: Int,
+      s: String,
+      m: Meta.Id
+  )
+  // sealed abstract case class Zorp private (a: Meta.Id, i: Int, s: String, z: Instant)
 
   object Zorp extends WithFuuidKey[Zorp] {
-    def apply(i: Int, s: String): Zorp =
-      new Zorp(i, s) {}
-    implicit def zorpEq: Eq[Zorp]     = { import auto.eq._; semi.eq }
+    def apply(
+        z: Instant,
+        a: Dollars,
+        i: Int,
+        s: String,
+        m: Meta.Id
+    ): Zorp =
+      new Zorp(z, a, i, s, m) {}
+
+    implicit def zorpEq: Eq[Zorp] = { import auto.eq._; semi.eq }
     implicit def zorpShow: Show[Zorp] = { import auto.show._; semi.show }
   }
 
@@ -176,39 +218,14 @@ object mvt {
     Result safe {
 
       import Zorp._
+      import CsvImplicits._ // { fuuidGet, fuuidPut, moneyGet, moneyPut }
 
-      // implicit val lga = LabelledGeneric[Zorp]
-
-      val p = "target/bars.csv"
-
-      // implicit val llr: LabelledRead[Zorp]  = deriveLabelledRead
-      // implicit val llw: LabelledWrite[Zorp] = deriveLabelledWrite
-
-      // Get[io.chrisdavenport.fuuid.FUUID]
-
-      import CsvImplicits.{ fuuidGet, fuuidPut }
+      val p = "target/zorps.csv"
 
       new impl.MemFileKeyValueStore(Zorp, Paths get p) with Zorps.KeyValueStore[F] {
         // import V._
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
       }
-    }
-
-  lazy val BarsDTT = KeyValueStore(Bar, KeyValueStore.Param.V)
-  lazy val Bars    = BarsDTT.deriveV[Bar]
-  def bars[F[_]: Sync: ContextShift]: Result[Bars.KeyValueStore[F]] =
-    Result safe {
-
-      // implicit val lga                     = LabelledGeneric[Bar]
-
-      // implicit val llr: LabelledRead[Bar]  = deriveLabelledRead
-      // implicit val llw: LabelledWrite[Bar] = deriveLabelledWrite
-
-      ???
-      // new impl.MemFileKeyValueStore(Bar, Paths get p) with Bars.KeyValueStore[F] {
-      //   import V._
-      //   final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-      // }
     }
 
   // keyValueStore[IO](KeyValueStore.Param.V) at "target/bars.csv" ofKeyChained Bars
