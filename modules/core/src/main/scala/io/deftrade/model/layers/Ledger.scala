@@ -163,7 +163,7 @@ trait Ledger { module: ModuleTypes =>
     object Book
   }
 
-  /** This object serves as the root of a dependent type tree.
+  /** This object serves as the root of a dependent type tree for `ledger entries`.
     */
   object Entry {
 
@@ -174,28 +174,11 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     type Value = Quantity
-  }
-
-  /** Generic `ledger entry`.
-    * Any kind of `ledger entry` must carry with it a `key`:
-    * `value`s are '''fungeable''' ''within'' `key`s, but not ''across'' them.
-    */
-  type Entry = (Entry.Key, Entry.Value)
-
-  /** How much of a given [[capital.Instrument]] is held.
-    *
-    * Can also be thought of as a [[Trade]] [[Leg]] at rest.
-    */
-  type Position = Entry
-
-  /**
-    */
-  object Position {
 
     /** Enables volume discounts or other quantity-specific pricing. */
     sealed abstract case class Pricer[F[_], C: Currency] private (
-        final override val price: Position => Stream[F, Money[C]]
-    ) extends module.Pricer.Aux[F, Position, C](price)
+        final override val price: Entry => Stream[F, Money[C]]
+    ) extends module.Pricer.Aux[F, Entry, C](price)
 
     /**
       */
@@ -207,32 +190,49 @@ trait Ledger { module: ModuleTypes =>
 
       /**
         */
-      def instance[F[_], C: Currency](price: Position => Stream[F, Money[C]]): Pricer[F, C] =
+      def instance[F[_], C: Currency](price: Entry => Stream[F, Money[C]]): Pricer[F, C] =
         new Pricer(price) {}
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance {
-          case (instrument, quantity) =>
-            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance { case (instrument, quantity) =>
+          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
 
-  /** A [[Position]] in motion.
+  /** Generic `ledger entry`.
+    * Any kind of `ledger entry` must carry with it a `key`:
+    * `value`s are '''fungeable''' ''within'' `key`s, but not ''across'' them.
+    */
+  type Entry = (Entry.Key, Entry.Value)
+
+  /** How much of a given [[capital.Instrument]] is held.
+    *
+    * Can also be thought of as a [[Trade]] [[Leg]] at rest.
+    *
+    * Note, this is just a type alias.
+    */
+  type Position = Entry
+
+  /**
+    */
+  final lazy val Position = Entry
+
+  /** A [[Entry]] in motion.
+    *
+    * Note, this is just a type alias.
     */
   type Leg = Entry
 
   /**
     */
-  lazy val Leg = Position
+  final lazy val Leg = Entry
 
   /** A set of (open) [[Position]]s.
     *
     * A `Folio` can be thought of as a "flat" portfolio",
     * i.e. a portfolio without sub portfolios.
-    *
-    * A `Folio` can also be thought of as a "sheet" in a spreadsheet.
     */
   type Folio = Map[Entry.Key, Entry.Value]
 
@@ -552,12 +552,11 @@ trait Ledger { module: ModuleTypes =>
       payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
   )(
       drawOn: Folio.Key
-  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
-    case (trade, amount) =>
-      for {
-        idb <- trades put trade
-        _   <- payCash(drawOn)(amount)
-      } yield Result(idb._1.some)
+  ): (Trade, Money[C]) => F[Result[Trade.Id]] = { case (trade, amount) =>
+    for {
+      idb <- trades put trade
+      _   <- payCash(drawOn)(amount)
+    } yield Result(idb._1.some)
   }
 
   /** wip
