@@ -37,17 +37,6 @@ import keys.{ IsIsin, IsUsin }
 
 /**
   * Models a tradeable thing.
-  *
-  * Everything is a `Contract` for (mostly future) ([[contracts.Numéraire.InCoin money]])
-  * ''except'' for the following categories of([[contracts.Numéraire.InKind pure stuff]]):
-  *   - `Contract`s for equity (e.g shares of common stock)
-  *   - `Contract`s for physical delivery of commodities (e.g. tanks of propane)
-  *   - `Contract`s for real property (e.g. CRE assets)
-  *
-  * TODO:
-  *   - specify the unified symbology behind `symbol`
-  *   - factories for custom `Instruments` (e.g. `SAFEnote`)
-  *   - `FpML` ingestion
   */
 final case class Instrument(
     symbol: Label,
@@ -73,7 +62,7 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
 }
 
 /**
-  * Abstract Data Type (ADT) representing [[contracts.Contract]] parameters and state.
+  * Represents [[contracts.Contract]] parameters and state.
   *
   * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
   *
@@ -98,19 +87,6 @@ sealed abstract class Form extends Product with Serializable {
 
 /**
   * Instances of `Form` memorialize the state of a `Contract` at a given point in time.
-  * (E.g.: the principle and interest balances in a term loan amortization schedule.)
-  * Therefore, a `Form` instance, associated with a given `Instrument`, will evolve over time.
-  * The key value store captures that evolution.
-  *
-  * How many evolutions per Instrument key is it reasonable to expect?
-  * Dozens (e.g. monthly) not billions (e.g. every millisecond).
-  * As an extreme example, the "trace" of bespoke structured product, quoted every
-  * fifteen minutes for ten years, would run to about sixty thosand entries. This might be fine.
-  *
-  * Other examples:
-  * - interest or dividend payment
-  * - optionality exercise
-  * - price fixings
   */
 object Form extends WithKey.Aux[Instrument.Key, Form] { lazy val Key = Instrument.Key }
 
@@ -424,29 +400,6 @@ object forms
 /**
   * Links which model `Instrument` lifecycle transformation acts
   * (such as M&A actions) as events connecting `Instrument.Key`s.
-  *
-  * Motivation:
-  *
-  * An (immutable) instrument in a [[model.layers.Ledger.Position]] can hide an extensive
-  * history: What if in 1990 you had 3 separate investments in DEC, COMPAQ, and HP stock...
-  * and then this happens:
-  * {{{
-  *         HP ->  HPQ
-  *                 ^
-  *                 ^
-  *  DEC -> COMPAQ -+
-  * }}}
-  * you end up with one investment in HPQ!
-  *
-  * - You will need to be able to walk the graph back in time.
-  * - `Novation`s are the link relations that connect [[Instrument]]s in that graph.
-  *
-  * TODO: `Provenance` factorization
-  *
-  * TODO: `Novation`s can represent `Contract`:
-  * - Issuance
-  * - Assignment
-  * - Termination
   */
 final case class Novation(
     ante: Option[Instrument.Key],
@@ -459,11 +412,6 @@ final case class Novation(
 
 /**
   * A `Novation.Id` makes an effective M&A ''receipt''.
-  *
-  * There can be more than one leg in an M&A transaction:
-  * - store a `List[Novation]` (or ideally a `NonEmptySet`)
-  * - all `List` elements (legs) will get the same `Id`.
-  * - thus the ''receipt'' is common to all the legs that make up the transaction.
   */
 object Novation extends WithId.Aux[Novation] {
 

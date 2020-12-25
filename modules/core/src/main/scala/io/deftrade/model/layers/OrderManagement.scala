@@ -54,10 +54,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     * The methods on `OMS` return [[cats.data.Kleisli]] arrows, which are intended to be chained with
     * `andThen`.
     *
-    * Reference:
-    * [[https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270
-    *    Functional and Reactive Domain Modelling, section 4.4]]
-    *
     * TODO: Revisit [[cats.data.Kleisli]] usage
     *   - Why not [[fs2.Pipe]]?
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
@@ -75,11 +71,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /**
       * What it is that the client wants [[Execution]] of.
-      *
-      * Note: a denominating currency is always required by the [[MarketData.Exchange]]s,
-      * in order to fully specify the trade, even if there is no limit amount attached.
-      *
-      * TODO: revisit parent/child orders
       */
     sealed abstract case class Order private (
         at: Instant,
@@ -91,8 +82,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     )
 
     /**
-      * Once placed, an [[Order]] may be modified or canceled,
-      * and so is modeled as an `entity` which can evolve over time.
       */
     object Order extends WithOpaqueKey[Long, Order] {
 
@@ -111,10 +100,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /**
       * What actually happened to the [[Order]] at the [[Market]].
       *
-      * Multiple partial executions reference the same `Order`
-      * and end up as multiple [[Transaction]]s.
-      *
-      * FIXME: is this where we signal [[Order]] cancellation? How?
+      * FIXME: canceled order signals are TBD.
       */
     sealed abstract case class Execution(
         at: Instant,
@@ -164,10 +150,6 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
   object OMS extends WithRefinedKey[String, IsLabel, OMSrecord] {
 
     /**
-      * Each OMS must maintain a contra [[Ledger.Folio.Key]].
-      * The creation of this account (and its [[Ledger.Folio.Key]]) must occur
-      * before the OMS is created.
-      *
       * TODO: evole
       */
     def mk[F[_]: Sync](

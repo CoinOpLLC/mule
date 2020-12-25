@@ -25,28 +25,15 @@ import cats.data.{ NonEmptyList, NonEmptyMap }
 import cats.kernel.CommutativeGroup
 
 /**
-  * StreamF[Record] and computations defining a layered set of financial domain models and services.
-  *
-  * This package object is where the policy decision to choose generic tax accounting
-  * for entities treated as partnerships.
-  * Different objects, package or otherwise, could make different policy decisions.
-  *
-  * Also, here is where we bind [[layers.ModuleTypes.MonetaryAmount]] (and thus [[money.Mny]])
-  * to [[scala.math.BigDecimal]],
-  * while other [[layers.ModuleTypes.Quantity]]s bind to [[scala.Double]].
-  *
-  * This generic model package serves up the full stack of [[layers]].
+  * Records and computations defining a layered set of financial domain models and services.
   */
 package object model
-/*
-  All layers and augments need to agree on certain types:
-     */
     extends ModuleTypes.Aux[
       /* type MonetaryAmount = */ BigDecimal,
       /* type Quantity       = */ Double
     ]
     //
-    // the full stack of layered capabilitities
+    // the full stack of layered capabilities
     //
     with Ledger          // possibly distributed
     with Accounting      // debits, credits, and all that

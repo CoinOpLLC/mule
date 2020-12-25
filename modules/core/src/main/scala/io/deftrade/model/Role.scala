@@ -42,15 +42,6 @@ object Role extends DtEnum[Role] {
   /**
     * That [[Party]] which is the market participant
     * responsible for establishing the [[layers.Accounts.Account]].
-    *
-    * Semantics for `Principal` are conditioned on the status of account, for examples:
-    * - beneficial owner for an asset
-    * - responsible party for a liability
-    * - shareholder for equity
-    * - business unit chief for revenue and expenses
-    *
-    * `Principal`s have authority to add or remove [[Agent]]s.
-    *  A `Princple` is their own `Agent` unless otherwise specified.
     */
   case object Principal extends Principal {
 
@@ -75,7 +66,7 @@ object Role extends DtEnum[Role] {
   object NonPrincipal {
 
     /**
-      * A test for all `Role`s ''other than'' `Princple`.
+      * Extractor for all `Role`s ''other than'' `Princple`.
       */
     def unapply(role: Role): Option[NonPrincipal] =
       role match {
@@ -86,37 +77,16 @@ object Role extends DtEnum[Role] {
 
   /**
     * The primary delegate selected by a `Principal`.
-    *
-    * `Agents` have authortity to add or remove [[Manager]]s.
-    * An `Agent` is their own `Manager` unless otherwise specified.
     */
   case object Agent extends NonPrincipal
 
   /**
     * The primary delegate selected by the `Agent`.
-    * `Party`(s) with responsibility for, and authority over,
-    * the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions
-    * which will result in `Transaction`s settling to the `Account`.
     */
   case object Manager extends NonPrincipal
 
   /**
     * `Auditor`s are first class participants, with a package of rights and responsibilities.
-    *
-    * There are a finite enumeration of [[Role]]s.
-    * Every `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]]
-    * which is situation and juristiction specific.
-    *
-    * Practically, what this means is that `Auditor`s will have a (possibly limited) view
-    * into the state of the `Ledger`,
-    * and (possibly) the ability to block the settlement of `Transaction`s to the `Ledger`
-    * or even intitiate `Transaction`s.
-    *
-    * Actions of the `Auditor` may include the publishing of specific summaries of its views
-    * into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
-    *
-    * N.B.: the `Auditor` need not be a regulatory entity; in particular this role might
-    * be suited eg to a Risk Manager, operating in the context of a hedge fund.
     */
   case object Auditor extends NonPrincipal
 

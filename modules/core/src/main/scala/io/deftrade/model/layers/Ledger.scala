@@ -66,18 +66,9 @@ trait Ledger { module: ModuleTypes =>
     implicit val C: Currency[CurrencyTag]
   }
 
-  /** TODO: The different kinds of `Pricer`, listed in order of abstraction (most to least):
+  /** TODO: The different kinds of `Pricer`, listed in order of abstraction (most to least),
+    * Model / Market / Book / Cfg.
     *
-    *   - `Model`: reports a ''fair value'' modelled price
-    *     - may depend on `market data` for callibration
-    *     - therefore limited by accuracy (in practice)
-    *   - `Market`: reports the current ''mark to market'' price
-    *     - may depend on a `model` for interpolation to thinly traded / untraded assets...
-    *     - therefore extensible to all assets (theoretically)
-    *   - `Book`: the price we paid for the asset
-    *     - only covers the assets we own(ed).
-    *     - captured from our `Transaction` stream.
-    *   - `Cfg`: just load the pricing data from a config file (or .csv file).
     */
   object Pricer {
 
@@ -195,8 +186,9 @@ trait Ledger { module: ModuleTypes =>
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance { case (instrument, quantity) =>
-          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance {
+          case (instrument, quantity) =>
+            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
@@ -347,16 +339,6 @@ trait Ledger { module: ModuleTypes =>
   final lazy val Metas = ValueStore(Meta, ValueStore.Param.SADT(Meta)).deriveV[SADT.Aux[Meta]]
 
   /** The concrete record for `Ledger` updates.
-    *
-    * Do we mean `Transaction` in the ''business'' sense, or the ''computer science'' sense?
-    * '''Yes''': both parties must agree upon the result, under all semantics for the term.
-    *
-    * The exact semantics will depend on the higher level context: a `Transaction`
-    * memorializing a booked `Trade` will spawn a cascade of `Transaction`s (and [[Confirmation]]s)
-    * as that `Transaction` is settled.
-    *
-    * Note: there is no currency field; cash payments are reified in currency-as-instrument.
-    * Store the '''cryptographic hash''' of whatever metadata there is.
     */
   sealed abstract case class Transaction private (
       at: Instant,
@@ -426,39 +408,7 @@ trait Ledger { module: ModuleTypes =>
     */
   final lazy val Transactions = ValueStore(Transaction, ValueStore.Param.V).deriveV[Transaction]
 
-  /** Realize that `Folio { type UpdatedEvent = Id }`.
-    *
-    * A trail (`Stream`) of `Confirmations` is low-touch auditable.
-    *
-    * Nota Bene: the `Transaction.Id` is chained into the `Confirmation.Id`s that go into the
-    * settlement computation.
-    *
-    * Q: How do we settle a `Trade`?
-    *     - the net effect must be to transfer the `Trade` between `Folio`s.
-    *
-    * A: Use two fibers (per `Trade`)
-    *     - one side (fiber) does:
-    *         - `expect.n = trade.n |> diodePos` // the thing being traded, typically
-    *         - `escrow.n = trade.n |> diodeNeg` // the payment, typically
-    *         - workflow option one:
-    *             - "manual" payment transfer
-    *             - `fiber.wait(escrow.n === empty)` // reactive
-    *         - workflow option two
-    *             - assumes programmatic transfer capability for assets! (USD typically)
-    *             - `open += escrow.n              ` // proactive
-    *             - `escrow.n = empty`
-    *     - other side (fiber) does:
-    *         - same, except for `Trade` * -1
-    *     - join on both fibers (''now'' `trade.n` can be settled)
-    *     - both sides:
-    *         - `open += expect.n`
-    *         - `expect.n = empty`
-    *     - ''nota bene''
-    *         - no `Folio.Key`s need be exchanged at all
-    *             - `join` does all the work
-    *         - both `expect` and `escrow` are left empty in a successful settlement
-    *             - eliminated on snapshot
-    *
+  /** Note that [[Folio.Id]] is actually an `update event` for the specified [[Folio.Key]].
     * TODO: get this to work across nodes in a cluster
     */
   sealed abstract case class Confirmation private (at: Instant, from: Folio.Id, to: Folio.Id)
@@ -516,35 +466,7 @@ trait Ledger { module: ModuleTypes =>
   final lazy val Confirmations =
     KeyValueStore(Confirmation, KeyValueStore.Param.V).deriveV[Confirmation]
 
-  /** '''Cash''' is:
-    *   - ''fungable''
-    *   - ''self-pricing''
-    *
-    *   - a bank account is a kind of [[capital.Instrument]]
-    *   - we know ''our'' cash `instrument` details (e.g. `USD` bank accounts).
-    *       - must track quantity (`balance`) per such `instrument` of ours
-    *       - don't want to have to need to know `instrument` details of the other party
-    *   - the [[capital.Instrument.Key key]] is a `String Refined `[[capital.keys.IsUsBan]]
-    *   - a `Folio` can contain a number of such `instrument`s and associated quantities
-    *     (bank balances)
-    *   - `instrument.symbol === currency.code` for ''all'' `cash instrument`s
-    *   - the `Trade`s recorded in the `Transaction` log do ''not'' record `cash instrument`
-    *     details but instead
-    *     deal in '''reified''' `cash instrument`s
-    *         - with [[capital.Instrument.Key]]s constucted
-    *     by taking the [[money.CurrencyLike.code three letter currency code]]
-    *     as the '''exact''' `Instrument.Key`
-    *   - The allocation of cash from/to each account is recorded in
-    *     the [[keyval.KeyValueStore]] for `Folio`s.
-    *
-    *   - creates a complete (balanced), ''paid'' `Trade` with the `reified cash instrument`
-    *   - records that `Trade` in its store and returns the id, which is ready-to-use in
-    *     creating a [[Transaction]].
-    *   - NOTE: it is up to the payCash function to effectfully subtract the amount
-    *     from the cash position
-    *   - TODO: ensure the `payCash` update is atomic (should return zero or one `Folio.Id`)
-    *
-    *   @return `Stream` effect will effectively subtract amount from the `against` folio
+  /** '''Cash''' is ''fungable''and ''self-pricing''.
     */
   final def payment[F[_]: Sync, C: Currency](
       trades: Trades.ValueStore[F]
@@ -552,11 +474,12 @@ trait Ledger { module: ModuleTypes =>
       payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
   )(
       drawOn: Folio.Key
-  ): (Trade, Money[C]) => F[Result[Trade.Id]] = { case (trade, amount) =>
-    for {
-      idb <- trades put trade
-      _   <- payCash(drawOn)(amount)
-    } yield Result(idb._1.some)
+  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
+    case (trade, amount) =>
+      for {
+        idb <- trades put trade
+        _   <- payCash(drawOn)(amount)
+      } yield Result(idb._1.some)
   }
 
   /** wip

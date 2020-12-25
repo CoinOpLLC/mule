@@ -18,29 +18,13 @@ package io
 
 /**
   * Foundational toolkit for applications serving '''financial market participants'''.
-  *
-  * This toolkit provides the necessary types and methods to specify
-  * `Abstract Algebraic Domain Model`s
-  *   - `Abstract` because models are mapped to multiple materialized types
-  * via ''natural transformations'' (i.e. multiple interpreters for the same language).
-  *   - `Algebraic` because models are formally composable
-  *   - `Domain Model`s because the abstract algebra aspires to be '''legible''' to
-  * the afformentioned ''financial market participants''.
-  *
-  * What financial market participants?
-  *
-  *   - Initial scope: small private equity funds, small hedge funds, family offices, RIAs,
-  *   loan funds, real estate funds, ad-hoc seed venture funds, etc.
-  *
-  *   - Potential scope: banks, credit unions, CDFIs, broker/dealers, crypto exchanges,
-  * and other actors with additional operational and regulatory requirements.
   */
 package object deftrade extends deftrade.results.mixin {
 
   /**
-    * Informs wart remover that the value is intentionally discarded.
+    * Informs wart remover (and code reviewers) that the value is intentionally discarded.
     *
-    * Useful for checking whether a thing compiles at all. Hard to miss on a code review.
+    * Useful for checking whether a thing compiles at all.
     */
   val discardValue: Any => Unit = (_: Any) => ()
 }

@@ -9,15 +9,10 @@ import cats.implicits._
 /**
   * In what do we price things?
   *
-  * `Numéraire` is formal finance term which, contrary to what a naive anglophone might think,
-  * signifies the ''denominator'' for contracts and transactions.
   */
 sealed trait Numéraire
 
 /**
-  * There are exactly two ways we can settle the bill...
-  *
-  * ... this (top level) is where we declare the policy decisions about what those ways are.
   */
 object Numéraire {
 

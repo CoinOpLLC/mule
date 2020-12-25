@@ -207,7 +207,7 @@ object Engine {
       final def next: DiscreteTime = series at step + 1
     }
 
-    /** FIXME: star me kitten */
+    /** FIXME: implement */
     object DiscreteTime {
 
       /** */
@@ -458,10 +458,6 @@ object Engine {
   /**
     * Manual `Contract` performance workflow scheduling.
     *
-    * Produces calendar schedules of actions for humans to follow up on:
-    *   - make and expect payments, exercise options, etc.
-    *   - uses automation tools as integrations become available
-    *
     * FIXME: do something impressive
     */
   sealed abstract case class Scheduling() extends Engine {
@@ -478,12 +474,6 @@ object Engine {
 
   /**
     * Automated `Contract` performance.
-    *
-    * An `Engine` predicated on the idea that the
-    * difference between "workflow automation" and "smart contract execution"
-    * is a matter of degree and perspective.
-    *
-    * And counterparty platform integration. (And that.)
     *
     * FIXME: do something basic
     */

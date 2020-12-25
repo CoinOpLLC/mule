@@ -20,57 +20,8 @@ import eu.timepit.refined
 import refined.api.Refined
 
 /**
-  * Derived types and implicit methods for the persistence and caching of
-  * domain value types (typically case classes),
-  * with complementary key value store algebras and implementations.
-  *
-  * Defines a
-  * [[https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration]]
-  * system for `id`s and `key`s:
-  *   - `Id`: SHA type
-  *       - computed via `sha(Row)`,
-  *       - immutable representation
-  *       - content addressed or chained
-  *   - `Key`: identifier types
-  *       - domain legible (e.g. `AccountNo`)
-  *       - opaque (e.g. `UUID`s)
-  *   - Both `Id` and `Key` have `Order`, and `Show` typeclass instances
-  *   - `Value`:
-  *       - value class
-  *       - typeclass instances for `Eq`, and `Show`.
-  *       - Map methods enabled when `Value <~< (K2: Order, V2: Eq)`
-  *
-  * A `type Foo` may not contain instances of, nor depend upon, type `Foo.Key`.
-  *
-  * Point being: there will be no `id: Id` or `key: Key` fields within domain types!
-  * These are stored separately (e.g. `key`s in an in-memory [[scala.collection.Map]])
-  *
-  * However, foreign keys which reference other domain value types are permitted within value types.
-  *
-  * It is assumed that package clients will generally pursue
-  * [[https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault]] style modelling and use `hub`s
-  * and `link`s to define graphs of `value types` defined by `business key`s,
-  * with certain exceptions to denormalize `essential attributes`.
-  *
-  *   - Q: what goes in `value types`?
-  *   - A: `Business keys` and `essential attributes`.
-  *   - Q: What is a "business key?"
-  *   - A: "Real business keys only change when the business changes!"
-  *   - Q: What is an "essential attribute"?
-  *   - A: Some attributes are like `business keys`: necessary everywhere in the same form
-  *       - ubiquitous
-  *       - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
-  *
-  * Special treatment for `essential attribute`s.
-  *   - subject to ''tactical denormalization''
-  *       - deviates from strict Data Vault methodology
-  *       - mixes `satelite` fields in with `link` or `hub` shaped relations
-  *       - essential attributes are ubiquitous (therefore don'tadd redundancy by denormalizing)
-  *    - polymorphic fields are modelled as `SADT.Aux[ADT]`
-  *       - `ADT` := Algebraic Data Type
-  *       - [[io.circe.Json Json]] `encoder`s and `decoder`s
-  *       - which can be stored / indexed as binary in Mongo and Postgres
-  *       - which can be projected to create true `satellite` views.
+  * Key value store algebras and implementations for persistence and caching of
+  * domain value types (typically case classes).
   *
   * TODO: Postgres / Mongo / Kafka integration
   */

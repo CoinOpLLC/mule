@@ -12,16 +12,6 @@ sealed trait Contract
   * Note internally the `Contract` instances are lazy, via [[cats.Eval]].
   *
   * Implements the [[cats.Group]] typeclass instance for `Contract`.
-  *
-  * TODO: consider:
-  *   - require "consideration" in every contract representing a `Trade`
-  *       - which can be constructed after the fact if need be
-  *   - just like in the real world, there's always this:
-  *       - ''Good and valuable consideration, the receipt and sufficiency of which
-  *       is hearby acknowledged'', which looks like this in code:
-  *       - {{{ object GavcTrasowiha extends Contract /* another Zero */ }}}
-  *   - implement {{{ implicit def mc: Monoid[Contract]}}}
-  *       - rolls up a combined `Contract` for any two Counterparties.
   */
 object Contract {
 

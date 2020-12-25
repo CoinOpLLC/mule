@@ -91,24 +91,6 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     * Represents a price quote (in currency `C`) for instruments of type `A`.
-    *
-    * The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is
-    * a human-legible expression in the domain of market quotes.
-    *
-    * Return both a `bid` and an `ask` for the given instrument.
-    *
-    * Domain modelling note: `quote` does not signal intent. For example, the client may ignore
-    * the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
-    * cannot not predjudice their responses when asked for a quote, as the client reveals nothing
-    * about their intent.
-    *
-    * Instances can come from a variety of sources including live market feeds
-    *   - "Orderly market" invariant: `ask` < `bid`
-    *   - must model disorderly markets: not everything that comes at you down the wire
-    *     can be expected to "make sense"
-    *
-    * Domain consideration: `Currency` exchange depends on '''pricing''' of some kind, and one or
-    * more Market(s) determine this price.
     */
   sealed abstract class QuotedIn[A, C] private[deftrade] (
       q: (MonetaryAmount, MonetaryAmount)

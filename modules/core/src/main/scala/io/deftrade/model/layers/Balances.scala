@@ -35,26 +35,6 @@ import refined.auto._
 
 /**
   * Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
-  *
-  * When summing Transactions, this module slice implements the algebra which
-  * maintains all the accounting identities.
-  *
-  * These are the terms and identities as '''we''' use them:
-  *
-  * {{{
-  *     Debits := Assets + Expenses                  // accounting definition
-  *     Credits := Liability + Revenue               // accounting definition
-  *     Debits === Credits                           // accounting identity
-  *     Assets === Liabilities                       // balance sheet identity
-  *     Assets + Expenses === Liabilities + Revenue  // substituting
-  *     Income := Revenue net Expenses               // the "bottom line"
-  *     Liabilities := Debt + Equity                 // always one or the other
-  *     RetainedEarnings = Income net Distributions  // business keeps what partners don't take
-  *     Equity :=                                    // total value of partners' stakes
-  *       ShareCapital                               // total raised across all rounds
-  *     + Reserves                                   // you never know
-  *     + RetainedEarnings                           // add to book value of partners' equity
-  * }}}
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
@@ -130,12 +110,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    * There are exactly two transformations of a `TrialBalance`
-    * and an `amount: Money[C]` which result in another legal `TrialBalance`:
-    *   - grow (shrink) balance by amount
-    *   - constant balance; swap amount between keys within debits (credits)
-    *
-    * These are broken out into separate methods: TODO: consider unfying.
     */
   sealed abstract case class TrialBalance[C] private (
       override val debits: Debits[C],
@@ -213,11 +187,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         period: Period,
         cratchit: Transaction => Stream[F, DoubleEntryKey]
     ): Pipe[F, Transaction, TrialBalance[C]] =
-      // extract the price from the Transaction
       //  TODO: how to guarantee this can be done in the general case
-      // create a DoubleEntryKey for it (depends on price - think about waterfall impl)
-      // create a TrialBalance from the price and de keys
-      // fold that TrialBalance into the running sum
       ???
   }
 
@@ -247,10 +217,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    * Follow the `Money`:
-    * - Operations
-    * - Investment
-    * - Financing
     */
   sealed trait CashFlowStatement extends Balance {
     def outflows: Debits[CurrencyTag]
@@ -309,26 +275,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 
   /**
-    * Should really be called
-    *    [[https://en.wikipedia.org/wiki/Statement_of_changes_in_equity
-    * Statement of Changes in Equity]],
-    * but that is judged insufficienty consise and regular.
-    *
-    * Since there is no other equity stament, this naming causes no confusion.
-    *
-    * Nota Bene the (arithmetic) indifference of the equity holder to equity
-    * transactions at market price: their book value is unaffected by such
-    * transactions.
-    *
-    * Change in Equity value: `Credits net Debits`, as usual for a [[Balance]]
-    *
-    *   - Debits
-    *       - Dividends paid (per share)
-    *       - Share buy-backs (premium over book value per share)
-    *
-    *   - Credits
-    *       - Shares issued (premium over book value per share)
-    *       - Comprehensive Income (per share)
+    * Often formally known as Statement of Changes in Equity.
     */
   sealed trait EquityStatement extends Balance
 

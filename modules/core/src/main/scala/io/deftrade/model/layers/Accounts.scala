@@ -30,17 +30,11 @@ trait Accounts { self: Ledger with ModuleTypes =>
   final lazy val Contacts =
     ValueStore(Contact, ValueStore.Param.SADT(Contact)).deriveV[SADT.Aux[Contact]]
 
-  /** Predicate defining a very conventional looking account numbering scheme.
+  /**
     */
   type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
 
-  /** `Account`s consist of:
-    *   - a `Folio` of settled [[Ledger.Transaction]]s
-    *   - a `Folio` of `Transaction`s not yet settled
-    *
-    *  A [[Roster]] - specifies a mapping of [[Party]]s to [[Role]]s,
-    * and who are the beneficial owners - is linked to the
-    * `Account` via its own table, indexed by the [[Account.Key]].
+  /** `Accounts` link the personal information of the account holders with the financial data of the ledgers.
     */
   sealed abstract case class Account(
       roster: Roster.Id,
@@ -84,10 +78,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   final lazy val Accounts = KeyValueStore(Account, KeyValueStore.Param.V).deriveV[Account]
 
-  /** Each [[Account]] is created with a [[Roster]], specifying the beneficial owners
-    * and their crew.
-    *
-    * Note: [[Party]]s '''must''' be specified for each [[Role.NonPrincipal non principal role]]
+  /** Each [[Account]] is created with a [[Roster]].
     */
   sealed abstract case class Roster private (
       principals: UnitPartition[Party.Key, Quantity],
@@ -220,11 +211,6 @@ trait Accounts { self: Ledger with ModuleTypes =>
       .deriveV[RosterValue]
 
   /** Models financial market participants.
-    *
-    * Presumed real world actors under the aegis of, and registered with, real world
-    * juristictions.
-    *
-    * Small step towards privacy by design: `Tax.No`'s are not used as `Key`s.
     */
   sealed abstract class Party {
     def name: Label

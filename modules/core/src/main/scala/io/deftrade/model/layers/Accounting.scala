@@ -172,35 +172,16 @@ trait Accounting { self: ModuleTypes =>
     def empty[K <: AccountingKey, C: Currency]: AccountingMap[K, C] = Map.empty
   }
 
-  /**
-    */
-  final type Debits[C] = AccountingMap[Debit, C]
-
-  /**
-    */
+  final type Debits[C]  = AccountingMap[Debit, C]
   final type Credits[C] = AccountingMap[Credit, C]
 
-  /** [[BalanceSheet]] assets */
-  final type Assets[C] = AccountingMap[Asset, C]
-
-  /** [[BalanceSheet]] liabilities */
-  final type Liabilities[C] = AccountingMap[Liability, C]
-
-  /** Assets net of Liabilities */
-  final type Equities[C] = AccountingMap[Equity, C]
-
-  /** "Top line" */
-  final type Revenues[C] = AccountingMap[Revenue, C]
-
-  /**
-    */
-  final type Expenses[C] = AccountingMap[Expense, C]
-
-  /** Revenues net of Expenses */
-  final type Incomes[C] = AccountingMap[Income, C]
-
-  /** TODO: Name needs work. */
-  final type Cashes[C] = AccountingMap[Cash, C]
+  final type Assets[C]      = AccountingMap[Asset, C]     // per BalanceSheet
+  final type Liabilities[C] = AccountingMap[Liability, C] // per BalanceSheet
+  final type Equities[C]    = AccountingMap[Equity, C]    // Assets net of Liabilities
+  final type Revenues[C]    = AccountingMap[Revenue, C]   // top line
+  final type Expenses[C]    = AccountingMap[Expense, C]   //
+  final type Incomes[C]     = AccountingMap[Income, C]    // bottom line
+  final type Cashes[C]      = AccountingMap[Cash, C]      // TODO: name needs work
 
   /**
     */

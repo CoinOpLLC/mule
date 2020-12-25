@@ -1,17 +1,637 @@
-# `def trade:` The Book of Books
+`deftrade`: The Book of Books
+---
 
-### The Table of Tables
+This document describes `deftrade`, a foundational toolkit for composing applications that serve investment funds, asset exchanges, and other **financial market participants**.
 
-Note that the first section of tables denotes the complete record of the financial transactions and can be parsed and analyzed without reference to the entities who did the transacting.
+Developers will use `deftrade` to build systems that allow traders, market makers, deal makers, portfolio managers, and clients to operate within a universal and distributed financial bookkeeping platform.
 
-The second section of tables denotes who did the transacting, and how it was accomplished.
+Users of these applications will be able to:
 
-- Publishes: Hub
-- Links: Link
-- Attrs: Satellite
+- lead their business: code _follows_ business, and code is _isomorphic_ to (legal) paper
+- strike deals of arbitrary complexity and have the "back office" keep up automatically
+- compose new contracts and entities by combining standard contracts via a lawful algebra
+
+The toolkit lays a principled and disciplined foundation that applications can leverage for trust and security.
+
+
+Nick Wade
+CoinOp LLC
+___
+<p style="page-break-before: always">
+
+[[toc]]
+
+## Elevator FAQ
+
+**What is `deftrade`?**
+: This toolkit provides the types and methods necessary to specify financial **domain models** that are **abstract** and algebraic. We say`abstract` because models are generic across all important types, including effect types. Models are `algebraic` because they compose formally within an algebraic system, including laws which the algebra respects.
+
+**I hated algebra - why should I like algebraic domain models?**
+:  The algebraically composed `domain model` is intended to be **legible** to - and thus **directly reviewable by** - the financial market participants (domain experts) who use the applications. Removing an entire level-of-human-indirection makes the application development path both more agile and more robustness.
+
+**What kind of financial domain models?**
+: - Distributed Asset Exchanges (i.e. an OTC marketplace)
+  - Algorithmic Trading Systems (ATS)
+  - many others (can't list them all, that's the point)
+
+**Who are you calling a "financial market participant"?**
+: - _Initial scope_: small private equity funds, small hedge funds, family offices, RIAs,  loan funds, real estate funds, ad-hoc seed venture funds, etc.
+  - _Potential scope_: banks, credit unions, CDFIs, broker/dealers, OTC market makers, crypto exchanges, and other actors with additional operational and regulatory requirements.
+
+**Why should I trust my application to run on `deftrade`?**
+: - correctness of the smart contracts underwrites trust in the business process
+    - `Ricardian` contracts composed via algebraic composition with parallel legal prose.
+    - smart contracts are "just code", so all the same correctness and validation techniques apply
+    - contract properties like "deterministic" and "terminating" _provable_ within the type system
+  - domain level algebraic laws
+    - capture higher level behavior
+    - automated test generation to verify
+  - soundly typed FP simplifies refactoring for maintenance and features
+    - type safety obviates (some) low level unit testing
+    - codec functions automatically _derived_ (not "generated")
+
+**What about the Name?**
+: Buried within the order pipeline is the following code:
+  ```scala
+  /** This phase is implemented by the brokerage api integration code. */
+  def trade: Order ToStreamOf Execution = ...
+  ```
+
+Note that `deftrade` is _not_ a complete application. In particular, while the ledger is designed to be distributed, the distributed coherence mechanism is not specified. This is in keeping with the practice of some other systems such as `Corda`. Different systems with different trust/threat models will make different choices.
+
+Manual reconciliation provides an _ultima ratio_ level of flexibility and capacity for integration. Custom smart contracts coexist / inter-operate with industry standard contracts (e.g. ICE Futures) which are modeled with "dummy" contracts, with parameters that are walked through their "real world" paths via manual reconciliation, if need be.
+
+<!-- research test bed for Ricardian smart contracts -->
+<!-- `deftrade` is `corda` for hobbit capital in the real economy -->
+
+## What does it mean to "keep a set of books?"
+
+Books should be like git, or like ink on parchment: indelible, immutable, and, when signed, irrefutable.
+
+All of the properties of money itself [can be taken from bookkeeping](link).
+
+### On-ledger counterparties vs external counterparties
+
+The essential model is of an island of on-ledger parties, who are potentially each other's counterparties, and who also face an assortment of off-ledger (external) counterparties (such as external markets, via brokerage accounts).
+
+TODO: need diagram here
+
+## Contracts, their ancillary types, and instance lifecycle
+
+"Smart contracts" are not a "map of the terrain". *They are the terrain.*
+
+But in the real world, where incomplete integration modulates the ability to automate, "dummy contracts" may be used to inter-operate with externally defined and pre-existing contracts, such as publicly traded equity securities ("stocks") and rated debt securities ("bonds").
+
+In the `deftrade` toolkit, `Contract` unifies all modes of performance and analysis:
+- captures the **operational semantics** of contract performance in an embedded domain specific language (DSL) that can be reviewed by the (non-programmer!) `Party`s to the `Contract`.
+- guides workflow plan generation for manual contract execution via [Engine.Scheduling](./modules/core/target/api/io/deftrade/contracts/Engine$$Scheduling.html)
+- supports smart contract execution via [Engine.Performing](./modules/core/target/api/io/deftrade/contracts/Engine$$Performing.html)
+- provides the reference for all modes of analysis
+   - [Engine.Pricing](./modules/core/target/api/io/deftrade/contracts/Engine$$Performing.html) begins with discrete time models
+   - monte-carlo methods for path-dependent `Contract`s (later)
+   - others tbd
+
+This design was substantially inspired by [Composing Contracts]() and other works listed in the [references](#References). The distinction between InCoin and InKind
+
+### Numéraire: the units of account
+
+`Numéraire` is formal finance term which, contrary to what an understandably naive anglophone might think, signifies the **denominator** (not numerator) for `Contract`s and `transaction`s.  
+
+There are exactly two ways we can "settle the bill", so to speak: `InCoin`, and `InKind`.
+
+The application level is where we declare the policy decisions about details associated with both modes.
+
+#### InCoin: Money and Currency
+
+`Money` has the following properties of interest in this model:
+ - Money is an amount denominated in a `Currency`
+ - Money is **fungable**
+ - Money is **self-pricing** (within its denomination)
+
+So called "ready funds" such as bank account balances are a kind of `capital.Instrument`. More on those in a later section.
+
+#### InKind: other things we can receive in consideration
+
+The smart contracts that operate within the `deftrade` platform are instances of the `Contract` type.
+
+`Contract` represents a recursive, lazily evaluated Algebraic Data Types (ADTs).
+
+`Contract` _instances_ are specified using a domain specific language (DSL) embedded within scala, which enumerate a small number of primitives.
+
+`Contract` _instances_ form an algebraic `Group`:
+- the universe of contracts is closed under algebraic combination: two contacts combined are still a (possibly meaningful) contract.
+- there is an element which represents identity (the `zero: Contract`)
+- there is an inverse for each element such that when an element is combined with its inverse, the result is unity.
+
+The composite `Contract` governing an `Trade` - the quantities of instruments proposed to be exchanged in a Transaction - is precisely that algebraic combination of Contracts specified by the `Instrument`s within the `Trade`.
+
+- for each side within a `Trade`, at least one Contract must be referenced, so as to be identifiable as "consideration".
+- just like in the real world, there's always this:
+  - ''Good and valuable consideration, the receipt and sufficiency of which is hearby acknowledged'', which looks like this in code:
+    ```scala
+    object GavcTrasowiha extends Contract // == zero, of course
+    ```
+
+This is the DSL for contract specification, representation and evaluation, capturing the operational semantics of contract performance.
+
+### Observables and oracles
+
+TODO: investigate potential for DeFi integration (which seems high)
+
+### Primitives
+
+```scala
+   /** Party immediately acquires one unit of `Numéraire` from counterparty. */
+   def unitOf(base: Numéraire): Contract
+
+   /** Party acquires `c` multiplied by `n`. */
+   def scale(n: Observable[Double])(c: => Contract): Contract
+
+   /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`. */
+   def branch(b: Observable[Boolean])(cT: => Contract)(cF: => Contract): Contract
+
+   /** Party assumes role of counterparty with respect to `c`. */
+   def give(c: => Contract): Contract = new Give(later(c)) {}
+
+   /** Party will acquire c as soon as `b` is observed `true`.  */
+   def when(b: Observable[Boolean])(c: => Contract): Contract
+
+   /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
+   def until(b: Observable[Boolean])(c: => Contract): Contract
+
+   /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
+   def anytime(b: Observable[Boolean])(c: => Contract): Contract
+
+   /** Party immediately receives both `c1` and `c2`. */
+   def both(c1: => Contract, c2: => Contract): Contract
+
+   /** Party freely and immediately chooses between `c1` or `c2`. */
+   def pick(c1: => Contract, c2: => Contract): Contract
+```
+
+### Engines
+
+Use an `Engine` to `eval`uate a `Contract`s and obtain a result. That result may be **effectful**, but is not required to be.
+
+The difference between "workflow automation" and "smart contract execution" is a matter of degree, perspective, and counterparty platform integration.
+
+There are currently three kinds of `Engine`s:
+
+#### Pricing
+Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
+process which represents the distribution of possible `Contract` values a given
+number of [[Pricing.TimeSteps]] from [[t0]].
+
+#### Scheduling
+
+Produces calendar schedules of actions for humans to follow up on:
+ - make and expect payments, exercise options, etc.
+ - uses automation tools as integrations become available
+
+#### Performing
+
+Automated `Contract` performance, including the capacity to commit Transactions to the Ledger.
+
+### The graph of `InKind` issuing entities.
+
+#### Instruments
+
+Models a tradeable thing with an embedded `Contract`.
+
+Every `Instrument` embeds a `Contract` for (mostly future) `InCoin` money, _except_ for the following categories of `InKind` "pure stuff":
+ - `Contract`s for **equity** (e.g shares of common stock)
+ - `Contract`s for **real property** (e.g. commercial property leases)
+ - `Contract`s for **physical delivery of commodities** (e.g. tanks of propane)
+
+TODO:
+ - specify a unified symbology behind `symbol`
+ - factories for custom `Instruments` (e.g. `SAFEnote`)
+ - `FpML` ingestion
+
+
+#### Forms
+
+Instances of `Form` memorialize the state of a `Contract` at a given point in time. (E.g.: the principle and interest balances in a term loan amortization schedule.) Therefore, a `Form` instance, associated with a given `Instrument`, will evolve over time. The key value store captures that evolution.
+
+**Q:**  How many evolutions per Instrument key is it reasonable to expect?
+
+**A:**  Dozens (e.g. monthly) not billions (e.g. every millisecond).
+
+As an extreme example, the "trace" of bespoke structured product, quoted every
+fifteen minutes for ten years, would run to about sixty thosand entries. This might be fine.
+Other examples:
+- interest or dividend payment
+- optionality exercise
+- price fixings
+
+#### Novations
+
+Links which model `Instrument` lifecycle transformation acts (such as M&A actions) as events connecting `Instrument.Key`s.
+
+Motivation: an (immutable) `Instrument` can hide an extensive history.
+
+Suppose that in 1990, you had 3 separate investments in DEC, COMPAQ, and HP stock...
+and then this happens:
+```
+       HP ->  HPQ
+               ^
+               ^
+DEC -> COMPAQ -+
+```
+you end up with one investment in HPQ!
+- It is generally necessary to capture the evolution of these graphs in time.
+- `Novation`s are the directed links that connect `Instrument`s in that graph.
+
+`Novation`s can represent `Contract`:
+- Issuance
+- Assignment
+- Termination
+
+A `Novation.Id` makes an effective M&A "receipt".
+There can be more than one leg in an M&A transaction:
+- store a `List[Novation]` (or ideally a `NonEmptySet`)
+- all `List` elements (legs) will get the same `Id`.
+- thus the "receipt" is common to all the legs that make up the transaction.
+
+TODO: code some examples
+TODO: `Provenance` factorization
+
+### References
+
+- Original papers at [Microsoft Resarch](https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/)
+- [LexiFi](https://www.lexifi.com/apropos/)
+  - sells a mature implementation of this technology in OCaml
+  - founded by J.M. Eber, who co-authored above papers.)
+- Anton van Straaten's [Haskell implementation](http://web.archive.org/web/20130814194431/http://contracts.scheming.org/)
+  - highly referenced; no longer maintained
+  - see in particular his section ''A note about the original papers''
+- Channing Walton's [scala implementation](https://github.com/channingwalton/scala-contracts) (also not actively maintained)
+- [Netrium](http://netrium.org/)'s open source [Haskell implementation](http://hackage.haskell.org/package/netrium) (status?)
+- Financial DSLs [resource page](http://www.dslfin.org/resources.html)
+
+## The Tables
+
+This section specifies the data model.
+
+### The `keyval` package.
+
+We define a `https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration`
+system for `id`s and `key`s:
+ - `Id`: SHA type
+     - computed via `sha(Row)`,
+     - immutable representation
+     - content addressed or chained
+ - `Key`: identifier types
+     - domain legible (e.g. `AccountNo`)
+     - opaque (e.g. `UUID`s)
+ - Both `Id` and `Key` have `Order`, and `Show` typeclass instances
+ - `Value`:
+     - value class
+     - typeclass instances for `Eq`, and `Show`.
+     - Map methods enabled when `Value <:< (K2: Order, V2: Eq)`
+A `type Foo` may not contain instances of, nor depend upon, type `Foo.Key`.
+Point being: there will be no `id: Id` or `key: Key` fields within domain types!
+These are stored separately (e.g. `key`s in an in-memory `scala.collection.Map`)
+However, foreign keys which reference other domain value types are permitted within value types.
+It is assumed that package clients will generally pursue
+`https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault` style modelling and use `hub`s
+and `link`s to define graphs of `value types` defined by `business key`s,
+with certain exceptions to denormalize `essential attributes`.
+ - Q: what goes in `value types`?
+ - A: `Business keys` and `essential attributes`.
+ - Q: What is a "business key?"
+ - A: "Real business keys only change when the business changes!"
+ - Q: What is an "essential attribute"?
+ - A: Some attributes are like `business keys`: necessary everywhere in the same form
+     - ubiquitous
+     - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
+Special treatment for `essential attribute`s.
+ - subject to **tactical denormalization**
+     - deviates from strict Data Vault methodology
+     - mixes `satelite` fields in with `link` or `hub` shaped relations
+     - essential attributes are ubiquitous (therefore don'tadd redundancy by denormalizing)
+  - polymorphic fields are modelled as `SADT.Aux[ADT]`
+     - `ADT` := Algebraic Data Type
+     - `io.circe.Json Json` `encoder`s and `decoder`s
+     - which can be stored / indexed as binary in Mongo and Postgres
+     - which can be projected to create true `satellite` views.
+
+## The Table of Tables
+
+This sections describes how the data models are layered and relate to each other.
+
+### The `model` package.
+
+The `model` package imlpements records and computations defining a layered set of financial domain models and services.
+
+This package object is where the policy decision to choose generic tax accounting for entities treated as partnerships. Different objects, package or otherwise, could make different policy decisions.
+
+Also, this is where we bind the `layers.ModuleTypes.MonetaryAmount` type (and thus `money.Mny`) to `scala.math.BigDecimal`, while other `layers.ModuleTypes.Quantity`s bind to `scala.Double`.
+
+This generic model package serves up the full stack of `layers`. Note that model object package analogs customized for certain applications need **not** incorporate all layers! In particular, the `Accounts` layer isn't necessary where the personal information of the market participants isn't necessary for the performance of business logic.
+
+```scala
+package object model
+    extends ModuleTypes.Aux[
+      /* type MonetaryAmount = */ BigDecimal,
+      /* type Quantity       = */ Double
+    ]
+    //
+    // the full stack of layered capabilities
+    //
+    with Ledger          // possibly distributed
+    with Accounting      // debits, credits, and all that
+    with Balances        // depends only on generic Accounting
+    with MarketData      // WIP; IBRK will be first integration
+    with OrderManagement // WIP; IBRK will be first integration
+    //
+    // PII firewalling simplified by eliminating dependencies:
+    // `Accounts` layer can be commented out!
+    //
+    with Accounts // binding of legal entities to sets of positions */
+    //
+    // necessary package level augmentation
+    //
+    with Contacts
+    with DefaultMetas
+    with IRS1065 { // replace or enhance as necessary
+      /* ... */
+    }
+```
+
+#### `Partition`s
+
+Models anything from the division of a pizza to the equity capital of a firm per partner.
+
+#### The record of market events: `Folio`s, `Trade`s, `Leg`s and `Position`s
+
+The key insight is that `Map`s are `Group`s if their values are. Maps are used to model both trades and portfolios of instruments, and so portfolios are naturally seen as sums of trades.
+
+##### `Transaction`s
+
+`Transactions`s record agreement between parties to strike a deal
+- a single order may be broken into multiple executions
+- are immutable once recorded
+
+##### `Confirmation`s
+
+`Confirmation`s acknowledge the delivery of the assets specified by executed transactions
+- recorded by recipients  
+- a single execution can be broken into multiple delivery confirmations
+- are immutable once recorded
+`Fiber`s are used for `Confirmation` flows.
+
+How light are `Fiber`s? So light we can create a pair for every outstanding (unconfirmed) execution.
+
+This means that "failed" transactions will result in "resource leaks" - except that the `Fiber` is so lightweight that it's just another heap allocated object, which must remain materialized (or persisted) to memorialize the failed transaction.
+
+#### Cash payment processing
+
+- we know **our** cash `instrument` details (e.g. `USD` bank accounts).
+   - must track quantity (`balance`) per such `instrument` of ours
+   - don't want to have to need to know `instrument` details of the other party
+- the `capital.Instrument.Key key` is a `String Refined capital.keys.IsUsBan`
+- a `Folio` can contain a number of such `instrument`s and associated quantities
+ (bank balances)
+- `instrument.symbol === currency.code` for **all** `cash instrument`s
+- the `Trade`s recorded in the `Transaction` log do **not** record `cash instrument`
+ details but instead
+ deal in **reified** `cash instrument`s
+     - with `capital.Instrument.Key`s constucted
+ by taking the `money.CurrencyLike.code three letter currency code`
+ as the **exact** `Instrument.Key`
+- The allocation of cash from/to each account is recorded in
+ the `keyval.KeyValueStore` for `Folio`s.
+- creates a complete (balanced), **paid** `Trade` with the `reified cash instrument`
+- records that `Trade` in its store and returns the id, which is ready-to-use in
+ creating a `Transaction`.
+- NOTE: it is up to the payCash function to effectfully subtract the amount
+ from the cash position
+- TODO: ensure the `payCash` update is atomic (should return zero or one `Folio.Id`)
+
+
+#### Processing `Transaction`s
+
+The `Transaction` is the concrete record for `Ledger` updates. Do we mean `Transaction` in the *business* sense, or the *computer science* sense? **Yes**: both parties must agree upon the result, under all semantics for the term. The exact semantics will depend on the higher level context: a `Transaction` memorializing a booked `Trade` will spawn a cascade of `Transaction`s (and `Confirmation`s) as that `Transaction` is settled. Note: there is no currency field; cash payments are reified in currency-as-instrument.
+
+What about metadata? We store the **cryptographic hash** of whatever metadata there is.
+
+
+Note that `Folio.Id` is actually an `update event` for the specified `Folio.Key`.  
+
+A trail of `Confirmations` is low-touch auditable.
+
+Nota Bene: the `Transaction.Id` is chained into the `Confirmation.Id`s that go into the
+settlement computation.
+Q: How do we settle a `Trade`?
+   - the net effect must be to transfer the `Trade` between `Folio`s.
+A: Use two fibers (per `Trade`)
+   - one side (fiber) does:
+       - `expect.n = trade.n |> diodePos   // the thing being traded, typically`
+       - `escrow.n = trade.n |> diodeNeg   // the payment, typically`
+       - workflow option one:
+           - "manual" payment transfer
+           - `fiber.wait(escrow.n === empty)` // reactive
+       - workflow option two
+           - assumes programmatic transfer capability for assets! (USD typically)
+           - `open += escrow.n              ` // proactive
+           - `escrow.n = empty`
+   - other side (fiber) does:
+       - same, except for `Trade` * -1
+   - join on both fibers (*now* `trade.n` can be settled)
+   - both sides:
+       - `open += expect.n`
+       - `expect.n = empty`
+   - *nota bene*
+       - no `Folio.Key`s need be exchanged at all
+           - `join` does all the work
+       - both `expect` and `escrow` are left empty in a successful settlement
+           - eliminated on snapshot
+
+This needs to work across p2p nodes.
+
+### Balances and Accounting
+
+Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s.
+When summing Transactions, this module slice implements the algebra which
+maintains all the accounting identities.
+These are the terms and identities as **we** use them:
+
+```scala
+   Debits := Assets + Expenses                  // accounting definition
+   Credits := Liability + Revenue               // accounting definition
+   Debits === Credits                           // accounting identity
+   Assets === Liabilities                       // balance sheet identity
+   Assets + Expenses === Liabilities + Revenue  // substituting
+   Income := Revenue net Expenses               // the "bottom line"
+   Liabilities := Debt + Equity                 // always one or the other
+   RetainedEarnings = Income net Distributions  // business keeps what partners don't take
+   Equity :=                                    // total value of partners' stakes
+     ShareCapital                               // total raised across all rounds
+   + Reserves                                   // you never know
+   + RetainedEarnings                           // add to book value of partners' equity
+```
+
+#### Pricing
+
+`Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.    
+
+Return both a `bid` and an `ask` for the given instrument.
+
+Domain modelling note: `quote` does not signal intent. For example, the client may ignore
+the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
+cannot not predjudice their responses when asked for a quote, as the client reveals nothing
+about their intent.
+
+Pricing instances can deliver live market feeds
+- "Orderly market" invariant: `ask` < `bid`
+- must accept _disorderly_ markets: not everything that comes at you down the wire can be expected to "make sense"
+
+In addition to live markets, prices may orignate from
+- `Model`s, which report a *fair value* modeled price
+   - may depend on `market data` for calibration
+   - therefore limited by accuracy (in practice)
+- `Book`: the price we paid for the asset
+   - only covers the assets we own(ed).
+   - captured from our `Transaction` stream.
+
+#### Trial Balance
+
+There are exactly two transformations of a `TrialBalance` and an `amount: Money[C]` which result in another legal `TrialBalance`:
+ - grow (shrink) balance by amount
+ - constant balance; swap amount between keys within debits (credits)  
+
+These are broken out into separate methods.
+
+TODO: how to guarantee this can be done in the general case
+- extract the price from the Transaction
+- create a `DoubleEntryKey` for it (depends on price - think about waterfall impl)
+- create a TrialBalance from the price and de keys
+- fold that TrialBalance into the running sum
+
+#### Cash Flow Statement
+
+Typically broken into three sections:
+- Operations
+- Investment
+- Financing
+
+#### Equity
+
+`EquityStatement` should really be called [Statement of Changes in Equity](https://en.wikipedia.org/wiki/Statement_of_changes_in_equity)
+
+Note the (arithmetic) indifference of the equity holder to equity
+transactions at market price: their book value is unaffected by such
+transactions.
+
+Change in Equity value: `Credits net Debits`, as usual for a `Balance`
+- Debits
+   - Dividends paid (per share)
+   - Share buy-backs (premium over book value per share)
+- Credits
+   - Shares issued (premium over book value per share)
+   - Comprehensive Income (per share)
+
+### Accounts
+
+`Account`s Model the relation of `Party`s to `Folio`s, including the definition of `Role`s. They are modeled as long lived entities that can evolve over time. Each is created with a `Roster`, specifying the `Principal` owners and their `NonPrincipal` crew: their `Agent`, their `Manager`s, and the `Auditor`s.
+
+While least one `Party` **must** be specified for each role in the roster, the default is to assign the principal to perform each of the non principal roles for themselves.
+
+Accounts link the personal information of the account holders with the financial data of the ledgers, so handle with care!
+
+The set of accounts is keyed by an `Account.No`, a refined long integer defining a very conventional looking account numbering scheme. It is intended to be transcribed by human hand if necessary.
+
+Accounts link the personal information of the account holders with the financial data of the ledgers, and are therefore sensitive.
+
+`Account`s consist of:
+ - a `Folio` of settled `Ledger.Transaction`s
+ - a `Folio` of `Transaction`s not yet settled
+A `Roster` - specifies a mapping of `Party`s to `Role`s,
+and who are the beneficial owners - is linked to the
+`Account` via its own table, indexed by the `Account.Key`.
+
+#### `Party`s
+
+Presumed real world actors under the aegis of, and registered with, real world juristictions.
+
+One simple but crucial design feature is that `Tax.No`'s are not used as `Key`s to identify `Party`s.
+
+#### `Role`s
+
+Each `Party` within an `Account`s `Roster` is assigned one of a finite enumeration of `Role`s. . Every `Role` is mapped to a `Party` via a `Roster` which is **application and jurisdiction specific**.
+
+`Principal`
+: That `Party` which is the market participant responsible for establishing the `Account`. Semantics for `Principal` are conditioned on the status of account, for example
+  - beneficial owner for an asset
+  - responsible party for a liability
+  - shareholder for equity
+  - business unit chief for revenue and expenses
+
+`Agent`
+: The primary delegate selected by the `Principal`s. A `Princple` is their own `Agent` unless otherwise specified.
+
+`Manager`
+: The primary delegate selected by the `Agent`. `Party`(s) with responsibility for, and authority over,
+the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions which will result in `Transaction`s settling to the `Account`.
+
+`Auditor`
+: First class participants, with a package of rights and responsibilities. `Auditor`s will have a (possibly limited) view into the state of the `Ledger`, and (optionally) the ability to block the **settlement** of a `Transaction` (but not its **record**) to the `Ledger` (i.e. "break trades"), or even to initiate the recording of a `Transaction`.
+  - Actions of the `Auditor` may include the publishing of specific summaries of its views into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
+  - Note: the `Auditor` need not be a regulatory entity; in particular this role might be suited e.g. to a "risk manager" in the context of a hedge fund.
+  - Note further: an `Auditor` function could be something as low level (and automatable) as certifying that a set of Folios has never "double spent" - that everything that came out of it had gone into it at some point in the past.
+
+
+### `Market`s
+
+This section describes how `Transaction`s are agreed upon by the parties to them, prior to the `Transaction` recording in the `Ledger`.
+
+- Internal Markets
+  - all parties are "on Ledger"
+  - internalization saves external transaction costs
+  - self clearing / self settling
+- External Market integration
+  - Identified by `MIC` codes (reference data)
+  - Virtual markets (procedural order routers)
+
+#### Order Management
+
+`OMS` := Order Management System. Ubiquitous domain acronym.
+
+Reference for the order/execution pipeline: [Functional and Reactive Domain Modeling, section 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
+
+##### `Order`s
+
+`Order`s propose transactions to `Market`s for execution
+- within time and price limits, or other parametric bounds (interest rate, volatility)
+- ... or not! "market orders" request unconditional execution (common, useful, dangerous)
+- may be modified or canceled, and so are modeled as _entities_ which can evolve over time.
+
+##### `Execution`s
+
+`Execution`s record a link between a transaction and the order which requested it
+- a single order may be broken into multiple executions
+- are immutable once recorded
+
+What it is that the client wants `Execution` of. Note: a denominating currency is always required by the `MarketData.Exchange`s, in order to fully specify the trade, even if there is no limit amount attached.
+
+Note that the first section of tables denotes the complete record of the financial transactions and can be parsed and analyzed without reference to the entities who did the transacting. The second section of tables denotes who did the transacting, and how it was accomplished.
+
+Settlement updates the actual `Folio`s, with `Account` specific (and this `Folio` specific) cash account `capital.Instrument`s substituted for the raw `money.Currency` pseudo `Instrument` specified in the `Order` and enumerated within the `Leg`s of the `Trade` specified in the `Transaction`.
+
+Each OMS must maintain a contra `Ledger.Folio.Key`. The creation of this account (and its `Ledger.Folio.Key`) must occur before the OMS is created.
+
+TODO: revisit parent/child orders
 
 ---
 <p style="page-break-before: always">
+
+### Table Specifications by Cohort
+
+Adapting the terminology of Data Vault modeling gives us the following usage:
+- Publishes: Hub
+- Links: Link
+- Attrs: Satellite
 
 #### Contracts  
 
