@@ -1,12 +1,14 @@
+[[toc]]
+
 # `package keyval`
 
-Types and methods for persistent `value store`s and `key value store`s.  
+Types and methods for persistent `value store`s and `key value store`s.
 
 Note: the following `scala` code is simplified for exposition.
 
 ### `Id` computation using `sha`
 
-A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.  
+A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.
 
 ```scala
   /** assume for example - other choices would work here as well */
@@ -36,10 +38,10 @@ to compute a new (`Merkel chain`ed) `Id` for a given `Row`.
 
     /** chained address for row */
   def chainedRowSha: Id => Row => Id =
-    id => row => chain(id)(sha(row))  
+    id => row => chain(id)(sha(row))
 ```
 
-An `Id` calculated via `sha` can span multiple `Rows`.  
+An `Id` calculated via `sha` can span multiple `Rows`.
 
 ```scala
 
@@ -67,7 +69,7 @@ trait WithValue[V] {
   type Id    = Sha  /*: Order */
   type Value = V    /*: Eq */
 
-  // free type members  
+  // free type members
 
   type Row
 
@@ -108,7 +110,7 @@ Here we compute the `Id` of the `Row` using a secure hash function
 This simple convention entails `Set` semantics: duplicates are (semantically) discarded;
 identical `Row`s hash to the same `Id`.
 
-```scala  
+```scala
 type Shape[_] = Set[_]
 type Spec     = Value
 // type Model = Set[Value]
@@ -135,7 +137,7 @@ This is _also_ a pure immutable `value store`, but with `chain`ed `Id`s. No long
 Entails `List` semantics: the order of commitment may be proved by the `Id` sequence.
 
 
-```scala  
+```scala
 type Shape[_] = List[_]
 type Spec     = Value
 // type Model = List[Value]
@@ -169,7 +171,7 @@ This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, V
 `Id`s are computed across all `Row`s belonging
 to the same `Map`.
 
-```scala  
+```scala
 type Shape[_] = Set[_] // or List[_] for chained address!
 type Spec     = Map[K2, V2]
 
@@ -200,7 +202,7 @@ This is a value store of `Nel[Value]` rows.
 
 Rows that are committed together get the same `Id`.
 
-```scala  
+```scala
 type Shape[_] = Set[_] // or List[_] for chained address!
 type Spec     = Nel[Value]
 
@@ -215,7 +217,7 @@ val example: Model =
 ```
 
 `Store`s of this shape are used in this example to implement a
-set of lists of arbitrary currencies.  
+set of lists of arbitrary currencies.
 
 **TODO:** make this a set of `Command` or `Event` values of some kind - that shows off the `Shape`.
 
@@ -243,7 +245,7 @@ This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, N
 
 In the example above, a `Map[K2, V2]` of size 3 is followed by a `Map` of size 1.
 
-```scala  
+```scala
 
 type Shape[_] = Set[_] // or List[_]  for chained address!
 type Spec     = Map[K2, Nel[V2]]
@@ -293,11 +295,11 @@ Note: `Id`s are chained per `Key`, which has these implications:
 transferred or validated without additional context.
 - intermediate `Id` state must be maintained per key
     - (`Map[Key, Id]`)
-    - scales with the number of unique keys!  
-- chaining arbitrary blocks together is no longer straightforward  
+    - scales with the number of unique keys!
+- chaining arbitrary blocks together is no longer straightforward
     - (entails a `Map[Key, Id] => Map[Key, Id]` somewhere handy)
 
-```scala  
+```scala
 type Shape[_] = Map[Key, _]
 type Spec     = Value
 
@@ -326,7 +328,7 @@ Note that `Row`s that are committed together get the same `Id`.
 
 However, _all_ rows contribute to the data model!
 
-```scala  
+```scala
 type Shape[_] = Map[Key, _]
 type Spec     = Nel[Value]
 
@@ -362,7 +364,7 @@ Id | (Key | Option[(K2 | Option[V2])])
 
 This is a key value store of `Map[K2, V2]` rows.
 
-```scala  
+```scala
 type Shape[_] = Map[Key, _]
 type Spec     = Map[K2, V2]
 
@@ -393,16 +395,16 @@ This is a key value store of `Map[K2, Nel[V2]]` rows
 Note: same data commits as the previous example, but different semantics.
 
 
-```scala  
+```scala
 type Shape[_] = Map[Key, _]
 type Spec     = Map[K2, Nel[V2]]
 
 val example: Model =
   Map(
-    IBan.06776 -> Map(XAU -> Nel(  397.23)) ,
-    IBan.09993 -> Map(XAU -> Nel(  420.33)) ,
-    UsBan.5321 -> Map(USD -> Nel( 10000.00  ,
-                                   5000.00)),
+    IBan.06776 -> Map(XAU -> Nel(  397.23)),
+    IBan.09993 -> Map(XAU -> Nel(  420.33)),
+    UsBan.5321 -> Map(USD -> Nel(10000.00  ,
+                                  5000.00)),
   )
 ```
 
@@ -444,17 +446,17 @@ Id | (Key | Option[(K2 | Option[V2])])
 
 // identity, basically
 // overrideable (?!) SADT / Json stuff
-def fromValue[A](v: Value)(implicit asA: Value <~< A): A = asA 
-def toValue(a: A)(implicit asValue: A <~< Value): Value  = asValue 
+def fromValue[A](v: Value)(implicit asA: Value <~< A): A = asA
+def toValue(a: A)(implicit asValue: A <~< Value): Value  = asValue
 
 // `List`
-def fromValues[A](vs: List[Value])(implicit asA: Value <~< A): List[A] = 
+def fromValues[A](vs: List[Value])(implicit asA: Value <~< A): List[A] =
   vs map fromValue
 
-def toValues(az: List[A])(implicit asValue: A <~< Value): List[Value]  = 
-  az map toValue 
+def toValues(az: List[A])(implicit asValue: A <~< Value): List[Value]  =
+  az map toValue
 
-// TODO: consider `Stream` instead of `List` here 
+// TODO: consider `Stream` instead of `List` here
 def fromValues[K2: Order, V2: Eq](vs: List[Value])(
   implicit asK2V2: Value <~< (K2, V2)
 ): Map[K2, V2] = ...
@@ -475,8 +477,8 @@ def toValues[C: Currency](balance: Balance[C])(
   implicit asValue: (AccountingKey, Money[C]) <~< Value
 ): List[Value] = ...
 
-// no general implementation 
-// special case override 
+// no general implementation
+// special case override
 // used for `Roster` (others?)
 def fromValues[A](vs: List[Value]): A
 def toValues[A](a: A): List[Value]
@@ -489,5 +491,5 @@ def toValues[A](a: A): List[Value]
   { concat, sum, replace } X { delete / no delete } X { single / multi }
 ```
 - use foldMap to implement `snapshot` on all, `CQRS/ES` style
-- `snapshot` effectively preserves cryptographic history 
+- `snapshot` effectively preserves cryptographic history
     - by chaining `snapshot` results into the source stream

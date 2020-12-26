@@ -342,16 +342,14 @@ trait Ledger { module: ModuleTypes =>
     */
   sealed abstract case class Transaction private (
       at: Instant,
-      from: Folio.Key,
-      to: Folio.Key,
-      trade: Trade.Id,
+      folioA: Folio.Key,
+      tradeA: Trade.Id,
+      folioB: Folio.Key,
+      tradeB: Trade.Id,
       meta: Meta.Id
   )
 
   /** Because `Transaction`s are immutable, we model them as pure values.
-    *
-    * No `Transaction` is created except within the context
-    * of an effectful functor - e.g. `F[_]: Sync: ContextShift` among other possibilities.
     */
   object Transaction extends WithId.Aux[Transaction] {
 
@@ -359,12 +357,13 @@ trait Ledger { module: ModuleTypes =>
       */
     private def apply(
         at: Instant,
-        from: Folio.Key,
-        to: Folio.Key,
-        trade: Trade.Id,
+        folioA: Folio.Key,
+        tradeA: Trade.Id,
+        folioB: Folio.Key,
+        tradeB: Trade.Id,
         meta: Meta.Id
     ): Transaction =
-      new Transaction(at, from, to, trade, meta) {}
+      new Transaction(at, folioA, tradeA, folioB, tradeB, meta) {}
 
     /**
       */
@@ -372,12 +371,13 @@ trait Ledger { module: ModuleTypes =>
         trades: Trades.ValueStore[F],
         metas: Metas.ValueStore[F]
     )(
-        from: Folio.Key,
-        to: Folio.Key,
+        folioA: Folio.Key,
+        tradeA: Trade.Id,
+        folioB: Folio.Key,
         leg: Leg,
         meta: Meta
     ): F[Transaction] =
-      multiLeg(trades, metas)(from, to, Trade(leg), meta)
+      multiLeg(trades, metas)(folioA, tradeA, folioB, Trade(leg), meta)
 
     /**
       */
@@ -385,15 +385,16 @@ trait Ledger { module: ModuleTypes =>
         trades: Trades.ValueStore[F],
         metas: Metas.ValueStore[F]
     )(
-        from: Folio.Key,
-        to: Folio.Key,
+        folioA: Folio.Key,
+        tradeA: Trade.Id,
+        folioB: Folio.Key,
         trade: Trade,
         meta: Meta
     ): F[Transaction] =
       for {
         tid <- trades put trade
         mid <- metas put meta map (_._1)
-      } yield Transaction(instant, from, to, tid._1, mid)
+      } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
     /**
       */
@@ -413,7 +414,7 @@ trait Ledger { module: ModuleTypes =>
     */
   sealed abstract case class Confirmation private (at: Instant, from: Folio.Id, to: Folio.Id)
 
-  /** TODO: implement the ''No deletion'' policy for this `KeyValueStore`
+  /**
     */
   object Confirmation extends WithKey.Aux[Transaction.Id, Confirmation] {
 

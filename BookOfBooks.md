@@ -13,6 +13,8 @@ Users of these applications will be able to:
 
 The toolkit lays a principled and disciplined foundation that applications can leverage for trust and security.
 
+In the spirit of **Domain Driven Design**, this document is meant to define a _ubiquitous vocabulary_ for developers and domain experts who use `deftrade` to get better domain models faster.
+
 
 Nick Wade
 CoinOp LLC
@@ -24,7 +26,7 @@ ___
 ## Elevator FAQ
 
 **What is `deftrade`?**
-: This toolkit provides the types and methods necessary to specify financial **domain models** that are **abstract** and algebraic. We say`abstract` because models are generic across all important types, including effect types. Models are `algebraic` because they compose formally within an algebraic system, including laws which the algebra respects.
+: A toolkit that provides the types and methods necessary to specify financial **domain models** that are **abstract** and algebraic. We say`abstract` because models are generic across all important types, including effect types. Models are `algebraic` because they compose formally within an algebraic system, including laws which the algebra respects.
 
 **I hated algebra - why should I like algebraic domain models?**
 :  The algebraically composed `domain model` is intended to be **legible** to - and thus **directly reviewable by** - the financial market participants (domain experts) who use the applications. Removing an entire level-of-human-indirection makes the application development path both more agile and more robustness.
@@ -61,6 +63,8 @@ Note that `deftrade` is _not_ a complete application. In particular, while the l
 
 Manual reconciliation provides an _ultima ratio_ level of flexibility and capacity for integration. Custom smart contracts coexist / inter-operate with industry standard contracts (e.g. ICE Futures) which are modeled with "dummy" contracts, with parameters that are walked through their "real world" paths via manual reconciliation, if need be.
 
+As a simple example, consider the a publicly traded common stock which issues a dividend. Having no control or pre-knowledge of the dividend (until announced), the reconciliation of the external state and the internal (`Ledger`) state must be effected manually.
+
 <!-- research test bed for Ricardian smart contracts -->
 <!-- `deftrade` is `corda` for hobbit capital in the real economy -->
 
@@ -95,7 +99,7 @@ This design was substantially inspired by [Composing Contracts]() and other work
 
 ### Numéraire: the units of account
 
-`Numéraire` is formal finance term which, contrary to what an understandably naive anglophone might think, signifies the **denominator** (not numerator) for `Contract`s and `transaction`s.  
+`Numéraire` is formal finance term which, contrary to what an understandably naive anglophone might think, signifies the **denominator** (not numerator) for `Contract`s and `transaction`s.
 
 There are exactly two ways we can "settle the bill", so to speak: `InCoin`, and `InKind`.
 
@@ -275,46 +279,486 @@ This section specifies the data model.
 
 ### The `keyval` package.
 
-We define a `https://en.wikipedia.org/wiki/Convention_over_configuration convention over configuration`
-system for `id`s and `key`s:
- - `Id`: SHA type
-     - computed via `sha(Row)`,
-     - immutable representation
-     - content addressed or chained
- - `Key`: identifier types
-     - domain legible (e.g. `AccountNo`)
-     - opaque (e.g. `UUID`s)
- - Both `Id` and `Key` have `Order`, and `Show` typeclass instances
- - `Value`:
-     - value class
-     - typeclass instances for `Eq`, and `Show`.
-     - Map methods enabled when `Value <:< (K2: Order, V2: Eq)`
-A `type Foo` may not contain instances of, nor depend upon, type `Foo.Key`.
-Point being: there will be no `id: Id` or `key: Key` fields within domain types!
-These are stored separately (e.g. `key`s in an in-memory `scala.collection.Map`)
-However, foreign keys which reference other domain value types are permitted within value types.
-It is assumed that package clients will generally pursue
-`https://en.wikipedia.org/wiki/Data_vault_modeling Data Vault` style modelling and use `hub`s
-and `link`s to define graphs of `value types` defined by `business key`s,
-with certain exceptions to denormalize `essential attributes`.
- - Q: what goes in `value types`?
- - A: `Business keys` and `essential attributes`.
- - Q: What is a "business key?"
- - A: "Real business keys only change when the business changes!"
- - Q: What is an "essential attribute"?
- - A: Some attributes are like `business keys`: necessary everywhere in the same form
-     - ubiquitous
-     - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
+#### Types
+
+We define a [convention over configuration](https://en.wikipedia.org/wiki/Convention_over_configuration) system for `id`s and `key`s:
+- `Id`: SHA type
+  - computed via `sha(Row)`,
+  - immutable representation
+  - content addressed or chained
+- `Key`: identifier types
+  - domain legible (e.g. `AccountNo`)
+  - opaque (e.g. `UUID`s)
+- Both `Id` and `Key` have `Order`, and `Show` typeclass instances
+- `Value`:
+  - value class
+  - typeclass instances for `Eq`, and `Show`.
+  - `Value` is not the same as `Spec` (more later)
+
+#### Primary Index Conventions
+
+In contrast to some other programming conventions, a `type Foo` may not contain instances of, nor depend upon, type `Foo.Id` or `Foo.Key`.
+
+Stated simply: there will be no `id: Id` or `key: Key` fields within domain types! Index types are stored separately at every level of the storage hierarchy (e.g. `key`s in an in-memory `scala.collection.Map`)
+
+However, **foreign keys** which reference other domain value types are permitted within value types.
+
+#### Data Vault Models
+
+It is assumed that `keyval` package clients will generally pursue [Data Vault](https://en.wikipedia.org/wiki/Data_vault_modeling) style modeling and use `hub`s and `link`s to define graphs of `value types` defined by `business key`s, and `essential attributes`.
+
+`Business Keys`
+:  _via negativa_, "Real business keys only change when the business changes!" (cite: lore)
+
+`Essential Attributes`
+: Some attributes are like `business keys`: necessary everywhere in the same form
+  - ubiquitous
+  - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
+
 Special treatment for `essential attribute`s.
- - subject to **tactical denormalization**
+ - **tactical denormalization**
      - deviates from strict Data Vault methodology
      - mixes `satelite` fields in with `link` or `hub` shaped relations
-     - essential attributes are ubiquitous (therefore don'tadd redundancy by denormalizing)
+     - essential attributes are ubiquitous (therefore don't add redundancy by denormalizing)
   - polymorphic fields are modelled as `SADT.Aux[ADT]`
      - `ADT` := Algebraic Data Type
-     - `io.circe.Json Json` `encoder`s and `decoder`s
-     - which can be stored / indexed as binary in Mongo and Postgres
-     - which can be projected to create true `satellite` views.
+     - `JSON` to begin (other choices exist)
+       - can be stored / indexed as binary in Mongo and Postgres
+       - can be projected to create true `satellite` views.
+
+### `Id` computation using `sha`
+
+A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.
+
+**Note**: the following `scala` code is _simplified_ for exposition.
+
+```scala
+/** assume for example - other choices would work here as well */
+   type Sha = String Refined IsSha256AsBase58
+
+/** magical code! elides many details about canonical formats and codecs! */
+   def sha[A](a: A): Sha = { ... }
+```
+Assume a suitable type `Row` that represents the bits to be persisted in association with a given `Id`. (`Row` will be elaborated in the following section.)
+
+We can use `sha` to compute an `Id` based only on instances of `Row`:
+
+```scala
+
+/** content address for row */
+  def rowSha: Row => Id =
+    row => sha(row)
+```
+Or, we can use a previous `Id` (computed from some prior `Row`)
+to compute a new (`Merkel chain`ed) `Id` for a given `Row`.
+
+```scala
+
+       /** chain `Id`s together into a sequence using `sha` */
+       def chain: Id => Id => Id =
+         i => j => sha((i, j))
+
+         /** chained address for row */
+       def chainedRowSha: Id => Row => Id =
+         id => row => chain(id)(sha(row))
+```
+
+**Note:** An `Id` calculated via `sha` can span multiple `Rows`.
+
+```scala
+
+        /** content addressed `Id` spanning multiple `Row`s.
+          *
+          * single `sha` validates single transaction semantics
+          */
+        def rowsSha: (Row, List[Row]) => Id =
+          (row, rows) => rows.foldLeft(rowSha(row))((s, r) => chain(s)(sha(r)))
+
+        /** chained addressed `Id`s spanning multiple `Row`s (single transaction) */
+        def chainedRowsSha: Id => (Row, List[Row]) => Id =
+          id => (row, rows) => chain(id)(rowsSha(row, rows))
+
+```
+This specifies all the types and methods necessary to compute `Id`s for any Store
+
+### Companion root trait `WithValue`
+
+```scala
+     trait WithValue[V] {
+
+       // bound type members
+
+       type Id    = Sha  /*: Order */
+       type Value = V    /*: Eq */
+
+       // free type members
+
+       type Row
+
+       type Shape[_]
+       type Spec
+
+       // derived type members
+
+       type Repr    = Map[Id, Row]
+       type Record  = (Id, Row)
+       type StreamF[Record] = fs2.Stream[cats.effect.IO, Record] // for example
+
+       type Model  = Shape[Spec]
+     }
+```
+Type swag provider for the free type variable `Value`.
+
+Any type `A` we bind to `Value` will have these provided. `Value` types must have value equality semantics - of course!
+
+### Companion mixin `WithId`
+```scala
+     trait WithId[V] extends WithValue[V] {
+       type Row = Value
+     }
+```
+For immutable `value store`s, the `Row` is just the `Value`.
+
+#### content address models a `Set`
+
+Id | Value
+:--- | ---:
+`a = rowSha` | 42.00
+`b = rowSha` | 33.33
+`a = rowSha` | 42.00
+
+Here we compute the `Id` of the `Row` using a secure hash function
+(`sha`).
+This simple convention entails `Set` semantics: duplicates are (semantically) discarded;
+identical `Row`s hash to the same `Id`.
+
+```scala
+     type Shape[_] = Set[_]
+     type Spec     = Value
+     // type Model = Set[Value]
+
+     val example: Model = Set(33.33, 42.00)
+```
+
+Note: duplicate rows are _silently_ elided.
+
+Because the `Id` may be computed directly given the `Value`, or "content", to be referenced,
+this type of `store` can be called `content addressed`.
+
+Note: The sequential order of committed `Value`s is not guaranteed to be maintained.
+
+#### chained address models a `List`
+
+Id | Value
+:--- | ---:
+`a = chainedRowSha(_)` | 42.00
+`b = chainedRowSha(a)` | 33.33
+`c = chainedRowSha(b)` | 42.00
+
+This is _also_ a pure immutable `value store`, but with `chain`ed `Id`s. No longer content addressable! Duplicate `Row`s will hash to distinct `Id`s due to chaining.
+Entails `List` semantics: the order of commitment may be proved by the `Id` sequence.
+
+
+```scala
+     type Shape[_] = List[_]
+     type Spec     = Value
+     // type Model = List[Value]
+
+     val example: Model = List(42.00, 33.33, 42.00)
+```
+
+Note in particular that a _block_ of chained `Id`s forms a
+function `Id => Id` (input to output) permitting blocks themselves to be chained (!).
+
+`Store`s of this shape are used for `model.Transaction`s.
+
+All `Shape` specializations of [WithId](Companion mixin `WithId`) may use
+*either* `content address` or `chained address` functions to compute `Id`.
+
+#### specialization for `Map`s.
+
+```scala
+        type K2 /*: Order */
+        type V2 /*: Eq */
+        type Value = (K2, V2)
+```
+
+Id            | (K2 |      V2)
+:------------ | --- | --------:
+`a = rowsSha` | USD | 10,000.00
+`a`           | XAU |    420.33
+`b = rowsSha` | XAU |    397.23
+
+This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, V2]`.
+`Id`s are computed across all `Row`s belonging
+to the same `Map`.
+
+```scala
+     type Shape[_] = Set[_] // or List[_] for chained address!
+     type Spec     = Map[K2, V2]
+
+     val example: Model = Set (
+       Map (
+         USD ->  10000.00,
+         XAU ->    420.33
+       ),
+       Map (
+         XAU ->    397.23
+       )
+     )
+```
+
+`Store`s of this shape are used e.g. to model `Trade`s (with `content address`ing).
+
+#### specialization for `Nel`s.
+
+Id |  Value
+:--- | ---:
+`a = chainedRowSha(_)`  | XAU
+`b = chainedRowsSha(a)` | XAU
+`b`                     | CHF
+`c = chainedRowsSha(b)` | USD
+`c`                     | USD
+
+This is a value store of `Nel[Value]` rows.
+
+Rows that are committed together get the same `Id`.
+
+```scala
+     type Shape[_] = Set[_] // or List[_] for chained address!
+     type Spec     = Nel[Value]
+
+     val example: Model =
+       Set(
+         Nel(XAU),
+         Nel(XAU ,
+             CHF),
+         Nel(USD ,
+             USD)
+       )
+```
+
+`Store`s of this shape are used in this example to implement a set of lists of arbitrary currencies.
+
+**TODO:** make this example a set of `Command` or `Event` values of some kind - that shows off the `Shape`.
+
+#### specialization for `Map`s of `Nel`s.
+
+```scala
+        type K2 /*: Order */
+        type V2 /*: Eq */
+        type Value = (K2, V2)
+```
+
+May use either content address or chained address for `Id`.
+Duplicate rows must be appended within a single call that computes a single `Id`.
+
+Id            | (K2 |      V2)
+:------------ | --- | --------:
+`a = rowsSha` | USD |10,000.00
+`a`           | USD | 5,000.00
+`a`           | USD | 5,000.00
+`a`           | XAU |   420.33
+`b = rowsSha` | XAU |   397.23
+
+This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, Nel[V2]]`.
+`Id`s are computed across all `Row`s belonging to the same `Map`.
+
+In the example above, a `Map[K2, V2]` of size 3 is followed by a `Map` of size 1.
+
+```scala
+
+     type Shape[_] = Set[_] // or List[_]  for chained address!
+     type Spec     = Map[K2, Nel[V2]]
+
+     val example: Model =
+       Set (
+         Map (
+           USD -> Nel(10000.00 ,
+                       5000.00 ,
+                       5000.00),
+           XAU -> Nel(  420.33)
+         ),
+         Map (
+           XAU -> Nel(  397.23)
+         )
+       )
+```
+
+### Companion mixin `WithKey`
+
+The use of chained address for `Id` is mandatory.
+
+Rational: since we are tracing the dynamic evolution of a value indexed by a key,
+multiple instances of the same `Row` entail positional significance in the data model.
+(We can write the same row multiple times, and it matters in what order we write it.)
+
+```scala
+       trait WithKey[K, V] extends WithValue[V] {
+         type Key  = K /*: Order */
+         type Row  = (Key, Option[Value])
+       }
+```
+
+Id | (Key | Option[Value])
+:--- | --- | ---:
+`a = chainedRowSha(_)` | USD | 10,000.00
+`b = chainedRowSha(_)` | XAU | 420.33
+`c = chainedRowSha(b)` | XAU | 397.23
+`d = chainedRowSha(a)` | USD | 5,000.00
+
+This is a key value store. The `Value` for a given `Key` evolves over time and the store records each evolution, maintaining the entire `Value` history for each `Key`.
+
+Note: `Id`s are chained per `Key`, (`keychaining`), which has these implications:
+
+- the evolution of the value for a single key can be extracted from the store and
+transferred or validated without additional context.
+- intermediate `Id` state must be maintained per key
+   - (`Map[Key, Id]`)
+   - scales with the number of unique keys!
+- chaining arbitrary blocks together is no longer straightforward
+   - (entails a `Map[Key, Id] => Map[Key, Id]` somewhere handy)
+
+```scala
+     type Shape[_] = Map[Key, _]
+     type Spec     = Value
+
+     val example: Model =
+       Map(
+         USD -> 5000.00,
+         XAU ->  397.23
+       )
+```
+
+`Store`s of this shape are used in this example to map a currency to an amount.
+
+#### specialization for `Nel`s
+
+Id | (Key | Option[Value])
+:--- | --- | ---:
+`a = chainedRowSha(_)`  | IBan.09993 | XAU
+`b = chainedRowsSha(_)` | IBan.06776 | XAU
+`b`                     | IBan.06776 | CHF
+`c = chainedRowSha(_)`  | UsBan.5321 | USD
+`d = chainedRowSha(b)`  | IBan.06776 | USD
+
+This is a key value store of `Nel[Value]`s.
+
+Note that `Row`s that are committed together get the same `Id`.
+
+However, _all_ rows contribute to the data model!
+
+```scala
+     type Shape[_] = Map[Key, _]
+     type Spec     = Nel[Value]
+
+     val example: Model =
+       Map(
+         IBan.06776 -> Nel(XAU ,
+                           CHF ,
+                           USD),
+         IBan.09993 -> Nel(XAU),
+         UsBan.5321 -> Nel(USD),
+       )
+```
+
+`Store`s of this shape are used in this example to implement a list of permitted currencies per account.
+
+---
+
+#### specialization for `Map`s
+```scala
+        type K2 /*: Order */
+        type V2 /*: Eq */
+        type Value = (K2, V2)
+        type Row  = (Key, Option[(K2, Option[V2])])
+```
+
+Id | (Key | Option[(K2 | Option[V2])])
+:--- | --- | --- | ---:
+`a = chainedRowSha(_)` | UsBan.5321 | USD | 10,000.00
+`b = chainedRowSha(_)` | IBan.09993 | XAU |    420.33
+`c = chainedRowSha(_)` | IBan.06776 | XAU |    397.23
+`d = chainedRowSha(a)` | UsBan.5321 | USD |  5,000.00
+
+This is a key value store of `Map[K2, V2]` rows.
+
+```scala
+     type Shape[_] = Map[Key, _]
+     type Spec     = Map[K2, V2]
+
+     val example: Model =
+       Map(
+         IBan.06776 -> Map(XAU ->  397.23),
+         IBan.09993 -> Map(XAU ->  420.33),
+         UsBan.5321 -> Map(USD -> 5000.00),
+       )
+```
+
+`Store`s of this shape are used for `model.Folio`s
+
+---
+
+#### specialization for `Map`s of `Nel`s
+
+Id | (Key | Option[(K2 | Option[V2])])
+:--- | --- | --- | ---:
+`a = chainedRowSha(_)` | UsBan.5321 | USD | 10,000.00
+`b = chainedRowSha(_)` | IBan.09993 | XAU |    420.33
+`c = chainedRowSha(_)` | IBan.06776 | XAU |    397.23
+`d = chainedRowSha(a)` | UsBan.5321 | USD |  5,000.00
+
+This is a key value store of `Map[K2, Nel[V2]]` rows
+(the most general structure supported).
+
+Note: same data commits as the previous example, but different semantics.
+
+
+```scala
+
+  type Shape[_] = Map[Key, _]
+  type Spec     = Map[K2, Nel[V2]]
+
+  val example: Model =
+    Map(
+      IBan.06776 -> Map(XAU -> Nel(  397.23)),
+      IBan.09993 -> Map(XAU -> Nel(  420.33)),
+      UsBan.5321 -> Map(USD -> Nel(10000.00  ,
+                                    5000.00)),
+    )
+```
+
+`Store`s of this shape are used for e.g. ???
+TODO: identify use case, again probably using events as values
+
+---
+
+#### "deleting" a `Key`
+
+`Value`s are `nullable` in the `WithKey` context.
+
+In this example, the value associated with the key `USD` is semantically deleted.
+
+Id | (Key | Option[Value])
+:--- | --- | ---:
+`z` = chainedRowSha(`_`) | USD | `null`
+
+For `Map[Map]` and `Map[Map[Nel]]` specializations, `null`ify both the `K2` field for a given `Key`.
+
+Id | (Key | Option[(K2 | Option[V2])])
+:--- | --- | --- | ---:
+`x` = chainedRowSha(`d`) | UsBan.5321 | `null` | `null`
+
+#### "deleting" a `K2`
+
+For `Map[Map]` and `Map[Map[Nel]]` specializations,
+`null`ify the `V2` field for a given `(Key, K2)`.
+
+Id | (Key | Option[(K2 | Option[V2])])
+:--- | --- | --- | ---:
+`y` = chainedRowSha(`c`) | IBan.06776 | `XAU` | `null`
+
+---
 
 ## The Table of Tables
 
@@ -372,11 +816,12 @@ The key insight is that `Map`s are `Group`s if their values are. Maps are used t
 `Transactions`s record agreement between parties to strike a deal
 - a single order may be broken into multiple executions
 - are immutable once recorded
+`Transaction`s are always created within a parameterized context defining a range of side effects, persistence being the most relevant.
 
 ##### `Confirmation`s
 
 `Confirmation`s acknowledge the delivery of the assets specified by executed transactions
-- recorded by recipients  
+- recorded by recipients
 - a single execution can be broken into multiple delivery confirmations
 - are immutable once recorded
 `Fiber`s are used for `Confirmation` flows.
@@ -416,8 +861,7 @@ The `Transaction` is the concrete record for `Ledger` updates. Do we mean `Trans
 
 What about metadata? We store the **cryptographic hash** of whatever metadata there is.
 
-
-Note that `Folio.Id` is actually an `update event` for the specified `Folio.Key`.  
+Note that `Folio.Id` is actually an `update event` for the specified `Folio.Key`.
 
 A trail of `Confirmations` is low-touch auditable.
 
@@ -427,6 +871,9 @@ Q: How do we settle a `Trade`?
    - the net effect must be to transfer the `Trade` between `Folio`s.
 A: Use two fibers (per `Trade`)
    - one side (fiber) does:
+
+   (FIXME Transaction needs another field - see ToT
+
        - `expect.n = trade.n |> diodePos   // the thing being traded, typically`
        - `escrow.n = trade.n |> diodeNeg   // the payment, typically`
        - workflow option one:
@@ -474,7 +921,7 @@ These are the terms and identities as **we** use them:
 
 #### Pricing
 
-`Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.    
+`Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.
 
 Return both a `bid` and an `ask` for the given instrument.
 
@@ -499,7 +946,7 @@ In addition to live markets, prices may orignate from
 
 There are exactly two transformations of a `TrialBalance` and an `amount: Money[C]` which result in another legal `TrialBalance`:
  - grow (shrink) balance by amount
- - constant balance; swap amount between keys within debits (credits)  
+ - constant balance; swap amount between keys within debits (credits)
 
 These are broken out into separate methods.
 
@@ -508,6 +955,13 @@ TODO: how to guarantee this can be done in the general case
 - create a `DoubleEntryKey` for it (depends on price - think about waterfall impl)
 - create a TrialBalance from the price and de keys
 - fold that TrialBalance into the running sum
+
+
+#### Income Statement
+
+#### Balance Sheet
+
+"Balance" is a property of the type; `BalanceSheet`s cannot be out of balance.
 
 #### Cash Flow Statement
 
@@ -633,7 +1087,7 @@ Adapting the terminology of Data Vault modeling gives us the following usage:
 - Links: Link
 - Attrs: Satellite
 
-#### Contracts  
+#### Contracts
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
@@ -641,24 +1095,24 @@ Name | Shape | Publishes | Links | Attrs
 **Instruments** | KeyValue[V] | Key[`USIN`] | `LegalEntity.Key` | `symbol: Label`, `issuedIn: Option[Currency]`
 **Forms** | KeyValue[V] | Id | **`Instrument.Key`** | `display: Label`, `contract: Contract`
 
-#### Ledger  
+#### Ledger
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 **Trades** | Value[NEMKV] | Id | `Instrument.Key` | `_: Quantity`
 **Folios** | KeyValue[MKV] | Id, Key[`UUID`] | `Instrument.Key` | `_: Quantity`
-**Transactions** | Value[V] | Id | `Trade.Id`, `Folio.Key`[2], `Meta.Id` | `at: Instant`
+**Transactions** | Value[V] | Id | `Trade.Id`[2], `Folio.Key`[2], `Meta.Id` | `at: Instant`
 **Confirmations** | KeyValue[V] | | **`Transaction.Id`**, `Folio.Id`[2] | `at: Instant`
 **Metas** | Value[SADT] | Id | | `sadt: SADT`
 
-#### Accounting  
+#### Accounting
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 **Balances** | KeyValue[MKV] | Id | **`Folio.Key`** | `(AccountingKey, FinancialAmount)`
 **Reports** | KeyValue[LV] | Id | **`Folio.Key`** , `Balance.Id`[3,4], *`Report.Id`*[0,1] | `asOf: Instant`, `period: Period`
 
-#### People   
+#### People
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
@@ -668,19 +1122,19 @@ Name | Shape | Publishes | Links | Attrs
 **LegalEntities** |  KeyValue[V] | `Party.Key` | `Contact.Id` | `label: Label`, `ein: Ein`
 **Contacts** |  Value[SADT] | Id | | `sadt: SADT`
 
-#### Markets  
+#### Markets
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 **Counterparties** | KeyValue[V] | Key[`UUID`] |  `Party.Key`, `Folio.Key`, `Meta.Id` |
 **Exchanges** | KeyValue[V] | Key[`MIC`] |  `Party.Key`, `Folio.Key`, `Meta.Id` |
 **MDSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `Meta.Id`, `MarketList.Id` |
-**MarketLists** | Value[NELV] | Id | `MDS.Key`, `Exchange.Key` |  
+**MarketLists** | Value[NELV] | Id | `MDS.Key`, `Exchange.Key` |
 **OMSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `MarketList.Id`, `Folio.Key`[2] |
 **Orders** | KeyValue[V] | Key[`Long`] | `OMS.Key`, `Market.Key`, `Trade.Id` | `at: Instant`, `currency: Currency`, `limit: Option[MonetaryAmount]`, `goodTill: Option[Instant]`, `attrs: Meta.Id`
 **Executions** | Value[V] | Id | `Order.Key`, `Transaction.Id` | `at: Instant`
 
-#### Misc  
+#### Misc
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
