@@ -1,44 +1,27 @@
-# `deftrade`  
+# `deftrade`
 
-A stream algebra toolkit for financial market participants.
+A stream algebra for financial market participants.
 
-```scala
-  import io.deftrade._
-  import money.Currency
-  import model.Money
-  import cats.effect.Sync
-  import fs2.Stream
+## Installation
 
-  /** Witnesses that `X` is exchangeable in a fair and lawful contract. */
-  abstract class Consideration[X] { /* ... */ }
+(don't, yet)
 
-  /** Synchronous, effectful Arrow of Acquisition. */
-  abstract class Ferengi[F[_]: Sync] { /* ... */ }
-
-  /** Mission statement in a method signature gives us our project name. */
-  def trade[F[_]: Ferengi, X: Consideration, C: Currency](x: X): Stream[F, Money[C]] =
-    // ...
-```
-
-## Foundational financial domain values and calculations
-
-- `ledger` data model specifies chained (!) cryptographic hashes
-- `account` management: privacy-first data model protects PII
-    - account and tax `Id`s are excluded from core `Ledger` data model  
-    - `cash account` details (e.g. bank account) remain private to the `account`  
-- composable `contract` DSL and evaluation engines
-    - `form`s encapsulate common `contract`s for publicly traded `instrument`s
-    - custom `contract`s (e.g. convertible notes) can be embedded within ad-hoc `instrument`s
-        - "exempt" securities
-    - non-cash instruments (e.g. public stock) are identified with common keys (e.g. `CUSIP`s)
-- core `accounting` balances and reporting
-- `order management system` integration for external markets
-- `market data system` integration for real time tick stream providers
-- `DSL`s for commercial time and money calculations
+## Architecture
+See the [docs](docs).
 
 ## Implementation notes
 
-### data definitions use `ADT`s and `SACC`s.
+### `Stream` based computations
+
+`fs2.Stream`s are (possibly) effectful computations which produce sequences of `value`s. In-memory computations can be thought of as producers of `Stream`s of `Event`s.
+
+Trading "algo"s implement _state_ as DDD _aggregate-entities_
+- maintained in memory by `Stream` based computations
+- `KeyValueStore`: tracks the evolution over time of a `value` identified by a `key`
+- this is `CQRS/ES` and can be used to replicate / restore application or session state
+  - Results of these computations should be recomputable by replaying the event stream and *discarding the effects*.
+
+### in-memory data definitions use `ADT`s and `SACC`s.
 
 - **`ADT`** := algebraic data type
     - enable principled `codec` derivation
@@ -50,9 +33,7 @@ A stream algebra toolkit for financial market participants.
     - private constructor
     - no copy method
 
-### Abstract `ValueStore`s and `KeyValueStore`s
-- `ValueStore`: source and sink `stream`s of `value`s for persistence
-- `KeyValueStore`: tracks the evolution over time of a `value` identified by a `key`
+### persistence roadmap
 - spreadsheet integration via csv file based persistence with json for adts
 - KeyValue database candidates:
     - LightningDB:
@@ -61,31 +42,16 @@ A stream algebra toolkit for financial market participants.
     - use Kafka to push pg log to the cloud for replication?
     - CockroachDB
 
-### Stream based computations
-
-`Stream`s are (possibly) effectful computations which produce sequences of `value`s.
-
-- `fs2.Stream` (in memory)
-- Kafka streams
-- Spark
-
-In-memory computations can be thought of as producers of `Stream`s of `Event`s.
-Results of these computations should be recomputable by replaying the event stream to its consumers and *discarding their effects*.
-
-- trading algos implement state as `aggregate-entities`
-    - `aggregate entities` are maintained by `Stream` based computations
-    - this is `CQRS/ES` and can be used to replicate / restore application or session state
-
-### Why `scala 2.13`?  
-- `LazyList` for better Haskell porting 
-- `Map` is less broken 
+### Why `scala 2.13`?
+- `LazyList` for better Haskell porting
+- `Map` is less broken
 - literal singleton types
 - `cats.evidence` integration
 
 
 A project of [CoinOpLLC](https://coinopllc.com).
 
-### NO WARRANTY  
+### NO WARRANTY
 
 >This is free software; see the source for copying conditions.
 There is no warranty, not even for merchantability or fitness

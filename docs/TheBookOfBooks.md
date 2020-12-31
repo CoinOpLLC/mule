@@ -15,6 +15,24 @@ The toolkit lays a principled and disciplined foundation that applications can l
 
 In the spirit of **Domain Driven Design**, this document is meant to define a _ubiquitous vocabulary_ for developers and domain experts who use `deftrade` to get better domain models faster.
 
+**Features:**
+- Universal platform for all assets, real and virtual
+  - Smart contracts for automated performance
+  - "Dummy" contracts for legacy real world assets 
+- composable `Contract` DSL and evaluation engines
+  - public `Instrument`s embed standard `Contract`s
+    - for e.g. publicly traded securities or a standard convertible note
+  - private `Instrument`s embed custom `Contract`s
+  - `Form`s record the contract _state_ and its evolution over time
+  - `DSL`s for commercial time and money calculations
+- flexible `Ledger` data model
+  - chained cryptographic hashes as primary key types
+- `Account` management with privacy-first data model to protect PII
+  - account and tax `Id`s are excluded from core `Ledger` data model
+- core `Accounting` balances and reporting
+- market data system (`MDS`) integration hooks for real time tick stream providers
+- order management system (`OMS`) integration hooks for external markets
+
 
 Nick Wade
 CoinOp LLC
@@ -42,7 +60,7 @@ ___
 
 **Why should I trust my application to run on `deftrade`?**
 : - correctness of the smart contracts underwrites trust in the business process
-    - `Ricardian` contracts composed via algebraic composition with parallel legal prose.
+    - [Ricardian smart contracts](https://en.wikipedia.org/wiki/Ricardian_contract) composed via algebraic composition with parallel legal prose.
     - smart contracts are "just code", so all the same correctness and validation techniques apply
     - contract properties like "deterministic" and "terminating" _provable_ within the type system
   - domain level algebraic laws
@@ -51,6 +69,10 @@ ___
   - soundly typed FP simplifies refactoring for maintenance and features
     - type safety obviates (some) low level unit testing
     - codec functions automatically _derived_ (not "generated")
+  - cryptographic data model
+    - pervasive use of secure hashes as `Id`
+    - `SASH` table records signatures for any `Id`
+    - pay-as-you-go overhead flexibility for defining protocols
 
 **What about the Name?**
 : Buried within the order pipeline is the following code:
@@ -70,21 +92,41 @@ As a simple example, consider a publicly traded common stock which issues a divi
 
 ## What does it mean to "keep a set of books?"
 
-Books should be like git, or like ink on parchment: indelible, immutable, and, when signed, irrefutable. But those are 21st and 18th century terms, respectively.
+Keeping books is fundamental to finance, and to commerce itself. In fact, all of the properties of money itself [can be taken from bookkeeping](link).
 
-In 20th century computer engineering terminology, [database Durability]() and [Public Key]() nonrepudiation are both required. That should cover us.
+### Foundational Requirements
 
-All of the properties of money itself [can be taken from bookkeeping](link).
+Books should be like ink on parchment: indelible, immutable, and, when signed, irrefutable.
+
+Implementing our solution here in the twenty first century, we need the following basic services
+- storage with [ACID](https://en.wikipedia.org/wiki/ACID) properties
+  - devil in the detail: multi-party Consistency
+- [Public Key]() [signature nonrepudiation]()
+  - devil in the detail: PKI
+
+Ultimately the data storage foundation must provide **attestible immutability**
+  - like **git** has (with PGP signed commits)
+  - `deftrade` hash trees can populate a "Merkle Forest" in `IPFS`
 
 ### On-ledger counterparties vs external counterparties
 
-The canonical use case is of an island of on-ledger parties, who are potentially each other's counterparties, and who also face an assortment of off-ledger (external) counterparties (such as external markets, via brokerage accounts).
+The canonical use case is of an island of on-ledger parties, who are potentially each other's counterparties, and who also face an assortment of off-ledger (external) counterparties (such as external markets), accessed via brokerage account API integrations.
 
-TODO: need diagram here
+Different parties have different roles with respect to bookkeeping, and that includes parties representing regulatory authorities such as auditors.
+
+TODO: explore "Smart regulatory contract" as a platform token
+TODO: need [Corda](https://www.r3.com/wp-content/uploads/2019/06/corda-platform-whitepaper.pdf) diagram from R3cev here. Relevant usage model to reference.
+
+> Figure 3: Consensus over transaction validity is performed only by parties to the
+transaction in question. Therefore, data is only shared with those parties which
+are required to see it. Other platforms generally reach consensus at the ledger
+level. Thus, any given actor in a Corda system sees only a subset of the overall
+data managed by the system as a whole. We allow arbitrary combinations of
+actors to participate in the consensus process for any given piece of data.
 
 ## Contracts, their ancillary types, and instance lifecycle
 
-"Smart contracts" are not a "map of the terrain". *They are the terrain.*
+"Smart contracts" are not a "map of the terrain". *They are the terrain*, in the sense that they directly embody contract _performance_.
 
 But in the real world, where incomplete integration modulates the ability to automate, "dummy contracts" may be used to inter-operate with externally defined and pre-existing contracts, such as publicly traded equity securities ("stocks") and rated debt securities ("bonds").
 
@@ -110,17 +152,17 @@ The smart contracts that operate within the `deftrade` platform are instances of
 `Contract` _instances_ are specified using a domain specific language (DSL) embedded within scala, which enumerate a small number of primitives.
 
 `Contract` _instances_ form an algebraic `Group`:
-- the universe of contracts is closed under algebraic combination: two contacts combined are still a (possibly meaningful) contract.
-- there is an element which represents identity (the `zero: Contract`)
-- there is an inverse for each element such that when an element is combined with its inverse, the result is unity.
+- the universe of contracts is **closed** under algebraic combination: two contacts combined are also a contract.
+- there is an element which represents **identity** (the `zero: Contract`)
+- there is an **inverse** for each element such that when an element is combined with its inverse, the result is unity.
 
-The composite `Contract` governing an `Trade` - the quantities of instruments proposed to be exchanged in a Transaction - is precisely that algebraic combination of Contracts specified by the `Instrument`s within the `Trade`.
+The composite `Contract` governing an `Trade` - the quantities of instruments proposed to be exchanged in a Transaction - is precisely that algebraic combination of Contracts specified by the `Instrument`s within the `Trade`. More on `Instrument`s and `Trade`s later, but for now consider that they mean what they sound like they mean.
 
-- for each side within a `Trade`, at least one Contract must be referenced, so as to be identifiable as "consideration".
+- for each side within a `Trade`, at least one `Contract` must be referenced, so as to be identifiable as "consideration".
 - just like in the real world, there's always this:
-  - ''Good and valuable consideration, the receipt and sufficiency of which is hearby acknowledged'', which looks like this in code:
+  - ''Good and valuable consideration, the receipt and sufficiency of which are hearby acknowledged'', which looks like this in code:
     ```scala
-    object GavcTrasowiha extends Contract // == zero, of course
+    object GavcTrasowaHa extends Contract // == zero, of course
     ```
 
 ### Numéraire: the units of account
@@ -134,15 +176,18 @@ The application level is where we declare the policy decisions about details ass
 #### InCoin: Money and Currency
 
 `Money` has the following properties of interest in this model:
- - Money is an amount denominated in a `Currency`
+ - Money is an amount denominated in a (supported) **`Currency`**
  - Money is **fungable**
  - Money is **self-pricing** (within its denomination)
 
-So called "ready funds" such as bank account balances are a kind of `capital.Instrument`.
+ Most kinds of debt are simply `Contract`s for future `Money`.
 
 #### InKind: other things we can receive in consideration
 
-In fact, an `Instrument` can encapsulate any contract - contracts for frozen pork bellies, for instance. A mundane, technical, and cynical usage is an offer to retire debt with more debt. These offers are often taken.
+For example:
+ - `Contract`s for **equity** (e.g shares of common stock)
+ - `Contract`s for **real property** (e.g. commercial property leases)
+ - `Contract`s for **physical delivery of commodities** (e.g. tanks of propane)
 
 ### Contract DSL
 
@@ -192,9 +237,8 @@ The difference between "workflow automation" and "smart contract execution" is a
 There are currently three kinds of `Engine`s:
 
 #### Pricing
-Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
-process which represents the distribution of possible `Contract` values a given
-number of [[Pricing.TimeSteps]] from [[t0]].
+
+Evaluate the `Contract` in the specified `Currency`, returning a **real valued process** which represents the distribution of possible `Contract` values a given number of `TimeSteps` from `t0`.
 
 #### Scheduling
 
@@ -206,16 +250,15 @@ Produces calendar schedules of actions for humans to follow up on:
 
 Automated `Contract` performance, including the capacity to commit Transactions to the Ledger.
 
-### The graph of `InKind` issuing entities.
+### Evolution of the Instrument graph
+
+Our investible universe is comprised of a graph of `Instrument`s issued by various entities.
+
+Note in particular that the graph of the legal entities who issue the `Instrument`s is not recorded per se, only the graph of the `Instrument`s issued by those legal entities.
 
 #### Instruments
 
-Models a tradeable thing with an embedded `Contract`.
-
-Every `Instrument` embeds a `Contract` for (mostly future) `InCoin` money, _except_ for the following categories of `InKind` "pure stuff":
- - `Contract`s for **equity** (e.g shares of common stock)
- - `Contract`s for **real property** (e.g. commercial property leases)
- - `Contract`s for **physical delivery of commodities** (e.g. tanks of propane)
+Models a tradeable thing. Each `Instrument` embeds a `Contract`.
 
 TODO:
  - specify a unified symbology behind `symbol`
@@ -233,6 +276,7 @@ Instances of `Form` memorialize the state of a `Contract` at a given point in ti
 
 As an extreme example, the "trace" of bespoke structured product, quoted every
 fifteen minutes for ten years, would run to about sixty thosand entries. This might be fine.
+
 Other examples:
 - interest or dividend payment
 - optionality exercise
@@ -267,7 +311,6 @@ There can be more than one leg in an M&A transaction:
 - all `List` elements (legs) will get the same `Id`.
 - thus the "receipt" is common to all the legs that make up the transaction.
 
-TODO: code some examples
 TODO: `Provenance` factorization
 
 ### References
@@ -293,32 +336,15 @@ The business data object lifecycle procedes inexorably:
 
 `In Memory ==> ... ==> On Ice`
 
-and every other persistence in between is a cache of some kind.
+Every persistence in between can be viewed as a _cache_ of some kind.
 
 This exposition will cover the two endpoints (where `On Ice` is taken to be `.csv`).
 
-#### Immutable, append only data model
+#### Immutable, append-only data model
 
 Tracing the evolution of the value associated with a key, by folding the values associated with that key to provide a "sum" of some kind, is the technique by which "state variables" are created and maintained within memory.
 
 Recording only the intent to delete identified data, and not the actual data, is usually a good practice. The exception would be where data _must_ be erased (e.g. for regulatory reasons). It will be necesssary to make a snapshot of the folded-up structure in a table or file which **completely replaces** the previous data in order to physically delete data. This will become necessary over time if bounded storage requirements are respected.
-
-
-#### Data systems of record
-
-Various kinds of data comprise a typical financial markets office, and it is domain convention to refer to them by these names:
-
-Ledger Data
-: derp
-
-Account Data
-: derp
-
-Reference Data
-: derp
-
-Market Data
-: derp
 
 #### Indexing Types
 
@@ -353,26 +379,31 @@ However, **foreign keys** which reference other domain value types are permitted
 
 #### Data Vault Modeling
 
-It is assumed that `keyval` package clients will generally pursue [Data Vault](https://en.wikipedia.org/wiki/Data_vault_modeling) style modeling and use `hub`s and `link`s to define graphs of `value types` defined by `business key`s, and `essential attributes`.
+It is assumed that `keyval` package clients will generally pursue [Data Vault](https://en.wikipedia.org/wiki/Data_vault_modeling) style modeling and use `hub`s and `link`s to define graphs of `value types` defined by `business key`s.
+
+A `link` in "Data Vault" terms (foreign key) must be either be a business key or an `Id` (the identifier of an immutable record) from some `Table`.
 
 `Business Keys`
-:  _via negativa_, "Real business keys only change when the business changes!" (cite: lore)
+: - integral or string types with domain specific formats and semantics
+  - possibly opaque (like a `UUID`), possibly public (like an `ISIN`)
+  - may index `KeyValue` stores directly
+  - _via negativa_, "**Real** business keys only change when the **business** changes!" (cite: lore).
 
 `Essential Attributes`
-: Some attributes are like `business keys`: necessary everywhere in the same form
-  - ubiquitous
+: - ubiquitous
   - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
+  - permit **tactical denormalization**
+    - deviates from strict Data Vault methodology
+    - mixes `satelite` fields in with `link` or `hub` shaped relations
+    - no redundancy from denormalizing due to ubiquity
 
-Special treatment for `essential attribute`s.
- - **tactical denormalization**
-     - deviates from strict Data Vault methodology
-     - mixes `satelite` fields in with `link` or `hub` shaped relations
-     - essential attributes are ubiquitous (therefore don't add redundancy by denormalizing)
-  - polymorphic fields are modelled as `SADT.Aux[ADT]`
-     - `ADT` := Algebraic Data Type
-     - `JSON` to begin (other choices exist)
-       - can be stored / indexed as binary in Mongo and Postgres
-       - can be projected to create true `satellite` views.
+`Optional Attributes`
+: - always `link`ed, never denormalized.
+  - single, polymorphic fields recorded as Serialized Algebraic Data Types (`SADT`s)
+  - persisted / indexed as binary in Mongo and Postgres
+  - simple `JSON` to begin
+    - [IPLD compliant](https://specs.ipld.io/#ipld-codecs) (barely)
+    - TODO: `DAG-JSON`, `DAG-CBOR`
 
 ### Id computation via secure hash
 
@@ -398,7 +429,7 @@ We can use `sha` to compute an `Id` based only on instances of `Row`:
     row => sha(row)
 ```
 Or, we can use a previous `Id` (computed from some prior `Row`)
-to compute a new (`Merkel chain`ed) `Id` for a given `Row`.
+to compute a new (`hash chain`ed) `Id` for a given `Row`.
 
 ```scala
 
@@ -429,43 +460,47 @@ to compute a new (`Merkel chain`ed) `Id` for a given `Row`.
 ```
 This specifies all the types and methods necessary to compute `Id`s for any Store
 
-### Companion root trait `WithValue`
+### Stores
+
+There are two types of `Store`s: `Value` and `KeyValue`.
+- Value stores persist immutable (in memory) values
+- KeyValue stores persist associative arrays of (key, value) pairs
+- Both use the root WithValue type to augment companion objects of `type V`
+  - define (specific) `Id` and (generic) `Record` types for _both_ kinds of `Store`.
+
+#### `Store`s and companion root trait `WithValue`
 
 ```scala
-     trait WithValue[V] {
+/** once again simplified for exposition
+  */
+trait WithValue[V] {
 
-       // bound type members
+ // bound type members
+ //
+ type Id    = Sha  /*: Order */
+ type Value = V    /*: Eq */
 
-       type Id    = Sha  /*: Order */
-       type Value = V    /*: Eq */
+ // free type members
+ //
+ type Row   // what we append, prefixed with Id
+ type Spec  // what we get and put
 
-       // free type members
-
-       type Row
-
-       type Shape[_]
-       type Spec
-
-       // derived type members
-
-       type Repr    = Map[Id, Row]
-       type Record  = (Id, Row)
-       type StreamF[Record] = fs2.Stream[cats.effect.IO, Record] // for example
-
-       type Model  = Shape[Spec]
-     }
+ // derived type members
+ //
+ type Record = (Id, Row)
+}
 ```
 Type swag provider for the free type variable `Value`.
 
 Any type `A` we bind to `Value` will have these provided. `Value` types must have value equality semantics - of course!
 
-### Companion mixin `WithId`
+### `ValueStore`s and Companion mixin `WithId`
 ```scala
      trait WithId[V] extends WithValue[V] {
        type Row = Value
      }
 ```
-For immutable `value store`s, the `Row` is just the `Value`.
+The `Row` type is simply bound to the  `Value` type.
 
 #### content address models a `Set`
 
@@ -481,19 +516,18 @@ This simple convention entails `Set` semantics: duplicates are (semantically) di
 identical `Row`s hash to the same `Id`.
 
 ```scala
-     type Shape[_] = Set[_]
-     type Spec     = Value
-     // type Model = Set[Value]
+type Spec     = Value
+type Shape[_] = Set[_]
+type Model    = Shape[Spec]
 
-     val example: Model = Set(33.33, 42.00)
+val example: Model = Set(33.33, 42.00)
 ```
 
-Note: duplicate rows are _silently_ elided.
+Note: duplicate rows are elided, and this elision is signaled in the API.
 
-Because the `Id` may be computed directly given the `Value`, or "content", to be referenced,
-this type of `store` can be called `content addressed`.
+Because the `Id` may be computed directly given the `Value`, or "content", to be referenced, this type of `store` can be called `content addressed`.
 
-Note: The sequential order of committed `Value`s is not guaranteed to be maintained.
+Note: The sequential order of committed `Value`s is not guaranteed to be maintained. In particular, the physical presence of a `Record` which precedes another cannot be taken as indication, let alone proof, that there is a temporal ordering between them which is defined by the `ValueStore` (such ordering may be defined elsewhere withing a specific data model).
 
 #### chained address models a `List`
 
@@ -508,11 +542,12 @@ Entails `List` semantics: the order of commitment may be proved by the `Id` sequ
 
 
 ```scala
-     type Shape[_] = List[_]
-     type Spec     = Value
-     // type Model = List[Value]
+type Spec     = Value
+/* type Shape[_] = Set[_] */
+type Shape[_] = List[_]
+type Model    = Shape[Spec]
 
-     val example: Model = List(42.00, 33.33, 42.00)
+val example: Model = List(42.00, 33.33, 42.00)
 ```
 
 Note in particular that a _block_ of chained `Id`s forms a
@@ -520,15 +555,14 @@ function `Id => Id` (input to output) permitting blocks themselves to be chained
 
 `Store`s of this shape are used for `model.Transaction`s.
 
-All `Shape` specializations of [WithId](Companion mixin `WithId`) may use
-*either* `content address` or `chained address` functions to compute `Id`.
+All `Shape` specializations of `WithId` may use *either* `content address` or `chained address` functions to compute `Id`.
 
-#### specialization for `Map`s.
+#### specialization for `Nem`s (Non Empty Maps)
 
 ```scala
-        type K2 /*: Order */
-        type V2 /*: Eq */
-        type Value = (K2, V2)
+type K2 /*: Order */
+type V2 /*: Eq */
+type Value = (K2, V2)
 ```
 
 Id            | (K2 |      V2)
@@ -542,18 +576,17 @@ This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, V
 to the same `Map`.
 
 ```scala
-     type Shape[_] = Set[_] // or List[_] for chained address!
-     type Spec     = Map[K2, V2]
+type Spec     = NonEmptyMap[K2, V2]
 
-     val example: Model = Set (
-       Map (
-         USD ->  10000.00,
-         XAU ->    420.33
-       ),
-       Map (
-         XAU ->    397.23
-       )
-     )
+val example: Model = Set (
+  Map (
+    USD ->  10000.00,
+    XAU ->    420.33
+  ),
+  Map (
+    XAU ->    397.23
+  )
+)
 ```
 
 `Store`s of this shape are used e.g. to model `Trade`s (with `content address`ing).
@@ -573,29 +606,28 @@ This is a value store of `Nel[Value]` rows.
 Rows that are committed together get the same `Id`.
 
 ```scala
-     type Shape[_] = Set[_] // or List[_] for chained address!
      type Spec     = Nel[Value]
 
-     val example: Model =
-       Set(
-         Nel(XAU),
-         Nel(XAU ,
-             CHF),
-         Nel(USD ,
-             USD)
-       )
+val example: Model =
+  Set(
+    Nel(XAU),
+    Nel(XAU ,
+        CHF),
+    Nel(USD ,
+        USD)
+  )
 ```
 
-`Store`s of this shape are used in this example to implement a set of lists of arbitrary currencies.
+`Store`s with this specialization are used in this example to implement a set of lists of arbitrary currencies.
 
 **TODO:** make this example a set of `Command` or `Event` values of some kind - that shows off the `Shape`.
 
 #### specialization for `Map`s of `Nel`s.
 
 ```scala
-        type K2 /*: Order */
-        type V2 /*: Eq */
-        type Value = (K2, V2)
+type K2 /*: Order */
+type V2 /*: Eq */
+type Value = (K2, V2)
 ```
 
 May use either content address or chained address for `Id`.
@@ -616,24 +648,25 @@ In the example above, a `Map[K2, V2]` of size 3 is followed by a `Map` of size 1
 
 ```scala
 
-     type Shape[_] = Set[_] // or List[_]  for chained address!
-     type Spec     = Map[K2, Nel[V2]]
+type Shape[_] = Set[_] // or List[_]  for chained address!
+type Spec     = Map[K2, Nel[V2]]
 
-     val example: Model =
-       Set (
-         Map (
-           USD -> Nel(10000.00 ,
-                       5000.00 ,
-                       5000.00),
-           XAU -> Nel(  420.33)
-         ),
-         Map (
-           XAU -> Nel(  397.23)
-         )
-       )
+val example: Model =
+  Set (
+    Map (
+      USD -> Nel(10000.00 ,
+                  5000.00 ,
+                  5000.00),
+      XAU -> Nel(  420.33)
+    ),
+    Map (
+      XAU -> Nel(  397.23)
+    )
+  )
 ```
+### `KeyValueStore`s
 
-### Companion mixin `WithKey`
+#### Companion mixin `WithKey`
 
 The use of chained address for `Id` is mandatory.
 
@@ -642,10 +675,10 @@ multiple instances of the same `Row` entail positional significance in the data 
 (We can write the same row multiple times, and it matters in what order we write it.)
 
 ```scala
-       trait WithKey[K, V] extends WithValue[V] {
-         type Key  = K /*: Order */
-         type Row  = (Key, Option[Value])
-       }
+trait WithKey[K, V] extends WithValue[V] {
+  type Key  = K /*: Order */
+  type Row  = (Key, Option[Value])
+}
 ```
 
 Id | (Key | Option[Value])
@@ -668,7 +701,6 @@ transferred or validated without additional context.
    - (entails a `Map[Key, Id] => Map[Key, Id]` somewhere handy)
 
 ```scala
-     type Shape[_] = Map[Key, _]
      type Spec     = Value
 
      val example: Model =
@@ -816,25 +848,23 @@ This sections describes how the data models are layered and relate to each other
 
 The `model` package implements records and computations which define a layered set of financial domain models and services.
 
-This generic model package serves up the full stack of `layers`. Note that model object package analogs customized for certain applications need **not** incorporate all layers! In particular, the `Accounts` layer isn't necessary where the personal information of the market participants isn't necessary for the performance of business logic.
+The simplified model package illustrated below serves up the full stack of `layers`.
 
+But note: a `model` package object analog customized for certain applications need **not** incorporate all layers! In particular, the `Accounts` layer isn't necessary where the personal information of the market participants isn't necessary for the performance of business logic.
 ```scala
-/** simplified for exposition
-  */
-package object model
-    extends Ledger {
+package object model extends /* */ {
     //
-    // full stack of layered capabilities
+    with Ledger          // folios, transactions, confirmations
     //
-    with Accounting      // debits, credits, and all that
-    with Balances        // depends only on generic Accounting
-    with MarketData      // WIP; IBRK will be first integration
-    with OrderManagement // WIP; IBRK will be first integration
+    with Accounting      // debits, credits, and all their descendants
+    with Balances        // accounting sums across transactions
+    with MarketData      // IBKR will be first integration
+    with OrderManagement // IBKR will be first integration
     //
-    // PII firewalling simplified by eliminating dependencies:
-    // `Accounts` layer can be commented out!
+    // `Accounts` layer can be omited for applications not requiring information
+    // about any `Party` to the `Position`s held.
     //
-    with Accounts // binding of legal entities to sets of positions */
+    with Accounts // binding of parties to sets of positions
     //
       /* ... */
     }
@@ -844,7 +874,7 @@ The `model` package object is also where we bind certain application policy deci
 
 This is where the policy decision to choose generic tax accounting for entities treated as partnerships. Different objects instantiating the layers could make different policy decisions.
 
-Also, this is where we bind the `MonetaryAmount` type (and thus `Money`) to `BigDecimal`, while other `Financial` `Quantity`s bind to `Double`.
+Also, this is where we bind the `MonetaryAmount` type (and thus `Money`) to `BigDecimal`, while other `Financial` `Quantity`s bind to `Double`. Again, other instanting objects could make other decisions; see the API docs (and the code!) for more details.
 
 #### `Partition`s
 
@@ -878,11 +908,12 @@ The key insight is that `Map`s are `Group`s if their values are. Maps are used t
 - are immutable once recorded
 `Fiber`s are used for `Confirmation` flows.
 
-How light are `Fiber`s? So light we can create a pair for every outstanding (unconfirmed) execution.
+How lightweight are `Fiber`s? So light we can create a pair for every outstanding (unconfirmed) `Execution`.
 
 This means that "failed" transactions will result in "resource leaks" - except that the `Fiber` is so lightweight that it's just another heap allocated object, which must remain materialized (or persisted) to memorialize the failed transaction.
 
 #### Cash and payment
+So called "ready funds" such as bank account balances are a kind of `capital.Instrument`.
 
 - we know **our** cash `instrument` details (e.g. `USD` bank accounts).
    - must track quantity (`balance`) per such `instrument` of ours
@@ -964,6 +995,27 @@ It should be understood that `Market`s cannot be defined without reference to re
   - `MIC` code identities (reference data)
   - Virtual markets (procedural order routers)
 
+#### Market Data Systems
+
+Various kinds of data about and from markets inhabit a modern financial markets office, and it is domain convention to refer to the different kinds of data by these names:
+
+Market Data
+: - bid/ask/trade ticks for live markets
+  - can be very legit high freq (c.g. [OPRA](https://www.opraplan.com/))
+  - but also low freq like announced dividend amounts, dates, and ex-dividend dates
+  - Wall St Journal prime rate - low freq, very important, classic oracle problem
+
+Historical Data
+: - old market data, where `old` effectively means "useless for live pricing models"
+  - used for back-testing
+  - can be aggregated (e.g. ticks -> bars)
+
+Reference Data
+: - Think of this as market metadata
+  - Market ID codes, hours, holiday lists,
+
+Market data and Historical data are both used within various `Pricing` modules (described in a subsequent section).
+
 #### Order Management
 
 Ubiquitous within the domain is the acronym,`OMS`, which stands for **Order Management System**. Financial markets, especially publicly traded markets, are often grouped and accessed together over a session based API which manages the order lifecycle.
@@ -1004,12 +1056,11 @@ TODO: revisit parent/child orders
 
 ### Balances and Accounting
 
-Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s.
-When summing Transactions, this module slice implements the algebra which
-maintains all the accounting identities.
-These are the terms and identities as **we** use them:
+Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s. When summing Transactions, this module slice implements the algebra which maintains all the accounting identities.
 
-```scala
+These are the accounting terms and identities as we use them:
+
+```
    Debits := Assets + Expenses                  // accounting definition
    Credits := Liability + Revenue               // accounting definition
    Debits === Credits                           // accounting identity
@@ -1023,17 +1074,13 @@ These are the terms and identities as **we** use them:
    + Reserves                                   // you never know
    + RetainedEarnings                           // add to book value of partners' equity
 ```
-
 #### Pricing
 
 `Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.
 
 Return both a `bid` and an `ask` for the given instrument.
 
-Domain modelling note: `quote` does not signal intent. For example, the client may ignore
-the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers)
-cannot not predjudice their responses when asked for a quote, as the client reveals nothing
-about their intent.
+**Important: requesting a `quote` _does not signal intent_**. For example, the client may ignore the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers) cannot not predjudice their responses when asked for a quote, as the client reveals nothing about their intent.
 
 Pricing instances can deliver live market feeds
 - "Orderly market" invariant: `ask` < `bid`
@@ -1119,6 +1166,7 @@ One simple but crucial design feature is that `Tax.No`'s are not used as `Key`s 
 Each `Party` within an `Account`s `Roster` is assigned one of a finite enumeration of `Role`s. . Every `Role` is mapped to a `Party` via a `Roster` which is **application and jurisdiction specific**.
 
 While least one `Party` **must** be specified for each role in the roster, the default is to assign the principal to perform each of the non principal roles for themselves.
+
 
 #### Principals and NonPrincipals, enumerated
 
