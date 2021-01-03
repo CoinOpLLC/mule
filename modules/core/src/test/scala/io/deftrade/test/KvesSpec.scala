@@ -8,7 +8,7 @@ import refinements.{ IsLabel, IsUnitInterval, Label }
 import IsUnitInterval._
 
 import cats.implicits._
-import cats.{ Eq, Show }
+import cats.{ Eq, Order, Show }
 import cats.derived.{ auto, semi }
 import cats.effect.{ ContextShift, IO, Sync }
 
@@ -189,6 +189,29 @@ object mvt {
         final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
       }
     }
+  import io.chrisdavenport.cormorant.{ Get, LabelledRead, LabelledWrite, Put }
+  import shapeless.{ HList, LabelledGeneric, Lazy }
+  def kvs[F[
+      _
+  ]: Sync: ContextShift, K: Order: Get: Put, V: Show: Eq, K2: Order, V2: Eq, HV <: HList](
+      V: WithKey.Aux[K, V]
+  )(
+      param: KeyValueStore.Param
+  )(
+      st: param.DependentTypeThunk[K, V]#SubThunk[K2, V2]
+  )(implicit
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]
+  ): Result[st.KeyValueStore[F]] =
+    Result safe {
+      import V._
+      import CsvImplicits._
+      val p = "target/fixme.csv"
+      new impl.MemFileKeyValueStore[F, K, V, HV](V, Paths get p) with st.KeyValueStore[F] {
+        final protected lazy val fresh: Fresh[Id, Row] = ??? // Fresh.shaChain[Row]
+      }
+    }
 
   // keyValueStore[IO](KeyValueStore.Param.V) at "target/costs.csv" ofKeyChained Costs
   // want this syntax:
@@ -214,7 +237,7 @@ object arbitraryMvt {
   def metas: Metas.ValueStore[IO]    = ???
   def costs: Costs.KeyValueStore[IO] = ???
 
-  implicit def arbitraryFoo: Arbitrary[Stream[IO, Product]] =
+  implicit def arbitraryProduct: Arbitrary[Stream[IO, Product]] =
     Arbitrary {
       for {
         bs       <- drift(arbitrary[Cost])
@@ -224,7 +247,7 @@ object arbitraryMvt {
       } yield Product.mkPipe(metas, costs)(nuts, bs, contacts, ms)
     }
 
-  implicit def arbitraryBar: Arbitrary[IO[Cost]] =
+  implicit def arbitraryCost: Arbitrary[IO[Cost]] =
     Arbitrary {
       for {
         amount <- arbitrary[Money[USD]]
