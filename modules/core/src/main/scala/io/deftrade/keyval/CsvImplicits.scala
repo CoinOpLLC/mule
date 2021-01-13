@@ -6,17 +6,17 @@ import money._
 import cats.implicits._
 import cats.data.NonEmptyList
 
-import io.chrisdavenport.cormorant
-import cormorant._
+import io.circe.{ parser, Decoder, Encoder }
 
-import cormorant.implicits.stringPut
+import io.chrisdavenport.{ cormorant, fuuid }
 
-import io.chrisdavenport.fuuid
 import fuuid.FUUID
 
-import io.circe.{ Decoder, Encoder }
+import cormorant.implicits.stringPut
+import cormorant._
 
 protected trait CsvImplicits {
+
   private[keyval] lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
 
   /**
@@ -81,14 +81,12 @@ protected trait CsvImplicits {
   implicit def sadtGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
     new Get[SADT.Aux[T]] {
 
-      import io.circe.parser._
-
       /**
         */
       def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
         for {
-          json <- parse(field.x) leftMap toDecodeFailure
-        } yield SADT[T](json)
+          json <- parser.parse(field.x) leftMap toDecodeFailure
+        } yield SADT cast json
     }
 
   /**

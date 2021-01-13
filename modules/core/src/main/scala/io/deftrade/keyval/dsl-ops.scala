@@ -13,22 +13,22 @@ import shapeless.{ HList, LabelledGeneric, Lazy }
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
-import java.nio.file.{ Paths }
+import java.nio.file.{ Path, Paths }
 
 trait dsl {
 
   /**
     */
-  def valueStore[F[_]: Sync: ContextShift](param: ValueStore.Param) = VsOps[F](param)
+  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
 
   /**
     */
-  def keyValueStore[F[_]: Sync: ContextShift](param: KeyValueStore.Param) = KvsOps[F](param)
+  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
 /** dsl for value stores
   */
-final case class VsOps[F[_]: Sync: ContextShift](final val param: ValueStore.Param) {
+final case class VsOps[F[_]: Sync: ContextShift]() {
 
   /** `at` clause
     */
@@ -38,51 +38,69 @@ final case class VsOps[F[_]: Sync: ContextShift](final val param: ValueStore.Par
     */
   sealed case class AddressOps(p: String) {
 
-    private def path = Paths get p
-
     /**
       */
-    def ofContentAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        v: WithId.Aux[V]
-    )(
-        thunk: param.DependentTypeThunk[V]
-    )(
-        subThunk: thunk.SubThunk[K2, V2]
+    def ofContentAddressed[
+        V: Eq: Show,
+        K2: Order: Show,
+        V2: Eq: Show,
+        HV <: HList
+    ](
+        V: ValueStores[V]
     )(implicit
-      // IsV: p.ValueSpec[K2, V2] === v.Value,
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[subThunk.ValueStore[F]] =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[V.ValueStore[F]] =
       Result safe {
-        new CaMfValueStore[F, v.Value, HV](
-          v,
-          path
-        ) with subThunk.ValueStore[F] {}
+
+        import V.{ Row, Value }
+
+        new CsvValueStore[F, Value](V) with V.ValueStore[F] with MemFileV[F, V] {
+
+          def path: Path = Paths get p
+
+          final override lazy val fresh = Fresh.shaContent[Row]
+
+          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
+          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+        }
       }
 
     /** `of` clause
       */
-    def ofChainAddressed[V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        v: WithId.Aux[V]
-    )(
-        thunk: param.DependentTypeThunk[V]
-    )(
-        subThunk: thunk.SubThunk[K2, V2]
+    def ofChainAddressed[
+        V: Eq: Show,
+        K2: Order: Show,
+        V2: Eq: Show,
+        HV <: HList
+    ](
+        V: ValueStores[V]
     )(implicit
-      // IsV: p.ValueSpec[K2, V2] === v.Value,
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[subThunk.ValueStore[F]] =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[V.ValueStore[F]] =
       Result safe {
-        new ChMfValueStore[F, V, HV](v, path) with subThunk.ValueStore[F] {}
+
+        import V.{ Row, Value }
+
+        new CsvValueStore[F, Value](V) with V.ValueStore[F] with MemFileV[F, V] {
+
+          def path: Path = Paths get p
+
+          final override lazy val fresh = Fresh.shaChain[Row]
+
+          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
+          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+        }
       }
   }
 }
 
 /**
   */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
-final case class KvsOps[F[_]: Sync: ContextShift](param: KeyValueStore.Param) {
+final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
 
   /**
     */
@@ -90,54 +108,33 @@ final case class KvsOps[F[_]: Sync: ContextShift](param: KeyValueStore.Param) {
 
   /**
     */
-  sealed case class AddressOps(p: String) {
+  sealed case class AddressOps(p: String) { address =>
 
-    def ofKeyChained[K: Show, V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        subThunk: param.DependentTypeThunk[K, V]#SubThunk[K2, V2]
+    def ofKeyChained[
+        K: Show: Get: Put,
+        V: Eq: Show,
+        K2: Order: Show,
+        V2: Eq: Show,
+        HV <: HList
+    ](
+        KV: KeyValueStores[K, V]
     )(implicit
-      // isV: param.ValueSpec[K2, V2] === V,
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]],
-      lgetk: Lazy[Get[K]],
-      lputk: Lazy[Put[K]]) =
+        lgv: LabelledGeneric.Aux[V, HV],
+        llr: Lazy[LabelledRead[HV]],
+        llw: Lazy[LabelledWrite[HV]]
+    ): Result[KV.KeyValueStore[F]] =
       Result safe {
 
-        implicit val kGet = lgetk.value
-        implicit val kPut = lputk.value
+        import KV.{ Id, Key, Row, Value }
 
-        new MemFileKeyValueStore(subThunk.kv, Paths get p) with subThunk.KeyValueStore[F] {
+        new CsvKeyValueStore(KV) with KV.KeyValueStore[F] with MemFileKV[F, Key, Value] {
 
-          import V._
+          def path: Path = Paths get p
+
           final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-        }
-      }
 
-    // K2: Order: Show, V2: Eq: Show
-
-    /**
-      */
-    def ofChainAddressed[K: Show, V: Eq: Show, K2: Order: Show, V2: Eq: Show, HV <: HList](
-        kv: WithKey.Aux[K, V]
-    )(
-        thunk: param.DependentTypeThunk[K, V]
-    )(
-        subThunk: thunk.SubThunk[K2, V2]
-    )(implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]],
-      lgetk: Lazy[Get[K]],
-      lputk: Lazy[Put[K]]): Result[subThunk.KeyValueStore[F]] =
-      Result safe {
-
-        implicit val kGet = lgetk.value
-        implicit val kPut = lputk.value
-
-        new MemFileKeyValueStore(kv, Paths get p) with subThunk.KeyValueStore[F] {
-
-          import V._
-          final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
+          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv
         }
       }
   }

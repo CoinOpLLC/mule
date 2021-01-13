@@ -35,34 +35,34 @@ import refined.cats._
 
 import keys.{ IsIsin, IsUsin }
 
-/**
-  * Models a tradeable thing.
+/** Models a tradeable thing.
   */
 final case class Instrument(
     symbol: Label,
-    issuedBy: LegalEntity.Key,
+    issuedBy: LegalEntities.Key,
     issuedIn: Option[CurrencyLike]
 ) extends Numéraire.InKind
 
 /**
-  * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
-  * The [[keyval.WithKey]] companion takes
-  * advantage of the natural (`ISIN` derived) "business key" to define a `String` refinement.
   */
-object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
+object Instrument {
 
   /**
     */
-  implicit def instrumentEq: Eq[Instrument] =
-    // import auto._; semi.eq
-    Eq.fromUniversalEquals[Instrument]
+  implicit def instrumentEq: Eq[Instrument] = { import auto._; semi.eq }
+  // Eq.fromUniversalEquals[Instrument]
 
-  // /** */
-  // implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
+  /**
+    */
+  implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
 }
 
-/**
-  * Represents [[contracts.Contract]] parameters and state.
+/** Indexed by CUSIPs and other formats.
+  * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
+  */
+object Instruments extends KeyValueStores.KV[String Refined IsUsin, Instrument]
+
+/** Represents [[contracts.Contract]] parameters and state.
   *
   * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
   *
@@ -70,13 +70,11 @@ object Instrument extends WithRefinedKey[String, IsAscii24, Instrument] {
   */
 sealed abstract class Form extends Product with Serializable {
 
-  /**
-    * The `Contract` embedded within this `Form`.
+  /** The `Contract` embedded within this `Form`.
     */
   def contract: Contract
 
-  /**
-    * The display name is the final case class name.
+  /** The display name is the final case class name.
     */
   final def display: Label = {
     val name: String = productPrefix
@@ -85,23 +83,24 @@ sealed abstract class Form extends Product with Serializable {
   }
 }
 
-/**
-  * Instances of `Form` memorialize the state of a `Contract` at a given point in time.
+/** Instances of `Form` memorialize the state of a `Contract` at a given point in time.
   */
-object Form extends WithKey.Aux[Instrument.Key, Form] { lazy val Key = Instrument.Key }
+object Form
 
-/**
-  * Parameters common to multiple `Form`s.
+// object Forms extends KeyValueStores.KV[Instruments.Key, Form] {
+//   // lazy val Key: KeyCompanion[Instrument] = ??? // Instruments.Key
+// }
+
+/** Parameters common to multiple `Form`s.
   */
 object columns {
 
-  /**
-    * Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
+  /** Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
     *
     * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
     */
   sealed trait Tracks { self: Form =>
-    def members: Set[Instrument.Key]
+    def members: Set[Instruments.Key]
   }
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
@@ -114,8 +113,7 @@ object columns {
     def expires: ZonedDateTime
   }
 
-  /**
-    * `Strike`s only apply to `Derivative`s.
+  /** `Strike`s only apply to `Derivative`s.
     *
     * TODO: {{{def logMoneynessStrike(strike: Double, forward: Double): Strike }}}
     */
@@ -123,15 +121,13 @@ object columns {
     def strike: Double
   }
 
-  /**
-    * All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
+  /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
     * and expire on a certain day.
     */
-  sealed trait Derivative extends Expiry with Strike { def underlier: WithKey#Key }
+  sealed trait Derivative extends Expiry with Strike { def underlier: Instruments.Key }
 }
 
-/**
-  * Groups of related `Form`s.
+/** Groups of related `Form`s.
   */
 object layers {
 
@@ -143,7 +139,7 @@ object layers {
 
     /**
       */
-    case class CommonStock(
+    final case class CommonStock(
         tclass: Option[Label]
     ) extends Form {
 
@@ -153,7 +149,7 @@ object layers {
 
     /**
       */
-    object CommonStock extends WithRefinedKey[String, IsUsin, CommonStock]
+    object CommonStocks extends KeyValueStores.KV[String Refined IsUsin, CommonStock]
 
     /**
       */
@@ -170,21 +166,16 @@ object layers {
 
     /**
       */
-    object PreferredStock extends WithRefinedKey[String, IsUsin, PreferredStock]
+    object PreferredStocks extends KeyValueStores.KV[String Refined IsUsin, PreferredStock]
 
-    /**
-      * Assume semiannual, Treasury-style coupons.
-      *
-      * FIXME:
-      * - state is experimental
-      * - under most circumstances the list is never inspected (forced)
+    /** Assume semiannual, Treasury-style coupons.
       */
-    case class Bond(
+    final case class Bond(
         coupon: Double, // per 100 face
         issued: Instant,
         matures: ZonedDateTime,
-        paidCoupons: LazyList[Instant], // most recent first
-        unpaidCoupons: LazyList[ZonedDateTime] // soonest due first
+        unpaidCoupons: List[ZonedDateTime], // soonest due first
+        paidCoupons: List[Instant]          // most recent first
     ) extends Form
         with Maturity {
 
@@ -192,14 +183,13 @@ object layers {
       def contract: Contract = ???
     }
 
-    /**
-      * `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
+    /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
       */
-    object Bond extends WithRefinedKey[String, IsIsin, Bond]
+    object Bonds extends KeyValueStores.KV[String Refined IsIsin, Bond]
 
     /**
       */
-    case class Bill(
+    final case class Bill(
         override val matures: ZonedDateTime
     ) extends Form
         with Maturity {
@@ -211,14 +201,12 @@ object layers {
         zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
     }
 
-    /**
-      * `Bills` are always issued by entities, never by natural persons.
+    /** `Bills` are always issued by entities, never by natural persons.
       */
-    object Bill extends WithRefinedKey[String, IsIsin, Bill]
+    object Bills extends KeyValueStores.KV[String Refined IsIsin, Bill]
   }
 
-  /**
-    * And by "vanilla" we mean an exchange traded derivative (ETD).
+  /** And by "vanilla" we mean an exchange traded derivative (ETD).
     */
   trait VanillaDerivatives {
 
@@ -236,8 +224,8 @@ object layers {
 
     /**
       */
-    case class Index(
-        members: Set[Instrument.Key]
+    final case class Index(
+        members: Set[Instruments.Key]
     ) extends Form
         with Tracks {
 
@@ -247,12 +235,12 @@ object layers {
 
     /**
       */
-    object Index extends WithRefinedKey[String, IsIsin, Index]
+    object Indexes extends KeyValueStores.KV[String Refined IsIsin, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
-    case class XtFuture(
+    final case class XtFuture(
         expires: ZonedDateTime,
-        underlier: Instrument.Key,
+        underlier: Instruments.Key,
         strike: Double
     ) extends Form
         with Derivative {
@@ -263,13 +251,13 @@ object layers {
 
     /**
       */
-    object XtFuture extends WithRefinedKey[String, IsIsin, XtFuture]
+    object XtFutures extends KeyValueStores.KV[String Refined IsIsin, XtFuture]
 
     /** Exchange Traded Derivative - Option (ETD) */
-    case class XtOption(
+    final case class XtOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: Instrument.Key,
+        override val underlier: Instruments.Key,
         override val strike: Double
     ) extends Form
         with Derivative {
@@ -279,14 +267,14 @@ object layers {
     }
 
     /** TODO: recheck that `Isin` thing... */
-    object XtOption extends WithRefinedKey[String, IsIsin, XtOption]
+    object XtOptions extends KeyValueStores.KV[String Refined IsIsin, XtOption]
 
     /**
       */
-    case class XtFutureOption(
+    final case class XtFutureOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: XtFuture.Key,
+        override val underlier: XtFutures.Key,
         override val strike: Double
     ) extends Form
         with Derivative {
@@ -300,14 +288,14 @@ object layers {
 
     /**
       */
-    object XtFutureOption extends WithRefinedKey[String, IsIsin, XtFutureOption]
+    object XtFutureOptions extends KeyValueStores.KV[String Refined IsIsin, XtFutureOption]
 
     /**
       */
     case class XtIndexOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: Index.Key,
+        override val underlier: Indexes.Key,
         override val strike: Double
     ) extends Form
         with Derivative {
@@ -318,11 +306,10 @@ object layers {
 
     /**
       */
-    object XtIndexOption extends WithRefinedKey[String, IsIsin, XtIndexOption]
+    object XtIndexOptions extends KeyValueStores.KV[String Refined IsIsin, XtIndexOption]
   }
 
-  /**
-    * Private lending instruments.
+  /** Private lending instruments.
     *
     * TODO: do these next
     */
@@ -380,13 +367,12 @@ object layers {
 
 import layers._
 
-/**
-  * Groups of related `Form`s.
+/** Groups of related `Form`s.
   */
 object forms
     extends PrimaryCapital  // nececssary
     with VanillaDerivatives // fun
-    with Lending // as one does
+    with Lending            // as one does
 // with Fx                 // WIP
 // with Exotics            // primarily for hedge funds
 // with Ibor               // primariy for banks
@@ -397,24 +383,26 @@ object forms
 //   def sourcedFrom: String Refined Url
 // }
 
-/**
-  * Links which model `Instrument` lifecycle transformation acts
+/** Links which model `Instrument` lifecycle transformation acts
   * (such as M&A actions) as events connecting `Instrument.Key`s.
   */
 final case class Novation(
-    ante: Option[Instrument.Key],
-    post: Option[Instrument.Key],
+    ante: Option[Instruments.Key],
+    post: Option[Instruments.Key],
     date: LocalDate,
-    meta: Meta.Id,
+    // meta: Meta.Id,
     sourcedAt: Instant,
     sourcedFrom: String Refined Url
 ) // extends Provenance
 
-/**
-  * A `Novation.Id` makes an effective M&A ''receipt''.
+/** A `Novation.Id` makes an effective M&A ''receipt''.
   */
-object Novation extends WithId.Aux[Novation] {
+object Novation {
 
   implicit def novationOrder: Order[Novation] = { import auto.order._; semi.order }
-  implicit def novationShow: Show[Novation]   = { import auto.show._; semi.show }
+  implicit def novationShow: Show[Novation] = { import auto.show._; semi.show }
 }
+
+/**
+  */
+object Novations extends ValueStores.V[Novation]

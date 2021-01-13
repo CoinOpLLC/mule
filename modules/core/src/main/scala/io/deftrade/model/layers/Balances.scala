@@ -23,6 +23,7 @@ import syntax._, time._, money._, keyval._
 import cats.implicits._
 import cats.{ Invariant }
 import cats.kernel.CommutativeGroup
+import cats.data.NonEmptyList
 
 import cats.effect.Sync
 import fs2.{ Pipe, Stream }
@@ -33,8 +34,7 @@ import refined.auto._
 // narrow import to get `Field` operators (only!) for `Fractional` spire types.
 // import spire.syntax.field._
 
-/**
-  * Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
+/** Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   */
 trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
@@ -77,8 +77,9 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  // object Balance extends WithKey.Aux[(Folio.Key, LocalDate, Period), BalanceLike] {
-  object Balance extends WithKey.Aux[Folio.Key, Balance] {
+  object Balance {
+
+    final type Entry = (AccountingKey, MonetaryAmount)
 
     /** Exact type of both keys is specified.
       */
@@ -100,13 +101,23 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
       final type CreditType = CR
     }
 
-    lazy val Key = Folio.Key
-
     /** Decompose into separate `Debit` and `Credit` maps. */
     def unapply[DB <: Debit, CR <: Credit, C: Currency](
         b: Balance.Aux[DB, CR, C]
     ): Option[(AccountingMap[DB, C], AccountingMap[CR, C])] =
       (b.debits, b.credits).some
+  }
+
+  /**
+    */
+  sealed abstract class BalanceStores[B <: Balance]
+      extends ValueStores.Codec(BalanceStores.encode[B], BalanceStores.decode[B])
+
+  /**
+    */
+  object BalanceStores {
+    def encode[B <: Balance]: B => NonEmptyList[Balance.Entry] = _ => ???
+    def decode[B <: Balance]: NonEmptyList[Balance.Entry] => B = _ => ???
   }
 
   /**
@@ -149,12 +160,9 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     final def accrualBooks: AccrualReport.Aux[C] = ???
   }
 
-  /**
-    * Only public interface for creation is transformation, starting with `empty`.
+  /** Only public interface for creation is transformation, starting with `empty`.
     */
-  object TrialBalance extends WithKey.Aux[Folio.Key, TrialBalance[_]] {
-
-    lazy val Key = Folio.Key
+  object TrialBalance {
 
     /**
       */
@@ -198,11 +206,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def revenues: Revenues[CurrencyTag]
   }
 
-  /**
-    */
-  object IncomeStatement extends WithKey.Aux[Folio.Key, IncomeStatement] {
-
-    lazy val Key = Folio.Key
+  object IncomeStatement extends BalanceStores[IncomeStatement] {
 
     sealed abstract case class Aux[C] private[IncomeStatement] (
         final override val expenses: Expenses[C],
@@ -225,9 +229,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object CashFlowStatement extends WithKey.Aux[Folio.Key, CashFlowStatement] {
-
-    lazy val Key = Folio.Key
+  object CashFlowStatement extends BalanceStores[CashFlowStatement] {
 
     /**
       */
@@ -254,9 +256,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object BalanceSheet extends WithKey.Aux[Folio.Key, BalanceSheet] {
-
-    lazy val Key = Folio.Key
+  object BalanceSheet extends BalanceStores[BalanceSheet] {
 
     /**
       */
@@ -274,16 +274,13 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): BalanceSheet = new Aux[C](assets, liabilities) {}
   }
 
-  /**
-    * Often formally known as Statement of Changes in Equity.
+  /** Often formally known as Statement of Changes in Equity.
     */
   sealed trait EquityStatement extends Balance
 
   /** TODO: implement `Period` as a secondary index?
     */
-  object EquityStatement extends WithKey.Aux[Folio.Key, EquityStatement] {
-
-    lazy val Key = Folio.Key
+  object EquityStatement extends BalanceStores[EquityStatement] {
 
     sealed abstract case class Aux[C] private[EquityStatement] (
         override val debits: Debits[C],
@@ -307,7 +304,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
     /**
       */
-    type ReprId <: Report.Id
+    type ReprId <: Reports.Id
 
     /**
       */
@@ -337,12 +334,11 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     final def currency(implicit C: Currency[CurrencyTag]): Currency[CurrencyTag] = C
   }
 
-  /**
-    * Placeholder
+  /** Placeholder
     *
     * TODO: Footnotes table or column?
     */
-  object Report extends WithId.Aux[(Folio.Key, Report)] {
+  object Report {
 
     /**
       */
@@ -351,39 +347,38 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     }
   }
 
+  object Reports extends KeyValueStores.KV[Folios.Key, Report]
+
   /**
     */
   sealed trait CashReport extends Report {
-
-    /**
-      */
-    final type ReprId = CashReport.Id
+    final type ReprId = CashReports.Id
   }
 
   /**
     */
-  object CashReport extends WithKey.Aux[Folio.Key, CashReport] {
+  object CashReport {
 
     /**
       */
     sealed abstract case class Aux[C] private[CashReport] (
         asOf: Instant,
         period: Period,
-        previous: CashReport.Id,
+        previous: CashReports.Id,
         cs: CashFlowStatement.Id,
         bs: BalanceSheet.Id,
         es: EquityStatement.Id
     ) extends Report.Aux[C]
         with CashReport
 
-    lazy val Key = Folio.Key
+    lazy val Key = Folios.Key
 
     /**
       */
     private[model] def apply[F[_], C: Currency](
         asOf: Instant,
         period: Period,
-        previous: CashReport.Id,
+        previous: CashReports.Id,
         cs: CashFlowStatement.Id,
         bs: BalanceSheet.Id,
         es: EquityStatement.Id
@@ -397,11 +392,13 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Pipe[F, Transaction, CashReport] = ???
   }
 
+  object CashReports extends KeyValueStores.KV[Folios.Key, CashReport]
+
   /**
     */
   sealed trait AccrualReport extends Report {
 
-    final type ReprId = AccrualReport.Id
+    final type ReprId = AccrualReports.Id
 
     /**
       */
@@ -412,23 +409,17 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         es: EquityStatement.Aux[CurrencyTag]
     )
 
-    /** wip */
-    def view[F[_]](abss: AccrualReport.Store[F])(abs: AccrualReport.Id): View =
-      ???
-
     def is: IncomeStatement.Id
   }
 
   /**
     */
-  object AccrualReport extends WithKey.Aux[Folio.Key, AccrualReport] {
-
-    lazy val Key = Folio.Key
+  object AccrualReport {
 
     sealed abstract case class Aux[C] private[AccrualReport] (
         asOf: Instant,
         period: Period,
-        previous: AccrualReport.Id,
+        previous: AccrualReports.Id,
         cs: CashFlowStatement.Id,
         is: IncomeStatement.Id,
         bs: BalanceSheet.Id,
@@ -441,7 +432,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     private[Balances] def apply[C: Currency](
         asOf: Instant,
         period: Period,
-        previous: AccrualReport.Id,
+        previous: AccrualReports.Id,
         cs: CashFlowStatement.Id,
         is: IncomeStatement.Id,
         bs: BalanceSheet.Id,
@@ -452,10 +443,14 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     /**
       */
     final def report[F[_]: Sync, C: Currency](
-        previous: AccrualReport.Id,
+        previous: AccrualReports.Id,
         period: Period,
         treatment: Transaction => Stream[F, DoubleEntryKey]
-    ): Stream[F, Transaction.Id] => F[AccrualReport.Id] =
+    ): Stream[F, Transactions.Id] => F[AccrualReports.Id] =
       ???
   }
+}
+
+object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
+  // lazy val Key = Folios.Key
 }

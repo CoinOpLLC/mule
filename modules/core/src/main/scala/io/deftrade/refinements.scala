@@ -32,8 +32,7 @@ import scodec.bits.ByteVector
 // import shapeless.syntax.singleton._
 // import scala.language.existentials,
 
-/**
-  * A palette of domain specific refined types.
+/** A palette of domain specific refined types.
   */
 object refinements {
 
@@ -78,8 +77,7 @@ object refinements {
     */
   type Num3 = String Refined MatchesRegex[Num3.type]
 
-  /**
-    * RDB friendly `String`s that are born usable as is.
+  /** RDB friendly `String`s that are born usable as is.
     * Postgres optimizes strings of length 126 (and shorter).
     * FIXME: account for `UTF-8` encoding
     */
@@ -107,8 +105,7 @@ object refinements {
   /** Non-whitespace, non control block, non-empty ASCII string of bounded length. */
   type IsAscii24 = Size[3 To 24] And Forall['!' To '~']
 
-  /**
-    * A short, pure ASCII, all printable, no whitespace `Label`.
+  /** A short, pure ASCII, all printable, no whitespace `Label`.
     */
   type Ascii24 = String Refined IsAscii24
 
@@ -116,6 +113,8 @@ object refinements {
     */
   sealed abstract case class IsSha()
 
+  /**
+    */
   object IsSha {
 
     lazy val instance: IsSha = new IsSha() {}

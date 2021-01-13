@@ -16,32 +16,52 @@
 
 package io.deftrade
 
-import eu.timepit.refined
-import refined.api.Refined
+import cats.{ Order, Show }
 
-/**
-  * Key value store algebras and implementations for persistence and caching of
+import eu.timepit.refined
+import refined.api.{ Refined, Validate }
+
+/** Key value store algebras and implementations for persistence and caching of
   * domain value types (typically case classes).
   *
   * TODO: Postgres / Mongo / Kafka integration
   */
-package object keyval extends keyval.dsl {
+package object keyval {
+// package object keyval extends keyval.dsl {
 
   import shapeless.syntax.singleton._
 
-  /**
-    * The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
+  /** The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
     *
     * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
     * useful for type member `T`, which is the (singleton) type of the id column label.
     */
   private[keyval] final implicit val id = Symbol("id").witness
 
-  /**
-    * [[Key]] column type literal witness - same purpose as [[id]].
+  /** [[Key]] column type literal witness - same purpose as [[id]].
     */
   private[keyval] final implicit val key = Symbol("key").witness
 
   /** Just an alias. */
   type OpaqueKey[K, V] = Refined[K, V]
+}
+
+package keyval {
+
+  /**
+    */
+  object OpaqueKey {
+
+    /**
+      */
+    private[keyval] def apply[K: Order: Show, V](k: K): OpaqueKey[K, V] = Refined unsafeApply k
+
+    /**
+      */
+    def unsafe[K: Order: Show, V](k: K): OpaqueKey[K, V] = apply(k)
+
+    /** TODO: review; feels questionably permissive
+      */
+    implicit def validate[K: Order: Show, V]: Validate[K, V] = Validate alwaysPassed (())
+  }
 }

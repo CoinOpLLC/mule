@@ -10,8 +10,11 @@ import cats.data.{ NonEmptyList, NonEmptySet }
 import cats.derived.{ auto, semi }
 
 import eu.timepit.refined
+import refined.api.Refined
 import refined.cats._
 import refined.numeric.Interval
+
+import io.chrisdavenport.fuuid.FUUID
 
 /** Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
   */
@@ -23,82 +26,78 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  val Contact: WithSADT[Contact]
-
-  /**
-    */
-  final lazy val Contacts =
-    ValueStore(Contact, ValueStore.Param.SADT(Contact)).deriveV[SADT.Aux[Contact]]
+  val Contacts: ValueStores.SADT[Contact]
 
   /**
     */
   type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
 
-  /** `Accounts` link the personal information of the account holders with the financial data of the ledgers.
+  /** `Accounts` link the personal information of the account holders
+    * with the financial data of the ledgers.
     */
   sealed abstract case class Account(
-      roster: Roster.Id,
-      open: Folio.Key,
-      escrowed: Folio.Key,
-      expected: Folio.Key
+      roster: Rosters.Id,
+      open: Folios.Key,
+      escrowed: Folios.Key,
+      expected: Folios.Key
   )
 
   /** Accounts are modelled as long lived entities that can evolve over time.
     */
-  object Account extends WithRefinedKey[Long, IsAccountNo, Account] {
+  object Account {
 
     /**   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
       */
-    protected[deftrade] def freshFolioKey = Folio.Key.random
+    protected[deftrade] def freshFolioKey = Folios.Key.random
 
     /**
       */
     protected[deftrade] def apply(
-        roster: Roster.Id,
-        open: Folio.Key,
-        escrowed: Folio.Key,
-        expected: Folio.Key
+        roster: Rosters.Id,
+        open: Folios.Key,
+        escrowed: Folios.Key,
+        expected: Folios.Key
     ): Account =
       new Account(roster, open, escrowed, expected) {}
 
     /**
       */
-    def fromRoster(roster: Roster.Id): Account =
+    def fromRoster(roster: Rosters.Id): Account =
       apply(roster, freshFolioKey, freshFolioKey, freshFolioKey)
 
     /** alt version FIXME: implement */
-    def fromRoster[F[_]](roster: Roster): F[Account.Id] =
+    def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
       ???
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
+    implicit def accountEq: Eq[Account] = { import auto.eq._; semi.eq }
     implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
   }
 
   /**
     */
-  final lazy val Accounts = KeyValueStore(Account, KeyValueStore.Param.V).deriveV[Account]
+  object Accounts extends KeyValueStores.KV[Long Refined IsAccountNo, Account]
 
   /** Each [[Account]] is created with a [[Roster]].
     */
   sealed abstract case class Roster private (
-      principals: UnitPartition[Party.Key, Quantity],
-      private val nps: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
+      principals: UnitPartition[Parties.Key, Quantity],
+      private val nps: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
   ) {
 
     /**
       */
-    lazy val nonPrincipals: Role.NonPrincipal => NonEmptySet[Party.Key] = nps(_)
+    lazy val nonPrincipals: Role.NonPrincipal => NonEmptySet[Parties.Key] = nps(_)
 
     /**
       */
-    lazy val roles: Role => NonEmptySet[Party.Key] = {
+    lazy val roles: Role => NonEmptySet[Parties.Key] = {
       case Role.Principal        => principals.keys
       case Role.NonPrincipal(np) => nonPrincipals(np)
     }
 
     /**
       */
-    def withAgent(agent: Party.Key): Roster =
+    def withAgent(agent: Parties.Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Agent -> (NonEmptySet one agent))
@@ -106,7 +105,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    def withManager(manager: Party.Key): Roster =
+    def withManager(manager: Parties.Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Manager -> (NonEmptySet one manager))
@@ -114,7 +113,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    def withAuditor(auditor: Party.Key): Roster =
+    def withAuditor(auditor: Parties.Key): Roster =
       Roster(
         principals = principals,
         nonPrincipals = nps + (Role.Auditor -> (NonEmptySet one auditor))
@@ -123,41 +122,39 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /** TODO: revert this to a tuple.
     */
-  case class RosterValue(party: Party.Key, role: Role, stake: Option[Quantity])
+  case class RosterValue(party: Parties.Key, role: Role, stake: Option[Quantity])
 
   /** Creation patterns for account management teams.
     */
-  object Roster extends WithId.Aux[RosterValue] {
+  object Roster {
 
-    implicit def valueShow: Show[Value] = { import auto.show._; semi.show }
-    implicit def valueEq: Eq[Value]     = { import auto.eq._; semi.eq }
+    implicit def valueShow: Show[Roster] = { import auto.show._; semi.show }
+    implicit def valueEq: Eq[Roster] = { import auto.eq._; semi.eq }
 
     private[deftrade] def apply(
-        principals: UnitPartition[Party.Key, Quantity],
-        nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
+        principals: UnitPartition[Parties.Key, Quantity],
+        nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
     ): Roster =
       new Roster(principals, nonPrincipals) {}
 
-    private[deftrade] def to(vs: NonEmptyList[Value]): Roster = {
+    private[deftrade] def to(vs: NonEmptyList[RosterValue]): Roster = {
       import Role.{ NonPrincipal, Principal }
       val (xs, nonPrincipals) = vs.foldLeft(
-        (List.empty[(Party.Key, Quantity)], Map.empty[NonPrincipal, NonEmptySet[Party.Key]])
-      ) {
-        case ((us, nps), value) =>
-          value match {
-            case RosterValue(p, Principal, Some(u)) => ((p, u) :: us, nps)
-            case RosterValue(p, NonPrincipal(r), None) =>
-              (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
-          }
+        (List.empty[(Parties.Key, Quantity)], Map.empty[NonPrincipal, NonEmptySet[Parties.Key]])
+      ) { case ((us, nps), value) =>
+        value match {
+          case RosterValue(p, Principal, Some(u)) => ((p, u) :: us, nps)
+          case RosterValue(p, NonPrincipal(r), None) =>
+            (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
+        }
       }
       val Right(principals) = UnitPartition exact (xs: _*)
       Roster(principals, nonPrincipals)
     }
 
-    private[deftrade] def from(roster: Roster): NonEmptyList[Value] = {
-      val ps = roster.principals.kvs.toNel map {
-        case (party, share) =>
-          RosterValue(party, Role.principal, share.value.some)
+    private[deftrade] def from(roster: Roster): NonEmptyList[RosterValue] = {
+      val ps = roster.principals.kvs.toNel map { case (party, share) =>
+        RosterValue(party, Role.principal, share.value.some)
       }
       val nps = for {
         role  <- Role.nonPrincipals
@@ -168,8 +165,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /** most general public creation method */
     def from(
-        principals: UnitPartition[Party.Key, Quantity],
-        nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Party.Key]]
+        principals: UnitPartition[Parties.Key, Quantity],
+        nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
     ) =
       Roster(
         principals,
@@ -181,65 +178,63 @@ trait Accounts { self: Ledger with ModuleTypes =>
     /** By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
       * regardless of their share of the principle pie.
       */
-    def fromPrinciples(principals: UnitPartition[Party.Key, Quantity]): Roster =
+    def fromPrinciples(principals: UnitPartition[Parties.Key, Quantity]): Roster =
       from(principals, Map.empty)
 
     /**
       */
-    def single(entity: Party.Key): Roster =
+    def single(entity: Parties.Key): Roster =
       fromPrinciples(principals = UnitPartition single entity)
 
     /** Splits partition equally among [[Role.Principal]]s.
       */
-    def equalSplitFrom(ps: Party.Key*): Result[Roster] =
+    def equalSplitFrom(ps: Parties.Key*): Result[Roster] =
       for {
-        slices <- UnitPartition fair [Party.Key, Quantity] (ps: _*)
+        slices <- UnitPartition fair [Parties.Key, Quantity] (ps: _*)
       } yield fromPrinciples(slices)
 
     /**
       */
-    implicit def eq: Eq[Roster]     = { import auto.eq._; semi.eq }
+    implicit def eq: Eq[Roster] = { import auto.eq._; semi.eq }
     implicit def show: Show[Roster] = { import auto.show._; semi.show }
   }
 
-  import Roster._
+  object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
-  /**
-    */
-  final lazy val Rosters =
-    ValueStore(Roster, ValueStore.Param.Aux(Roster.from, Roster.to))
-      .deriveV[RosterValue]
+  // import Roster._
 
   /** Models financial market participants.
     */
   sealed abstract class Party {
     def name: Label
     def taxNo: Tax.No
-    def contact: Contact.Id
+    def contact: Contacts.Id
   }
 
   /** Players that are recognized by the system (ours).
     */
-  object Party extends WithFuuidKey[Party] {
+  object Party {
 
     /**
       */
-    def apply(name: Label, taxNo: Tax.No, contact: Contact.Id): Party =
+    def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id): Party =
       taxNo match {
         case Tax.Ssn(ssn) => NaturalPerson(name, ssn, contact)
         case Tax.Ein(ein) => LegalEntity(name, ein, contact)
       }
 
-    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
+    implicit def partyEq: Eq[Party] = { import auto.eq._; semi.eq }
     implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
   }
+
+  object Parties extends KeyValueStores.KV[FUUID, Party]
 
   /** `NaturalPerson`s are `Party`s.
     */
   sealed abstract case class NaturalPerson(
       name: Label,
       ssn: Tax.Ssn,
-      contact: Contact.Id
+      contact: Contacts.Id
   ) extends Party {
 
     /**
@@ -249,30 +244,29 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object NaturalPerson extends WithFuuidKey[NaturalPerson] {
+  object NaturalPerson {
 
     /**
       */
-    def apply(name: Label, ssn: Tax.Ssn, contact: Contact.Id): NaturalPerson =
+    def apply(name: Label, ssn: Tax.Ssn, contact: Contacts.Id): NaturalPerson =
       new NaturalPerson(name, ssn, contact) {}
 
     import refined.cats._
 
-    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
+    implicit def naturalPersonEq: Eq[NaturalPerson] = { import auto.eq._; semi.eq }
     implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
   }
 
   /**
     */
-  final lazy val NaturalPersons =
-    KeyValueStore(NaturalPerson, KeyValueStore.Param.V).deriveV[NaturalPerson]
+  object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
 
   /**
     */
   sealed abstract case class LegalEntity private (
       name: Label,
       ein: Tax.Ein,
-      contact: Contact.Id
+      contact: Contacts.Id
   ) extends Party {
 
     /**
@@ -282,21 +276,18 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object LegalEntity extends WithFuuidKey[LegalEntity] {
+  object LegalEntity {
 
     /**
       */
-    def apply(name: Label, ein: Tax.Ein, contact: Contact.Id): LegalEntity =
+    def apply(name: Label, ein: Tax.Ein, contact: Contacts.Id): LegalEntity =
       new LegalEntity(name, ein, contact) {}
 
     import refined.cats._
 
-    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
+    implicit def legalEntityEq: Eq[LegalEntity] = { import auto.eq._; semi.eq }
     implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
   }
 
-  /**
-    */
-  final lazy val LegalEntities =
-    KeyValueStore(LegalEntity, KeyValueStore.Param.V).deriveV[LegalEntity]
+  object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]
 }

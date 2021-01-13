@@ -23,7 +23,7 @@ import time._, money._, keyval._, capital._
 import cats.implicits._
 
 import cats.kernel.{ Monoid }
-import cats.{ Eq, Order, Show }
+import cats.{ Eq, Functor, Show }
 import cats.data.NonEmptyMap
 import cats.derived.{ auto, semi }
 import cats.effect.{ Sync }
@@ -31,9 +31,9 @@ import cats.effect.{ Sync }
 import eu.timepit.refined
 import refined.cats._
 
-import fs2.{ Pipe, Stream }
-import io.deftrade.keyval.WithKey.KeyCompanion
-import io.getquill.ast.Value
+import io.chrisdavenport.fuuid.FUUID
+
+import fs2.Stream
 
 /** Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
@@ -68,7 +68,6 @@ trait Ledger { module: ModuleTypes =>
 
   /** TODO: The different kinds of `Pricer`, listed in order of abstraction (most to least),
     * Model / Market / Book / Cfg.
-    *
     */
   object Pricer {
 
@@ -86,8 +85,8 @@ trait Ledger { module: ModuleTypes =>
     /** Price data per unit of instrument.
       */
     sealed abstract class Instrument[F[_], C: Currency] private (
-        final override val price: capital.Instrument.Key => Stream[F, Money[C]]
-    ) extends Pricer.Aux[F, capital.Instrument.Key, C](price)
+        final override val price: Instruments.Key => Stream[F, Money[C]]
+    ) extends Pricer.Aux[F, Instruments.Key, C](price)
 
     /** Deploy `Pricer`s by creating search paths per `Currency` and instantiating
       * these pricers in the implicit context.
@@ -101,7 +100,7 @@ trait Ledger { module: ModuleTypes =>
       /**
         */
       def instance[F[_], C: Currency](
-          price: capital.Instrument.Key => Stream[F, Money[C]]
+          price: Instruments.Key => Stream[F, Money[C]]
       ): Instrument[F, C] =
         new Instrument(price) {}
 
@@ -133,9 +132,9 @@ trait Ledger { module: ModuleTypes =>
     /**
       */
     sealed abstract class Book[F[_], C: Currency] private (
-        folios: Folio.Store[F],
-        k: Folio.Key
-    ) extends Pricer.Aux[F, capital.Instrument.Key, C]((instrument: capital.Instrument.Key) => {
+        folios: Folios.KeyValueStore[F],
+        k: Folios.Key
+    ) extends Pricer.Aux[F, Instruments.Key, C]((instrument: Instruments.Key) => {
           import money.Financial._
 
           // val positions: Stream[F, Position] = for {
@@ -147,7 +146,7 @@ trait Ledger { module: ModuleTypes =>
 
       /** FIXME: need a method to pull the timetamps from the Transaction stream.
         */
-      final def lots(instrument: capital.Instrument.Key): Stream[F, (Quantity, Instant)] = ???
+      final def lots(instrument: Instruments.Key): Stream[F, (Quantity, Instant)] = ???
       // folios.rows filter (_._1 === instrument) map (r => (r._2._1, ???))
     }
 
@@ -160,7 +159,7 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    type Key = Instrument.Key
+    type Key = Instruments.Key
 
     /**
       */
@@ -186,9 +185,8 @@ trait Ledger { module: ModuleTypes =>
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance {
-          case (instrument, quantity) =>
-            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance { case (instrument, quantity) =>
+          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
@@ -197,7 +195,7 @@ trait Ledger { module: ModuleTypes =>
     * Any kind of `ledger entry` must carry with it a `key`:
     * `value`s are '''fungeable''' ''within'' `key`s, but not ''across'' them.
     */
-  type Entry = (Entry.Key, Entry.Value)
+  final type Entry = (Entry.Key, Entry.Value)
 
   /** How much of a given [[capital.Instrument]] is held.
     *
@@ -205,7 +203,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Note, this is just a type alias.
     */
-  type Position = Entry
+  final type Position = Entry
 
   /**
     */
@@ -215,7 +213,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Note, this is just a type alias.
     */
-  type Leg = Entry
+  final type Leg = Entry
 
   /**
     */
@@ -226,7 +224,7 @@ trait Ledger { module: ModuleTypes =>
     * A `Folio` can be thought of as a "flat" portfolio",
     * i.e. a portfolio without sub portfolios.
     */
-  type Folio = Map[Entry.Key, Entry.Value]
+  final type Folio = Map[Entry.Key, Entry.Value]
 
   /** A `Folio` key value store holds (open) [[Trade]]s,
     * indexed by opaque [[Account]] identifiers.
@@ -236,12 +234,12 @@ trait Ledger { module: ModuleTypes =>
     *   (Folio.Key, Instrument.Key, Quantity)
     * }}}
     */
-  object Folio extends WithFuuidKey[Position] {
+  object Folio {
 
     /** Conceptually, lifts all the [[Position]]s into `Map`s,
       * and sums them as the `Map`s form commutative groups.
       *
-      * Implementation differs, for efficiency.
+      * Implementation may differ for efficiency.
       */
     def apply(ps: Position*): Folio = indexAndSum(ps.toList)
 
@@ -252,16 +250,19 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  final lazy val Folios =
-    KeyValueStore(Folio, KeyValueStore.Param.MKV).deriveKV[Entry.Key, Entry.Value]
+  object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value] {
+    lazy val Key = FuuidKeyCompanion
+  }
 
   /** A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
-  type Trade = NonEmptyMap[Entry.Key, Entry.Value]
+  final type Trade = NonEmptyMap[Entry.Key, Entry.Value]
 
   /**
     */
-  object Trade extends WithId.Aux[Leg] {
+  object Trade {
+
+    def apply(trade: Trade): Trade = trade
 
     /**
       */
@@ -316,7 +317,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Data Vault Classification:
     */
-  final lazy val Trades = ValueStore(Trade, ValueStore.Param.NEMKV).deriveKV[Entry.Key, Entry.Value]
+  object Trades extends ValueStores.NEMKV[Leg, Entry.Key, Entry.Value]
 
   /** Root of the transaction metadata abstract datatype.
     */
@@ -332,68 +333,58 @@ trait Ledger { module: ModuleTypes =>
     * in conjunction with digital signatures. Thus the metadata is bound into the Ricardian
     * lineage of the contract.
     */
-  val Meta: WithSADT[Meta]
-
-  /**
-    */
-  final lazy val Metas = ValueStore(Meta, ValueStore.Param.SADT(Meta)).deriveV[SADT.Aux[Meta]]
+  val Metas: ValueStores.SADT[Meta]
 
   /** The concrete record for `Ledger` updates.
     */
   sealed abstract case class Transaction private (
       at: Instant,
-      folioA: Folio.Key,
-      tradeA: Trade.Id,
-      folioB: Folio.Key,
-      tradeB: Trade.Id,
-      meta: Meta.Id
+      folioA: Folios.Key,
+      tradeA: Trades.Id,
+      folioB: Folios.Key,
+      tradeB: Trades.Id,
+      meta: Metas.Id
   )
 
   /** Because `Transaction`s are immutable, we model them as pure values.
     */
-  object Transaction extends WithId.Aux[Transaction] {
+  object Transaction {
 
     /**
       */
-    private def apply(
+    def apply(
         at: Instant,
-        folioA: Folio.Key,
-        tradeA: Trade.Id,
-        folioB: Folio.Key,
-        tradeB: Trade.Id,
-        meta: Meta.Id
+        folioA: Folios.Key,
+        tradeA: Trades.Id,
+        folioB: Folios.Key,
+        tradeB: Trades.Id,
+        meta: Metas.Id
     ): Transaction =
       new Transaction(at, folioA, tradeA, folioB, tradeB, meta) {}
 
     /**
       */
     def singleLeg[F[_]: Sync](
-        trades: Trades.ValueStore[F],
-        metas: Metas.ValueStore[F]
-    )(
-        folioA: Folio.Key,
-        tradeA: Trade.Id,
-        folioB: Folio.Key,
+        folioA: Folios.Key,
+        tradeA: Trades.Id,
+        folioB: Folios.Key,
         leg: Leg,
         meta: Meta
     ): F[Transaction] =
-      multiLeg(trades, metas)(folioA, tradeA, folioB, Trade(leg), meta)
+      multiLeg(folioA, tradeA, folioB, Trade(leg), meta)
 
     /**
       */
     def multiLeg[F[_]: Sync](
-        trades: Trades.ValueStore[F],
-        metas: Metas.ValueStore[F]
-    )(
-        folioA: Folio.Key,
-        tradeA: Trade.Id,
-        folioB: Folio.Key,
+        folioA: Folios.Key,
+        tradeA: Trades.Id,
+        folioB: Folios.Key,
         trade: Trade,
         meta: Meta
     ): F[Transaction] =
       for {
-        tid <- trades put trade
-        mid <- metas put meta map (_._1)
+        tid <- trades[F] put trade
+        mid <- metas[F] put meta map (_._1)
       } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
     /**
@@ -405,86 +396,67 @@ trait Ledger { module: ModuleTypes =>
     implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
   }
 
-  /**
-    */
-  final lazy val Transactions = ValueStore(Transaction, ValueStore.Param.V).deriveV[Transaction]
+  object Transactions extends ValueStores.V[Transaction]
 
   /** Note that [[Folio.Id]] is actually an `update event` for the specified [[Folio.Key]].
     * TODO: get this to work across nodes in a cluster
     */
-  sealed abstract case class Confirmation private (at: Instant, from: Folio.Id, to: Folio.Id)
+  sealed abstract case class Confirmation private (at: Instant, from: Folios.Id, to: Folios.Id)
 
   /**
     */
-  object Confirmation extends WithKey.Aux[Transaction.Id, Confirmation] {
+  object Confirmation {
 
     /**
       */
-    private[model] def apply(at: Instant, from: Folio.Id, to: Folio.Id): Confirmation =
+    private[model] def apply(at: Instant, from: Folios.Id, to: Folios.Id): Confirmation =
       new Confirmation(at, from, to) {}
 
-    /**
-      */
-    object Key extends KeyCompanion[Transaction.Id] {
-      implicit def order = Order[Transaction.Id]
-      implicit def show  = Show[Transaction.Id]
-    }
-
-    /**
-      */
     implicit lazy val confirmationEq: Eq[Confirmation] = { import auto.eq._; semi.eq }
-
-    /**
-      */
     implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
 
-    /** Drives the exchange of [[Trade]]s between [[Folio]]s.
+    /** Process which drives the exchange of [[Trade]]s between [[Folio]]s.
       *
       * FIXME: define and implement
       */
-    trait Agent
+    trait Settlement
 
     /**
       */
-    object Agent
+    object Settlement
 
     /** For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
       */
-    def unsettled[F[_]]: Transaction.Id => Stream[F, Confirmation.Id] => F[Folio] =
+    def unsettled[F[_]]: Transactions.Id => Stream[F, Confirmations.Id] => F[Folio] =
       ???
 
     /** Monotonic, in that [[Transaction]]s are never observed to "unsettle".
       *
       * Nota Bene - '''memoize''' these if need be
       */
-    def settled[F[_]: cats.Functor]: Transaction.Id => Stream[F, Confirmation.Id] => F[Boolean] =
+    def settled[F[_]: Functor]: Transactions.Id => Stream[F, Confirmations.Id] => F[Boolean] =
       xn => cs => unsettled(xn)(cs) map (_ === Folio.empty)
-
   }
 
   /**
     */
-  final lazy val Confirmations =
-    KeyValueStore(Confirmation, KeyValueStore.Param.V).deriveV[Confirmation]
+  object Confirmations extends KeyValueStores.KV[Transactions.Id, Confirmation]
 
   /** '''Cash''' is ''fungable''and ''self-pricing''.
     */
   final def payment[F[_]: Sync, C: Currency](
-      trades: Trades.ValueStore[F]
+      payCash: Folios.Key => Money[C] => F[Result[Folios.Id]]
   )(
-      payCash: Folio.Key => Money[C] => F[Result[Folio.Id]]
-  )(
-      drawOn: Folio.Key
-  ): (Trade, Money[C]) => F[Result[Trade.Id]] = {
-    case (trade, amount) =>
-      for {
-        idb <- trades put trade
-        _   <- payCash(drawOn)(amount)
-      } yield Result(idb._1.some)
+      drawOn: Folios.Key
+  ): (Trade, Money[C]) => F[Result[Trades.Id]] = { case (trade, amount) =>
+    for {
+      idb <- trades[F] put trade
+      _   <- payCash(drawOn)(amount)
+    } yield Result(idb._1.some)
   }
 
-  /** wip
-    */
-  def unsettled2[F[_]](cs: Confirmation.Store[F])(xn: Transaction.Id): F[Trade] = ???
-  // Confirmation.unsettled(xn)(cs select xn) FIXME
+  def trades[F[_]]: Trades.ValueStore[F]                  = ???
+  def metas[F[_]]: Metas.ValueStore[F]                    = ???
+  def transactions[F[_]]: Transactions.ValueStore[F]      = ???
+  def confirmations[F[_]]: Confirmations.KeyValueStore[F] = ???
 }
