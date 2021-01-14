@@ -53,6 +53,7 @@ trait Stores[V] {
 
   /** Base class
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   trait Store[F[_]] {
 
     implicit val F: Sync[F]

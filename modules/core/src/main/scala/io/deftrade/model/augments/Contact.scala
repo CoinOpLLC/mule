@@ -59,12 +59,12 @@ trait Contacts {
       ???
   }
 
-  implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semi.eq }
+  implicit lazy val contactEq: Eq[Contact] = { import auto.eq._; semi.eq }
   implicit lazy val contactShow: Show[Contact] = { import auto.show._; semi.show }
 
   /**
     */
-  object Contact extends WithSADT[Contact] {
+  object Contact {
 
     /**
       */
@@ -154,4 +154,8 @@ trait Contacts {
       */
     final type Email = String Refined MatchesRegex[IsEmail.type]
   }
+
+  /**
+    */
+  object Contacts extends ValueStores.SADT[Contact]
 }

@@ -31,16 +31,18 @@ trait DefaultMetas { self: ModuleTypes with Ledger =>
     */
   object Memo { def apply(memo: Label): Memo = new Memo(memo) {} }
 
-  implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
+  implicit lazy val metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
   implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
 
   /**
     */
-  final override object Meta extends WithSADT[Meta] {
+  object Meta {
 
     import io.circe.generic.semiauto._
 
     implicit lazy val decoder: Decoder[Meta] = deriveDecoder
     implicit lazy val encoder: Encoder[Meta] = deriveEncoder
   }
+
+  final override object Metas extends ValueStores.SADT[Meta]
 }

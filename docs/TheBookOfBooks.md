@@ -284,7 +284,7 @@ Other examples:
 
 #### Novations
 
-Links which model `Instrument` lifecycle transformation acts (such as M&A actions) as events connecting `Instrument.Key`s.
+Links which model `Instrument` lifecycle transformation acts (such as M&A actions) as events connecting `Instruments.Key`s.
 
 Motivation: an (immutable) `Instrument` can hide an extensive history.
 
@@ -923,7 +923,7 @@ So called "ready funds" such as bank account balances are a kind of `capital.Ins
   //                 ____reify ___
   //                /             \
   //               /               V
-  Money[C: Currency]     <==>      (Instrument.Key, Quantity)
+  Money[C: Currency]     <==>      (Instruments.Key, Quantity)
   //               ^                /
   //                \____abstract__/
   ```
@@ -931,11 +931,11 @@ So called "ready funds" such as bank account balances are a kind of `capital.Ins
 By platform convention, `instrument.symbol === currency.code` for **all** `cash instrument`s.
 
 For `Position`s within `Folio`s:
-- the `Instrument.Key` is a `String Refined capital.keys.IsUsBan`
+- the `Instruments.Key` is a `String Refined capital.keys.IsUsBan`
 - a `Folio` can contain a number of such `instrument`s and associated quantities: identified bank balances, which can be thought of as "bank account positions".
 
 For `Leg`s within `Trade`s:
-- the`Instrument.Key`s is constucted by taking the [three letter currency code](money.CurrencyLike.code) **_only_** as the **exact `Instrument.Key`**
+- the`Instruments.Key`s is constucted by taking the [three letter currency code](money.CurrencyLike.code) **_only_** as the **exact `Instruments.Key`**
 - the `Transaction` record does **not** record (e.g. bank account) details but instead deal in cash `Instrument`s that are both **reified** and stripped of detail.
 
 #### Processing Transactions
@@ -948,7 +948,7 @@ Important design note: _there is no currency field_; cash payments are reified i
 
 What about metadata? the `meta` field, an `SADT` extension point, stores the **cryptographic hash** of whatever metadata there is, preserving uniform treatment and constant size.
 
-Transaction settlment is easily `audit`ed, as a `Confirmation` trail links all the relevent `Folio.Id`s, where `Folio.Id` represent a **persistent update event** for the specified `Folio.Key`!
+Transaction settlment is easily `audit`ed, as a `Confirmation` trail links all the relevent `Folio.Id`s, where `Folio.Id` represent a **persistent update event** for the specified `Folios.Key`!
 
 Cryptographic note: the `Transaction.Id` is chained into the `Confirmation.Id`s that go into the settlement computation.
 
@@ -976,7 +976,7 @@ We accomplish this by employing two _concurrent_ `Fiber`s per `Transaction`:
    - `expect.n = empty`
 
 
-*Note*: no `Folio.Key`s need be exchanged at all, because `join` does all the work. Both `expect` and `escrow` are left empty in a successful settlement, and are therefore eliminated on snapshot (`key`s which reference empty `Folio`s are dropped).
+*Note*: no `Folios.Key`s need be exchanged at all, because `join` does all the work. Both `expect` and `escrow` are left empty in a successful settlement, and are therefore eliminated on snapshot (`key`s which reference empty `Folio`s are dropped).
 
 ### Markets
 
@@ -1047,7 +1047,7 @@ Note that the first section of tables denotes the complete record of the financi
 
 Settlement updates the actual `Folio`s, with `Account` specific (and this `Folio` specific) cash account `capital.Instrument`s substituted for the raw `money.Currency` pseudo `Instrument` specified in the `Order` and enumerated within the `Leg`s of the `Trade` specified in the `Transaction`.
 
-Each OMS must maintain a contra `Ledger.Folio.Key`. The creation of this account (and its `Ledger.Folio.Key`) must occur before the OMS is created.
+Each OMS must maintain a contra `Ledger.Folios.Key`. The creation of this account (and its `Ledger.Folios.Key`) must occur before the OMS is created.
 
 TODO: revisit parent/child orders
 
@@ -1201,17 +1201,17 @@ Adapting the terminology of Data Vault modeling gives us the following usage:
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Novations** | Value[V] | Id | `Instrument.Key`[1,2], `Meta.Id` | `date: LocalDate`
+**Novations** | Value[V] | Id | `Instruments.Key`[1,2], `Metas.Id` | `date: LocalDate`
 **Instruments** | KeyValue[V] | Key[`USIN`] | `LegalEntity.Key` | `symbol: Label`, `issuedIn: Option[Currency]`
-**Forms** | KeyValue[V] | Id | **`Instrument.Key`** | `display: Label`, `contract: Contract`, `state: SADT`
+**Forms** | KeyValue[V] | Id | **`Instruments.Key`** | `display: Label`, `contract: Contract`, `state: SADT`
 
 #### Ledger
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Trades** | Value[NEMKV] | Id | `Instrument.Key` | `_: Quantity`
-**Folios** | KeyValue[MKV] | Id, Key[`UUID`] | `Instrument.Key` | `_: Quantity`
-**Transactions** | Value[V] | Id | `Trade.Id`[2], `Folio.Key`[2], `Meta.Id` | `at: Instant`
+**Trades** | Value[NEMKV] | Id | `Instruments.Key` | `_: Quantity`
+**Folios** | KeyValue[MKV] | Id, Key[`UUID`] | `Instruments.Key` | `_: Quantity`
+**Transactions** | Value[V] | Id | `Trade.Id`[2], `Folios.Key`[2], `Metas.Id` | `at: Instant`
 **Confirmations** | KeyValue[V] | | **`Transaction.Id`**, `Folio.Id`[2] | `at: Instant`
 **Metas** | Value[SADT] | Id | | `sadt: SADT`
 
@@ -1219,29 +1219,29 @@ Name | Shape | Publishes | Links | Attrs
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Balances** | KeyValue[MKV] | Id | **`Folio.Key`** | `(AccountingKey, FinancialAmount)`
-**Reports** | KeyValue[LV] | Id | **`Folio.Key`** , `Balance.Id`[3,4], *`Report.Id`*[0,1] | `asOf: Instant`, `period: Period`
+**Balances** | KeyValue[MKV] | Id | **`Folios.Key`** | `(AccountingKey, FinancialAmount)`
+**Reports** | KeyValue[LV] | Id | **`Folios.Key`** , `Balance.Id`[3,4], *`Report.Id`*[0,1] | `asOf: Instant`, `period: Period`
 
 #### People
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Accounts** | KeyValue[V] | Key[`AccountNo`] | `Folio.Key`[2], `Roster.Id` |
-**Rosters** | Value[V] | Id | `Party.Key` | `role: Role`, `stake: Option[Quantity]`
-**NaturalPersons** | KeyValue[V] | `Party.Key` | `Contact.Id` | `label: Label`, `ssn: Ssn`
-**LegalEntities** |  KeyValue[V] | `Party.Key` | `Contact.Id` | `label: Label`, `ein: Ein`
+**Accounts** | KeyValue[V] | Key[`AccountNo`] | `Folios.Key`[2], `Roster.Id` |
+**Rosters** | Value[V] | Id | `Parties.Key` | `role: Role`, `stake: Option[Quantity]`
+**NaturalPersons** | KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ssn: Ssn`
+**LegalEntities** |  KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ein: Ein`
 **Contacts** |  Value[SADT] | Id | | `sadt: SADT`
 
 #### Markets
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Counterparties** | KeyValue[V] | Key[`UUID`] |  `Party.Key`, `Folio.Key`, `Meta.Id` |
-**Exchanges** | KeyValue[V] | Key[`MIC`] |  `Party.Key`, `Folio.Key`, `Meta.Id` |
-**MDSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `Meta.Id`, `MarketList.Id` |
+**Counterparties** | KeyValue[V] | Key[`UUID`] |  `Parties.Key`, `Folios.Key`, `Metas.Id` |
+**Exchanges** | KeyValue[V] | Key[`MIC`] |  `Parties.Key`, `Folios.Key`, `Metas.Id` |
+**MDSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `Metas.Id`, `MarketList.Id` |
 **MarketLists** | Value[NELV] | Id | `MDS.Key`, `Exchange.Key` |
-**OMSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `MarketList.Id`, `Folio.Key`[2] |
-**Orders** | KeyValue[V] | Key[`Long`] | `OMS.Key`, `Market.Key`, `Trade.Id` | `at: Instant`, `currency: Currency`, `limit: Option[MonetaryAmount]`, `goodTill: Option[Instant]`, `attrs: Meta.Id`
+**OMSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `MarketList.Id`, `Folios.Key`[2] |
+**Orders** | KeyValue[V] | Key[`Long`] | `OMS.Key`, `Market.Key`, `Trade.Id` | `at: Instant`, `currency: Currency`, `limit: Option[MonetaryAmount]`, `goodTill: Option[Instant]`, `attrs: Metas.Id`
 **Executions** | Value[V] | Id | `Order.Key`, `Transaction.Id` | `at: Instant`
 
 #### Misc
@@ -1250,4 +1250,4 @@ Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 **TickData** | KeyValue[V] | Key[`Label`] |  | `at: Instant`, `tick: Tick`, `price: MonetaryAmount`, `size: Quantity`
 ---|---|---|---|---|---
-**SASH** | KeyValue[V] | |  **`*.Id`**, `Party.Key` | `sig: Sig`
+**SASH** | KeyValue[V] | |  **`*.Id`**, `Parties.Key` | `sig: Sig`

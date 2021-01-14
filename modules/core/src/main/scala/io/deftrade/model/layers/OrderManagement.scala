@@ -39,17 +39,16 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /**
     */
-  type Allocation = UnitPartition[Folio.Key, Quantity]
+  type Allocation = UnitPartition[Folios.Key, Quantity]
 
   /** Namespace placeholder */
   object Allocation
 
   /**
     */
-  type OMSrecord = (LegalEntity.Key, Folio.Key, Folio.Key, Market.Key)
+  type OMSrecord = (LegalEntities.Key, Folios.Key, Folios.Key, Exchanges.Key)
 
-  /**
-    * `OMS` := Order Management System. Ubiquitous domain acronym.
+  /** `OMS` := Order Management System. Ubiquitous domain acronym.
     *
     * The methods on `OMS` return [[cats.data.Kleisli]] arrows, which are intended to be chained with
     * `andThen`.
@@ -59,23 +58,22 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
   sealed abstract case class OMS[F[_]](
-      host: LegalEntity.Key,
-      entry: Folio.Key,
-      contra: Folio.Key,
-      markets: NonEmptySet[Market.Key]
+      host: LegalEntities.Key,
+      entry: Folios.Key,
+      contra: Folios.Key,
+      markets: NonEmptySet[Exchanges.Key]
   ) {
 
     /**
       */
     type ToStreamOf[T, R] = Kleisli[ResultT[Stream[F, *], *], T, R]
 
-    /**
-      * What it is that the client wants [[Execution]] of.
+    /** What it is that the client wants [[Execution]] of.
       */
     sealed abstract case class Order private (
         at: Instant,
-        market: Market.Key,
-        trade: Trade.Id,
+        market: Exchanges.Key,
+        trade: Trades.Id,
         currency: CurrencyLike,
         limit: Option[MonetaryAmount],
         goodTill: Option[Instant]
@@ -83,37 +81,40 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /**
       */
-    object Order extends WithOpaqueKey[Long, Order] {
+    object Order {
 
-      /**
-        * Note that currency is required even for market orders.
+      /** Note that currency is required even for market orders.
         */
-      def market[C: Currency](market: Market.Key, trade: Trade.Id): Order =
+      def market[C: Currency](market: Exchanges.Key, trade: Trades.Id): Order =
         new Order(instant, market, trade, Currency[C], none, none) {}
 
       /**
         */
-      def limit[C: Currency](market: Market.Key, trade: Trade.Id, limit: Money[C]): Order =
+      def limit[C: Currency](market: Exchanges.Key, trade: Trades.Id, limit: Money[C]): Order =
         new Order(instant, market, trade, Currency[C], limit.amount.some, none) {}
     }
 
     /**
-      * What actually happened to the [[Order]] at the [[Market]].
+      */
+    object Orders extends KeyValueStores.KV[Long OpaqueKey Order, Order]
+
+    /** What actually happened to the [[Order]] at the [[Market]].
       *
       * FIXME: canceled order signals are TBD.
       */
     sealed abstract case class Execution(
         at: Instant,
-        order: Order.Key,
-        transaction: Transaction.Id
+        order: Orders.Key,
+        transaction: Transactions.Id
     )
 
-    /**
-      * `Execution`s are pure values (do not evolve.)
+    /** `Execution`s are pure values (do not evolve.)
       *
       * Implication for domain modellers: so-called "broken trades" require explicit modelling.
       */
-    object Execution extends WithId.Aux[Execution] {}
+    object Execution
+
+    object Executions extends ValueStores.V[Execution]
 
     def riskCheck: Order ToStreamOf Order
 
@@ -127,8 +128,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       */
     final def allocate(a: Allocation): Execution ToStreamOf Execution = ???
 
-    /**
-      * Settlement updates the actual [[Folio]]s,
+    /** Settlement updates the actual [[Folio]]s,
       * with [[Account]] specific (and this `Folio` specific)
       * cash account [[capital.Instrument]]s substituted for the raw [[money.Currency]]
       * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
@@ -138,8 +138,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       */
     final val settle: Execution ToStreamOf Confirmation = ???
 
-    /**
-      * Order processing is all just kleisli arrows? Always has been.
+    /** Order processing is all just kleisli arrows? Always has been.
       */
     final def process(allocation: Allocation): Order ToStreamOf Confirmation =
       riskCheck andThen trade andThen allocate(allocation) andThen settle
@@ -147,17 +146,16 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
   /**
     */
-  object OMS extends WithRefinedKey[String, IsLabel, OMSrecord] {
+  object OMS {
 
-    /**
-      * TODO: evole
+    /** TODO: evole
       */
     def mk[F[_]: Sync](
-        host: LegalEntity.Key,
-        entry: Folio.Key,
-        contra: Folio.Key,
-        market: Market.Key,
-        ms: Market.Key*
+        host: LegalEntities.Key,
+        entry: Folios.Key,
+        contra: Folios.Key,
+        market: Exchanges.Key,
+        ms: Exchanges.Key*
     ): OMS[F] =
       new OMS[F](host, entry, contra, NonEmptySet(market, SortedSet(ms: _*))) {
 

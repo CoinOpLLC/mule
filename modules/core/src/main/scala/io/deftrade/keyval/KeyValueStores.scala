@@ -18,26 +18,20 @@ package io.deftrade
 package keyval
 
 import cats.implicits._
-import cats.{ Order, Show }
+import cats.{ Order }
 import cats.kernel.Monoid
 import cats.data.{ NonEmptyList }
 
 import eu.timepit.refined
-import refined.api.{ Min, Refined, Validate }
-import refined.refineV
 import refined.cats.refTypeOrder
-
-import io.chrisdavenport.fuuid.FUUID
 
 import shapeless.labelled._
 
 import scala.collection.immutable.SortedMap
 
-import java.util.UUID
-
 /**
   */
-abstract class KeyValueStores[K, V] extends Stores[V] { self =>
+abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
   /** `Foo` tables are indexed by `Foo.Key`s
     */
@@ -47,80 +41,21 @@ abstract class KeyValueStores[K, V] extends Stores[V] { self =>
     */
   final type KeyField = FieldType[key.T, Key]
 
-  /** Companion
-    */
-  val Key: KeyCompanion[Key]
-
-  /** Key type companion base class.
-    */
-  abstract class KeyCompanion[K] {
-
-    /**
-      */
-    implicit def order: Order[K]
-
-    /**
-      */
-    implicit def show: Show[K]
-  }
-
-  /** Companion base class for `Refined` key types.
-    */
-  abstract class RefinedKeyCompanion[K: Order: Show, P] extends KeyCompanion[Refined[K, P]] {
-
-    /**
-      */
-    def apply(k: K)(implicit ev: Validate[K, P]): Result[Refined[K, P]] =
-      refineV[P](k) leftMap Fail.fromString
-
-    /** for testability */
-    def unsafe(k: K): Refined[K, P] = Refined unsafeApply k
-
-    /**
-      */
-    final override implicit def order = Order[Refined[K, P]]
-
-    import refined.cats._ // FIXME: why?
-
-    /** nb `Show` is inferred for _all_ `Refined[K: Show, V]` (unquallified for V) */
-    final override implicit def show = Show[Refined[K, P]]
-
-    /** Where the key type is integral, we will reserve the min value. */
-    def reserved(implicit K: Min[K]): Refined[K, P] = Refined unsafeApply K.min
-  }
-
-  /**
-    */
-  object FuuidKeyCompanion extends KeyCompanion[FUUID] {
-
-    /**
-      */
-    def random: FUUID = FUUID fromUUID UUID.randomUUID
-
-    /**
-      */
-    implicit def order = Order[FUUID]
-
-    /**
-      */
-    implicit def show = Show[FUUID]
-  }
-
-  /** All values are optionable because all vales are deletable.
-    */
   final type Row = (K, Option[V])
 
   /** What we `get` and `put`.
     */
   type Spec
 
-  /**
+  /** A `Nel[ValueSpec] is how we store `Spec`s.
+    */
+  type ValueSpec
+
+  /** A type representing the sum of all `Spec`s for a given `Key`.
     */
   type NelSpec
 
   protected implicit def nelSpecMonoid: Monoid[NelSpec]
-
-  type ValueSpec
 
   implicit val IsV: ValueSpec =:= V
 
@@ -259,8 +194,8 @@ abstract class KeyValueStores[K, V] extends Stores[V] { self =>
     /**
       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final protected def storeLookup(key: Key): F[List[(Id, List[Value])]] = {
-      import Key._
+    final protected def storeLookup(key: Key): F[List[(Id, List[Value])]] =
+      // import Key._
       records
         .filter { case (_, (k, _)) => k === key }
         .groupAdjacentBy({ case (id, _) => id })
@@ -272,7 +207,6 @@ abstract class KeyValueStores[K, V] extends Stores[V] { self =>
         }
         .compile
         .lastOrError
-    }
   }
 }
 
@@ -282,7 +216,7 @@ final object KeyValueStores {
 
   /** (Single, scalar) `Value`
     */
-  abstract class KV[K, V](implicit
+  abstract class KV[K: Order, V](implicit
       final val IsV: V =:= V
   ) extends KeyValueStores[K, V] {
 
@@ -311,7 +245,7 @@ final object KeyValueStores {
 
   /** Map of `K2`s and `V2`s
     */
-  abstract class MKV[K, V, K2: Order, V2](implicit
+  abstract class MKV[K: Order, V, K2: Order, V2](implicit
       final val IsV: (K2, V2) =:= V
   ) extends KeyValueStores[K, V] {
 

@@ -48,7 +48,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
       */
-    protected[deftrade] def freshFolioKey = Folios.Key.random
+    protected[deftrade] def freshFolioKey = FUUID fromUUID java.util.UUID.randomUUID()
 
     /**
       */

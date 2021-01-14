@@ -238,8 +238,8 @@ package test {
         asOf: Instant,
         nut: Nut,
         quantity: Int Refined Positive,
-        from: Party.Key,
-        to: Party.Key,
+        from: Parties.Key,
+        to: Parties.Key,
         amount: Dollars,
         memo: String Refined NonEmpty
     )
@@ -249,8 +249,8 @@ package test {
       def mk(
           nut: Nut,
           jars: Int,
-          from: Party.Key,
-          to: Party.Key,
+          from: Parties.Key,
+          to: Parties.Key,
           total: Double,
           instructions: String = ""
       ): Invoice = {

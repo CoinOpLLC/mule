@@ -33,9 +33,11 @@ import refined.string.{ Url }
 import refined.numeric.{ Positive }
 import refined.cats._
 
-import keys.{ IsIsin, IsUsin }
+import keys.{ ISIN, USIN }
 
 /** Models a tradeable thing.
+  *
+  * Policy: Only legal entities (and not natural persons) may issue `Instruments`.
   */
 final case class Instrument(
     symbol: Label,
@@ -54,13 +56,18 @@ object Instrument {
 
   /**
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
 }
 
 /** Indexed by CUSIPs and other formats.
   * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
   */
-object Instruments extends KeyValueStores.KV[String Refined IsUsin, Instrument]
+object Instruments extends KeyValueStores.KV[USIN, Instrument]
+
+/**
+  */
+object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
 
 /** Represents [[contracts.Contract]] parameters and state.
   *
@@ -95,7 +102,7 @@ object Form
   */
 object columns {
 
-  /** Denotes a single [[Instrument.Key]] which tracks a (non-empty) set of `Instrument.Key`s
+  /** Denotes a single [[Instruments.Key]] which tracks a (non-empty) set of `Instruments.Key`s
     *
     * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
     */
@@ -149,7 +156,7 @@ object layers {
 
     /**
       */
-    object CommonStocks extends KeyValueStores.KV[String Refined IsUsin, CommonStock]
+    object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
 
     /**
       */
@@ -166,7 +173,7 @@ object layers {
 
     /**
       */
-    object PreferredStocks extends KeyValueStores.KV[String Refined IsUsin, PreferredStock]
+    object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
 
     /** Assume semiannual, Treasury-style coupons.
       */
@@ -185,7 +192,7 @@ object layers {
 
     /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
       */
-    object Bonds extends KeyValueStores.KV[String Refined IsIsin, Bond]
+    object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
 
     /**
       */
@@ -203,7 +210,7 @@ object layers {
 
     /** `Bills` are always issued by entities, never by natural persons.
       */
-    object Bills extends KeyValueStores.KV[String Refined IsIsin, Bill]
+    object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
   }
 
   /** And by "vanilla" we mean an exchange traded derivative (ETD).
@@ -235,7 +242,7 @@ object layers {
 
     /**
       */
-    object Indexes extends KeyValueStores.KV[String Refined IsIsin, Index]
+    object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
     final case class XtFuture(
@@ -251,7 +258,7 @@ object layers {
 
     /**
       */
-    object XtFutures extends KeyValueStores.KV[String Refined IsIsin, XtFuture]
+    object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
 
     /** Exchange Traded Derivative - Option (ETD) */
     final case class XtOption(
@@ -267,14 +274,24 @@ object layers {
     }
 
     /** TODO: recheck that `Isin` thing... */
-    object XtOptions extends KeyValueStores.KV[String Refined IsIsin, XtOption]
+    object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
+
+    protected object FIXME {
+
+      import refined.auto._
+
+      def x: ISIN = ???
+      def y: USIN = x
+    }
 
     /**
       */
     final case class XtFutureOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: XtFutures.Key,
+        // override val underlier: XtFutures.Key,
+        // override val underlier: ExchangeTradedInstruments.Key,
+        override val underlier: Instruments.Key,
         override val strike: Double
     ) extends Form
         with Derivative {
@@ -288,14 +305,14 @@ object layers {
 
     /**
       */
-    object XtFutureOptions extends KeyValueStores.KV[String Refined IsIsin, XtFutureOption]
+    object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
 
     /**
       */
     case class XtIndexOption(
         val putCall: PutCall,
         override val expires: ZonedDateTime,
-        override val underlier: Indexes.Key,
+        override val underlier: Instruments.Key,
         override val strike: Double
     ) extends Form
         with Derivative {
@@ -306,7 +323,7 @@ object layers {
 
     /**
       */
-    object XtIndexOptions extends KeyValueStores.KV[String Refined IsIsin, XtIndexOption]
+    object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
   }
 
   /** Private lending instruments.
@@ -384,13 +401,13 @@ object forms
 // }
 
 /** Links which model `Instrument` lifecycle transformation acts
-  * (such as M&A actions) as events connecting `Instrument.Key`s.
+  * (such as M&A actions) as events connecting `Instruments.Key`s.
   */
 final case class Novation(
     ante: Option[Instruments.Key],
     post: Option[Instruments.Key],
     date: LocalDate,
-    // meta: Meta.Id,
+    // meta: Metas.Id,
     sourcedAt: Instant,
     sourcedFrom: String Refined Url
 ) // extends Provenance

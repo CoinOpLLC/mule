@@ -139,7 +139,7 @@ object mvt {
   sealed abstract case class Cost private (
       z: Instant,
       amount: Dollars,
-      mi: Meta.Id
+      mi: Metas.Id
   )
 
   /**
@@ -148,7 +148,7 @@ object mvt {
 
     /**
       */
-    def apply(z: Instant, amount: Dollars, mi: Meta.Id): Cost =
+    def apply(z: Instant, amount: Dollars, mi: Metas.Id): Cost =
       new Cost(z, amount, mi) {}
 
     /**

@@ -110,6 +110,7 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
     */
   sealed case class AddressOps(p: String) { address =>
 
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def ofKeyChained[
         K: Show: Get: Put,
         V: Eq: Show,

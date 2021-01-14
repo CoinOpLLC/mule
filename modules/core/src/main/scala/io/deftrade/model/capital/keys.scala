@@ -14,19 +14,17 @@ import refined.api.Validate
 import refined.boolean.{ And, Or }
 import refined.string.{ MatchesRegex }
 
-/**
-  * Security Idenification Numbers (of any kind), modelled as `String Refined IsXsin`.
+/** Security Idenification Numbers (of any kind), modelled as `String Refined IsXsin`.
   */
 object keys {
 
-  /**
-    * An ISIN is a twelve character string that must match a certain regex, and whose characters
+  /** An ISIN is a twelve character string that must match a certain regex, and whose characters
     * must pass a certain (Luhn) checksum.
     */
   val MatchesRxIsin = """[A-Z]{2}[A-Z0-9]{9}[0-9]""".witness
   type MatchesRxIsin = MatchesRegex[MatchesRxIsin.T]
-  type IsIsin        = MatchesRxIsin And CheckedIsin
-  type Isin          = String Refined IsIsin
+  type IsISIN        = MatchesRxIsin And CheckedIsin
+  type ISIN          = String Refined IsISIN
 
   /**
     */
@@ -45,8 +43,7 @@ object keys {
     implicit def isinValidate: Validate.Plain[String, CheckedIsin] =
       Validate.fromPredicate(predicate, t => s"$t is not Luhny", instance)
 
-    /**
-      * * TODO need to add country checks,
+    /** * TODO need to add country checks,
       * and break them out into a separate function
       *
       *   - green-light only a predefined list of juristictions for registered securities
@@ -70,7 +67,7 @@ object keys {
       }
   }
 
-  /** Pseudo `Isin` matches `Isin` regex, but uses the 9 digit body for proprietary mappings. */
+  /** Pseudo `ISIN` matches `ISIN` regex, but uses the 9 digit body for proprietary mappings. */
   type IsPsin = MatchesRxIsin And CheckedPsin // sic
   type Psin   = String Refined IsPsin
 
@@ -105,32 +102,30 @@ object keys {
       }
   }
 
-  /**
-    * How deftrade canonicalizes securities identifiers:
-    * Use `Isin`s where non-isin uses use reserved country codes: {X*, ZZ}
+  /** How deftrade canonicalizes securities identifiers:
+    * Use `ISIN`s where non-isin uses use reserved country codes: {X*, ZZ}
     *
-    * Universal Security Identifying Number: Usin
+    * Universal Security Identifying Number: USIN
     */
-  type IsUsin = IsIsin Or IsPsin
-  type Usin   = String Refined IsUsin
+  type IsUSIN = IsISIN Or IsPsin
+  type USIN   = String Refined IsUSIN
 
   /**
     */
-  object Usin {
+  object USIN {
 
-    /**
-      * the least we can do
+    /** the least we can do
       */
-    def from(s: String): Result[Usin] = ???
-
-    /**
-      */
-    def fromIsin(isin: Isin): Isin = ???
+    def from(s: String): Result[USIN] = ???
 
     /**
       */
-    def fromCusip(cusip: Cusip): Isin = ???
-    // def fromSedol(sedol: Sedol): Isin = ???
+    def fromIsin(isin: ISIN): ISIN = ???
+
+    /**
+      */
+    def fromCusip(cusip: Cusip): ISIN = ???
+    // def fromSedol(sedol: Sedol): ISIN = ???
 
     /**
       */
@@ -142,20 +137,20 @@ object keys {
 
     /**
       */
-    def toIsin(usin: Usin): Result[Isin] = ???
+    def toIsin(usin: USIN): Result[ISIN] = ???
 
     /**
       */
-    def toCusip(usin: Usin): Result[Cusip] = ???
-    // def toSedol(usin: Usin): Result[Sedol] = ???
+    def toCusip(usin: USIN): Result[Cusip] = ???
+    // def toSedol(usin: USIN): Result[Sedol] = ???
 
     /**
       */
-    def toUnreg(usin: Usin): Result[Unreg] = ???
+    def toUnreg(usin: USIN): Result[Unreg] = ???
 
     /**
       */
-    def toIbrk(usin: Usin): Result[Ibrk] = ???
+    def toIbrk(usin: USIN): Result[Ibrk] = ???
   }
 
   /**
@@ -165,8 +160,7 @@ object keys {
   type IsCusip        = MatchesRxCusip And CheckedCusip
   type Cusip          = String Refined IsCusip
 
-  /**
-    * A CUSIP is a nine character string that must match a certain regex, and whose characters
+  /** A CUSIP is a nine character string that must match a certain regex, and whose characters
     * must pass a certain (Luhn) checksum.
     */
   sealed abstract case class CheckedCusip()
@@ -194,8 +188,7 @@ object keys {
       }
   }
 
-  /**
-    * `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
+  /** `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
     * `ConId`'s
     */
   val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
@@ -203,8 +196,7 @@ object keys {
   type IsIbrk        = MatchesRxIbrk
   type Ibrk          = String Refined IsIbrk
 
-  /**
-    * `Unreg` identifiers represent unregistered securities, numbered by the firm.
+  /** `Unreg` identifiers represent unregistered securities, numbered by the firm.
     * TODO: revisit how these are defined.
     */
   val MatchesRxUnreg = """\d{8}\d?""".witness
@@ -212,8 +204,7 @@ object keys {
   type IsUnreg        = MatchesRxUnreg
   type Unreg          = String Refined IsUnreg
 
-  /**
-    * `UsBan` identifiers represent bank account numbers in the US
+  /** `UsBan` identifiers represent bank account numbers in the US
     * TODO: Next up is IBAN
     */
   val MatchesRxUsBan = """\d{8,10}""".witness
