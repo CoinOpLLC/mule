@@ -18,7 +18,7 @@ In the spirit of **Domain Driven Design**, this document is meant to define a _u
 **Features:**
 - Universal platform for all assets, real and virtual
   - Smart contracts for automated performance
-  - "Dummy" contracts for legacy real world assets 
+  - "Dummy" contracts for legacy real world assets
 - composable `Contract` DSL and evaluation engines
   - public `Instrument`s embed standard `Contract`s
     - for e.g. publicly traded securities or a standard convertible note
@@ -92,7 +92,12 @@ As a simple example, consider a publicly traded common stock which issues a divi
 
 ## What does it mean to "keep a set of books?"
 
-Keeping books is fundamental to finance, and to commerce itself. In fact, all of the properties of money itself [can be taken from bookkeeping](link).
+Organizations of all kinds and in all ages have "kept books", and the literature on history and practice is vast.
+
+In the last decade, the confluence of techniques which constitue "crypto-currency" - secure hashes, merkle trees, PKI, and distributed consensus - have given rise to a strange new respect for the role of bookkeeping in regards to the ontology of money itself.
+
+In fact, the essential properties of money may be [viewed as deriving from the institutional memory of the ledgers that account for it](https://mariolaul.medium.com/the-bookkeeping-view-of-money-and-crypto-economic-analysis-f8a9a3c23de9):
+>According to this [bookkeeping] view, the monetary system is a collective method of enabling and keeping track of economic activity and relations using a socially agreed upon measuring unit. In other words, **a bookkeeping system** that allows individuals, organizations and society at large to value assets and activities, mobilize real resources, clear and settle transactions, carry into the present their financial history, and project into the future their economic plans and interdependencies. As such, it represents a form of **communal, institutionalized memory**, regardless of whether its rules are officially mandated or based on a set of informal norms and practices.
 
 ### Foundational Requirements
 
@@ -664,7 +669,11 @@ val example: Model =
     )
   )
 ```
-### `KeyValueStore`s
+### KeyValueStores
+
+The `KeyValueStore` type represents a family of persistence algebras with parametric effect type, indexed by an ordered key type. This key type is typically bound to a business key type from the domain model.
+
+
 
 #### Companion mixin `WithKey`
 
@@ -729,17 +738,17 @@ Note that `Row`s that are committed together get the same `Id`.
 However, _all_ rows contribute to the data model!
 
 ```scala
-     type Shape[_] = Map[Key, _]
-     type Spec     = Nel[Value]
+type Shape[_] = Map[Key, _]
+type Spec     = Nel[Value]
 
-     val example: Model =
-       Map(
-         IBan.06776 -> Nel(XAU ,
-                           CHF ,
-                           USD),
-         IBan.09993 -> Nel(XAU),
-         UsBan.5321 -> Nel(USD),
-       )
+val example: Model =
+  Map(
+    IBan.06776 -> Nel(XAU ,
+                      CHF ,
+                      USD),
+    IBan.09993 -> Nel(XAU),
+    UsBan.5321 -> Nel(USD),
+  )
 ```
 
 `Store`s of this shape are used in this example to implement a list of permitted currencies per account.
@@ -748,10 +757,10 @@ However, _all_ rows contribute to the data model!
 
 #### specialization for `Map`s
 ```scala
-        type K2 /*: Order */
-        type V2 /*: Eq */
-        type Value = (K2, V2)
-        type Row  = (Key, Option[(K2, Option[V2])])
+type K2 /*: Order */
+type V2 /*: Eq */
+type Value = (K2, V2)
+type Row  = (Key, Option[(K2, Option[V2])])
 ```
 
 Id | (Key | Option[(K2 | Option[V2])])
@@ -961,10 +970,10 @@ We accomplish this by employing two _concurrent_ `Fiber`s per `Transaction`:
   - `escrow.n = a.trade   // the payment, typically`
   - workflow option one:
     - "manual" payment transfer
-    - `fiber.wait(escrow.n === empty)` // reactive
+    - `fiber.wait(escrow.n === empty) // reactive`
   - workflow option two
     - assumes programmatic transfer capability for assets! (USD typically)
-    - `open += escrow.n              ` // proactive
+    - `open += escrow.n               // proactive`
     - `escrow.n = empty`
 - side `B`:
     - same, _mutatis mutandis_ (`a` <==> `b`)
@@ -975,25 +984,24 @@ We accomplish this by employing two _concurrent_ `Fiber`s per `Transaction`:
    - `open += expect.n`
    - `expect.n = empty`
 
-
-*Note*: no `Folio.Key`s need be exchanged at all, because `join` does all the work. Both `expect` and `escrow` are left empty in a successful settlement, and are therefore eliminated on snapshot (`key`s which reference empty `Folio`s are dropped).
+*Note*: no `Folio.Key`s need be exchanged at all, because `join` does all the work. Both scratch `Folio`s, `expect` and `escrow`, are left empty in a successful settlement, and are therefore eliminated on snapshot (`key`s which reference empty `Folio`s are dropped).
 
 ### Markets
 
-This section skips ahead a bit, and describes how `Transaction`s are agreed upon by the parties to them, prior to those `Transaction` recording in the `Ledger`.
+This section describes how `Transaction`s are agreed upon by the parties to them, prior to those `Transaction` recording in the `Ledger`.
 
 It should be understood that `Market`s cannot be defined without reference to real world agents, but we'll ignore that aspect for now and continue to add detail arount the processing of `Transaction`s.
 
 `Internal` markets can be defined where
-  - all parties are "on Ledger"
-  - internal transactions save on external transaction costs
-  - self clearing / self settling
-  - possible to implement netting
+- all parties are "on Ledger"
+- internal transactions save on external transaction costs
+- self clearing / self settling
+- possible to implement netting
 
 `External` market integration topics include
-  - API integrations
-  - `MIC` code identities (reference data)
-  - Virtual markets (procedural order routers)
+- API integrations
+- `MIC` code identities (reference data)
+- Virtual markets (procedural order routers)
 
 #### Market Data Systems
 
@@ -1056,7 +1064,7 @@ TODO: revisit parent/child orders
 
 ### Balances and Accounting
 
-Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s. When summing Transactions, this module slice implements the algebra which maintains all the accounting identities.
+Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s. When summing Transactions, this layer implements the algebra which maintains all the accounting definitions, identities, and computed sums.
 
 These are the accounting terms and identities as we use them:
 
@@ -1068,12 +1076,14 @@ These are the accounting terms and identities as we use them:
    Assets + Expenses === Liabilities + Revenue  // substituting
    Income := Revenue net Expenses               // the "bottom line"
    Liabilities := Debt + Equity                 // always one or the other
-   RetainedEarnings = Income net Distributions  // business keeps what partners don't take
+   RetainedEarnings = Income net Distributions  // business keeps what partners don't
    Equity :=                                    // total value of partners' stakes
      ShareCapital                               // total raised across all rounds
    + Reserves                                   // you never know
-   + RetainedEarnings                           // add to book value of partners' equity
+   + RetainedEarnings                           // add to book value of equity
 ```
+
+TODO: express these as _algebraic laws_.
 #### Pricing
 
 `Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.
@@ -1083,7 +1093,7 @@ Return both a `bid` and an `ask` for the given instrument.
 **Important: requesting a `quote` _does not signal intent_**. For example, the client may ignore the returned ask and just hit the bid (if selling). Servers of this api (e.g. stockbrokers) cannot not predjudice their responses when asked for a quote, as the client reveals nothing about their intent.
 
 Pricing instances can deliver live market feeds
-- "Orderly market" invariant: `ask` < `bid`
+- "Orderly market" invariant: `bid` < `ask`
 - must accept _disorderly_ markets: not everything that comes at you down the wire can be expected to "make sense"
 
 In addition to live markets, prices may orignate from
@@ -1219,7 +1229,7 @@ Name | Shape | Publishes | Links | Attrs
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Balances** | KeyValue[MKV] | Id | **`Folio.Key`** | `(AccountingKey, FinancialAmount)`
+**Balances** | Value[MKV] | Id |  | `(AccountingKey, FinancialAmount)`
 **Reports** | KeyValue[LV] | Id | **`Folio.Key`** , `Balance.Id`[3,4], *`Report.Id`*[0,1] | `asOf: Instant`, `period: Period`
 
 #### People
