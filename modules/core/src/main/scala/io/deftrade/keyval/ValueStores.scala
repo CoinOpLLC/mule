@@ -106,7 +106,7 @@ object ValueStores {
       f: T => NonEmptyList[U],
       g: NonEmptyList[U] => T
   )(implicit final val IsV: U =:= U)
-      extends ValueStores[T] {
+      extends ValueStores[U] {
 
     final type Key2   = Nothing
     final type Value2 = T
@@ -131,7 +131,7 @@ object ValueStores {
     * Note this value is forgery resistant (up to the strength of the `sha`).
     */
   abstract class SADT[V: Encoder: Decoder](implicit
-      final val IsV: V =:= V
+      isV: V =:= V
   ) extends ValueStores.Codec[V, keyval.SADT.Aux[V]](
         v => NonEmptyList one (SADT from v),
         nel => {
@@ -166,7 +166,7 @@ object ValueStores {
   ) extends ValueStores[V] {
 
     final type Spec      = List[W]
-    final type ValueSpec = V
+    final type ValueSpec = Option[W]
 
     final def fromSpec(s: Spec): NonEmptyList[ValueSpec] =
       s match {
@@ -177,7 +177,7 @@ object ValueStores {
     final def toSpec(vs: NonEmptyList[ValueSpec]): Spec =
       vs match {
         case NonEmptyList(_, Nil) => List.empty
-        case nel                  => IsV liftContra nel.toList map (_.fold(???)(identity))
+        case nel                  => nel.toList map (_.fold(???)(identity))
       }
   }
 

@@ -231,7 +231,7 @@ trait Ledger { module: ModuleTypes =>
     *
     * Specifically: a `Map` of `Map`s, which, normalized and written out as a list,
     * has rows of type: {{{
-    *   (Folio.Key, Instrument.Key, Quantity)
+    *   (Folios.Key, Instruments.Key, Quantity)
     * }}}
     */
   object Folio {
@@ -250,9 +250,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value] {
-    lazy val Key = FuuidKeyCompanion
-  }
+  object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value]
 
   /** A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
@@ -398,7 +396,7 @@ trait Ledger { module: ModuleTypes =>
 
   object Transactions extends ValueStores.V[Transaction]
 
-  /** Note that [[Folio.Id]] is actually an `update event` for the specified [[Folio.Key]].
+  /** Note that [[Folio.Id]] is actually an `update event` for the specified [[Folios.Key]].
     * TODO: get this to work across nodes in a cluster
     */
   sealed abstract case class Confirmation private (at: Instant, from: Folios.Id, to: Folios.Id)

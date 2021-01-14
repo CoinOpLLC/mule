@@ -23,9 +23,9 @@ object ledgerz {
 
   implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
 
-  Eq[Instrument.Key] |> discardValue
-  Eq[Quantity]       |> discardValue
-  Eq[Position]       |> discardValue
+  Eq[Instruments.Key] |> discardValue
+  Eq[Quantity]        |> discardValue
+  Eq[Position]        |> discardValue
 
   // val Right((instruments, trades, folios, transactions, metas)) = for {
   // val tables = for {

@@ -371,8 +371,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ) extends Report.Aux[C]
         with CashReport
 
-    lazy val Key = Folios.Key
-
     /**
       */
     private[model] def apply[F[_], C: Currency](

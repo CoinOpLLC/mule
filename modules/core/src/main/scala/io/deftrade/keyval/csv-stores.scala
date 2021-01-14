@@ -153,6 +153,7 @@ abstract class CsvValueStore[F[_], V](
 
 /**
   */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
     final val KV: KeyValueStores[K, V]
 )(implicit override val F: Sync[F], override val X: ContextShift[F])
@@ -242,6 +243,7 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
   *
   * This is where we hide the fact that we're doing implementation inheritance.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Any"))
 sealed protected trait MemFile[F[_], V] {
 
   self: CsvStore[F, V] with Stores[V]#Store[F] =>

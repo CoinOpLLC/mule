@@ -19,8 +19,8 @@ package model
 package layers
 
 import money._, keyval._, time._
-import capital.Instrument
-import refinements.{ IsLabel }
+import capital.Instruments
+import refinements.{ Label }
 
 import cats.implicits._
 import cats.{ Monad, Order, Show }
@@ -39,6 +39,8 @@ import refined.numeric.{ GreaterEqual, LessEqual }
 import refined.string.{ Trimmed, Uuid => IsUuid }
 
 import scala.collection.immutable.SortedSet
+
+import io.chrisdavenport.fuuid.FUUID
 
 import refined.cats._
 
@@ -86,11 +88,10 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new Quoted(quote) {}
 
     implicit def qOrder: Order[Quoted] = { import auto.order._; semi.order }
-    implicit def qShow: Show[Quoted]   = { import auto.show._; semi.show }
+    implicit def qShow: Show[Quoted] = { import auto.show._; semi.show }
   }
 
-  /**
-    * Represents a price quote (in currency `C`) for instruments of type `A`.
+  /** Represents a price quote (in currency `C`) for instruments of type `A`.
     */
   sealed abstract class QuotedIn[A, C] private[deftrade] (
       q: (MonetaryAmount, MonetaryAmount)
@@ -113,8 +114,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
       */
     def cross: Option[CrossType] = None
 
-    /**
-      * Inverse quotes are peculiar to `forex`.
+    /** Inverse quotes are peculiar to `forex`.
       */
     final def inverse(implicit C: Currency[C]): C QuotedIn A =
       new QuotedIn[C, A]((1 / self.bid, 1 / self.ask)) {
@@ -127,8 +127,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
         override def isDerived = true
       }
 
-    /**
-      * Cross quotes are also peculiar to `forex`.
+    /** Cross quotes are also peculiar to `forex`.
       *
       * Our `A` is a `Currency`, and our `C: Currency` is the cross currency.
       */
@@ -265,7 +264,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object TickData extends WithRefinedKey[String, IsLabel, TickData] {
+  object TickData {
 
     /**
       */
@@ -273,10 +272,9 @@ trait MarketData { self: Ledger with ModuleTypes =>
       new TickData(at, tick, price, size) {}
 
     implicit def tdOrder: Order[TickData] = { import auto.order._; semi.order }
-    implicit def tdShow: Show[TickData]   = { import auto.show._; semi.show }
+    implicit def tdShow: Show[TickData] = { import auto.show._; semi.show }
 
-    /**
-      * {{{
+    /** {{{
       * val myLimit: USD(55.47)
       * val td: TickData = 100.0 bid myLimit.amount
       * }}}
@@ -301,16 +299,19 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  // type IsMic = Size[GreaterEqual[3] And LessEqual[4]] And Trimmed
-  type IsMic = Size[GreaterEqual[3]] And Size[LessEqual[4]] And Trimmed
-  // type IsMic = Size[LessEqual[4]]
+  object TickDataSets extends KeyValueStores.KV[Label, TickData]
 
   /**
     */
-  type Mic = String Refined IsMic // market venue
+  // type IsMIC = Size[GreaterEqual[3] And LessEqual[4]] And Trimmed
+  type IsMIC = Size[GreaterEqual[3]] And Size[LessEqual[4]] And Trimmed
+  // type IsMIC = Size[LessEqual[4]]
 
   /**
-    * Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
+    */
+  type MIC = String Refined IsMIC // market venue
+
+  /** Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
     *
     * Note: "double entry bookkeeping" in the context of a shared [[Ledger]] with
     * multiple [[OrderManagement.OMS OMS gateways]] to externally traded `Instrument`s
@@ -322,11 +323,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - "reverse polarity" when we enter a short position.
     *   - indexAndSum settled positions for reconcilliation
     */
-  sealed trait Market { def host: Party.Key; def contra: Folio.Key; def meta: Meta.Id }
+  sealed trait Market { def host: Parties.Key; def contra: Folios.Key; def meta: Metas.Id }
 
   /** Markets evolve.
     */
-  object Market extends WithRefinedKey[String, IsUuid Or IsMic, Market] {
+  object Market {
 
     /** beware - naming here follows machine semantics not domain semantics!!!
       *
@@ -335,74 +336,83 @@ trait MarketData { self: Ledger with ModuleTypes =>
     implicit def marketOrder: Order[Market] = Order by (_.contra)
   }
 
-  /**
-    * Models a private party whose [[Ledger.Folio]]s we run [[Ledger.Transaction]]s against.
+  object Markets
+
+  /** Models a private party whose [[Ledger.Folio]]s we run [[Ledger.Transaction]]s against.
     *
     * The `Counterparty` is assumed to have an [[Accounts.Account]] whose [[Ledger.Folio]]s are
     * recorded on on the [[Ledger]].
     */
   sealed abstract case class Counterparty(
-      final val host: Party.Key,
-      final val contra: Folio.Key,
-      final val meta: Meta.Id
+      final val host: NaturalPersons.Key,
+      final val contra: Folios.Key,
+      final val meta: Metas.Id
   ) extends Market
 
   /**
     */
-  object Counterparty extends WithRefinedKey[String, IsUuid, Counterparty] {
+  object Counterparty {
 
-    def apply(host: Party.Key, contra: Folio.Key, meta: Meta.Id): Counterparty =
+    def apply(host: NaturalPersons.Key, contra: Folios.Key, meta: Metas.Id): Counterparty =
       new Counterparty(host, contra, meta) {}
 
-    def mk[F[_]](metas: Metas.ValueStore[F])(host: Party.Key, meta: Meta): F[Counterparty] = ???
+    def mk[F[_]](host: Parties.Key, meta: Meta): F[Counterparty] = ???
 
     implicit def cpShow: Show[Counterparty] = { import auto.show._; semi.show }
   }
 
-  /**
-    * Single effective counterparty: the `Exchange` itself.
-    *   - [[Mic]]s are unique.
+  object Counterparties extends KeyValueStores.KV[FUUID, Counterparty]
+
+  /** Single effective counterparty: the `Exchange` itself.
+    *   - [[MIC]]s are unique.
     *   - seller for all buyers and vice versa.
     *   - activity recorded in a `contra account`
     */
   sealed abstract case class Exchange private (
-      final val host: Party.Key,
-      final val contra: Folio.Key,
-      final val meta: Meta.Id
+      final val host: LegalEntities.Key,
+      final val contra: Folios.Key,
+      final val meta: Metas.Id
   ) extends Market
 
   /**
     */
-  object Exchange extends WithRefinedKey[String, IsMic, Exchange] {
+  object Exchange {
 
     /**
       */
-    protected[deftrade] def apply(host: Party.Key, contra: Folio.Key, meta: Meta.Id): Exchange =
+    protected[deftrade] def apply(
+        host: LegalEntities.Key,
+        contra: Folios.Key,
+        meta: Metas.Id
+    ): Exchange =
       new Exchange(host, contra, meta) {}
 
     /**
       */
-    def withEntity(host: Party.Key): Exchange => Exchange =
+    def withEntity(host: Parties.Key): Exchange => Exchange =
       x => Exchange(host, x.contra, x.meta)
 
     implicit def exShow: Show[Exchange] = { import auto.show._; semi.show }
   }
 
   /**
-    * MDS := Market Data Source.
+    */
+  object Exchanges extends KeyValueStores.KV[MIC, Exchange]
+
+  /** MDS := Market Data Source.
     */
   sealed abstract case class MDS private (
-      provider: Party.Key,
-      markets: NonEmptySet[Market.Key],
-      meta: Meta.Id
+      provider: Parties.Key,
+      markets: NonEmptySet[Exchanges.Key],
+      meta: Metas.Id
   ) {
 
     /** `Currency`-specific quote factory. */
-    def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C
+    def quotedIn[C: Currency](ik: Instruments.Key): Instruments.Key QuotedIn C
 
     /**
       */
-    final def quote[F[_]: Monad, C: Currency](ik: Instrument.Key): F[Money[C]] =
+    final def quote[F[_]: Monad, C: Currency](ik: Instruments.Key): F[Money[C]] =
       Monad[F] pure (Currency[C] apply quotedIn(ik).mid)
 
     /**
@@ -412,8 +422,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
         case (security, quantity) => quote[F, C](security) map (_ * quantity)
       }
 
-    /**
-      * Simple per-leg pricing. Note, this method is `override`-able.
+    /** Simple per-leg pricing. Note, this method is `override`-able.
       *
       * TODO: this is so minimal as to be of questionable viablity... but is correct
       */
@@ -421,21 +430,26 @@ trait MarketData { self: Ledger with ModuleTypes =>
       trade.toNel foldMapM quoteLeg[F, C]
   }
 
-  /** FIXME: normalize fields? */
-  object MDS extends WithRefinedKey[String, IsLabel, MDS] {
+  /**
+    */
+  object MDS {
 
     private[deftrade] def apply(
-        provider: Party.Key,
-        meta: Meta.Id,
-        market: Market.Key,
-        markets: Market.Key*
+        provider: Parties.Key,
+        meta: Metas.Id,
+        market: Exchanges.Key,
+        markets: Exchanges.Key*
     ): MDS =
       new MDS(provider, NonEmptySet(market, SortedSet(markets: _*)), meta) {
 
         /** FIXME: how do we specialize? */
-        def quotedIn[C: Currency](ik: Instrument.Key): Instrument.Key QuotedIn C = ???
+        def quotedIn[C: Currency](ik: Instruments.Key): Instruments.Key QuotedIn C = ???
       }
   }
+
+  /**
+    */
+  object MDSs extends KeyValueStores.KV[Label, MDS]
 
   /** placeholder */
   trait OrderBook
