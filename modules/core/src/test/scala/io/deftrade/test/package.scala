@@ -1,29 +1,16 @@
 package io.deftrade
 
-import money._, keyval._, model._, refinements._
-import Currency.{ EUR, USD }
+import refinements._
 
 import cats.implicits._
-
-import enumeratum._
-
 import eu.timepit.refined
 import refined.refineV
-import refined.api.Refined
-import refined.collection.NonEmpty
-import refined.numeric._
 import refined.auto._
 
 import org.scalacheck._
 // import org.scalacheck.cats.implicits._
-import org.scalacheck.ScalacheckShapeless._
-import Arbitrary.arbitrary
-
-object console {
-  def slowrun[T, R](t: T)(run: T => R, zzz: Long = 100L): R =
-    try run(t)
-    finally Thread sleep zzz
-}
+// import org.scalacheck.ScalacheckShapeless._
+// import Arbitrary.arbitrary
 
 package object test {
 
@@ -167,6 +154,12 @@ package object test {
 
 package test {
 
+  object console {
+    def slowrun[T, R](t: T)(run: T => R, zzz: Long = 100L): R =
+      try run(t)
+      finally Thread sleep zzz
+  }
+
   object Jt8Gen {
 
     import time._
@@ -185,82 +178,5 @@ package test {
           secs <- Gen.chooseNum(0L, oneHundredYearsOfSeconds)
         } yield java.time.Instant.ofEpochSecond(secs)
       }
-  }
-
-  /**
-    */
-  sealed trait Nut extends EnumEntry with Serializable
-
-  /**
-    */
-  object Nut extends DtEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-    case object Brazil     extends Nut
-
-    lazy val values = findValues
-  }
-
-  object currencies {
-
-    implicit def arbitraryMny[C: Currency]: Arbitrary[Money[C]] =
-      Arbitrary {
-        import Financial.Ops
-        val fiat = Currency[C]
-
-        for {
-          amount <- arbitrary[Double]
-        } yield fiat(amount.to[model.MonetaryAmount])
-      }
-
-    type Dollars = Money[USD]
-    lazy val Dollars                                   = USD
-    def dollars(amount: model.MonetaryAmount): Dollars = Dollars(amount)
-
-    type Euros = Money[EUR]
-    lazy val Euros                                 = EUR
-    def euros(amount: model.MonetaryAmount): Euros = Euros(amount)
-  }
-
-  object invoices {
-
-    import time._, keyval._
-
-    import currencies._
-
-    sealed abstract case class Invoice(
-        asOf: Instant,
-        nut: Nut,
-        quantity: Int Refined Positive,
-        from: Parties.Key,
-        to: Parties.Key,
-        amount: Dollars,
-        memo: String Refined NonEmpty
-    )
-
-    object Invoice extends WithOpaqueKey[Long, Invoice] {
-
-      def mk(
-          nut: Nut,
-          jars: Int,
-          from: Parties.Key,
-          to: Parties.Key,
-          total: Double,
-          instructions: String = ""
-      ): Invoice = {
-
-        val Right(quantity) = refineV[Positive](jars min 1)
-        val Right(memo)     = refineV[NonEmpty](s"special instructions: $instructions")
-        val amount          = dollars(total)
-
-        new Invoice(asOf = instant, nut, quantity, from, to, amount, memo) {}
-      }
-    }
   }
 }

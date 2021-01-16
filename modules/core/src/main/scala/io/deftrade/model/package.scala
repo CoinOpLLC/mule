@@ -133,9 +133,9 @@ package object model
   // object Accounts {`
   //
   //   val Right((accounts, rosters, contacts)) = for {
-  //     accounts <- keyValueStore[IO] at "accounts.csv" ofChainAddressed Account
-  //     rosters  <- keyValueStore[IO] at "rosters.csv" ofChainAddressed Roster
-  //     parties  <- keyValueStore[IO] at "parties.csv" ofChainAddressed Party
+  //     accounts <- keyValueStore[IO] at "accounts.csv" ofChained Account
+  //     rosters  <- keyValueStore[IO] at "rosters.csv" ofChained Roster
+  //     parties  <- keyValueStore[IO] at "parties.csv" ofChained Party
   //     contacts <- valueStore[IO] at "contacts.csv" ofContentAddressed Contact
   //   } yield (accounts, rosters, parties, contacts)
   // }

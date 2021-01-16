@@ -76,7 +76,7 @@ abstract class ValueStores[V] extends Stores[V] { param =>
       for {
         x <- hasId(id)
         ret <- if (x) (id, false).pure[F]
-               else append(h, t: _*) map ((_, true))
+              else append(h, t: _*) map ((_, true))
       } yield ret
     }
 
@@ -130,7 +130,8 @@ object ValueStores {
     *
     * Note this value is forgery resistant (up to the strength of the `sha`).
     */
-  abstract class SADT[V: Encoder: Decoder](implicit
+  abstract class SADT[V: Encoder: Decoder](
+      implicit
       isV: V =:= V
   ) extends ValueStores.Codec[V, keyval.SADT.Aux[V]](
         v => NonEmptyList one (SADT from v),
@@ -142,7 +143,8 @@ object ValueStores {
 
   /** Values
     */
-  abstract class V[V](implicit
+  abstract class V[V](
+      implicit
       final val IsV: V =:= V
   ) extends ValueStores[V] {
 
@@ -161,7 +163,8 @@ object ValueStores {
 
   /** Lists of Values
     */
-  abstract class LV[V, W](implicit
+  abstract class LV[V, W](
+      implicit
       final val IsV: Option[W] =:= V
   ) extends ValueStores[V] {
 
@@ -183,7 +186,8 @@ object ValueStores {
 
   /** Maps of `(K2 -> V2)`s
     */
-  abstract class MKV[V, K2: Order, V2](implicit
+  abstract class MKV[V, K2: Order, V2](
+      implicit
       final val IsV: Option[(K2, V2)] =:= V
   ) extends ValueStores[V] {
 
@@ -205,7 +209,8 @@ object ValueStores {
 
   /** Maps of (Key -> List[Value])s
     */
-  abstract class MKLV[V, K2: Order, V2](implicit
+  abstract class MKLV[V, K2: Order, V2](
+      implicit
       final val IsV: Option[(K2, Option[V2])] =:= V
   ) extends ValueStores[V] {
 
@@ -241,7 +246,8 @@ object ValueStores {
 
   /** Non Empty Lists of Values
     */
-  abstract class NELV[V](implicit
+  abstract class NELV[V](
+      implicit
       final val IsV: V =:= V
   ) extends ValueStores[V] {
 
@@ -257,7 +263,8 @@ object ValueStores {
 
   /** Non Empty Maps of (Key -> Values)s
     */
-  abstract class NEMKV[V, K2: Order, V2](implicit
+  abstract class NEMKV[V, K2: Order, V2](
+      implicit
       final val IsV: (K2, V2) =:= V
   ) extends ValueStores[V] {
 
@@ -273,7 +280,8 @@ object ValueStores {
 
   /** Non Empty Maps of (Key -> List[Value])s
     */
-  abstract class NEMKLV[V, K2: Order, V2](implicit
+  abstract class NEMKLV[V, K2: Order, V2](
+      implicit
       final val IsV: (K2, Option[V2]) =:= V
   ) extends ValueStores[V] {
     final type Spec      = NonEmptyMap[K2, List[V2]]

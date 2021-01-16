@@ -12,10 +12,10 @@ A cryptographic hash function (secure hash algorithm: `sha`) is the basis of ind
 
 ```scala
   /** assume for example - other choices would work here as well */
-  type Sha = String Refined IsSha256AsBase58
+  type SHA = String Refined IsSha256AsBase58
 
   /** elides many details about canonical formats and codecs */
-  def sha[A](a: A): Sha = { ... }
+  def sha[A](a: A): SHA = { ... }
 ```
 Assume a suitable type `Row` that represents the bits to be persisted in association
 with a given `Id`. (`Row` will be elaborated in the following section.)
@@ -66,7 +66,7 @@ trait WithValue[V] {
 
   // bound type members
 
-  type Id    = Sha  /*: Order */
+  type Id    = SHA  /*: Order */
   type Value = V    /*: Eq */
 
   // free type members

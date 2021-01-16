@@ -1,7 +1,7 @@
 package io.deftrade
 package test
 
-import time._, money._, keyval._, model.{ Contact, Meta, Metas, Money }
+import time._, money._, keyval._, model.{ Contact, Contacts, Meta, Metas, Money }
 import Currency.{ USD }
 import currencies._
 import refinements.{ IsLabel, IsUnitInterval, Label }
@@ -27,7 +27,7 @@ import cormorant.refined._
 import cormorant.implicits._
 
 import io.chrisdavenport.fuuid
-import fuuid.{ FUUIDGen }
+import fuuid.{ FUUID, FUUIDGen }
 
 import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -52,27 +52,27 @@ object mvt {
     */
   sealed abstract case class Product private (
       nut: Nut,
-      cost: Cost.Key,
+      cost: Costs.Key,
       name: Label,
       factor: Double Refined `[0,1)`,
-      owner: Contact.Id
+      owner: Contacts.Id
   )
 
   /**
     */
-  object Product extends WithRefinedKey[String, IsLabel, Product] {
+  object Product {
 
-    implicit def fooEq: Eq[Product] = { import auto.eq._; semi.eq }
-    implicit def fooShow: Show[Product] = { import auto.show._; semi.show }
+    implicit def productEq: Eq[Product]     = { import auto.eq._; semi.eq }
+    implicit def productShow: Show[Product] = { import auto.show._; semi.show }
 
     /**
       */
     def apply(
         nut: Nut,
-        cost: Cost.Key,
+        cost: Costs.Key,
         name: Label,
         factor: Double Refined `[0,1)`,
-        owner: Contact.Id
+        owner: Contacts.Id
     ): Product =
       new Product(nut, cost, name, factor, owner) {}
 
@@ -118,38 +118,43 @@ object mvt {
       ) evalMap (mk(metas, costs) _).tupled
   }
 
-  lazy val Products = KeyValueStore(Product, KeyValueStore.Param.V).deriveV[Product]
+  object Products extends KeyValueStores[Label, Product]
 
   def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
-    Result safe {
+    keyValueStore[F] at "target/products.csv" ofKeyChained Products
 
-      // import Product._
-      import CsvImplicits._
+  object Foos extends ValueStores[Product]
 
-      val p = "target/products.csv"
+  def foos[F[_]: Sync: ContextShift]: Result[Foos.ValueStore[F]] =
+    valueStore[F] at "target/foos.csv" ofChained Foos
+  // Result safe {
+  //   // import Product._
+  //   import CsvImplicits._
 
-      new impl.MemFileKeyValueStore(Product, Paths get p) with Products.KeyValueStore[F] {
-        import V._
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-      }
-    }
+  //   val p = "target/products.csv"
+
+  //   new impl.MemFileKeyValueStore(Product, Paths get p) with Products.KeyValueStore[F] {
+  //     import V._
+  //     final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+  //   }
+  // }
 
   /**
     */
   sealed abstract case class Cost private (
-      z: Instant,
+      asOf: Instant,
       amount: Dollars,
       mi: Metas.Id
   )
 
   /**
     */
-  object Cost extends WithFuuidKey[Cost] {
+  object Cost {
 
     /**
       */
-    def apply(z: Instant, amount: Dollars, mi: Metas.Id): Cost =
-      new Cost(z, amount, mi) {}
+    def apply(asOf: Instant, amount: Dollars, mi: Metas.Id): Cost =
+      new Cost(asOf, amount, mi) {}
 
     /**
       */
@@ -171,53 +176,54 @@ object mvt {
         cost   <- Stream eval mk(metas)(amount, meta)
       } yield cost
 
-    implicit def barEq: Eq[Cost] = { import auto.eq._; semi.eq }
+    implicit def barEq: Eq[Cost]     = { import auto.eq._; semi.eq }
     implicit def barShow: Show[Cost] = { import auto.show._; semi.show }
   }
 
-  lazy val Costs = KeyValueStore(Cost, KeyValueStore.Param.V).deriveV[Cost]
+  object Costs extends KeyValueStores.KV[FUUID, Cost]
 
-  def costs[F[_]: Sync: ContextShift]: Result[Costs.KeyValueStore[F]] =
-    Result safe {
-
-      import Cost._
-      import CsvImplicits._
-
-      val p = "target/costs.csv"
-
-      new impl.MemFileKeyValueStore(Cost, Paths get p) with Costs.KeyValueStore[F] {
-        final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
-      }
-    }
-  import io.chrisdavenport.cormorant.{ Get, LabelledRead, LabelledWrite, Put }
-  import shapeless.{ HList, LabelledGeneric, Lazy }
-  def kvs[F[
-      _
-  ]: Sync: ContextShift, K: Order: Get: Put, V: Show: Eq, K2: Order, V2: Eq, HV <: HList](
-      V: WithKey.Aux[K, V]
-  )(
-      param: KeyValueStore.Param
-  )(
-      st: param.DependentTypeThunk[K, V]#SubThunk[K2, V2]
-  )(implicit
-      lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]
-  ): Result[st.KeyValueStore[F]] =
-    Result safe {
-      import V._
-      import CsvImplicits._
-      val p = "target/fixme.csv"
-      new impl.MemFileKeyValueStore[F, K, V, HV](V, Paths get p) with st.KeyValueStore[F] {
-        final protected lazy val fresh: Fresh[Id, Row] = ??? // Fresh.shaChain[Row]
-      }
-    }
-
+  def costs[F[_]: Sync: ContextShift]: Result[Costs.KeyValueStore[F]] = {
+    import CsvImplicits._
+    keyValueStore[F] at "target/costs.csv" ofKeyChained Costs
+  }
+  // Result safe {
+  //
+  //   import Cost._
+  //   import CsvImplicits._
+  //
+  //   val p = "target/costs.csv"
+  //
+  //   new impl.MemFileKeyValueStore(Cost, Paths get p) with Costs.KeyValueStore[F] {
+  //     final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+  //   }
+  // }
+  // import io.chrisdavenport.cormorant.{ Get, LabelledRead, LabelledWrite, Put }
+  // import shapeless.{ HList, LabelledGeneric, Lazy }
+  // def kvs[F[
+  //     _
+  // ]: Sync: ContextShift, K: Order: Get: Put, V: Show: Eq, K2: Order, V2: Eq, HV <: HList](
+  //     V: WithKey.Aux[K, V]
+  // )(
+  //     param: KeyValueStore.Param
+  // )(
+  //     st: param.DependentTypeThunk[K, V]#SubThunk[K2, V2]
+  // )(implicit
+  //     lgv: LabelledGeneric.Aux[V, HV],
+  //     llr: Lazy[LabelledRead[HV]],
+  //     llw: Lazy[LabelledWrite[HV]]
+  // ): Result[st.KeyValueStore[F]] =
+  //   Result safe {
+  //     import V._
+  //     import CsvImplicits._
+  //     val p = "target/fixme.csv"
+  //     new impl.MemFileKeyValueStore[F, K, V, HV](V, Paths get p) with st.KeyValueStore[F] {
+  //       final protected lazy val fresh: Fresh[Id, Row] = ??? // Fresh.shaChain[Row]
+  //     }
+  //   }
   // keyValueStore[IO](KeyValueStore.Param.V) at "target/costs.csv" ofKeyChained Costs
   // want this syntax:
   // Cost keyValueStore[IO](KeyValueStore.Param.V) at "target/costs.csv" // chained is implied
-
-  // lazy val Right(products) = keyValueStore[IO] at "target/products.csv" ofChainAddressed Product
+  // lazy val Right(products) = keyValueStore[IO] at "target/products.csv" ofChained Product
   // lazy val Right(metas) = ???
   // valueStore[IO] at "target/metas.csv" ofContentAddressed SADT
 }

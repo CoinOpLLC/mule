@@ -111,15 +111,15 @@ object refinements {
 
   /**
     */
-  sealed abstract case class IsSha()
+  sealed abstract case class IsSHA()
 
   /**
     */
-  object IsSha {
+  object IsSHA {
 
-    lazy val instance: IsSha = new IsSha() {}
+    lazy val instance: IsSHA = new IsSHA() {}
 
-    implicit def isSha256Validate: Validate.Plain[String, IsSha] =
+    implicit def isSha256Validate: Validate.Plain[String, IsSHA] =
       Validate.fromPredicate(predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
 
     def predicate(s: String): Boolean =
@@ -131,18 +131,18 @@ object refinements {
 
   /**
     */
-  type Sha = String Refined IsSha
+  type SHA = String Refined IsSHA
 
   /**
     */
-  object Sha {
+  object SHA {
 
     /** Chosen project-wide (for now) */
     val Algo = "SHA-256"
 
     /**
       */
-    def toByteVector(sha: Sha) = ByteVector fromValidBase58 sha.value
+    def toByteVector(sha: SHA) = ByteVector fromValidBase58 sha.value
   }
 
   /**

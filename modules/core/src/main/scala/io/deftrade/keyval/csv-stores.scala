@@ -99,7 +99,8 @@ abstract class CsvValueStore[F[_], V](
 
   /**
     */
-  implicit final protected def readRecord[HV <: HList](implicit
+  implicit final protected def readRecord[HV <: HList](
+      implicit
       lgav: LabelledGeneric.Aux[Row, HV],
       llhv: Lazy[LabelledRead[HV]]
   ): LabelledRead[Record] =
@@ -115,7 +116,8 @@ abstract class CsvValueStore[F[_], V](
 
   /**
     */
-  final protected def deriveCsvDecoderV[HV <: HList](implicit
+  final protected def deriveCsvDecoderV[HV <: HList](
+      implicit
       lgav: LabelledGeneric.Aux[Row, HV],
       llhv: Lazy[LabelledRead[HV]]
   ): String PipeF Result[Record] =
@@ -127,9 +129,8 @@ abstract class CsvValueStore[F[_], V](
   implicit def writeRecord[
       HV <: HList
   ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledWrite[HV]]
-  ): LabelledWrite[Record] =
+    lgav: LabelledGeneric.Aux[V, HV],
+    llhv: Lazy[LabelledWrite[HV]]): LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
       private val lwhpr = LabelledWrite[IdField :: HV]
@@ -144,7 +145,8 @@ abstract class CsvValueStore[F[_], V](
 
   /**
     */
-  final protected def deriveCsvEncoderV[HV <: HList](implicit
+  final protected def deriveCsvEncoderV[HV <: HList](
+      implicit
       lgav: LabelledGeneric.Aux[V, HV],
       llhv: Lazy[LabelledWrite[HV]]
   ): Record PipeF String =
@@ -171,9 +173,8 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
   implicit def readRecord[
       HV <: HList
   ](implicit
-      lgav: LabelledGeneric.Aux[Value, HV],
-      llhv: Lazy[LabelledRead[HV]]
-  ): LabelledRead[Record] =
+    lgav: LabelledGeneric.Aux[Value, HV],
+    llhv: Lazy[LabelledRead[HV]]): LabelledRead[Record] =
     new LabelledRead[Record] {
 
       val lrhr = LabelledRead[IdField :: KeyField :: HV]
@@ -182,7 +183,7 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
         row match {
 
           case CSV.Row(
-                NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
+              NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
             lrhr.read(row, headers) map { hr =>
               (hr.head, (hr.tail.head: Key, none[Value]))
@@ -200,9 +201,8 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
   final protected def deriveCsvDecoderKv[
       HV <: HList
   ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]]
-  ): Pipe[F, String, Result[Record]] =
+    lgav: LabelledGeneric.Aux[V, HV],
+    llr: Lazy[LabelledRead[HV]]): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -211,9 +211,8 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
   implicit final def writeRecord[
       HV <: HList
   ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledWrite[HV]]
-  ): LabelledWrite[Record] =
+    lgav: LabelledGeneric.Aux[V, HV],
+    llhv: Lazy[LabelledWrite[HV]]): LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
       private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]
@@ -233,9 +232,8 @@ abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
   final protected def deriveCsvEncoderKv[
       HV <: HList
   ](implicit
-      lgav: LabelledGeneric.Aux[V, HV],
-      llw: Lazy[LabelledWrite[HV]]
-  ): Pipe[F, Record, String] =
+    lgav: LabelledGeneric.Aux[V, HV],
+    llw: Lazy[LabelledWrite[HV]]): Pipe[F, Record, String] =
     writeLabelled(printer)
 }
 
@@ -289,14 +287,15 @@ sealed protected trait MemFile[F[_], V] {
     for {
       handle <- appendHandles
       s      <- _
-    } yield pulls
-      .writeAllToFileHandle(
-        Stream eval
-          (F pure s) through
-          text.utf8Encode,
-        handle
-      )
-      .stream |> discardValue // nota bene this is intentional and necessary
+    } yield
+      pulls
+        .writeAllToFileHandle(
+          Stream eval
+            (F pure s) through
+            text.utf8Encode,
+          handle
+        )
+        .stream |> discardValue // nota bene this is intentional and necessary
   // WriteCursor(out, 0).writeAll(in).void
 }
 

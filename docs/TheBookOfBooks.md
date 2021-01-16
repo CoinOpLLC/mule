@@ -34,7 +34,7 @@ In the spirit of **Domain Driven Design**, this document is meant to define a _u
 - order management system (`OMS`) integration hooks for external markets
 
 
-Nick Wade
+Nick Wade  
 CoinOp LLC
 ___
 <p style="page-break-before: always">

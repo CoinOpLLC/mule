@@ -112,17 +112,18 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
     final def getAll(key: Key): F[Option[NelSpec]] =
       for {
         ivs <- storeLookup(key)
-      } yield ivs match {
-        case Nil => none
-        case (_, Nil) :: Nil =>
-          self.empty.fold(none[NelSpec])(spec => (self toNelSpec spec).some)
-        case h :: t =>
-          def specs = NonEmptyList(h, t) map {
-            case (_, Nil)    => ??? // won't reach here: see List[V] === Nil case above
-            case (_, h :: t) => self toSpec (IsV substituteContra NonEmptyList(h, t))
-          }
-          specs.map(self toNelSpec _).fold.some
-      }
+      } yield
+        ivs match {
+          case Nil => none
+          case (_, Nil) :: Nil =>
+            self.empty.fold(none[NelSpec])(spec => (self toNelSpec spec).some)
+          case h :: t =>
+            def specs = NonEmptyList(h, t) map {
+              case (_, Nil)    => ??? // won't reach here: see List[V] === Nil case above
+              case (_, h :: t) => self toSpec (IsV substituteContra NonEmptyList(h, t))
+            }
+            specs.map(self toNelSpec _).fold.some
+        }
 
     /** @return the [[Spec]] associated with the given [[Key]], if present.
       */
@@ -132,9 +133,9 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
         miss <- storeLookup(key)
         last = if (hit.isEmpty) miss.headOption else none
         _ <- last match {
-               case Some((id, vs @ (_ :: _))) => cacheFill(id, vs map (key -> _.some))
-               case _                         => ().pure[F]
-             }
+              case Some((id, vs @ (_ :: _))) => cacheFill(id, vs map (key -> _.some))
+              case _                         => ().pure[F]
+            }
       } yield {
         val mkSpec: List[Value] => Option[Spec] = {
           case Nil    => self.empty
@@ -199,11 +200,12 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
       records
         .filter { case (_, (k, _)) => k === key }
         .groupAdjacentBy({ case (id, _) => id })
-        .fold(List.empty[(Id, List[Value])]) { case (acc, (id, chunks)) =>
-          chunks.map { case (_, (_, ov)) => ov }.toList match {
-            case None :: Nil => List.empty[(Id, List[Value])]                // buh bye
-            case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc // reverses order
-          }
+        .fold(List.empty[(Id, List[Value])]) {
+          case (acc, (id, chunks)) =>
+            chunks.map { case (_, (_, ov)) => ov }.toList match {
+              case None :: Nil => List.empty[(Id, List[Value])] // buh bye
+              case ovs         => (id, ovs map (_.fold(???)(identity))) :: acc // reverses order
+            }
         }
         .compile
         .lastOrError
@@ -216,7 +218,8 @@ final object KeyValueStores {
 
   /** (Single, scalar) `Value`
     */
-  abstract class KV[K: Order, V](implicit
+  abstract class KV[K: Order, V](
+      implicit
       final val IsV: V =:= V
   ) extends KeyValueStores[K, V] {
 
@@ -245,7 +248,8 @@ final object KeyValueStores {
 
   /** Map of `K2`s and `V2`s
     */
-  abstract class MKV[K: Order, V, K2: Order, V2](implicit
+  abstract class MKV[K: Order, V, K2: Order, V2](
+      implicit
       final val IsV: (K2, V2) =:= V
   ) extends KeyValueStores[K, V] {
 

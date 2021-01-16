@@ -46,21 +46,20 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         V2: Eq: Show,
         HV <: HList
     ](
-        V: ValueStores[V]
+        VS: ValueStores[V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[V.ValueStore[F]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[VS.ValueStore[F]] =
       Result safe {
 
-        import V.{ Row, Value }
+        new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
-        new CsvValueStore[F, Value](V) with V.ValueStore[F] with MemFileV[F, V] {
+          def path: Path =
+            Paths get p
 
-          def path: Path = Paths get p
-
-          final override lazy val fresh = Fresh.shaContent[Row]
+          final override lazy val fresh =
+            Fresh.shaContent[VS.Row]
 
           final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
           final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
@@ -69,27 +68,26 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
     /** `of` clause
       */
-    def ofChainAddressed[
+    def ofChained[
         V: Eq: Show,
-        K2: Order: Show,
-        V2: Eq: Show,
+        // K2: Order: Show,
+        // V2: Eq: Show,
         HV <: HList
     ](
-        V: ValueStores[V]
+        VS: ValueStores[V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[V.ValueStore[F]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[VS.ValueStore[F]] =
       Result safe {
 
-        import V.{ Row, Value }
+        new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
-        new CsvValueStore[F, Value](V) with V.ValueStore[F] with MemFileV[F, V] {
+          def path: Path =
+            Paths get p
 
-          def path: Path = Paths get p
-
-          final override lazy val fresh = Fresh.shaChain[Row]
+          final override lazy val fresh =
+            Fresh.shaChain[VS.Row]
 
           final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
           final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
@@ -112,27 +110,26 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
 
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     def ofKeyChained[
-        K: Show: Get: Put,
+        K: Order: Show: Get: Put,
         V: Eq: Show,
         K2: Order: Show,
         V2: Eq: Show,
         HV <: HList
     ](
-        KV: KeyValueStores[K, V]
+        KVS: KeyValueStores[K, V]
     )(implicit
-        lgv: LabelledGeneric.Aux[V, HV],
-        llr: Lazy[LabelledRead[HV]],
-        llw: Lazy[LabelledWrite[HV]]
-    ): Result[KV.KeyValueStore[F]] =
+      lgv: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]],
+      llw: Lazy[LabelledWrite[HV]]): Result[KVS.KeyValueStore[F]] =
       Result safe {
 
-        import KV.{ Id, Key, Row, Value }
+        new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
 
-        new CsvKeyValueStore(KV) with KV.KeyValueStore[F] with MemFileKV[F, Key, Value] {
+          def path: Path =
+            Paths get p
 
-          def path: Path = Paths get p
-
-          final protected lazy val fresh: Fresh[Id, Row] = Fresh.shaChain[Row]
+          final protected lazy val fresh: Fresh[KVS.Id, KVS.Row] =
+            Fresh.shaChain[KVS.Row]
 
           final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
           final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv
