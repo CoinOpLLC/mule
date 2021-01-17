@@ -67,13 +67,6 @@ object currencies {
 object invoices {
 
   import time._, keyval._
-  import CsvImplicits._
-
-  import io.chrisdavenport.cormorant
-  // import cormorant.generic.semiauto._
-  import cormorant.refined._
-  import cormorant.implicits._
-
   import OpaqueKey._
 
   import currencies._
@@ -121,8 +114,14 @@ object invoices {
     implicit lazy val invoiceShow: Show[Invoice] = { import auto.show._; semi.show }
   }
 
-  object Invoices extends KeyValueStores.KV[Long Refined Invoice, Invoice]
+  object Invoices extends KeyValueStores.KV[Long OpaqueKey Invoice, Invoice]
 
-  def invoices[F[_]: Sync: ContextShift]: Result[Invoices.KeyValueStore[F]] =
+  def invoices[F[_]: Sync: ContextShift]: Result[Invoices.KeyValueStore[F]] = {
+    import CsvImplicits._
+    import io.chrisdavenport.cormorant
+    import cormorant.generic.semiauto._
+    import cormorant.refined._
+    import cormorant.implicits._
     keyValueStore[F] at "target/invoices.csv" ofKeyChained Invoices
+  }
 }

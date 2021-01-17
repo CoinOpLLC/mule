@@ -30,7 +30,6 @@ import refined.refineV
 import refined.api.Refined
 
 import BigDecimal.RoundingMode.{ DOWN, HALF_UP, RoundingMode }
-import shapeless.Fin
 
 /**
   * Unparameterized [[Currency]] base class.

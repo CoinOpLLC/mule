@@ -22,9 +22,6 @@ import refined.auto._
 import fs2.{ Stream }
 
 import io.chrisdavenport.cormorant
-import cormorant.generic.semiauto._
-import cormorant.refined._
-import cormorant.implicits._
 
 import io.chrisdavenport.fuuid
 import fuuid.{ FUUID, FUUIDGen }
@@ -61,9 +58,6 @@ object mvt {
   /**
     */
   object Product {
-
-    implicit def productEq: Eq[Product]     = { import auto.eq._; semi.eq }
-    implicit def productShow: Show[Product] = { import auto.show._; semi.show }
 
     /**
       */
@@ -116,14 +110,21 @@ object mvt {
           m <- ms
         } yield (n, b, c, m)
       ) evalMap (mk(metas, costs) _).tupled
+
+    implicit def productEq: Eq[Product]     = { import auto.eq._; semi.eq }
+    implicit def productShow: Show[Product] = { import auto.show._; semi.show }
   }
 
-  object Products extends KeyValueStores[Label, Product]
+  object Products extends KeyValueStores.KV[Label, Product]
+  import CsvImplicits._
+  import cormorant.generic.semiauto._
+  import cormorant.refined._
+  import cormorant.implicits._
 
   def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
     keyValueStore[F] at "target/products.csv" ofKeyChained Products
 
-  object Foos extends ValueStores[Product]
+  object Foos extends ValueStores.V[Product]
 
   def foos[F[_]: Sync: ContextShift]: Result[Foos.ValueStore[F]] =
     valueStore[F] at "target/foos.csv" ofChained Foos
