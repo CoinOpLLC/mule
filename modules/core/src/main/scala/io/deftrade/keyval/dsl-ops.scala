@@ -42,8 +42,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
       */
     def ofContentAddressed[
         V: Eq: Show,
-        // K2: Order: Show,
-        // V2: Eq: Show,
         HV <: HList
     ](
         VS: ValueStores[V]
@@ -70,8 +68,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
       */
     def ofChained[
         V: Eq: Show,
-        // K2: Order: Show,
-        // V2: Eq: Show,
         HV <: HList
     ](
         VS: ValueStores[V]
@@ -112,8 +108,6 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
     def ofKeyChained[
         K: Order: Show: Get: Put,
         V: Eq: Show,
-        // K2: Order: Show,
-        // V2: Eq: Show,
         HV <: HList
     ](
         KVS: KeyValueStores[K, V]
