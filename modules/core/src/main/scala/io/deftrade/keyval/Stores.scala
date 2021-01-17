@@ -17,7 +17,7 @@
 package io.deftrade
 package keyval
 
-import refinements.{ IsSha, Sha }
+import refinements.{ IsSHA, SHA }
 
 import cats.implicits._
 import cats.effect.{ ContextShift, Sync }
@@ -40,7 +40,7 @@ trait Stores[V] {
 
   /** `Id`s are defined to be secure hashes of some kind
     */
-  final type Id = Sha
+  final type Id = SHA
 
   /** The full type of the [[Id]] column.
     */
@@ -114,7 +114,7 @@ trait Stores[V] {
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     protected var prev: Id =
-      Refined unsafeApply [String, IsSha] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
+      Refined unsafeApply [String, IsSHA] "7hereWazAPharmrHadADogNBingoWuzHizN4m3oB1NGo"
 
     /** Note this returns a ''single'' `Id` for the whole sequence of `Row`s.
       *

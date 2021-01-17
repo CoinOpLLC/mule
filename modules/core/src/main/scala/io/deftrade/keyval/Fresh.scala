@@ -20,7 +20,7 @@ package keyval
 import cats.implicits._
 import cats.Show
 
-import refinements.{ Sha }
+import refinements.{ SHA }
 
 import spire.math.Integral
 import spire.syntax.field._
@@ -31,8 +31,7 @@ import scodec.bits.ByteVector
 
 import java.security.MessageDigest
 
-/**
-  * Defines how to create a fresh '''globally unique''' key which
+/** Defines how to create a fresh '''globally unique''' key which
   * is suitable to be persisted.
   */
 sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
@@ -51,8 +50,7 @@ object Fresh {
     */
   def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
 
-  /**
-    * Equivalent to `autoincrement` or `serial` from SQL.
+  /** Equivalent to `autoincrement` or `serial` from SQL.
     */
   def zeroBasedIncr[K: Integral: Show, P]: Fresh[OpaqueKey[K, P], P] = {
 
@@ -63,13 +61,12 @@ object Fresh {
     }
   }
 
-  /**
-    * Simple content-addressed `Id` generation using secure hash (`Sha`)
+  /** Simple content-addressed `Id` generation using secure hash (`SHA`)
     */
-  def shaContent[V: Show]: Fresh[Sha, V] = {
-    val md = MessageDigest getInstance Sha.Algo
+  def shaContent[V: Show]: Fresh[SHA, V] = {
+    val md = MessageDigest getInstance SHA.Algo
 
-    new Fresh[Sha, V]((_, v) => {
+    new Fresh[SHA, V]((_, v) => {
       md update (v.show getBytes "UTF-8")
       Refined unsafeApply ByteVector(md.digest).toBase58
     }) {}
@@ -81,12 +78,12 @@ object Fresh {
     * FIXME: the `Show` thing is just a hack; use scodec and CBOR
     * and pay attention to canonicalization
     */
-  def shaChain[V: Show]: Fresh[Sha, V] = {
+  def shaChain[V: Show]: Fresh[SHA, V] = {
 
-    val md = MessageDigest getInstance Sha.Algo
+    val md = MessageDigest getInstance SHA.Algo
 
-    new Fresh[Sha, V]((j, v) => {
-      md update (Sha toByteVector j).toArray
+    new Fresh[SHA, V]((j, v) => {
+      md update (SHA toByteVector j).toArray
       md update (v.show getBytes "UTF-8")
       Refined unsafeApply ByteVector(md.digest).toBase58
     }) {}

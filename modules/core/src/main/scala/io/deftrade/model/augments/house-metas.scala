@@ -31,7 +31,7 @@ trait DefaultMetas { self: ModuleTypes with Ledger =>
     */
   object Memo { def apply(memo: Label): Memo = new Memo(memo) {} }
 
-  implicit lazy val metaEq: Eq[Meta] = { import auto.eq._; semi.eq }
+  implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
   implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
 
   /**

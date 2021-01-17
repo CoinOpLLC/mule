@@ -185,8 +185,9 @@ trait Ledger { module: ModuleTypes =>
 
       /** Create a pricer from a pricing function. */
       implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
-        instance { case (instrument, quantity) =>
-          module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+        instance {
+          case (instrument, quantity) =>
+            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
         }
     }
   }
@@ -410,7 +411,7 @@ trait Ledger { module: ModuleTypes =>
     private[model] def apply(at: Instant, from: Folios.Id, to: Folios.Id): Confirmation =
       new Confirmation(at, from, to) {}
 
-    implicit lazy val confirmationEq: Eq[Confirmation] = { import auto.eq._; semi.eq }
+    implicit lazy val confirmationEq: Eq[Confirmation]     = { import auto.eq._; semi.eq }
     implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
 
     /** Process which drives the exchange of [[Trade]]s between [[Folio]]s.
@@ -446,11 +447,12 @@ trait Ledger { module: ModuleTypes =>
       payCash: Folios.Key => Money[C] => F[Result[Folios.Id]]
   )(
       drawOn: Folios.Key
-  ): (Trade, Money[C]) => F[Result[Trades.Id]] = { case (trade, amount) =>
-    for {
-      idb <- trades[F] put trade
-      _   <- payCash(drawOn)(amount)
-    } yield Result(idb._1.some)
+  ): (Trade, Money[C]) => F[Result[Trades.Id]] = {
+    case (trade, amount) =>
+      for {
+        idb <- trades[F] put trade
+        _   <- payCash(drawOn)(amount)
+      } yield Result(idb._1.some)
   }
 
   def trades[F[_]]: Trades.ValueStore[F]                  = ???

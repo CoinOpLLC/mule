@@ -29,10 +29,10 @@ object ledgerz {
 
   // val Right((instruments, trades, folios, transactions, metas)) = for {
   // val tables = for {
-  //   instruments  <- keyValueStore[IO] at "instruments.csv" ofChainAddressed Instrument
+  //   instruments  <- keyValueStore[IO] at "instruments.csv" ofChained Instrument
   //   trades       <- valueStore[IO] at "trades.csv" ofContentAddressed Trade
-  //   folios       <- keyValueStore[IO] at "folios.csv" ofChainAddressed Folio
-  //   transactions <- valueStore[IO] at "transactions.csv" ofChainAddressed Transaction
+  //   folios       <- keyValueStore[IO] at "folios.csv" ofChained Folio
+  //   transactions <- valueStore[IO] at "transactions.csv" ofChained Transaction
   //   metas        <- valueStore[IO] at "metas.csv" ofContentAddressed Meta
   // } yield (instruments, trades, folios, transactions, metas)
 }
