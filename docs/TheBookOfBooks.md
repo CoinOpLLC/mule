@@ -410,62 +410,7 @@ A `link` in "Data Vault" terms (foreign key) must be either be a business key or
     - [IPLD compliant](https://specs.ipld.io/#ipld-codecs) (barely)
     - TODO: `DAG-JSON`, `DAG-CBOR`
 
-### Id computation via secure hash
-
-A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.
-
-**Note**: the following `scala` code is _simplified_ for exposition.
-
-```scala
-/** assume for example - other choices would work here as well */
-   type Sha = String Refined IsSha256AsBase58
-
-/** magical code! elides many details about canonical formats and codecs! */
-   def sha[A](a: A): Sha = { ... }
-```
-Assume a suitable type `Row` that represents the bits to be persisted in association with a given `Id`. (`Row` will be elaborated in the following section.)
-
-We can use `sha` to compute an `Id` based only on instances of `Row`:
-
-```scala
-
-/** content address for row */
-  def rowSha: Row => Id =
-    row => sha(row)
-```
-Or, we can use a previous `Id` (computed from some prior `Row`)
-to compute a new (`hash chain`ed) `Id` for a given `Row`.
-
-```scala
-
-       /** chain `Id`s together into a sequence using `sha` */
-       def chain: Id => Id => Id =
-         i => j => sha((i, j))
-
-         /** chained address for row */
-       def chainedRowSha: Id => Row => Id =
-         id => row => chain(id)(sha(row))
-```
-
-**Note:** An `Id` calculated via `sha` can span multiple `Rows`.
-
-```scala
-
-        /** content addressed `Id` spanning multiple `Row`s.
-          *
-          * single `sha` validates single transaction semantics
-          */
-        def rowsSha: (Row, List[Row]) => Id =
-          (row, rows) => rows.foldLeft(rowSha(row))((s, r) => chain(s)(sha(r)))
-
-        /** chained addressed `Id`s spanning multiple `Row`s (single transaction) */
-        def chainedRowsSha: Id => (Row, List[Row]) => Id =
-          id => (row, rows) => chain(id)(rowsSha(row, rows))
-
-```
-This specifies all the types and methods necessary to compute `Id`s for any Store
-
-### Stores
+### Persistence Algebras
 
 There are two types of `Store`s: `Value` and `KeyValue`.
 - Value stores persist immutable (in memory) values
@@ -473,16 +418,68 @@ There are two types of `Store`s: `Value` and `KeyValue`.
 - Both use the root WithValue type to augment companion objects of `type V`
   - define (specific) `Id` and (generic) `Record` types for _both_ kinds of `Store`.
 
-#### `Store`s and companion root trait `WithValue`
+#### `Stores`
+
+A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.
+
+**Note**: the following `scala` code is _simplified_ for exposition.
+
+```scala
+/** assume for example - other choices would work here as well */
+   type SHA = String Refined IsSHA256AsBase58
+
+/** magical code! elides many details about canonical formats and codecs! */
+   def sha[A](a: A): SHA = { ... }
+```
+Assume a suitable type `Row` that represents the bits to be persisted in association with a given `Id`. (`Row` will be elaborated in the following section.)
+
+We can use `sha` to compute a unique `Id` based only on instances of `Row`:
+
+```scala
+type Id = SHA
+
+/** content address for row */
+def rowSHA: Row => Id =
+  row => sha(row)
+```
+Or, we can use a previous `Id` (computed from some prior `Row`)
+to compute a new (`hash chain`ed) `Id` for a given `Row`.
+
+```scala
+/** chain `Id`s together into a sequence using `sha` */
+def chain: Id => Id => Id =
+ i => j => sha((i, j))
+
+/** chained address for row */
+def chainedRowSHA: Id => Row => Id =
+  id => row => chain(id)(sha(row))
+```
+
+**Note:** An `Id` calculated via `sha` can (and often does) span **multiple** `Rows`.
+
+```scala
+/** content addressed `Id` spanning multiple `Row`s.
+  *
+  * single `sha` validates single transaction semantics
+  */
+def rowsSHA: (Row, List[Row]) => Id =
+  (row, rows) => rows.foldLeft(rowSHA(row))((s, r) => chain(s)(sha(r)))
+
+/** chained addressed `Id`s spanning multiple `Row`s (single transaction) */
+def chainedRowsSHA: Id => (Row, List[Row]) => Id =
+  id => (row, rows) => chain(id)(rowsSHA(row, rows))
+```
+
+This specifies all the types and methods necessary to compute `Id`s for any `Store`.
 
 ```scala
 /** once again simplified for exposition
   */
-trait WithValue[V] {
+trait Stores[V] {
 
  // bound type members
  //
- type Id    = Sha  /*: Order */
+ type Id    = SHA  /*: Order */
  type Value = V    /*: Eq */
 
  // free type members
@@ -499,7 +496,7 @@ Type swag provider for the free type variable `Value`.
 
 Any type `A` we bind to `Value` will have these provided. `Value` types must have value equality semantics - of course!
 
-### `ValueStore`s and Companion mixin `WithId`
+### `ValueStore`s
 ```scala
      trait WithId[V] extends WithValue[V] {
        type Row = Value
@@ -511,9 +508,9 @@ The `Row` type is simply bound to the  `Value` type.
 
 Id | Value
 :--- | ---:
-`a = rowSha` | 42.00
-`b = rowSha` | 33.33
-`a = rowSha` | 42.00
+`a = rowSHA` | 42.00
+`b = rowSHA` | 33.33
+`a = rowSHA` | 42.00
 
 Here we compute the `Id` of the `Row` using a secure hash function
 (`sha`).
@@ -538,9 +535,9 @@ Note: The sequential order of committed `Value`s is not guaranteed to be maintai
 
 Id | Value
 :--- | ---:
-`a = chainedRowSha(_)` | 42.00
-`b = chainedRowSha(a)` | 33.33
-`c = chainedRowSha(b)` | 42.00
+`a = chainedRowSHA(_)` | 42.00
+`b = chainedRowSHA(a)` | 33.33
+`c = chainedRowSHA(b)` | 42.00
 
 This is _also_ a pure immutable `value store`, but with `chain`ed `Id`s. No longer content addressable! Duplicate `Row`s will hash to distinct `Id`s due to chaining.
 Entails `List` semantics: the order of commitment may be proved by the `Id` sequence.
@@ -572,9 +569,9 @@ type Value = (K2, V2)
 
 Id            | (K2 |      V2)
 :------------ | --- | --------:
-`a = rowsSha` | USD | 10,000.00
+`a = rowsSHA` | USD | 10,000.00
 `a`           | XAU |    420.33
-`b = rowsSha` | XAU |    397.23
+`b = rowsSHA` | XAU |    397.23
 
 This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, V2]`.
 `Id`s are computed across all `Row`s belonging
@@ -600,10 +597,10 @@ val example: Model = Set (
 
 Id |  Value
 :--- | ---:
-`a = chainedRowSha(_)`  | XAU
-`b = chainedRowsSha(a)` | XAU
+`a = chainedRowSHA(_)`  | XAU
+`b = chainedRowsSHA(a)` | XAU
 `b`                     | CHF
-`c = chainedRowsSha(b)` | USD
+`c = chainedRowsSHA(b)` | USD
 `c`                     | USD
 
 This is a value store of `Nel[Value]` rows.
@@ -640,11 +637,11 @@ Duplicate rows must be appended within a single call that computes a single `Id`
 
 Id            | (K2 |      V2)
 :------------ | --- | --------:
-`a = rowsSha` | USD |10,000.00
+`a = rowsSHA` | USD |10,000.00
 `a`           | USD | 5,000.00
 `a`           | USD | 5,000.00
 `a`           | XAU |   420.33
-`b = rowsSha` | XAU |   397.23
+`b = rowsSHA` | XAU |   397.23
 
 This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, Nel[V2]]`.
 `Id`s are computed across all `Row`s belonging to the same `Map`.
@@ -669,13 +666,11 @@ val example: Model =
     )
   )
 ```
-### KeyValueStores
+### `KeyValueStores`
 
 The `KeyValueStore` type represents a family of persistence algebras with parametric effect type, indexed by an ordered key type. This key type is typically bound to a business key type from the domain model.
 
 
-
-#### Companion mixin `WithKey`
 
 The use of chained address for `Id` is mandatory.
 
@@ -684,7 +679,7 @@ multiple instances of the same `Row` entail positional significance in the data 
 (We can write the same row multiple times, and it matters in what order we write it.)
 
 ```scala
-trait WithKey[K, V] extends WithValue[V] {
+trait KeyValueStores[K, V] extends Stores[V] {
   type Key  = K /*: Order */
   type Row  = (Key, Option[Value])
 }
@@ -692,10 +687,10 @@ trait WithKey[K, V] extends WithValue[V] {
 
 Id | (Key | Option[Value])
 :--- | --- | ---:
-`a = chainedRowSha(_)` | USD | 10,000.00
-`b = chainedRowSha(_)` | XAU | 420.33
-`c = chainedRowSha(b)` | XAU | 397.23
-`d = chainedRowSha(a)` | USD | 5,000.00
+`a = chainedRowSHA(_)` | USD | 10,000.00
+`b = chainedRowSHA(_)` | XAU | 420.33
+`c = chainedRowSHA(b)` | XAU | 397.23
+`d = chainedRowSHA(a)` | USD | 5,000.00
 
 This is a key value store. The `Value` for a given `Key` evolves over time and the store records each evolution, maintaining the entire `Value` history for each `Key`.
 
@@ -725,11 +720,11 @@ transferred or validated without additional context.
 
 Id | (Key | Option[Value])
 :--- | --- | ---:
-`a = chainedRowSha(_)`  | IBan.09993 | XAU
-`b = chainedRowsSha(_)` | IBan.06776 | XAU
+`a = chainedRowSHA(_)`  | IBan.09993 | XAU
+`b = chainedRowsSHA(_)` | IBan.06776 | XAU
 `b`                     | IBan.06776 | CHF
-`c = chainedRowSha(_)`  | UsBan.5321 | USD
-`d = chainedRowSha(b)`  | IBan.06776 | USD
+`c = chainedRowSHA(_)`  | UsBan.5321 | USD
+`d = chainedRowSHA(b)`  | IBan.06776 | USD
 
 This is a key value store of `Nel[Value]`s.
 
@@ -765,10 +760,10 @@ type Row  = (Key, Option[(K2, Option[V2])])
 
 Id | (Key | Option[(K2 | Option[V2])])
 :--- | --- | --- | ---:
-`a = chainedRowSha(_)` | UsBan.5321 | USD | 10,000.00
-`b = chainedRowSha(_)` | IBan.09993 | XAU |    420.33
-`c = chainedRowSha(_)` | IBan.06776 | XAU |    397.23
-`d = chainedRowSha(a)` | UsBan.5321 | USD |  5,000.00
+`a = chainedRowSHA(_)` | UsBan.5321 | USD | 10,000.00
+`b = chainedRowSHA(_)` | IBan.09993 | XAU |    420.33
+`c = chainedRowSHA(_)` | IBan.06776 | XAU |    397.23
+`d = chainedRowSHA(a)` | UsBan.5321 | USD |  5,000.00
 
 This is a key value store of `Map[K2, V2]` rows.
 
@@ -792,10 +787,10 @@ This is a key value store of `Map[K2, V2]` rows.
 
 Id | (Key | Option[(K2 | Option[V2])])
 :--- | --- | --- | ---:
-`a = chainedRowSha(_)` | UsBan.5321 | USD | 10,000.00
-`b = chainedRowSha(_)` | IBan.09993 | XAU |    420.33
-`c = chainedRowSha(_)` | IBan.06776 | XAU |    397.23
-`d = chainedRowSha(a)` | UsBan.5321 | USD |  5,000.00
+`a = chainedRowSHA(_)` | UsBan.5321 | USD | 10,000.00
+`b = chainedRowSHA(_)` | IBan.09993 | XAU |    420.33
+`c = chainedRowSHA(_)` | IBan.06776 | XAU |    397.23
+`d = chainedRowSHA(a)` | UsBan.5321 | USD |  5,000.00
 
 This is a key value store of `Map[K2, Nel[V2]]` rows
 (the most general structure supported).
@@ -830,13 +825,13 @@ In this example, the value associated with the key `USD` is semantically deleted
 
 Id | (Key | Option[Value])
 :--- | --- | ---:
-`z` = chainedRowSha(`_`) | USD | `null`
+`z` = chainedRowSHA(`_`) | USD | `null`
 
 For `Map[Map]` and `Map[Map[Nel]]` specializations, `null`ify both the `K2` field for a given `Key`.
 
 Id | (Key | Option[(K2 | Option[V2])])
 :--- | --- | --- | ---:
-`x` = chainedRowSha(`d`) | UsBan.5321 | `null` | `null`
+`x` = chainedRowSHA(`d`) | UsBan.5321 | `null` | `null`
 
 #### "deleting" a `K2`
 
@@ -845,7 +840,7 @@ For `Map[Map]` and `Map[Map[Nel]]` specializations,
 
 Id | (Key | Option[(K2 | Option[V2])])
 :--- | --- | --- | ---:
-`y` = chainedRowSha(`c`) | IBan.06776 | `XAU` | `null`
+`y` = chainedRowSHA(`c`) | IBan.06776 | `XAU` | `null`
 
 ---
 
