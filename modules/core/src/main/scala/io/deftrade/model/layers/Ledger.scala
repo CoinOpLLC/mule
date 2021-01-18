@@ -229,11 +229,6 @@ trait Ledger { module: ModuleTypes =>
 
   /** A `Folio` key value store holds (open) [[Trade]]s,
     * indexed by opaque [[Account]] identifiers.
-    *
-    * Specifically: a `Map` of `Map`s, which, normalized and written out as a list,
-    * has rows of type: {{{
-    *   (Folios.Key, Instruments.Key, Quantity)
-    * }}}
     */
   object Folio {
 

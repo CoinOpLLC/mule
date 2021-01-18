@@ -21,7 +21,7 @@ import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 import cats.effect.Sync
 
 import eu.timepit.refined
@@ -30,7 +30,7 @@ import refined.string.{ MatchesRegex, Url }
 
 import refined.cats._
 
-import io.circe.{ Decoder, Encoder };
+import io.circe.{ Decoder, Encoder }
 import io.circe.refined._
 import io.circe.generic.semiauto._
 
@@ -59,8 +59,8 @@ trait Contacts {
       ???
   }
 
-  implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semi.eq }
-  implicit lazy val contactShow: Show[Contact] = { import auto.show._; semi.show }
+  implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semiauto.eq }
+  implicit lazy val contactShow: Show[Contact] = { import auto.show._; semiauto.show }
 
   /**
     */
@@ -92,8 +92,8 @@ trait Contacts {
       */
     object Name {
 
-      implicit lazy val nameEq: Eq[Name]     = semi.eq
-      implicit lazy val nameShow: Show[Name] = semi.show
+      implicit lazy val nameEq: Eq[Name]     = semiauto.eq
+      implicit lazy val nameShow: Show[Name] = semiauto.show
 
       implicit lazy val decoder: Decoder[Name] = deriveDecoder
       implicit lazy val encoder: Encoder[Name] = deriveEncoder
@@ -113,8 +113,8 @@ trait Contacts {
       */
     object USAddress {
 
-      implicit lazy val usAddressEq: Eq[USAddress]     = semi.eq
-      implicit lazy val usAddressShow: Show[USAddress] = semi.show
+      implicit lazy val usAddressEq: Eq[USAddress]     = semiauto.eq
+      implicit lazy val usAddressShow: Show[USAddress] = semiauto.show
 
       implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
       implicit lazy val encoder: Encoder[USAddress] = deriveEncoder
@@ -159,3 +159,7 @@ trait Contacts {
     */
   object Contacts extends ValueStores.SADT[Contact]
 }
+
+/**
+  */
+object Contacts extends Contacts

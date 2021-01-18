@@ -22,7 +22,7 @@ import time._, market._, money._, contracts._, keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import enumeratum.EnumEntry
 
@@ -33,31 +33,42 @@ import refined.string.{ Url }
 import refined.numeric.{ Positive }
 import refined.cats._
 
+import io.circe.{ Decoder, Encoder }
+import io.circe.refined._
+import io.circe.generic.semiauto._
+
 import keys.{ ISIN, USIN }
 
 /** Models a tradeable thing.
   *
   * Policy: Only legal entities (and not natural persons) may issue `Instruments`.
   */
-final case class Instrument(
-    symbol: Label,
-    issuedBy: LegalEntities.Key,
-    issuedIn: Option[CurrencyLike]
+sealed abstract case class Instrument private (
+    final val symbol: Label,
+    final val issuedBy: LegalEntities.Key,
+    final val issuedIn: Option[CurrencyLike]
 ) extends Numéraire.InKind
 
 /**
   */
 object Instrument {
 
+  def apply(
+      symbol: Label,
+      issuedBy: LegalEntities.Key,
+      issuedIn: Option[CurrencyLike]
+  ): Instrument =
+    new Instrument(symbol, issuedBy, issuedIn) {}
+
   /**
     */
-  implicit def instrumentEq: Eq[Instrument] = { import auto._; semi.eq }
+  implicit def instrumentEq: Eq[Instrument] = { import auto._; semiauto.eq }
   // Eq.fromUniversalEquals[Instrument]
 
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  implicit def instrumentShow: Show[Instrument] = { import auto._; semi.show }
+  implicit def instrumentShow: Show[Instrument] = { import auto._; semiauto.show }
 }
 
 /** Indexed by CUSIPs and other formats.
@@ -70,6 +81,8 @@ object Instruments extends KeyValueStores.KV[USIN, Instrument]
 object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
 
 /** Represents [[contracts.Contract]] parameters and state.
+  *
+  * Instances of `Form` memorialize the state of a `Contract` at a given point in time.
   *
   * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
   *
@@ -90,23 +103,26 @@ sealed abstract class Form extends Product with Serializable {
   }
 }
 
-/** Instances of `Form` memorialize the state of a `Contract` at a given point in time.
+/**
   */
-object Form
+object Form {
+  import io.circe.{ Decoder, Encoder }
 
-// object Forms extends KeyValueStores.KV[Instruments.Key, Form] {
-//   // lazy val Key: KeyCompanion[Instrument] = ??? // Instruments.Key
-// }
+  implicit lazy val formEncoder: Encoder[Form] = ???
+  implicit lazy val formDecoder: Decoder[Form] = ???
+}
+
+object Forms extends KeyValueStores.KV[Instruments.Key, SADT.Aux[Form]]
 
 /** Parameters common to multiple `Form`s.
   */
 object columns {
 
-  /** Denotes a single [[Instruments.Key]] which tracks a (non-empty) set of `Instruments.Key`s
+  /** Tracks a (non-empty) set of `Instruments.Key`s
     *
     * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
     */
-  sealed trait Tracks { self: Form =>
+  sealed trait Tracker { self: Form =>
     def members: Set[Instruments.Key]
   }
 
@@ -234,7 +250,7 @@ object layers {
     final case class Index(
         members: Set[Instruments.Key]
     ) extends Form
-        with Tracks {
+        with Tracker {
 
       /** FIXME: implement */
       def contract: Contract = ???
@@ -275,14 +291,6 @@ object layers {
 
     /** TODO: recheck that `Isin` thing... */
     object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
-
-    protected object FIXME {
-
-      import refined.auto._
-
-      def x: ISIN = ???
-      def y: USIN = x
-    }
 
     /**
       */
@@ -404,9 +412,9 @@ object forms
   * (such as M&A actions) as events connecting `Instruments.Key`s.
   */
 final case class Novation(
+    asOf: LocalDate,
     ante: Option[Instruments.Key],
     post: Option[Instruments.Key],
-    date: LocalDate,
     // meta: Metas.Id,
     sourcedAt: Instant,
     sourcedFrom: String Refined Url
@@ -416,8 +424,8 @@ final case class Novation(
   */
 object Novation {
 
-  implicit def novationOrder: Order[Novation] = { import auto.order._; semi.order }
-  implicit def novationShow: Show[Novation]   = { import auto.show._; semi.show }
+  implicit def novationOrder: Order[Novation] = { import auto.order._; semiauto.order }
+  implicit def novationShow: Show[Novation]   = { import auto.show._; semiauto.show }
 }
 
 /**

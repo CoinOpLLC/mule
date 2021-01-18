@@ -22,14 +22,6 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  type Contact
-
-  /**
-    */
-  val Contacts: ValueStores.SADT[Contact]
-
-  /**
-    */
   type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
 
   /** `Accounts` link the personal information of the account holders
@@ -203,93 +195,85 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
-  // import Roster._
+  import keyval.DtEnum
 
-  /** Models financial market participants.
-    */
-  sealed abstract class Party {
-    def name: Label
-    def taxNo: Tax.No
-    def contact: Contacts.Id
-  }
+  import enumeratum.{ EnumEntry }
 
-  /** Players that are recognized by the system (ours).
-    */
-  object Party {
-
-    /**
-      */
-    def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id): Party =
-      taxNo match {
-        case Tax.Ssn(ssn) => NaturalPerson(name, ssn, contact)
-        case Tax.Ein(ein) => LegalEntity(name, ein, contact)
-      }
-
-    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
-    implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
-  }
-
-  object Parties extends KeyValueStores.KV[FUUID, Party]
-
-  /** `NaturalPerson`s are `Party`s.
-    */
-  sealed abstract case class NaturalPerson(
-      name: Label,
-      ssn: Tax.Ssn,
-      contact: Contacts.Id
-  ) extends Party {
-
-    /**
-      */
-    final def taxNo: Tax.No = { import refined.auto._; ssn }
-  }
+  import cats.implicits._
 
   /**
+    * There are a finite enumeration of roles which [[Party]]s may take on with respect to
+    * [[layers.Accounts.Account]]s.
+    *
+    * Contextual note: each `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]].
     */
-  object NaturalPerson {
+  sealed trait Role extends EnumEntry
+
+  /**
+    * Enumerated `Role`s.
+    */
+  object Role extends DtEnum[Role] {
 
     /**
       */
-    def apply(name: Label, ssn: Tax.Ssn, contact: Contacts.Id): NaturalPerson =
-      new NaturalPerson(name, ssn, contact) {}
+    sealed trait Principal extends Role
 
-    import refined.cats._
+    /**
+      * That [[Party]] which is the market participant
+      * responsible for establishing the [[layers.Accounts.Account]].
+      */
+    case object Principal extends Principal {
 
-    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
-    implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
-  }
+      /**
+        * A test for all `Role`s ''other than'' `Princple`.
+        */
+      def unapply(role: Role): Option[Principal] =
+        role match {
+          case p: Principal => p.some
+          case _            => none
+        }
+    }
 
-  /**
-    */
-  object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
-
-  /**
-    */
-  sealed abstract case class LegalEntity private (
-      name: Label,
-      ein: Tax.Ein,
-      contact: Contacts.Id
-  ) extends Party {
+    @inline final def principal: Role = Principal
 
     /**
       */
-    final def taxNo: Tax.No = { import refined.auto._; ein }
-  }
-
-  /**
-    */
-  object LegalEntity {
+    sealed trait NonPrincipal extends Role
 
     /**
       */
-    def apply(name: Label, ein: Tax.Ein, contact: Contacts.Id): LegalEntity =
-      new LegalEntity(name, ein, contact) {}
+    object NonPrincipal {
 
-    import refined.cats._
+      /**
+        * Extractor for all `Role`s ''other than'' `Princple`.
+        */
+      def unapply(role: Role): Option[NonPrincipal] =
+        role match {
+          case Principal        => none
+          case np: NonPrincipal => np.some
+        }
+    }
 
-    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
-    implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
+    /**
+      * The primary delegate selected by a `Principal`.
+      */
+    case object Agent extends NonPrincipal
+
+    /**
+      * The primary delegate selected by the `Agent`.
+      */
+    case object Manager extends NonPrincipal
+
+    /**
+      * `Auditor`s are first class participants, with a package of rights and responsibilities.
+      */
+    case object Auditor extends NonPrincipal
+
+    /** The `findValues` macro collects all `value`s in the order written. */
+    lazy val values = findValues
+
+    /**
+      */
+    lazy val nonPrincipals = (values collect { case NonPrincipal(np) => np }).toList
   }
-
-  object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]
 }

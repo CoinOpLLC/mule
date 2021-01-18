@@ -26,7 +26,7 @@ import refined.api.{ Refined, Validate }
   *
   * TODO: Postgres / Mongo / Kafka integration
   */
-package object keyval extends keyval.dsl {
+package object keyval extends keyval.csvStoreDsl {
 
   import shapeless.syntax.singleton._
 
