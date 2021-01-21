@@ -48,8 +48,8 @@ package object model
     //
     // necessary package level augmentation
     //
-    with Contacts
-    with DefaultMetas
+    with contacts
+    with metas
     with IRS1065 { // replace or enhance as necessary
 
   /**

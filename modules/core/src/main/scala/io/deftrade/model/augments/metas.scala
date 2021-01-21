@@ -2,22 +2,20 @@ package io.deftrade
 package model
 package augments
 
-import keyval._, layers._
+import keyval._
 import refinements.Label
 
 import cats.implicits._
 import cats.{ Eq, Show }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
-import refined.cats._
 
 import io.circe.{ Decoder, Encoder };
-import io.circe.refined._
 
-/** House defaults.
+/**
   */
-trait DefaultMetas { self: ModuleTypes with Ledger =>
+trait metas {
 
   /** Root is unconstrained, enables disjunctive evolution.
     */
@@ -31,18 +29,25 @@ trait DefaultMetas { self: ModuleTypes with Ledger =>
     */
   object Memo { def apply(memo: Label): Memo = new Memo(memo) {} }
 
-  implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semi.eq }
-  implicit lazy val metaShow: Show[Meta] = { import auto.show._; semi.show }
-
   /**
     */
   object Meta {
 
+    import refined.cats._
+
+    implicit lazy val metaEq: Eq[Meta]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val metaShow: Show[Meta] = { import auto.show._; semiauto.show }
+
+    import io.circe.refined._
     import io.circe.generic.semiauto._
 
     implicit lazy val decoder: Decoder[Meta] = deriveDecoder
     implicit lazy val encoder: Encoder[Meta] = deriveEncoder
   }
 
-  final override object Metas extends ValueStores.SADT[Meta]
+  final object Metas extends ValueStores.SADT[Meta]
 }
+
+/**
+  */
+object metas extends metas

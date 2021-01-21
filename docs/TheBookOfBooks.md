@@ -1233,8 +1233,8 @@ Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 **Accounts** | KeyValue[V] | Key[`AccountNo`] | `Folios.Key`[2], `Roster.Id` |
 **Rosters** | Value[V] | Id | `Parties.Key` | `role: Role`, `stake: Option[Quantity]`
-**NaturalPersons** | KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ssn: Ssn`
-**LegalEntities** |  KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ein: Ein`
+**NaturalPersons** | KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ssn: SSN`
+**LegalEntities** |  KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ein: EIN`
 **Contacts** |  Value[SADT] | Id | | `sadt: SADT`
 
 #### Markets

@@ -25,7 +25,7 @@ import cats.implicits._
 import cats.kernel.{ Monoid }
 import cats.{ Eq, Functor, Show }
 import cats.data.NonEmptyMap
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 import cats.effect.{ Sync }
 
 import eu.timepit.refined
@@ -38,7 +38,7 @@ import fs2.Stream
 /** Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait Ledger { module: ModuleTypes =>
+trait Ledger { module: ModuleTypes with augments.metas =>
 
   /**
     */
@@ -210,7 +210,7 @@ trait Ledger { module: ModuleTypes =>
     */
   final lazy val Position = Entry
 
-  /** A [[Entry]] in motion.
+  /** [[Entry]] in motion.
     *
     * Note, this is just a type alias.
     */
@@ -313,23 +313,15 @@ trait Ledger { module: ModuleTypes =>
     */
   object Trades extends ValueStores.NEMKV[Leg, Entry.Key, Entry.Value]
 
-  /** Root of the transaction metadata abstract datatype.
-    */
-  type Meta
-
-  /** Persisted as an [[keyval.SADT]].
+  /** The concrete record for `Ledger` updates.
     *
-    * Nota Bene: By exploiting the `content addressed` nature of the `store` and
+    * Note: by exploiting the `content addressed` nature of the `store` and
     * recording the `Id` of an `SADT` instance, the [[Transaction]] record affords a
     * '''contemporaneous attestation''' of the data and its association with the transaction.
     *
     * This may be essential to the construction of certain smart [[contract]] systems, especially
     * in conjunction with digital signatures. Thus the metadata is bound into the Ricardian
     * lineage of the contract.
-    */
-  val Metas: ValueStores.SADT[Meta]
-
-  /** The concrete record for `Ledger` updates.
     */
   sealed abstract case class Transaction private (
       at: Instant,
@@ -383,11 +375,11 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semi.eq }
+    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semiauto.eq }
 
     /**
       */
-    implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semi.show }
+    implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semiauto.show }
   }
 
   object Transactions extends ValueStores.V[Transaction]
@@ -406,8 +398,8 @@ trait Ledger { module: ModuleTypes =>
     private[model] def apply(at: Instant, from: Folios.Id, to: Folios.Id): Confirmation =
       new Confirmation(at, from, to) {}
 
-    implicit lazy val confirmationEq: Eq[Confirmation]     = { import auto.eq._; semi.eq }
-    implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semi.show }
+    implicit lazy val confirmationEq: Eq[Confirmation]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val confirmationShow: Show[Confirmation] = { import auto.show._; semiauto.show }
 
     /** Process which drives the exchange of [[Trade]]s between [[Folio]]s.
       *

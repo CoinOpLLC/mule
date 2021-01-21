@@ -17,17 +17,12 @@ package io.deftrade
 package model
 
 import keyval._, refinements._
-import augments.Contacts.Contacts
 
 import cats.implicits._
 import cats.{ Eq, Show }
-// import cats.data.{ NonEmptyList, NonEmptySet }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
-// import refined.api.Refined
-// import refined.cats._
-// import refined.numeric.Interval
 
 import io.chrisdavenport.fuuid.FUUID
 
@@ -47,12 +42,12 @@ object Party {
     */
   def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id): Party =
     taxNo match {
-      case Tax.Ssn(ssn) => NaturalPerson(name, ssn, contact)
-      case Tax.Ein(ein) => LegalEntity(name, ein, contact)
+      case Tax.SSN(ssn) => NaturalPerson(name, ssn, contact)
+      case Tax.EIN(ein) => LegalEntity(name, ein, contact)
     }
 
-  implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
-  implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
+  implicit def partyEq: Eq[Party]     = { import auto.eq._; semiauto.eq }
+  implicit def partyShow: Show[Party] = { import auto.show._; semiauto.show }
 }
 
 object Parties extends KeyValueStores.KV[FUUID, Party]
@@ -61,7 +56,7 @@ object Parties extends KeyValueStores.KV[FUUID, Party]
   */
 sealed abstract case class NaturalPerson(
     name: Label,
-    ssn: Tax.Ssn,
+    ssn: Tax.SSN,
     contact: Contacts.Id
 ) extends Party {
 
@@ -76,13 +71,13 @@ object NaturalPerson {
 
   /**
     */
-  def apply(name: Label, ssn: Tax.Ssn, contact: Contacts.Id): NaturalPerson =
+  def apply(name: Label, ssn: Tax.SSN, contact: Contacts.Id): NaturalPerson =
     new NaturalPerson(name, ssn, contact) {}
 
   import refined.cats._
 
-  implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
-  implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
+  implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semiauto.eq }
+  implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semiauto.show }
 }
 
 /**
@@ -93,7 +88,7 @@ object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
   */
 sealed abstract case class LegalEntity private (
     name: Label,
-    ein: Tax.Ein,
+    ein: Tax.EIN,
     contact: Contacts.Id
 ) extends Party {
 
@@ -108,13 +103,13 @@ object LegalEntity {
 
   /**
     */
-  def apply(name: Label, ein: Tax.Ein, contact: Contacts.Id): LegalEntity =
+  def apply(name: Label, ein: Tax.EIN, contact: Contacts.Id): LegalEntity =
     new LegalEntity(name, ein, contact) {}
 
   import refined.cats._
 
-  implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
-  implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
+  implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semiauto.eq }
+  implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semiauto.show }
 }
 
 object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]

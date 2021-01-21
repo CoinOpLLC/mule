@@ -34,9 +34,9 @@ import io.circe.{ Decoder, Encoder }
 import io.circe.refined._
 import io.circe.generic.semiauto._
 
-/** The House Contact class.
+/**
   */
-trait Contacts {
+trait contacts {
 
   /**
     */
@@ -49,12 +49,12 @@ trait Contacts {
   ) {
 
     /** FIXME: `Accounts.contacts` dependency is unmapped */
-    def naturalPerson[F[_]: Sync](ssn: Tax.Ssn): F[NaturalPerson] =
+    def naturalPerson[F[_]: Sync](ssn: Tax.SSN): F[NaturalPerson] =
       ???
     // extract name from contact before persisting it
 
     /** FIXME: `Accounts.contacts` dependency is unmapped */
-    def legalEntity[F[_]: Sync](ein: Tax.Ein): F[LegalEntity] =
+    def legalEntity[F[_]: Sync](ein: Tax.EIN): F[LegalEntity] =
       // extract name from contact before persisting it
       ???
   }
@@ -162,4 +162,4 @@ trait Contacts {
 
 /**
   */
-object Contacts extends Contacts
+object contacts extends contacts
