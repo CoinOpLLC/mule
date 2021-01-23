@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, time._, money._, refinements.{ IsLabel }
+import keyval._, time._, money._
 
 import cats.implicits._
 // import cats.{ Sync }

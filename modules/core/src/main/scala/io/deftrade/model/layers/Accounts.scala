@@ -2,12 +2,12 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, refinements._
+import keyval._
 
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.data.{ NonEmptyList, NonEmptySet }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -61,8 +61,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
       ???
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
-    implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semiauto.eq }
+    implicit def accountShow: Show[Account] = { import auto.show._; semiauto.show }
   }
 
   /**
@@ -84,7 +84,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     lazy val roles: Role => NonEmptySet[Parties.Key] = {
       case Role.Principal        => principals.keys
-      case Role.NonPrincipal(np) => nonPrincipals(np)
+      case np: Role.NonPrincipal => nonPrincipals(np)
     }
 
     /**
@@ -120,8 +120,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   object Roster {
 
-    implicit def valueShow: Show[Roster] = { import auto.show._; semi.show }
-    implicit def valueEq: Eq[Roster]     = { import auto.eq._; semi.eq }
+    implicit def valueShow: Show[Roster] = { import auto.show._; semiauto.show }
+    implicit def valueEq: Eq[Roster]     = { import auto.eq._; semiauto.eq }
 
     private[deftrade] def apply(
         principals: UnitPartition[Parties.Key, Quantity],
@@ -139,6 +139,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
             case RosterValue(p, Principal, Some(u)) => ((p, u) :: us, nps)
             case RosterValue(p, NonPrincipal(r), None) =>
               (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
+            case _ => ??? // (sic)
           }
       }
       val Right(principals) = UnitPartition exact (xs: _*)
@@ -189,8 +190,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    implicit def eq: Eq[Roster]     = { import auto.eq._; semi.eq }
-    implicit def show: Show[Roster] = { import auto.show._; semi.show }
+    implicit def eq: Eq[Roster]     = { import auto.eq._; semiauto.eq }
+    implicit def show: Show[Roster] = { import auto.show._; semiauto.show }
   }
 
   object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
@@ -228,10 +229,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
         * A test for all `Role`s ''other than'' `Princple`.
         */
       def unapply(role: Role): Option[Principal] =
-        role match {
-          case p: Principal => p.some
-          case _            => none
-        }
+        if (role === this) this.some else none
     }
 
     @inline final def principal: Role = Principal

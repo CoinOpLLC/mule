@@ -38,7 +38,7 @@ import fs2.Stream
 /** Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait Ledger { module: ModuleTypes with augments.metas =>
+trait Ledger { module: ModuleTypes =>
 
   /**
     */
@@ -319,7 +319,8 @@ trait Ledger { module: ModuleTypes with augments.metas =>
     * recording the `Id` of an `SADT` instance, the [[Transaction]] record affords a
     * '''contemporaneous attestation''' of the data and its association with the transaction.
     *
-    * This may be essential to the construction of certain smart [[contract]] systems, especially
+    * This may be essential to the construction of certain smart [[io.deftrade.contracts contract]]
+    * systems, especially
     * in conjunction with digital signatures. Thus the metadata is bound into the Ricardian
     * lineage of the contract.
     */
@@ -384,7 +385,7 @@ trait Ledger { module: ModuleTypes with augments.metas =>
 
   object Transactions extends ValueStores.V[Transaction]
 
-  /** Note that [[Folio.Id]] is actually an `update event` for the specified [[Folios.Key]].
+  /** Note that [[Folios.Id]] is actually an `update event` for the specified [[Folios.Key]].
     * TODO: get this to work across nodes in a cluster
     */
   sealed abstract case class Confirmation private (at: Instant, from: Folios.Id, to: Folios.Id)

@@ -21,8 +21,7 @@ package impl
 import syntax._
 
 import cats.implicits._
-import cats.Show
-import cats.data.{ NonEmptyList, NonEmptyMap }
+import cats.data.{ NonEmptyList }
 
 import cats.effect.{ Blocker, ContextShift, Sync }
 

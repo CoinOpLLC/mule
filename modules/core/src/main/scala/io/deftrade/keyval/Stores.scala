@@ -92,7 +92,7 @@ trait Stores[V] {
       (records filter (_._1 === id) map (_._2)).compile.toList
 
     /** overrideable with default nop
-      * empty List entails `del`etion (only applicable to [[KeyValueStore]])
+      * empty List entails `del`etion (only applicable to [[KeyValueStores]])
       */
     protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
       ().pure[F]

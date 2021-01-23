@@ -82,7 +82,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
     /** Uncached.
       *
       * Note: `peek` cannot be used to distinguish whether an `Id` was never written,
-      * or has been written and subsequently [[delete]]d. Both cases return `F[None]`.
+      * or has been written and subsequently [[del]]eted. Both cases return `F[None]`.
       */
     final def peek(id: Id): F[Option[(Key, Spec)]] =
       rows(id) map {
@@ -212,7 +212,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
   }
 }
 
-/** What kind of values are we storing in our [[KeyValueStore]]?
+/**
   */
 final object KeyValueStores {
 

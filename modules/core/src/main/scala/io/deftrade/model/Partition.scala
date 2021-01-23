@@ -22,7 +22,7 @@ import syntax._, money._, refinements.IsUnitInterval
 import cats.implicits._
 import cats.{ Contravariant, Eq, Order, Show }
 import cats.data.{ NonEmptyMap, NonEmptySet }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import spire.math.Fractional
 import spire.syntax.field._
@@ -108,11 +108,10 @@ sealed trait PartitionLike {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   final def priced[C: Currency](
       amount: Mny[Value, C]
-  )(
-      implicit
-      K: Order[Key],
-      V: Financial[Value],
-  ): Map[Key, Mny[Value, C]] = (kvs map (amount * _.value)).toSortedMap
+  )(implicit
+    V: Financial[Value],
+  ): Map[Key, Mny[Value, C]] =
+    (kvs map (amount * _.value)).toSortedMap
 
   /** */
   def total(
@@ -259,7 +258,7 @@ object Partition {
   ) = compute(keys)(amount) |> apply[K, V]
 
   implicit def partitionEq[K: Order, V: Eq]: Eq[Partition[K, V]] = {
-    import auto.eq._; semi.eq
+    import auto.eq._; semiauto.eq
   }
 
   implicit def partitionShow[K: Show, V: Show]: Show[Partition[K, V]] =

@@ -33,10 +33,6 @@ import refined.string.{ Url }
 import refined.numeric.{ Positive }
 import refined.cats._
 
-import io.circe.{ Decoder, Encoder }
-import io.circe.refined._
-import io.circe.generic.semiauto._
-
 import keys.{ ISIN, USIN }
 
 /** Models a tradeable thing.
@@ -88,7 +84,7 @@ object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
   *
   * TODO: `Preamble`? `Exhibit`s? Other kinds of (linked or embedded) metadata?
   */
-sealed abstract class Form extends Product with Serializable {
+sealed abstract class Form extends Product {
 
   /** The `Contract` embedded within this `Form`.
     */
@@ -106,10 +102,17 @@ sealed abstract class Form extends Product with Serializable {
 /**
   */
 object Form {
-  import io.circe.{ Decoder, Encoder }
 
-  implicit lazy val formEncoder: Encoder[Form] = ???
-  implicit lazy val formDecoder: Decoder[Form] = ???
+  // import refined.cats._
+  //
+  // implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
+  // implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
+  //
+  // import io.circe.{ Decoder, Encoder }
+  // import io.circe.generic.semiauto._
+  //
+  // implicit lazy val formEncoder: Encoder[Form] = deriveEncoder
+  // implicit lazy val formDecoder: Decoder[Form] = deriveDecoder
 }
 
 object Forms extends KeyValueStores.KV[Instruments.Key, SADT.Aux[Form]]

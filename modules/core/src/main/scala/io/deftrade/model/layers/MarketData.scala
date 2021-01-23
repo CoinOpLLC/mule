@@ -43,7 +43,7 @@ import refined.cats._
 
 /**
   */
-trait MarketData { self: Ledger with ModuleTypes with augments.metas =>
+trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
