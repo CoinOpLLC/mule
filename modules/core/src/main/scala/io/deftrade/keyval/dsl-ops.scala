@@ -15,7 +15,7 @@ import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
 import java.nio.file.{ Path, Paths }
 
-trait dsl {
+trait csvStoreDsl {
 
   /**
     */
@@ -26,7 +26,7 @@ trait dsl {
   def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
-/** dsl for value stores
+/** csvStoreDsl for value stores
   */
 final case class VsOps[F[_]: Sync: ContextShift]() {
 

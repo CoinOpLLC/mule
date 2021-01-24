@@ -24,8 +24,7 @@ import refinements.{ Label }
 
 import cats.implicits._
 import cats.{ Monad, Order, Show }
-import cats.data.NonEmptySet
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import enumeratum.EnumEntry
 
@@ -33,12 +32,10 @@ import spire.syntax.field._
 
 import eu.timepit.refined
 import refined.api.Refined
-import refined.boolean.{ And, Or }
+import refined.boolean.{ And }
 import refined.collection.{ Size }
 import refined.numeric.{ GreaterEqual, LessEqual }
-import refined.string.{ Trimmed, Uuid => IsUuid }
-
-import scala.collection.immutable.SortedSet
+import refined.string.{ Trimmed }
 
 import io.chrisdavenport.fuuid.FUUID
 
@@ -87,8 +84,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
     protected def apply(quote: (MonetaryAmount, MonetaryAmount)): Quoted =
       new Quoted(quote) {}
 
-    implicit def qOrder: Order[Quoted] = { import auto.order._; semi.order }
-    implicit def qShow: Show[Quoted]   = { import auto.show._; semi.show }
+    implicit def qOrder: Order[Quoted] = { import auto.order._; semiauto.order }
+    implicit def qShow: Show[Quoted]   = { import auto.show._; semiauto.show }
   }
 
   /** Represents a price quote (in currency `C`) for instruments of type `A`.
@@ -271,8 +268,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def apply(at: Instant, tick: Tick, price: MonetaryAmount, size: Quantity): TickData =
       new TickData(at, tick, price, size) {}
 
-    implicit def tdOrder: Order[TickData] = { import auto.order._; semi.order }
-    implicit def tdShow: Show[TickData]   = { import auto.show._; semi.show }
+    implicit def tdOrder: Order[TickData] = { import auto.order._; semiauto.order }
+    implicit def tdShow: Show[TickData]   = { import auto.show._; semiauto.show }
 
     /** {{{
       * val myLimit: USD(55.47)
@@ -343,7 +340,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     * The `Counterparty` is assumed to have an [[Accounts.Account]] whose [[Ledger.Folio]]s are
     * recorded on on the [[Ledger]].
     */
-  sealed abstract case class Counterparty(
+  sealed abstract case class Counterparty private (
       final val host: NaturalPersons.Key,
       final val contra: Folios.Key,
       final val meta: Metas.Id
@@ -358,7 +355,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     def mk[F[_]](host: Parties.Key, meta: Meta): F[Counterparty] = ???
 
-    implicit def cpShow: Show[Counterparty] = { import auto.show._; semi.show }
+    implicit def cpShow: Show[Counterparty] = { import auto.show._; semiauto.show }
   }
 
   object Counterparties extends KeyValueStores.KV[FUUID, Counterparty]
@@ -392,18 +389,22 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def withEntity(host: Parties.Key): Exchange => Exchange =
       x => Exchange(host, x.contra, x.meta)
 
-    implicit def exShow: Show[Exchange] = { import auto.show._; semi.show }
+    implicit def exShow: Show[Exchange] = { import auto.show._; semiauto.show }
   }
 
   /**
     */
   object Exchanges extends KeyValueStores.KV[MIC, Exchange]
 
+  /**
+    */
+  object ExchangeSets extends KeyValueStores.KV[Label, Exchanges.Key]
+
   /** MDS := Market Data Source.
     */
   sealed abstract case class MDS private (
       provider: Parties.Key,
-      markets: NonEmptySet[Exchanges.Key],
+      markets: ExchangeSets.Key,
       meta: Metas.Id
   ) {
 
@@ -436,11 +437,10 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     private[deftrade] def apply(
         provider: Parties.Key,
+        markets: ExchangeSets.Key,
         meta: Metas.Id,
-        market: Exchanges.Key,
-        markets: Exchanges.Key*
     ): MDS =
-      new MDS(provider, NonEmptySet(market, SortedSet(markets: _*)), meta) {
+      new MDS(provider, markets, meta) {
 
         /** FIXME: how do we specialize? */
         def quotedIn[C: Currency](ik: Instruments.Key): Instruments.Key QuotedIn C = ???
@@ -456,5 +456,4 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /** placeholder */
   object OrderBook
-
 }

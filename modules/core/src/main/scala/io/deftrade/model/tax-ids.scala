@@ -45,13 +45,13 @@ object Tax {
 
   /**
     */
-  final type Ssn = String Refined IsSsn
+  final type SSN = String Refined IsSsn
 
-  object Ssn {
+  object SSN {
 
     /**
       */
-    def unapply(no: No)(implicit v: Validate[String, IsSsn]): Option[Ssn] =
+    def unapply(no: No)(implicit v: Validate[String, IsSsn]): Option[SSN] =
       refineV[IsSsn](no.value).toOption
   }
 
@@ -96,12 +96,12 @@ object Tax {
 
   /**
     */
-  final type Ein = String Refined IsEin
+  final type EIN = String Refined IsEin
 
   /**
     */
-  object Ein {
-    def unapply(no: No)(implicit v: Validate[String, IsEin]): Option[Ein] =
+  object EIN {
+    def unapply(no: No)(implicit v: Validate[String, IsEin]): Option[EIN] =
       refineV[IsEin](no.value).toOption
   }
 

@@ -86,7 +86,7 @@ protected trait CsvImplicits {
       def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
         for {
           json <- parser.parse(field.x) leftMap toDecodeFailure
-        } yield SADT cast json
+        } yield SADT unsafeFrom json
     }
 
   /**

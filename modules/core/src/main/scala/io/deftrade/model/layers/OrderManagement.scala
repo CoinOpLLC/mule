@@ -18,7 +18,7 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, time._, money._, refinements.{ IsLabel }
+import keyval._, time._, money._
 
 import cats.implicits._
 // import cats.{ Sync }
@@ -134,9 +134,9 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
       * of the [[Trade]] specified in the [[Transaction]].
       *
-      * FIXME: implement (it's a system affortance)
+      * FIXME: implement (it's a system affordance)
       */
-    final val settle: Execution ToStreamOf Confirmation = ???
+    final def settle: Execution ToStreamOf Confirmation = ???
 
     /** Order processing is all just kleisli arrows? Always has been.
       */

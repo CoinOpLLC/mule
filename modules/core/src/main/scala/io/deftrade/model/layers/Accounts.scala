@@ -2,12 +2,12 @@ package io.deftrade
 package model
 package layers
 
-import keyval._, refinements._
+import keyval._
 
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.data.{ NonEmptyList, NonEmptySet }
-import cats.derived.{ auto, semi }
+import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -19,14 +19,6 @@ import io.chrisdavenport.fuuid.FUUID
 /** Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
   */
 trait Accounts { self: Ledger with ModuleTypes =>
-
-  /**
-    */
-  type Contact
-
-  /**
-    */
-  val Contacts: ValueStores.SADT[Contact]
 
   /**
     */
@@ -69,8 +61,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
       ???
 
-    implicit def accountEq: Eq[Account]     = { import auto.eq._; semi.eq }
-    implicit def accountShow: Show[Account] = { import auto.show._; semi.show }
+    implicit def accountEq: Eq[Account]     = { import auto.eq._; semiauto.eq }
+    implicit def accountShow: Show[Account] = { import auto.show._; semiauto.show }
   }
 
   /**
@@ -92,7 +84,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     lazy val roles: Role => NonEmptySet[Parties.Key] = {
       case Role.Principal        => principals.keys
-      case Role.NonPrincipal(np) => nonPrincipals(np)
+      case np: Role.NonPrincipal => nonPrincipals(np)
     }
 
     /**
@@ -128,8 +120,8 @@ trait Accounts { self: Ledger with ModuleTypes =>
     */
   object Roster {
 
-    implicit def valueShow: Show[Roster] = { import auto.show._; semi.show }
-    implicit def valueEq: Eq[Roster]     = { import auto.eq._; semi.eq }
+    implicit def valueShow: Show[Roster] = { import auto.show._; semiauto.show }
+    implicit def valueEq: Eq[Roster]     = { import auto.eq._; semiauto.eq }
 
     private[deftrade] def apply(
         principals: UnitPartition[Parties.Key, Quantity],
@@ -147,6 +139,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
             case RosterValue(p, Principal, Some(u)) => ((p, u) :: us, nps)
             case RosterValue(p, NonPrincipal(r), None) =>
               (us, nps.updated(r, (nps get r).fold(NonEmptySet one p)(_ add p)))
+            case _ => ??? // (sic)
           }
       }
       val Right(principals) = UnitPartition exact (xs: _*)
@@ -197,99 +190,88 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    implicit def eq: Eq[Roster]     = { import auto.eq._; semi.eq }
-    implicit def show: Show[Roster] = { import auto.show._; semi.show }
+    implicit def eq: Eq[Roster]     = { import auto.eq._; semiauto.eq }
+    implicit def show: Show[Roster] = { import auto.show._; semiauto.show }
   }
 
   object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
-  // import Roster._
+  import keyval.DtEnum
 
-  /** Models financial market participants.
-    */
-  sealed abstract class Party {
-    def name: Label
-    def taxNo: Tax.No
-    def contact: Contacts.Id
-  }
+  import enumeratum.{ EnumEntry }
 
-  /** Players that are recognized by the system (ours).
-    */
-  object Party {
-
-    /**
-      */
-    def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id): Party =
-      taxNo match {
-        case Tax.Ssn(ssn) => NaturalPerson(name, ssn, contact)
-        case Tax.Ein(ein) => LegalEntity(name, ein, contact)
-      }
-
-    implicit def partyEq: Eq[Party]     = { import auto.eq._; semi.eq }
-    implicit def partyShow: Show[Party] = { import auto.show._; semi.show }
-  }
-
-  object Parties extends KeyValueStores.KV[FUUID, Party]
-
-  /** `NaturalPerson`s are `Party`s.
-    */
-  sealed abstract case class NaturalPerson(
-      name: Label,
-      ssn: Tax.Ssn,
-      contact: Contacts.Id
-  ) extends Party {
-
-    /**
-      */
-    final def taxNo: Tax.No = { import refined.auto._; ssn }
-  }
+  import cats.implicits._
 
   /**
+    * There are a finite enumeration of roles which [[Party]]s may take on with respect to
+    * [[layers.Accounts.Account]]s.
+    *
+    * Contextual note: each `Role` is mapped to a [[Party]] via a [[layers.Accounts.Roster]].
     */
-  object NaturalPerson {
+  sealed trait Role extends EnumEntry
+
+  /**
+    * Enumerated `Role`s.
+    */
+  object Role extends DtEnum[Role] {
 
     /**
       */
-    def apply(name: Label, ssn: Tax.Ssn, contact: Contacts.Id): NaturalPerson =
-      new NaturalPerson(name, ssn, contact) {}
+    sealed trait Principal extends Role
 
-    import refined.cats._
+    /**
+      * That [[Party]] which is the market participant
+      * responsible for establishing the [[layers.Accounts.Account]].
+      */
+    case object Principal extends Principal {
 
-    implicit def naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semi.eq }
-    implicit def naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semi.show }
-  }
+      /**
+        * A test for all `Role`s ''other than'' `Princple`.
+        */
+      def unapply(role: Role): Option[Principal] =
+        if (role === this) this.some else none
+    }
 
-  /**
-    */
-  object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
-
-  /**
-    */
-  sealed abstract case class LegalEntity private (
-      name: Label,
-      ein: Tax.Ein,
-      contact: Contacts.Id
-  ) extends Party {
+    @inline final def principal: Role = Principal
 
     /**
       */
-    final def taxNo: Tax.No = { import refined.auto._; ein }
-  }
-
-  /**
-    */
-  object LegalEntity {
+    sealed trait NonPrincipal extends Role
 
     /**
       */
-    def apply(name: Label, ein: Tax.Ein, contact: Contacts.Id): LegalEntity =
-      new LegalEntity(name, ein, contact) {}
+    object NonPrincipal {
 
-    import refined.cats._
+      /**
+        * Extractor for all `Role`s ''other than'' `Princple`.
+        */
+      def unapply(role: Role): Option[NonPrincipal] =
+        role match {
+          case Principal        => none
+          case np: NonPrincipal => np.some
+        }
+    }
 
-    implicit def legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semi.eq }
-    implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semi.show }
+    /**
+      * The primary delegate selected by a `Principal`.
+      */
+    case object Agent extends NonPrincipal
+
+    /**
+      * The primary delegate selected by the `Agent`.
+      */
+    case object Manager extends NonPrincipal
+
+    /**
+      * `Auditor`s are first class participants, with a package of rights and responsibilities.
+      */
+    case object Auditor extends NonPrincipal
+
+    /** The `findValues` macro collects all `value`s in the order written. */
+    lazy val values = findValues
+
+    /**
+      */
+    lazy val nonPrincipals = (values collect { case NonPrincipal(np) => np }).toList
   }
-
-  object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]
 }

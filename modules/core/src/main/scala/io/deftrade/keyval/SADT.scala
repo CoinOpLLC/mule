@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.{ Eq, Show }
 
 import io.circe.syntax._
-import io.circe.{ parser, Decoder, Encoder, Json }
+import io.circe.{ Decoder, Encoder, Json }
 
 /** Serialized Algebraic Data Type.
   *
@@ -57,20 +57,15 @@ object SADT {
     final def canonicalString: String = json.noSpacesSortKeys
   }
 
-  /** More D&D than type evasion. TODO: revisit this
-    */
-  def cast[T: Decoder: Encoder](json: Json): SADT.Aux[T] =
-    new Aux[T](json) {}
-
   /**
     */
   def from[T: Decoder: Encoder](t: T): SADT.Aux[T] =
     new Aux[T](t.asJson) {}
 
-  // private val Right(braces) = parser parse "{}"
-
-  // // FIXME decide if this is the way or not
-  // private[keyval] def empty[T]: SADT.Aux[T] = apply(braces)
+  /**
+    */
+  def unsafeFrom[T: Decoder: Encoder](json: Json): SADT.Aux[T] =
+    new Aux[T](json) {}
 
   implicit lazy val miscEq: Eq[SADT]     = Eq by (_.json)
   implicit lazy val miscShow: Show[SADT] = Show show (_.json.show)
