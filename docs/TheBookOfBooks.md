@@ -34,7 +34,7 @@ In the spirit of **Domain Driven Design**, this document is meant to define a _u
 - order management system (`OMS`) integration hooks for external markets
 
 
-Nick Wade  
+Nick Wade
 CoinOp LLC
 ___
 <p style="page-break-before: always">
@@ -364,15 +364,18 @@ The generation of unique primary key `Id` instances has been left to the databas
 The specific secure hash algorithm is bound by the application developers.
 
 ##### Key
-- identifier types
+
+`Key` types must have `Order` and `Show` typeclass instances defined and in scope.
+
+Typical `Key` types:
 - domain legible (e.g. `AccountNo`)
-- opaque (e.g. `UUID`s)
-- `Order`, and `Show` typeclass instances
+- opaque types (e.g. `UUID`s)
+- `Id` types of other tables
+- `Key` types of other tables
 
 ##### Value
-  - often a value class
-  - typeclass instances for `Eq`, and `Show`.
-  - `Value` is not the same as `Spec` (more later)
+
+Most often represents some kind of [value object](https://medium.com/swlh/value-objects-to-the-rescue-28c563ad97c6). Always requires typeclass instances for `Eq`, and `Show`. Note, `Value` is not the same as `Spec` (more later).
 
 #### Primary Index Conventions
 
@@ -492,15 +495,12 @@ trait Stores[V] {
  type Record = (Id, Row)
 }
 ```
-Type swag provider for the free type variable `Value`.
-
-Any type `A` we bind to `Value` will have these provided. `Value` types must have value equality semantics - of course!
 
 ### `ValueStore`s
 ```scala
-     trait WithId[V] extends WithValue[V] {
-       type Row = Value
-     }
+trait ValueStores[V] extends Stores[V] {
+  type Row = V
+}
 ```
 The `Row` type is simply bound to the  `Value` type.
 
@@ -513,9 +513,9 @@ Id | Value
 `a = rowSHA` | 42.00
 
 Here we compute the `Id` of the `Row` using a secure hash function
-(`sha`).
-This simple convention entails `Set` semantics: duplicates are (semantically) discarded;
-identical `Row`s hash to the same `Id`.
+(`sha`). This simple convention entails `Set` semantics: identical `Row`s hash to the same `Id`.
+
+Consider:
 
 ```scala
 type Spec     = Value
@@ -525,9 +525,9 @@ type Model    = Shape[Spec]
 val example: Model = Set(33.33, 42.00)
 ```
 
-Note: duplicate rows are elided, and this elision is signaled in the API.
+Note: duplicate row are elided when `append`ed, and this elision is signaled in the API.
 
-Because the `Id` may be computed directly given the `Value`, or "content", to be referenced, this type of `store` can be called `content addressed`.
+Because the `Id` may be computed directly given the `Value`, or "content", to be referenced, this type of value store can be called `content addressed`.
 
 Note: The sequential order of committed `Value`s is not guaranteed to be maintained. In particular, the physical presence of a `Record` which precedes another cannot be taken as indication, let alone proof, that there is a temporal ordering between them which is defined by the `ValueStore` (such ordering may be defined elsewhere withing a specific data model).
 
@@ -540,12 +540,11 @@ Id | Value
 `c = chainedRowSHA(b)` | 42.00
 
 This is _also_ a pure immutable `value store`, but with `chain`ed `Id`s. No longer content addressable! Duplicate `Row`s will hash to distinct `Id`s due to chaining.
-Entails `List` semantics: the order of commitment may be proved by the `Id` sequence.
+These value stores entail `List` semantics: in particular, the order of commitment may be proved by the `Id` sequence.
 
-
+Consider:
 ```scala
 type Spec     = Value
-/* type Shape[_] = Set[_] */
 type Shape[_] = List[_]
 type Model    = Shape[Spec]
 
@@ -557,9 +556,9 @@ function `Id => Id` (input to output) permitting blocks themselves to be chained
 
 `Store`s of this shape are used for `model.Transaction`s.
 
-All `Shape` specializations of `WithId` may use *either* `content address` or `chained address` functions to compute `Id`.
+All `Shape` specializations of `ValueStore` may use *either* `content address` or `chained address` functions to compute `Id`.
 
-#### specialization for `Nem`s (Non Empty Maps)
+#### specialization for non-empty Maps
 
 ```scala
 type K2 /*: Order */
@@ -591,9 +590,9 @@ val example: Model = Set (
 )
 ```
 
-`Store`s of this shape are used e.g. to model `Trade`s (with `content address`ing).
+`ValueStore`s of this shape are used e.g. to model `Trade`s (with `content address`ing).
 
-#### specialization for `Nel`s.
+#### specialization for non-empty Lists.
 
 Id |  Value
 :--- | ---:
@@ -624,7 +623,7 @@ val example: Model =
 
 **TODO:** make this example a set of `Command` or `Event` values of some kind - that shows off the `Shape`.
 
-#### specialization for `Map`s of `Nel`s.
+#### specialization for Maps of non-empty Lists.
 
 ```scala
 type K2 /*: Order */
@@ -716,7 +715,7 @@ transferred or validated without additional context.
 
 `Store`s of this shape are used in this example to map a currency to an amount.
 
-#### specialization for `Nel`s
+#### specialization for non-empty Lists
 
 Id | (Key | Option[Value])
 :--- | --- | ---:
@@ -750,7 +749,7 @@ val example: Model =
 
 ---
 
-#### specialization for `Map`s
+#### specialization for Maps
 ```scala
 type K2 /*: Order */
 type V2 /*: Eq */
@@ -1063,7 +1062,7 @@ Double entry `Balance` calculation from a `fs2.Stream` of `Ledger.Transaction`s.
 
 These are the accounting terms and identities as we use them:
 
-```
+```scala
    Debits := Assets + Expenses                  // accounting definition
    Credits := Liability + Revenue               // accounting definition
    Debits === Credits                           // accounting identity
@@ -1077,8 +1076,8 @@ These are the accounting terms and identities as we use them:
    + Reserves                                   // you never know
    + RetainedEarnings                           // add to book value of equity
 ```
-
 TODO: express these as _algebraic laws_.
+
 #### Pricing
 
 `Pricing` instances represent a price quote (in currency `C`) for instruments of type `A`. The two parameter type constructor takes advantage of the infix syntax; `A QuotedIn B` is a human-legible expression in the domain of market quotes.
@@ -1204,55 +1203,66 @@ Adapting the terminology of Data Vault modeling gives us the following usage:
 
 #### Contracts
 
-Name | Shape | Publishes | Links | Attrs
+Name | Store[`Spec`] | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Novations** | Value[V] | Id | `Instruments.Key`[1,2], `Metas.Id` | `date: LocalDate`
-**Instruments** | KeyValue[V] | Key[`USIN`] | `LegalEntity.Key` | `symbol: Label`, `issuedIn: Option[Currency]`
-**Forms** | KeyValue[V] | Id | **`Instruments.Key`** | `display: Label`, `contract: Contract`, `state: SADT`
+**Novations** | VS[`Novation`] | Id | `ante: Option[LegalEntities.Key]`, `post: Option[LegalEntities.Key]` | `asOf: LocalDate`
+**Instruments** | KVS[`UUID`, `Instrument`] | Key | `issuedBy: LegalEntities.Key` | `symbol: Label`, `issuedIn: Option[Currency]`
+**Forms** | KVS[`Instruments.Key`, `SADT[Form]`] | Id |  | `display: Label`, `contract: Contract`
 
 #### Ledger
 
-Name | Shape | Publishes | Links | Attrs
----- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Trades** | Value[NEMKV] | Id | `Instruments.Key` | `_: Quantity`
-**Folios** | KeyValue[MKV] | Id, Key[`UUID`] | `Instruments.Key` | `_: Quantity`
-**Transactions** | Value[V] | Id | `Trade.Id`[2], `Folios.Key`[2], `Metas.Id` | `at: Instant`
-**Confirmations** | KeyValue[V] | | **`Transaction.Id`**, `Folio.Id`[2] | `at: Instant`
-**Metas** | Value[SADT] | Id | | `sadt: SADT`
+Name | Store[`Spec`] | Publishes | Links | Attrs
+---- | ---------|------ |-----------------|-------------------------------|----------------------------------------------------------------------------------------
+**Trades** | VS[`Trade`] | Id |  | `_1: Instruments.Key` | `_2: Quantity`
+**Folios** | KVS[`UUID`, `Folio`] | Id, Key | `_1: Instruments.Key` | `_2: Quantity`
+**Portfolios** | VS[`Portfolio`] | Id | `open, escrowed, expected: Folios.Key` |
+**Transactions** | VS[`Transaction`] | Id  |  `a, b: (Trades.Id, Folios.Key)`, `meta: Metas.Id` | `at: Instant`
+**Confirmations** | KVS[`Transactions.Id`, `Confirmation`] |  | `from, to: Folio.Id` | `at: Instant`
+**Metas** | VS.SADT[`Memo`] | Id  | | `Memo`
 
 #### Accounting
 
-Name | Shape | Publishes | Links | Attrs
+Name | Store[`Spec`] | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Balances** | KeyValue[MKV] | Id | **`Folios.Key`** | `(AccountingKey, FinancialAmount)`
-**Reports** | KeyValue[LV] | Id | **`Folios.Key`** , `Balance.Id`[3,4], *`Report.Id`*[0,1] | `asOf: Instant`, `period: Period`
+**Balances** | VS[`Balance`] | Id | | `(_1: AccountingKey, _2: FinancialAmount)`
+**Reports** | KVS[`Folios.Key`, `Report`] | Id | `cs, bs, is, es: Balance.Id`, `prev: Option[Report.Id]` | `asOf: Instant`, `period: Period`
 
-#### People
+#### Accounts
 
-Name | Shape | Publishes | Links | Attrs
+Name | Store[`Spec`] | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Accounts** | KeyValue[V] | Key[`AccountNo`] | `Folios.Key`[2], `Roster.Id` |
-**Rosters** | Value[V] | Id | `Parties.Key` | `role: Role`, `stake: Option[Quantity]`
-**NaturalPersons** | KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ssn: Ssn`
-**LegalEntities** |  KeyValue[V] | `Parties.Key` | `Contact.Id` | `label: Label`, `ein: Ein`
-**Contacts** |  Value[SADT] | Id | | `sadt: SADT`
+**Accounts** | KVS[`AccountNo`, `Account`] | Key | `roster: Roster.Id`, `positions: Portfolios.Id` |
+**Rosters** | VS.Codec[`Roster`] | Id | `party: Parties.Key` | `role: Role`, `stake: Option[Quantity]`
 
-#### Markets
+#### Entities
 
-Name | Shape | Publishes | Links | Attrs
+Name | Store[`Spec`] | Publishes | Links | Attrs
+---- | --------------- |-----------------|-------------------------------|---------------------------------------------------------------------------------------
+**NaturalPersons** | KVS[`Parties.Key`] |  Key | `contact: Contact.Id` | `label: Label`, `ssn: SSN`
+**LegalEntities** |  KVS[`Parties.Key`] |  Key | `Contact.Id` | `label: Label`, `ein: EIN`
+**Contacts** |  VS.SADT[`Contact`] | Id | | `_: Contact`
+
+#### External Markets
+
+Name | Store[`Spec`] | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Counterparties** | KeyValue[V] | Key[`UUID`] |  `Parties.Key`, `Folios.Key`, `Metas.Id` |
-**Exchanges** | KeyValue[V] | Key[`MIC`] |  `Parties.Key`, `Folios.Key`, `Metas.Id` |
-**MDSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `Metas.Id`, `MarketList.Id` |
-**MarketLists** | Value[NELV] | Id | `MDS.Key`, `Exchange.Key` |
-**OMSs** | KeyValue[V] | Key[`Label`] | `LegalEntity.Key`, `MarketList.Id`, `Folios.Key`[2] |
-**Orders** | KeyValue[V] | Key[`Long`] | `OMS.Key`, `Market.Key`, `Trade.Id` | `at: Instant`, `currency: Currency`, `limit: Option[MonetaryAmount]`, `goodTill: Option[Instant]`, `attrs: Metas.Id`
-**Executions** | Value[V] | Id | `Order.Key`, `Transaction.Id` | `at: Instant`
+**Counterparties** | KVS[`UUID`, `Counterparty`] | Key |  `host: NaturalPersons.Key`, `contra: Portfolios.Id`, `meta: Metas.Id` |
+**Exchanges** | KVS[`MIC`, `Exchange`] | Key  |  `host: LegalEntities.Key`, `contra: Portfolios.Id`, `meta: Metas.Id` |
+**ExchangeSets** | KLVS[`Label`, `Exchanges.Key`] | Key  |  `Exchanges.Key` |
+
+#### Trading
+
+Name | Store[`Spec`] | Publishes | Links | Attrs
+---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
+**MDSs** | KVS[`Label`, `MDS`] | Key | `provider: LegalEntities.Key`, `markets: ExchangeSets.Key` `meta: Metas.Id` |
+**TickDataSets** | KVS[`Label`, `TickData`] | Key |  | `at: Instant`, `tick: Tick`, `price: MonetaryAmount`, `size: Quantity`
+**OMSs** | KVS[`Label`, `OMS`] | Key | `host: LegalEntities.Key`, `markets: ExchangeSets.Key`, `meta: Metas.Id` |
+**Orders** | KVS[`Opaque[Long]`, `Order`] | Key | `oms: OMSs.Key`, `exchange: Exchanges.Key`, `account: AccountNo`, `Trades.Id`, `attrs: Metas.Id` | `at: Instant`, `currency: Currency`, `limit: Option[MonetaryAmount]`, `goodTill: Option[Instant]`
+**Executions** | V[`Execution`] | Id | `order: Orders.Key`, `transaction: Transaction.Id` | `at: Instant`
 
 #### Misc
 
 Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**TickData** | KeyValue[V] | Key[`Label`] |  | `at: Instant`, `tick: Tick`, `price: MonetaryAmount`, `size: Quantity`
 ---|---|---|---|---|---
-**SASH** | KeyValue[V] | |  **`*.Id`**, `Parties.Key` | `sig: Sig`
+**SASHs** | KVS[`*.Id`, `SASH`] | Id | `signer: Parties.Key` | `sig: Sig`
