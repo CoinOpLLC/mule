@@ -248,6 +248,36 @@ trait Ledger { module: ModuleTypes =>
     */
   object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value]
 
+  /** Total view of [[Position]]s including those `escrowed` for transfer
+    * and those `expected` to settle.
+    *
+    * This class is used by the settlement machine elves.
+    */
+  sealed abstract case class Portfolio private (
+      final val open: Folios.Key,
+      final val escrowed: Folios.Key,
+      final val expected: Folios.Key
+  )
+
+  /**
+    */
+  object Portfolio {
+
+    def apply(
+        open: Folios.Key,
+        escrowed: Folios.Key,
+        expected: Folios.Key
+    ): Portfolio =
+      new Portfolio(open, escrowed, expected) {}
+
+    implicit lazy val portfolioEq: Eq[Portfolio]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val portfolioShow: Show[Portfolio] = { import auto.show._; semiauto.show }
+  }
+
+  /**
+    */
+  object Portfolios extends ValueStores.VS[Portfolio]
+
   /** A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
   final type Trade = NonEmptyMap[Entry.Key, Entry.Value]
@@ -374,16 +404,11 @@ trait Ledger { module: ModuleTypes =>
         mid <- metas[F] put meta map (_._1)
       } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
-    /**
-      */
-    implicit lazy val transactionEq: Eq[Transaction] = { import auto.eq._; semiauto.eq }
-
-    /**
-      */
+    implicit lazy val transactionEq: Eq[Transaction]     = { import auto.eq._; semiauto.eq }
     implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semiauto.show }
   }
 
-  object Transactions extends ValueStores.V[Transaction]
+  object Transactions extends ValueStores.VS[Transaction]
 
   /** Note that [[Folios.Id]] is actually an `update event` for the specified [[Folios.Key]].
     * TODO: get this to work across nodes in a cluster

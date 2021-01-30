@@ -221,8 +221,6 @@ trait Accounting { self: ModuleTypes =>
   /**
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
-    *
-    * FIXME: BR0K3N 4F
     */
   type Treatment[K <: AccountingKey] = UnitPartition[K, MonetaryAmount]
 

@@ -13,6 +13,8 @@ import shapeless.{ HList, LabelledGeneric, Lazy }
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
+import fs2.Pipe
+
 import java.nio.file.{ Path, Paths }
 
 trait csvStoreDsl {
@@ -59,8 +61,8 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
           final override lazy val fresh =
             Fresh.shaContent[VS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
         }
       }
 
@@ -85,8 +87,8 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
           final override lazy val fresh =
             Fresh.shaChain[VS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
         }
       }
   }
@@ -125,8 +127,8 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
           final protected lazy val fresh: Fresh[KVS.Id, KVS.Row] =
             Fresh.shaChain[KVS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderKv
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderKv
         }
       }
   }

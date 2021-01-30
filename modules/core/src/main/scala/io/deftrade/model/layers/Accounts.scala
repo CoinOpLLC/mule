@@ -27,11 +27,9 @@ trait Accounts { self: Ledger with ModuleTypes =>
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.
     */
-  sealed abstract case class Account(
-      roster: Rosters.Id,
-      open: Folios.Key,
-      escrowed: Folios.Key,
-      expected: Folios.Key
+  sealed abstract case class Account private (
+      final val roster: Rosters.Id,
+      final val positions: Portfolios.Id
   )
 
   /** Accounts are modelled as long lived entities that can evolve over time.
@@ -46,19 +44,13 @@ trait Accounts { self: Ledger with ModuleTypes =>
       */
     protected[deftrade] def apply(
         roster: Rosters.Id,
-        open: Folios.Key,
-        escrowed: Folios.Key,
-        expected: Folios.Key
+        positions: Portfolios.Id
     ): Account =
-      new Account(roster, open, escrowed, expected) {}
-
-    /**
-      */
-    def fromRoster(roster: Rosters.Id): Account =
-      apply(roster, freshFolioKey, freshFolioKey, freshFolioKey)
+      new Account(roster, positions) {}
 
     /** alt version FIXME: implement */
     def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
+      // freshFolioKey, freshFolioKey, freshFolioKey
       ???
 
     implicit def accountEq: Eq[Account]     = { import auto.eq._; semiauto.eq }

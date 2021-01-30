@@ -143,7 +143,7 @@ object ValueStores {
 
   /** Values
     */
-  abstract class V[V](
+  abstract class VS[V](
       implicit
       final val IsV: V =:= V
   ) extends ValueStores[V] {

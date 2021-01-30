@@ -21,16 +21,16 @@ package layers
 import keyval._, time._, money._
 
 import cats.implicits._
-// import cats.{ Sync }
-import cats.data.{ Kleisli, NonEmptySet }
-import cats.effect.{ Sync }
+import cats.{ Eq, Order, Show }
+import cats.derived.{ auto, semiauto }
+import cats.data.{ Kleisli }
+
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 import refined.auto._
+import refined.cats._
 
 import fs2.Stream
-
-import scala.collection.immutable.SortedSet
 
 /**
   */
@@ -57,12 +57,13 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     *   - Why not [[fs2.Pipe]]?
     *   - Order processing *is* a natural pipeline, and so the Kleisli modeling has fidelity.
     */
-  sealed abstract case class OMS[F[_]](
-      host: LegalEntities.Key,
-      entry: Folios.Key,
-      contra: Folios.Key,
-      markets: NonEmptySet[Exchanges.Key]
+  sealed abstract case class OMS private (
+      final val host: LegalEntities.Key,
+      final val markets: ExchangeSets.Key,
+      final val meta: Metas.Id,
   ) {
+
+    type F[_]
 
     /**
       */
@@ -71,12 +72,12 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     /** What it is that the client wants [[Execution]] of.
       */
     sealed abstract case class Order private (
-        at: Instant,
-        market: Exchanges.Key,
-        trade: Trades.Id,
-        currency: CurrencyLike,
-        limit: Option[MonetaryAmount],
-        goodTill: Option[Instant]
+        final val at: Instant,
+        final val market: Exchanges.Key,
+        final val trade: Trades.Id,
+        final val currency: CurrencyLike,
+        final val limit: Option[MonetaryAmount],
+        final val goodTill: Option[Instant]
     )
 
     /**
@@ -86,12 +87,25 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       /** Note that currency is required even for market orders.
         */
       def market[C: Currency](market: Exchanges.Key, trade: Trades.Id): Order =
-        new Order(instant, market, trade, Currency[C], none, none) {}
+        Order(instant, market, trade, Currency[C], none, none)
 
       /**
         */
       def limit[C: Currency](market: Exchanges.Key, trade: Trades.Id, limit: Money[C]): Order =
-        new Order(instant, market, trade, Currency[C], limit.amount.some, none) {}
+        Order(instant, market, trade, Currency[C], limit.amount.some, none)
+
+      private[OMS] def apply(
+          at: Instant,
+          market: Exchanges.Key,
+          trade: Trades.Id,
+          currency: CurrencyLike,
+          limit: Option[MonetaryAmount],
+          goodTill: Option[Instant]
+      ): Order =
+        new Order(at, market, trade, currency, limit, goodTill) {}
+
+      implicit lazy val cpEq: Eq[Order]     = { import auto.eq._; semiauto.eq }
+      implicit lazy val cpShow: Show[Order] = { import auto.show._; semiauto.show }
     }
 
     /**
@@ -102,19 +116,30 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       *
       * FIXME: canceled order signals are TBD.
       */
-    sealed abstract case class Execution(
-        at: Instant,
-        order: Orders.Key,
-        transaction: Transactions.Id
+    sealed abstract case class Execution private (
+        final val at: Instant,
+        final val order: Orders.Key,
+        final val transaction: Transactions.Id
     )
 
     /** `Execution`s are pure values (do not evolve.)
       *
       * Implication for domain modellers: so-called "broken trades" require explicit modelling.
       */
-    object Execution
+    object Execution {
 
-    object Executions extends ValueStores.V[Execution]
+      private[OMS] def apply(
+          at: Instant,
+          order: Orders.Key,
+          transaction: Transactions.Id
+      ): Execution =
+        new Execution(at, order, transaction) {}
+
+      implicit lazy val cpEq: Eq[Execution]     = { import auto.eq._; semiauto.eq }
+      implicit lazy val cpShow: Show[Execution] = { import auto.show._; semiauto.show }
+    }
+
+    object Executions extends ValueStores.VS[Execution]
 
     def riskCheck: Order ToStreamOf Order
 
@@ -148,16 +173,18 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
     */
   object OMS {
 
-    /** TODO: evole
-      */
-    def mk[F[_]: Sync](
+    // /** TODO: evole
+    //   */
+    private[deftrade] def apply(
         host: LegalEntities.Key,
-        entry: Folios.Key,
-        contra: Folios.Key,
-        market: Exchanges.Key,
-        ms: Exchanges.Key*
-    ): OMS[F] =
-      new OMS[F](host, entry, contra, NonEmptySet(market, SortedSet(ms: _*))) {
+        markets: ExchangeSets.Key,
+        meta: Metas.Id,
+    ): OMS =
+      new OMS(
+        host,
+        markets,
+        meta
+      ) {
 
         /**
           */
@@ -166,5 +193,9 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
         /** This phase is implemented by the brokerage api integration code. */
         def trade: Order ToStreamOf Execution = ???
       }
+
+    implicit lazy val omsOrder: Order[OMS] = { import auto.order._; semiauto.order }
+
+    implicit lazy val omsShow: Show[OMS] = { import auto.show._; semiauto.show }
   }
 }

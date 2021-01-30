@@ -55,40 +55,40 @@ sealed protected abstract class CsvStore[F[_], V](
     * Note: not distinguishing between `not found` and `IO error`
     * TODO: This needs to evolve.
     */
-  final def records: StreamF[Record] =
+  final def records: Stream[F, Record] =
     (readLines through csvToRecord).rethrow handleErrorWith (_ => Stream.empty)
 
   /** csv
     */
-  final protected def persist: Record PipeF Unit = recordToCSV andThen appendingSink
+  final protected def persist: Pipe[F, Record, Unit] = recordToCSV andThen appendingSink
 
   /**
     */
-  protected def readLines: StreamF[String]
+  protected def readLines: Stream[F, String]
 
   /**
     */
-  protected def appendingSink: String PipeF Unit
+  protected def appendingSink: Pipe[F, String, Unit]
 
   /**
     */
-  protected def recordToCSV: Record PipeF String
+  protected def recordToCSV: Pipe[F, Record, String]
 
   /**
     */
-  protected def csvToRecord: String PipeF Result[Record]
+  protected def csvToRecord: Pipe[F, String, Result[Record]]
 }
 
 /**
   */
 abstract class CsvValueStore[F[_], V](
-    final val V: ValueStores[V]
+    final val VS: ValueStores[V]
 )(implicit override val F: Sync[F], override val X: ContextShift[F])
-    extends CsvStore[F, V](V) {
+    extends CsvStore[F, V](VS) {
 
   self: ValueStores[V]#ValueStore[F] =>
 
-  import V.{ Id, IdField, Row }
+  import VS.{ Id, IdField, Row }
 
   import cormorant.refined._
   import cormorant.implicits._
@@ -119,7 +119,7 @@ abstract class CsvValueStore[F[_], V](
       implicit
       lgav: LabelledGeneric.Aux[Row, HV],
       llhv: Lazy[LabelledRead[HV]]
-  ): String PipeF Result[Record] =
+  ): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -148,7 +148,7 @@ abstract class CsvValueStore[F[_], V](
       implicit
       lgav: LabelledGeneric.Aux[V, HV],
       llhv: Lazy[LabelledWrite[HV]]
-  ): Record PipeF String =
+  ): Pipe[F, Record, String] =
     writeLabelled[F, Record](printer)
 }
 
@@ -156,13 +156,13 @@ abstract class CsvValueStore[F[_], V](
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
-    final val KV: KeyValueStores[K, V]
+    final val KVS: KeyValueStores[K, V]
 )(implicit override val F: Sync[F], override val X: ContextShift[F])
-    extends CsvStore[F, V](KV) {
+    extends CsvStore[F, V](KVS) {
 
   self: KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KV.{ IdField, Key, KeyField, Value }
+  import KVS.{ IdField, Key, KeyField, Value }
 
   import cormorant.refined._
   import cormorant.implicits._
@@ -303,7 +303,7 @@ sealed protected trait MemFile[F[_], V] {
 trait MemFileV[F[_], V] extends MemFile[F, V] {
   self: CsvValueStore[F, V] with ValueStores[V]#ValueStore[F] =>
 
-  import V.{ Id, Row }
+  import VS.{ Id, Row }
 
   override protected def cacheLookup(id: Id): F[List[Row]] =
     ???
@@ -317,7 +317,7 @@ trait MemFileV[F[_], V] extends MemFile[F, V] {
 trait MemFileKV[F[_], K, V] extends MemFile[F, V] {
   self: CsvKeyValueStore[F, K, V] with KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KV.{ Id, Key, Row, Value }
+  import KVS.{ Id, Key, Row, Value }
 
   override protected def cacheLookup(key: Key): F[Option[(Id, List[Value])]] =
     ???

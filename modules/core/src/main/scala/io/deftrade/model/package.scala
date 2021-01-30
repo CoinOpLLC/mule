@@ -52,6 +52,14 @@ package object model
 
   /**
     */
+  final type UnitPartition[K, N] = Partition[K, N, Partition.IsNormalized]
+
+  /**
+    */
+  final type ScaledPartition[K, N] = Partition[K, N, Partition.IsPositive]
+
+  /**
+    */
   def groupBy[
       F[_]: Applicative: Foldable: SemigroupK,
       K,

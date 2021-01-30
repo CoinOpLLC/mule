@@ -38,7 +38,7 @@ trait Stores[V] {
     */
   final type Value = V
 
-  /** `Id`s are defined to be secure hashes of some kind
+  /** `Id`s are primary keys, and defined to be secure hashes of some kind.
     */
   final type Id = SHA
 
@@ -47,7 +47,6 @@ trait Stores[V] {
   final type IdField = FieldType[id.T, Id]
 
   /** Think spreadsheet or relational table,
-    * keeping in mind that [[Value]]s are can be, and often are, compound.
     */
   type Row
 
@@ -63,17 +62,9 @@ trait Stores[V] {
       */
     final type Record = (Id, Row)
 
-    /**
-      */
-    final type StreamF[A] = Stream[F, A]
-
-    /**
-      */
-    final type PipeF[A, B] = Pipe[F, A, B]
-
     /** implementations may override. TODO: Revisit this decision.
       */
-    def rows: StreamF[Row] =
+    def rows: Stream[F, Row] =
       records map (_._2)
 
     /** implementations may override. TODO: Revisit this decision.
@@ -83,7 +74,7 @@ trait Stores[V] {
 
     /** Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
       */
-    protected def records: StreamF[Record]
+    protected def records: Stream[F, Record]
 
     /**  Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
       *  implementations may override. TODO: Revisit this decision.
@@ -99,7 +90,7 @@ trait Stores[V] {
 
     /**
       */
-    protected def persist: Record PipeF Unit
+    protected def persist: Pipe[F, Record, Unit]
 
     /**
       */

@@ -223,7 +223,7 @@ object mvt {
   def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
     keyValueStore[F] at "target/products.csv" ofKeyChained Products
 
-  object Foos extends ValueStores.V[Product]
+  object Foos extends ValueStores.VS[Product]
 
   def foos[F[_]: Sync: ContextShift]: Result[Foos.ValueStore[F]] =
     valueStore[F] at "target/foos.csv" ofChained Foos

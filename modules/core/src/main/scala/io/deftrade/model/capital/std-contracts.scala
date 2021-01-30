@@ -12,6 +12,9 @@ object std {
   import Financial.Ops
   import Observable._
 
+  def cash[N: Financial, C: Currency]: Contract =
+    one[C]
+
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](
       maturity: Instant,

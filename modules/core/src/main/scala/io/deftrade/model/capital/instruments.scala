@@ -84,7 +84,7 @@ object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
   *
   * TODO: `Preamble`? `Exhibit`s? Other kinds of (linked or embedded) metadata?
   */
-sealed abstract class Form extends Product {
+sealed trait Form extends Product with Serializable {
 
   /** The `Contract` embedded within this `Form`.
     */
@@ -103,8 +103,8 @@ sealed abstract class Form extends Product {
   */
 object Form {
 
-  // import refined.cats._
-  //
+  import refined.cats._
+
   // implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
   // implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
   //
@@ -165,12 +165,16 @@ object layers {
 
     /**
       */
-    final case class CommonStock(
-        tclass: Option[Label]
-    ) extends Form {
+    sealed abstract case class CommonStock(tclass: Option[Label]) extends Form {
 
       /** FIXME: implement */
       def contract: Contract = ???
+    }
+
+    object CommonStock {
+      def apply(tclass: Option[Label]): CommonStock = new CommonStock(tclass) {}
+      implicit lazy val formEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
+      implicit lazy val formShow: Show[CommonStock] = { import auto.show._; semiauto.show }
     }
 
     /**
@@ -433,4 +437,4 @@ object Novation {
 
 /**
   */
-object Novations extends ValueStores.V[Novation]
+object Novations extends ValueStores.VS[Novation]

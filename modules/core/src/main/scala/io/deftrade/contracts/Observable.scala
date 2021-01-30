@@ -19,25 +19,44 @@ sealed trait Observable[A]
 /**  */
 object Observable {
 
-  sealed abstract case class Const[A](a: A) extends Observable[A]
-  sealed abstract case class Branch[A](
+  sealed abstract case class Const[A] private (a: A) extends Observable[A]
+  object Const { def apply[A](a: A): Const[A] = new Const(a) {} }
+
+  sealed abstract case class Branch[A] private (
       oB: Observable[Boolean],
       oT: Observable[A],
       oF: Observable[A]
   ) extends Observable[A]
 
-  sealed abstract case class Before(t: Instant) extends Observable[Boolean]
-  sealed abstract case class At(t: Instant)     extends Observable[Boolean]
+  object Branch {
+    def apply[A](
+        oB: Observable[Boolean],
+        oT: Observable[A],
+        oF: Observable[A]
+    ): Branch[A] = new Branch(oB, oT, oF) {}
+  }
 
-  import Unary.{ Op => UnOp, _ }
+  sealed abstract case class Before private (t: Instant) extends Observable[Boolean]
+  object Before { def apply(t: Instant): Before = new Before(t) {} }
+
+  sealed abstract case class At private (t: Instant) extends Observable[Boolean]
+  object At { def apply(t: Instant): At = new At(t) {} }
 
   /**  */
-  sealed abstract case class Unary[A](op: UnOp[A], o: Observable[A]) extends Observable[A]
+  sealed abstract case class Unary[A] private (
+      op: Unary.Op[A],
+      o: Observable[A]
+  ) extends Observable[A]
 
   /**  */
   object Unary {
 
-    sealed abstract class Op[A](val f: A => A)
+    def apply[A](
+        op: Op[A],
+        o: Observable[A]
+    ): Unary[A] = new Unary(op, o) {}
+
+    sealed abstract class Op[A](final val f: A => A)
 
     case object Not extends Op[Boolean](!_)
 
@@ -48,16 +67,23 @@ object Observable {
     case object Log  extends Op[Double](math log _)
   }
 
-  import Binary.{ Op => BinOp, _ }
-
   /**  */
-  sealed abstract case class Binary[A, B](op: BinOp[A, B], oL: Observable[A], oR: Observable[A])
-      extends Observable[B]
+  sealed abstract case class Binary[A, B] private (
+      op: Binary.Op[A, B],
+      oL: Observable[A],
+      oR: Observable[A]
+  ) extends Observable[B]
 
   /**  */
   object Binary {
 
-    sealed abstract class Op[A, B](val f: (A, A) => B)
+    def apply[A, B](
+        op: Binary.Op[A, B],
+        oL: Observable[A],
+        oR: Observable[A]
+    ): Binary[A, B] = new Binary(op, oL, oR) {}
+
+    sealed abstract class Op[A, B](final val f: (A, A) => B)
 
     case object And  extends Op[Boolean, Boolean](_ & _)
     case object Or   extends Op[Boolean, Boolean](_ | _)
@@ -78,19 +104,21 @@ object Observable {
     case object Max extends Op[Double, Double](_ max _)
   }
 
+  import Unary._, Binary._
+
   /** `const(x)` is an observable that has value x at any time. */
-  def const[A](a: A): Observable[A] = new Const(a) {}
+  def const[A](a: A): Observable[A] = Const(a)
 
   /** primitive */
-  def before(t: Instant): Observable[Boolean] = new Before(t) {}
-  def at(t: Instant): Observable[Boolean]     = new At(t)     {}
+  def before(t: Instant): Observable[Boolean] = Before(t)
+  def at(t: Instant): Observable[Boolean]     = At(t)
 
-  def not(o: Observable[Boolean]): Observable[Boolean] = new Unary(Not, o) {}
+  def not(o: Observable[Boolean]): Observable[Boolean] = Unary(Not, o)
 
-  def abs(o: Observable[Double]): Observable[Double]  = new Unary(Abs, o)  {}
-  def sqrt(o: Observable[Double]): Observable[Double] = new Unary(Sqrt, o) {}
-  def exp(o: Observable[Double]): Observable[Double]  = new Unary(Exp, o)  {}
-  def log(o: Observable[Double]): Observable[Double]  = new Unary(Log, o)  {}
+  def abs(o: Observable[Double]): Observable[Double]  = Unary(Abs, o)
+  def sqrt(o: Observable[Double]): Observable[Double] = Unary(Sqrt, o)
+  def exp(o: Observable[Double]): Observable[Double]  = Unary(Exp, o)
+  def log(o: Observable[Double]): Observable[Double]  = Unary(Log, o)
 
   /** derived */
   def atOrAfter(t: Instant): Observable[Boolean] = not(before(t))
@@ -101,12 +129,12 @@ object Observable {
     def unary_! : Observable[Boolean] = not(oL)
 
     def branch(cT: => Contract)(cF: => Contract): Contract = contracts.branch(oL)(cT)(cF)
-    def branch[A](oT: => Observable[A])(oF: => Observable[A]): Observable[A] =
-      new Branch(oL, oT, oF) {}
 
-    def and(oR: Observable[Boolean]): Observable[Boolean] = new Binary(And, oL, oR)  {}
-    def or(oR: Observable[Boolean]): Observable[Boolean]  = new Binary(Or, oL, oR)   {}
-    def ===(oR: Observable[Boolean]): Observable[Boolean] = new Binary(Xnor, oL, oR) {}
+    def branch[A](oT: => Observable[A])(oF: => Observable[A]): Observable[A] = Branch(oL, oT, oF)
+
+    def and(oR: Observable[Boolean]): Observable[Boolean] = Binary(And, oL, oR)
+    def or(oR: Observable[Boolean]): Observable[Boolean]  = Binary(Or, oL, oR)
+    def ===(oR: Observable[Boolean]): Observable[Boolean] = Binary(Xnor, oL, oR)
   }
 
   /** */
@@ -114,21 +142,21 @@ object Observable {
 
     def *(c: => Contract): Contract = contracts.scale(oL)(c)
 
-    def unary_! : Observable[Double] = new Unary(Neg, oL) {}
+    def unary_! : Observable[Double] = Unary(Neg, oL)
 
-    def <(oR: Observable[Double]): Observable[Boolean]   = new Binary(Lt, oL, oR)  {}
-    def <=(oR: Observable[Double]): Observable[Boolean]  = new Binary(Lte, oL, oR) {}
-    def >(oR: Observable[Double]): Observable[Boolean]   = new Binary(Gt, oL, oR)  {}
-    def >=(oR: Observable[Double]): Observable[Boolean]  = new Binary(Gte, oL, oR) {}
-    def ===(oR: Observable[Double]): Observable[Boolean] = new Binary(Eq, oL, oR)  {}
-    def !==(oR: Observable[Double]): Observable[Boolean] = new Binary(Neq, oL, oR) {}
+    def <(oR: Observable[Double]): Observable[Boolean]   = Binary(Lt, oL, oR)
+    def <=(oR: Observable[Double]): Observable[Boolean]  = Binary(Lte, oL, oR)
+    def >(oR: Observable[Double]): Observable[Boolean]   = Binary(Gt, oL, oR)
+    def >=(oR: Observable[Double]): Observable[Boolean]  = Binary(Gte, oL, oR)
+    def ===(oR: Observable[Double]): Observable[Boolean] = Binary(Eq, oL, oR)
+    def !==(oR: Observable[Double]): Observable[Boolean] = Binary(Neq, oL, oR)
 
-    def +(oR: Observable[Double]): Observable[Double]   = new Binary(Add, oL, oR) {}
-    def -(oR: Observable[Double]): Observable[Double]   = new Binary(Sub, oL, oR) {}
-    def *(oR: Observable[Double]): Observable[Double]   = new Binary(Mul, oL, oR) {}
-    def /(oR: Observable[Double]): Observable[Double]   = new Binary(Div, oL, oR) {}
-    def min(oR: Observable[Double]): Observable[Double] = new Binary(Min, oL, oR) {}
-    def max(oR: Observable[Double]): Observable[Double] = new Binary(Max, oL, oR) {}
+    def +(oR: Observable[Double]): Observable[Double]   = Binary(Add, oL, oR)
+    def -(oR: Observable[Double]): Observable[Double]   = Binary(Sub, oL, oR)
+    def *(oR: Observable[Double]): Observable[Double]   = Binary(Mul, oL, oR)
+    def /(oR: Observable[Double]): Observable[Double]   = Binary(Div, oL, oR)
+    def min(oR: Observable[Double]): Observable[Double] = Binary(Min, oL, oR)
+    def max(oR: Observable[Double]): Observable[Double] = Binary(Max, oL, oR)
   }
 
   /** TODO: this needs pretty printing! */

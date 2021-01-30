@@ -134,8 +134,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         amount: Money[C]
     )(implicit C: Currency[C]): TrialBalance[C] =
       TrialBalance(
-        debits |+| (keys.debits priced -amount),
-        credits |+| (keys.credits priced amount)
+        debits |+| (keys.debits priced -amount).toSortedMap,
+        credits |+| (keys.credits priced amount).toSortedMap
       )
 
     /**

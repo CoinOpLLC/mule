@@ -23,7 +23,7 @@ import capital.Instruments
 import refinements.{ Label }
 
 import cats.implicits._
-import cats.{ Monad, Order, Show }
+import cats.{ Eq, Monad, Order, Show }
 import cats.derived.{ auto, semiauto }
 
 import enumeratum.EnumEntry
@@ -36,10 +36,10 @@ import refined.boolean.{ And }
 import refined.collection.{ Size }
 import refined.numeric.{ GreaterEqual, LessEqual }
 import refined.string.{ Trimmed }
+// import refined.auto._
+import refined.cats._
 
 import io.chrisdavenport.fuuid.FUUID
-
-import refined.cats._
 
 /**
   */
@@ -320,17 +320,13 @@ trait MarketData { self: Ledger with ModuleTypes =>
     *   - "reverse polarity" when we enter a short position.
     *   - indexAndSum settled positions for reconcilliation
     */
-  sealed trait Market { def host: Parties.Key; def contra: Folios.Key; def meta: Metas.Id }
+  sealed trait Market { def host: Parties.Key; def contra: Portfolios.Id; def meta: Metas.Id }
 
   /** Markets evolve.
     */
   object Market {
-
-    /** beware - naming here follows machine semantics not domain semantics!!!
-      *
-      * Invariant: Markets are assigned unique `contra` Folios.
-      */
-    implicit def marketOrder: Order[Market] = Order by (_.contra)
+    // implicit def marketEq: Eq[Market]     = { import auto.eq._; semiauto.eq }
+    // implicit def marketShow: Show[Market] = { import auto.show._; semiauto.show }
   }
 
   object Markets
@@ -342,7 +338,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Counterparty private (
       final val host: NaturalPersons.Key,
-      final val contra: Folios.Key,
+      final val contra: Portfolios.Id,
       final val meta: Metas.Id
   ) extends Market
 
@@ -350,12 +346,13 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   object Counterparty {
 
-    def apply(host: NaturalPersons.Key, contra: Folios.Key, meta: Metas.Id): Counterparty =
+    def apply(host: NaturalPersons.Key, contra: Portfolios.Id, meta: Metas.Id): Counterparty =
       new Counterparty(host, contra, meta) {}
 
     def mk[F[_]](host: Parties.Key, meta: Meta): F[Counterparty] = ???
 
-    implicit def cpShow: Show[Counterparty] = { import auto.show._; semiauto.show }
+    implicit lazy val cpEq: Eq[Counterparty]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val cpShow: Show[Counterparty] = { import auto.show._; semiauto.show }
   }
 
   object Counterparties extends KeyValueStores.KV[FUUID, Counterparty]
@@ -367,7 +364,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   sealed abstract case class Exchange private (
       final val host: LegalEntities.Key,
-      final val contra: Folios.Key,
+      final val contra: Portfolios.Id,
       final val meta: Metas.Id
   ) extends Market
 
@@ -377,9 +374,9 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
     /**
       */
-    protected[deftrade] def apply(
+    def apply(
         host: LegalEntities.Key,
-        contra: Folios.Key,
+        contra: Portfolios.Id,
         meta: Metas.Id
     ): Exchange =
       new Exchange(host, contra, meta) {}
@@ -389,7 +386,8 @@ trait MarketData { self: Ledger with ModuleTypes =>
     def withEntity(host: Parties.Key): Exchange => Exchange =
       x => Exchange(host, x.contra, x.meta)
 
-    implicit def exShow: Show[Exchange] = { import auto.show._; semiauto.show }
+    implicit lazy val exchangeEq: Eq[Exchange]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val exchangeShow: Show[Exchange] = { import auto.show._; semiauto.show }
   }
 
   /**
@@ -435,7 +433,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     */
   object MDS {
 
-    private[deftrade] def apply(
+    def apply(
         provider: Parties.Key,
         markets: ExchangeSets.Key,
         meta: Metas.Id,
