@@ -59,7 +59,6 @@ object Instrument {
   /**
     */
   implicit def instrumentEq: Eq[Instrument] = { import auto._; semiauto.eq }
-  // Eq.fromUniversalEquals[Instrument]
 
   /**
     */
@@ -71,6 +70,12 @@ object Instrument {
   * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
   */
 object Instruments extends KeyValueStores.KV[USIN, Instrument]
+
+trait papers[F[_]] {
+  def instruments: Instruments.KeyValueStore[F]
+  def forms: Forms.KeyValueStore[F]
+  def novations: Novations.ValueStore[F]
+}
 
 /**
   */

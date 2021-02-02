@@ -21,6 +21,7 @@ package layers
 import money.{ Financial, Mny }
 
 import cats.Show
+import cats.effect.{ Sync }
 
 /**
   * Module level abstract quantities and monetary amounts, which may be distinct types.
@@ -34,6 +35,18 @@ import cats.Show
   * a money market fund instrument.)
   */
 trait ModuleTypes {
+
+  /**
+    */
+  type IO[_]
+
+  /**
+    */
+  // implicit protected val X: ContextShift[IO]
+
+  /**
+    */
+  implicit protected val Y: Sync[IO]
 
   /**
     */
@@ -70,19 +83,19 @@ object ModuleTypes {
 
   /**
     */
-  abstract class Aux[MA, Q]()(
-      implicit final protected val maFinancial: Financial[MA],
-      implicit final protected val qFinancial: Financial[Q],
-      implicit final protected val qShow: Show[Q],
-      implicit final protected val maShow: Show[MA]
-  ) extends ModuleTypes {
+  abstract class Aux[F[_], MA, Q]()(implicit
+                                    // final protected val X: ContextShift[F],
+                                    final protected val Y: Sync[F],
+                                    final protected val maFinancial: Financial[MA],
+                                    final protected val maShow: Show[MA],
+                                    final protected val qFinancial: Financial[Q],
+                                    final protected val qShow: Show[Q])
+      extends ModuleTypes {
 
-    /**
-      */
+    final type IO[x] = F[x]
+    // final protected val X: ContextShift[F] = IO.contextShift
+
     final type MonetaryAmount = MA
-
-    /**
-      */
-    final type Quantity = Q
+    final type Quantity       = Q
   }
 }

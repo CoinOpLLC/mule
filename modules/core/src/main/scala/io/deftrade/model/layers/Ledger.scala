@@ -40,6 +40,16 @@ import fs2.Stream
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Ledger { module: ModuleTypes =>
 
+  trait ledgers {
+    def trades: Trades.ValueStore[IO]
+    def metas: Metas.ValueStore[IO]
+    def transactions: Transactions.ValueStore[IO]
+    def confirmations: Confirmations.KeyValueStore[IO]
+  }
+
+  val ledgers: ledgers
+  import ledgers._
+
   /**
     */
   sealed trait Pricer {
@@ -52,14 +62,10 @@ trait Ledger { module: ModuleTypes =>
       */
     type CurrencyTag
 
-    /**
-      */
-    type EffectType[_]
-
     /** Note that we are using `price` as a ''verb'' here.
       * TODO: consider how to memoize
       */
-    val price: Priced => Stream[EffectType, Money[CurrencyTag]]
+    val price: Priced => Stream[IO, Money[CurrencyTag]]
 
     /**
       */
@@ -73,20 +79,19 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    abstract class Aux[F[_], P, C] protected (
-        override val price: P => Stream[F, Money[C]]
+    abstract class Aux[P, C] protected (
+        override val price: P => Stream[IO, Money[C]]
     )(implicit final override val C: Currency[C])
         extends Pricer {
-      final type Priced        = P
-      final type CurrencyTag   = C
-      final type EffectType[_] = F[_]
+      final type Priced      = P
+      final type CurrencyTag = C
     }
 
     /** Price data per unit of instrument.
       */
-    sealed abstract class Instrument[F[_], C: Currency] private (
-        final override val price: Instruments.Key => Stream[F, Money[C]]
-    ) extends Pricer.Aux[F, Instruments.Key, C](price)
+    sealed abstract class Instrument[C: Currency] private (
+        final override val price: Instruments.Key => Stream[IO, Money[C]]
+    ) extends Pricer.Aux[Instruments.Key, C](price)
 
     /** Deploy `Pricer`s by creating search paths per `Currency` and instantiating
       * these pricers in the implicit context.
@@ -94,20 +99,27 @@ trait Ledger { module: ModuleTypes =>
     object Instrument {
 
       /** summon implicit value */
-      def apply[F[_], C: Currency](implicit pricer: Instrument[F, C]): Instrument[F, C] =
+      def apply[C: Currency](implicit pricer: Instrument[C]): Instrument[C] =
         pricer
 
       /**
         */
-      def instance[F[_], C: Currency](
-          price: Instruments.Key => Stream[F, Money[C]]
-      ): Instrument[F, C] =
+      def apply[C: Currency](
+          price: Instruments.Key => Stream[IO, Money[C]]
+      ): Instrument[C] =
         new Instrument(price) {}
 
       /**
         */
-      def empty[F[_], C: Currency]: Instrument[F, C] =
-        instance(_ => Stream.empty[F])
+      def instance[C: Currency](
+          price: Instruments.Key => Stream[IO, Money[C]]
+      ): Instrument[C] =
+        Instrument(price)
+
+      /**
+        */
+      def empty[C: Currency]: Instrument[C] =
+        instance(_ => Stream.empty[IO])
 
       /** @return an `Instrument` which be functions as a two element search path
         * of `Pricer.Instrument`s.
@@ -115,38 +127,38 @@ trait Ledger { module: ModuleTypes =>
         * TODO: Looks like `Pricer.Instrument` is a [[cats.Monoid]]
         * ''not commutative'': price given by `a` (if given) has precedence.
         */
-      def combine[F[_], C: Currency](
-          a: Instrument[F, C],
-          b: Instrument[F, C]
-      ): Instrument[F, C] =
+      def combine[C: Currency](
+          a: Instrument[C],
+          b: Instrument[C]
+      ): Instrument[C] =
         instance { instrument =>
           (a price instrument) ++ (b price instrument) take 1
         }
 
       /**
         */
-      implicit def instrumentPricerMonoid[F[_]: Sync, C: Currency]: Monoid[Instrument[F, C]] =
-        Monoid.instance(empty[F, C], combine[F, C])
+      implicit def instrumentPricerMonoid[C: Currency]: Monoid[Instrument[C]] =
+        Monoid.instance(empty[C], combine[C])
     }
 
     /**
       */
-    sealed abstract class Book[F[_], C: Currency] private (
-        folios: Folios.KeyValueStore[F],
+    sealed abstract class Book[C: Currency] private (
+        folios: Folios.KeyValueStore[IO],
         k: Folios.Key
-    ) extends Pricer.Aux[F, Instruments.Key, C]((instrument: Instruments.Key) => {
+    ) extends Pricer.Aux[Instruments.Key, C]((instrument: Instruments.Key) => {
           import money.Financial._
 
           // val positions: Stream[F, Position] = for {
           //   position <- folios selectAll k
           // } yield position
 
-          Stream(3.14, 6.18).map(Currency[C] fiat _.to[MonetaryAmount]).covary[F]
+          Stream(3.14, 6.18).map(Currency[C] fiat _.to[MonetaryAmount]).covary[IO]
         }) {
 
       /** FIXME: need a method to pull the timetamps from the Transaction stream.
         */
-      final def lots(instrument: Instruments.Key): Stream[F, (Quantity, Instant)] = ???
+      final def lots(instrument: Instruments.Key): Stream[IO, (Quantity, Instant)] = ???
       // folios.rows filter (_._1 === instrument) map (r => (r._2._1, ???))
     }
 
@@ -166,28 +178,28 @@ trait Ledger { module: ModuleTypes =>
     type Value = Quantity
 
     /** Enables volume discounts or other quantity-specific pricing. */
-    sealed abstract case class Pricer[F[_], C: Currency] private (
-        final override val price: Entry => Stream[F, Money[C]]
-    ) extends module.Pricer.Aux[F, Entry, C](price)
+    sealed abstract case class Pricer[C: Currency] private (
+        final override val price: Entry => Stream[IO, Money[C]]
+    ) extends module.Pricer.Aux[Entry, C](price)
 
     /**
       */
     object Pricer {
 
       /** Summon a pricer for a given currency. */
-      def apply[F[_], C: Currency](implicit pricer: Pricer[F, C]): Pricer[F, C] =
+      def apply[C: Currency](implicit pricer: Pricer[C]): Pricer[C] =
         pricer
 
       /**
         */
-      def instance[F[_], C: Currency](price: Entry => Stream[F, Money[C]]): Pricer[F, C] =
+      def instance[C: Currency](price: Entry => Stream[IO, Money[C]]): Pricer[C] =
         new Pricer(price) {}
 
       /** Create a pricer from a pricing function. */
-      implicit def default[F[_]: Sync, C: Currency: module.Pricer.Instrument[F, *]]: Pricer[F, C] =
+      implicit def default[C: Currency: module.Pricer.Instrument]: Pricer[C] =
         instance {
           case (instrument, quantity) =>
-            module.Pricer.Instrument[F, C] price instrument map (_ * quantity)
+            module.Pricer.Instrument[C] price instrument map (_ * quantity)
         }
     }
   }
@@ -295,32 +307,32 @@ trait Ledger { module: ModuleTypes =>
     /** Enables package deals, or portfolio valuation informed by covariance,
       * or other holistic methodology.
       */
-    sealed abstract case class Pricer[F[_], C: Currency] private (
-        final override val price: Trade => Stream[F, Money[C]]
-    ) extends module.Pricer.Aux[F, Trade, C](price)
+    sealed abstract case class Pricer[C: Currency] private (
+        final override val price: Trade => Stream[IO, Money[C]]
+    ) extends module.Pricer.Aux[Trade, C](price)
 
     /**
       */
     object Pricer {
 
       /** Summon a pricer for a given currency. */
-      def apply[F[_], C: Currency](implicit pricer: Pricer[F, C]): Pricer[F, C] =
+      def apply[C: Currency](implicit pricer: Pricer[C]): Pricer[C] =
         pricer
 
       /**
         */
-      def instance[F[_], C: Currency](
-          price: Trade => Stream[F, Money[C]]
-      ): Pricer[F, C] =
+      def instance[C: Currency](
+          price: Trade => Stream[IO, Money[C]]
+      ): Pricer[C] =
         new Pricer(price) {}
 
       /** Create a pricer from a pricing function. */
       @SuppressWarnings(Array("org.wartremover.warts.Any"))
-      implicit def default[F[_]: Sync, C: Currency: Leg.Pricer[F, *]]: Pricer[F, C] =
+      implicit def default[C: Currency: Leg.Pricer]: Pricer[C] =
         instance { trade =>
-          val lp = Leg.Pricer[F, C]
+          val lp = Leg.Pricer[C]
           val prices = for {
-            leg   <- Stream evals (Sync[F] delay trade.toNel)
+            leg   <- Stream evals (Sync[IO] delay trade.toNel)
             price <- lp price leg
           } yield price
           prices foldMap identity
@@ -329,17 +341,16 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    def of[F[_]: Sync, C: Currency: Trade.Pricer[F, *]](
+    def of[C: Currency: Trade.Pricer](
         trade: Trade
-    ): Stream[F, (Trade, Money[C])] =
+    ): Stream[IO, (Trade, Money[C])] =
       for {
-        amount <- Trade.Pricer[F, C] price trade
+        amount <- Trade.Pricer[C] price trade
       } yield (trade, amount)
   }
 
   /** In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     *
-    * Data Vault Classification:
     */
   object Trades extends ValueStores.NEMKV[Leg, Entry.Key, Entry.Value]
 
@@ -381,27 +392,27 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    def singleLeg[F[_]: Sync](
+    def singleLeg(
         folioA: Folios.Key,
         tradeA: Trades.Id,
         folioB: Folios.Key,
         leg: Leg,
         meta: Meta
-    ): F[Transaction] =
+    ): IO[Transaction] =
       multiLeg(folioA, tradeA, folioB, Trade(leg), meta)
 
     /**
       */
-    def multiLeg[F[_]: Sync](
+    def multiLeg(
         folioA: Folios.Key,
         tradeA: Trades.Id,
         folioB: Folios.Key,
         trade: Trade,
         meta: Meta
-    ): F[Transaction] =
+    ): IO[Transaction] =
       for {
-        tid <- trades[F] put trade
-        mid <- metas[F] put meta map (_._1)
+        tid <- trades put trade
+        mid <- metas put meta map (_._1)
       } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
     implicit lazy val transactionEq: Eq[Transaction]     = { import auto.eq._; semiauto.eq }
@@ -439,14 +450,14 @@ trait Ledger { module: ModuleTypes =>
 
     /** For a given [[Transaction]], what part of the [[Trade]] remains unsettled?
       */
-    def unsettled[F[_]]: Transactions.Id => Stream[F, Confirmations.Id] => F[Folio] =
+    def unsettled: Transactions.Id => Stream[IO, Confirmations.Id] => IO[Folio] =
       ???
 
     /** Monotonic, in that [[Transaction]]s are never observed to "unsettle".
       *
       * Nota Bene - '''memoize''' these if need be
       */
-    def settled[F[_]: Functor]: Transactions.Id => Stream[F, Confirmations.Id] => F[Boolean] =
+    def settled: Transactions.Id => Stream[IO, Confirmations.Id] => IO[Boolean] =
       xn => cs => unsettled(xn)(cs) map (_ === Folio.empty)
   }
 
@@ -456,20 +467,15 @@ trait Ledger { module: ModuleTypes =>
 
   /** '''Cash''' is ''fungable''and ''self-pricing''.
     */
-  final def payment[F[_]: Sync, C: Currency](
-      payCash: Folios.Key => Money[C] => F[Result[Folios.Id]]
+  final def payment[C: Currency](
+      payCash: Folios.Key => Money[C] => IO[Result[Folios.Id]]
   )(
       drawOn: Folios.Key
-  ): (Trade, Money[C]) => F[Result[Trades.Id]] = {
+  ): (Trade, Money[C]) => IO[Result[Trades.Id]] = {
     case (trade, amount) =>
       for {
-        idb <- trades[F] put trade
+        idb <- trades put trade
         _   <- payCash(drawOn)(amount)
       } yield Result(idb._1.some)
   }
-
-  def trades[F[_]]: Trades.ValueStore[F]                  = ???
-  def metas[F[_]]: Metas.ValueStore[F]                    = ???
-  def transactions[F[_]]: Transactions.ValueStore[F]      = ???
-  def confirmations[F[_]]: Confirmations.KeyValueStore[F] = ???
 }
