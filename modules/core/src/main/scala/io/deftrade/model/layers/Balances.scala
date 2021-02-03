@@ -36,7 +36,7 @@ import refined.auto._
 
 /** Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   */
-trait Balances { self: Ledger with Accounting with ModuleTypes =>
+trait Balances { self: ModuleTypes with Ledger with Accounting =>
 
   import AccountingKey.syntax._
 
@@ -206,7 +206,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def revenues: Revenues[CurrencyTag]
   }
 
-  object IncomeStatement extends BalanceStores[IncomeStatement] {
+  case object IncomeStatement extends BalanceStores[IncomeStatement] {
 
     sealed abstract case class Aux[C] private[IncomeStatement] (
         final override val expenses: Expenses[C],
@@ -229,7 +229,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object CashFlowStatement extends BalanceStores[CashFlowStatement] {
+  case object CashFlowStatement extends BalanceStores[CashFlowStatement] {
 
     /**
       */
@@ -256,7 +256,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object BalanceSheet extends BalanceStores[BalanceSheet] {
+  case object BalanceSheet extends BalanceStores[BalanceSheet] {
 
     /**
       */
@@ -280,7 +280,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /** TODO: implement `Period` as a secondary index?
     */
-  object EquityStatement extends BalanceStores[EquityStatement] {
+  case object EquityStatement extends BalanceStores[EquityStatement] {
 
     sealed abstract case class Aux[C] private[EquityStatement] (
         override val debits: Debits[C],
@@ -347,7 +347,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     }
   }
 
-  object Reports extends KeyValueStores.KV[Folios.Key, Report]
+  case object Reports extends KeyValueStores.KV[Folios.Key, Report]
 
   /**
     */
@@ -390,7 +390,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Pipe[F, Transaction, CashReport] = ???
   }
 
-  object CashReports extends KeyValueStores.KV[Folios.Key, CashReport]
+  case object CashReports extends KeyValueStores.KV[Folios.Key, CashReport]
 
   /**
     */
@@ -449,6 +449,6 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
   }
 }
 
-object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
+case object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
   // lazy val Key = Folios.Key
 }

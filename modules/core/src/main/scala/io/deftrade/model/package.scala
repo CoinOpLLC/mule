@@ -21,7 +21,7 @@ import keyval.{ keyValueStore, valueStore }
 import model.layers._
 import model.augments._
 
-// import cats.implicits._
+import cats.implicits._
 import cats.{ Applicative, Eq, Foldable, Order, SemigroupK, Show }
 import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyList, NonEmptyMap }
@@ -54,7 +54,9 @@ package object model
     //
     // necessary package level augmentation
     //
-    with IRS1065 { // replace or enhance as necessary
+    with IRS1065
+    //
+    with csvStores { // replace or enhance as necessary
 
   /**
     */
@@ -63,38 +65,6 @@ package object model
   /**
     */
   final type ScaledPartition[K, N] = Partition[K, N, Partition.IsPositive]
-
-  // implicit def X: ContextShift[IO] = ???
-
-  object ledgers extends ledgers {
-    def trades: Trades.ValueStore[IO] =
-      // val Right(ret) = valueStore[IO] at "target/trades.csv" ofContentAddressed Trades
-      // ret
-      ???
-
-    def metas: Metas.ValueStore[IO]                    = ???
-    def transactions: Transactions.ValueStore[IO]      = ???
-    def confirmations: Confirmations.KeyValueStore[IO] = ???
-  }
-
-  object papers extends capital.papers[IO] {
-    import capital.{ Forms, Instruments, Novations }
-    def instruments: Instruments.KeyValueStore[IO] = ???
-    def forms: Forms.KeyValueStore[IO]             = ???
-    def novations: Novations.ValueStore[IO]        = ???
-  }
-
-  // object Accounts {`
-  //
-  //   val Right((accounts, rosters, contacts)) = for {
-  //     accounts <- keyValueStore[IO] at "accounts.csv" ofChained Account
-  //     rosters  <- keyValueStore[IO] at "rosters.csv" ofChained Roster
-  //     parties  <- keyValueStore[IO] at "parties.csv" ofChained Party
-  //     contacts <- valueStore[IO] at "contacts.csv" ofContentAddressed Contact
-  //   } yield (accounts, rosters, parties, contacts)
-  // }
-
-  import cats.implicits._
 
   /**
     */

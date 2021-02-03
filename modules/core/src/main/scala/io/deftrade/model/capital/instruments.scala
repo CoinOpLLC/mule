@@ -69,17 +69,17 @@ object Instrument {
 /** Indexed by CUSIPs and other formats.
   * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
   */
-object Instruments extends KeyValueStores.KV[USIN, Instrument]
+case object Instruments extends KeyValueStores.KV[USIN, Instrument]
 
-trait papers[F[_]] {
-  def instruments: Instruments.KeyValueStore[F]
-  def forms: Forms.KeyValueStore[F]
-  def novations: Novations.ValueStore[F]
-}
+case class Papers[F[_]](
+    instruments: Instruments.KeyValueStore[F],
+    forms: Forms.KeyValueStore[F],
+    novations: Novations.ValueStore[F]
+)
 
 /**
   */
-object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
+case object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
 
 /** Represents [[contracts.Contract]] parameters and state.
   *
@@ -120,7 +120,7 @@ object Form {
   // implicit lazy val formDecoder: Decoder[Form] = deriveDecoder
 }
 
-object Forms extends KeyValueStores.KV[Instruments.Key, SADT.Aux[Form]]
+case object Forms extends KeyValueStores.KV[Instruments.Key, SADT.Aux[Form]]
 
 /** Parameters common to multiple `Form`s.
   */
@@ -184,7 +184,7 @@ object layers {
 
     /**
       */
-    object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
+    case object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
 
     /**
       */
@@ -201,7 +201,7 @@ object layers {
 
     /**
       */
-    object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
+    case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
 
     /** Assume semiannual, Treasury-style coupons.
       */
@@ -220,7 +220,7 @@ object layers {
 
     /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
       */
-    object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
+    case object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
 
     /**
       */
@@ -238,7 +238,7 @@ object layers {
 
     /** `Bills` are always issued by entities, never by natural persons.
       */
-    object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
+    case object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
   }
 
   /** And by "vanilla" we mean an exchange traded derivative (ETD).
@@ -270,7 +270,7 @@ object layers {
 
     /**
       */
-    object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
+    case object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
 
     /** Exchange Traded Derivative - Future (ETD) */
     final case class XtFuture(
@@ -286,7 +286,7 @@ object layers {
 
     /**
       */
-    object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
+    case object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
 
     /** Exchange Traded Derivative - Option (ETD) */
     final case class XtOption(
@@ -302,7 +302,7 @@ object layers {
     }
 
     /** TODO: recheck that `Isin` thing... */
-    object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
+    case object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
 
     /**
       */
@@ -325,7 +325,7 @@ object layers {
 
     /**
       */
-    object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
+    case object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
 
     /**
       */
@@ -343,7 +343,7 @@ object layers {
 
     /**
       */
-    object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
+    case object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
   }
 
   /** Private lending instruments.
@@ -442,4 +442,4 @@ object Novation {
 
 /**
   */
-object Novations extends ValueStores.VS[Novation]
+case object Novations extends ValueStores.VS[Novation]

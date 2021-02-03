@@ -23,7 +23,7 @@ import time._, money._, keyval._, capital._
 import cats.implicits._
 
 import cats.kernel.{ Monoid }
-import cats.{ Eq, Functor, Show }
+import cats.{ Eq, Show }
 import cats.data.NonEmptyMap
 import cats.derived.{ auto, semiauto }
 import cats.effect.{ Sync }
@@ -40,14 +40,16 @@ import fs2.Stream
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Ledger { module: ModuleTypes =>
 
-  trait ledgers {
-    def trades: Trades.ValueStore[IO]
-    def metas: Metas.ValueStore[IO]
-    def transactions: Transactions.ValueStore[IO]
-    def confirmations: Confirmations.KeyValueStore[IO]
-  }
+  case class Ledgers(
+      trades: Trades.ValueStore[IO],
+      folios: Folios.KeyValueStore[IO],
+      portfolios: Portfolios.ValueStore[IO],
+      transactions: Transactions.ValueStore[IO],
+      memos: Metas.ValueStore[IO],
+      confirmations: Confirmations.KeyValueStore[IO]
+  )
 
-  val ledgers: ledgers
+  val ledgers: Ledgers
   import ledgers._
 
   /**
@@ -258,7 +260,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value]
+  case object Folios extends KeyValueStores.MKV[FUUID, Position, Entry.Key, Entry.Value]
 
   /** Total view of [[Position]]s including those `escrowed` for transfer
     * and those `expected` to settle.
@@ -288,7 +290,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  object Portfolios extends ValueStores.VS[Portfolio]
+  case object Portfolios extends ValueStores.VS[Portfolio]
 
   /** A [[Folio]] in motion, with the exception that unlike a `Folio`, a `Trade` cannot be empty.
     */
@@ -352,7 +354,7 @@ trait Ledger { module: ModuleTypes =>
   /** In contrast to a [[Folio]] `store`, [[Trade]] `store`s hold simple, ''immutable'' `value`s.
     *
     */
-  object Trades extends ValueStores.NEMKV[Leg, Entry.Key, Entry.Value]
+  case object Trades extends ValueStores.NEMKV[Leg, Entry.Key, Entry.Value]
 
   /** The concrete record for `Ledger` updates.
     *
@@ -371,7 +373,7 @@ trait Ledger { module: ModuleTypes =>
       tradeA: Trades.Id,
       folioB: Folios.Key,
       tradeB: Trades.Id,
-      meta: Metas.Id
+      memo: Metas.Id
   )
 
   /** Because `Transaction`s are immutable, we model them as pure values.
@@ -386,9 +388,9 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         tradeB: Trades.Id,
-        meta: Metas.Id
+        memo: Metas.Id
     ): Transaction =
-      new Transaction(at, folioA, tradeA, folioB, tradeB, meta) {}
+      new Transaction(at, folioA, tradeA, folioB, tradeB, memo) {}
 
     /**
       */
@@ -397,9 +399,9 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         leg: Leg,
-        meta: Meta
+        memo: Meta
     ): IO[Transaction] =
-      multiLeg(folioA, tradeA, folioB, Trade(leg), meta)
+      multiLeg(folioA, tradeA, folioB, Trade(leg), memo)
 
     /**
       */
@@ -408,18 +410,18 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         trade: Trade,
-        meta: Meta
+        memo: Meta
     ): IO[Transaction] =
       for {
         tid <- trades put trade
-        mid <- metas put meta map (_._1)
+        mid <- memos put memo map (_._1)
       } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
     implicit lazy val transactionEq: Eq[Transaction]     = { import auto.eq._; semiauto.eq }
     implicit lazy val transactionShow: Show[Transaction] = { import auto.show._; semiauto.show }
   }
 
-  object Transactions extends ValueStores.VS[Transaction]
+  case object Transactions extends ValueStores.VS[Transaction]
 
   /** Note that [[Folios.Id]] is actually an `update event` for the specified [[Folios.Key]].
     * TODO: get this to work across nodes in a cluster
@@ -463,7 +465,7 @@ trait Ledger { module: ModuleTypes =>
 
   /**
     */
-  object Confirmations extends KeyValueStores.KV[Transactions.Id, Confirmation]
+  case object Confirmations extends KeyValueStores.KV[Transactions.Id, Confirmation]
 
   /** '''Cash''' is ''fungable''and ''self-pricing''.
     */

@@ -40,4 +40,4 @@ object Meta {
   implicit lazy val encoder: Encoder[Meta] = deriveEncoder
 }
 
-final object Metas extends ValueStores.SADT[Meta]
+case object Metas extends ValueStores.SADT[Meta]

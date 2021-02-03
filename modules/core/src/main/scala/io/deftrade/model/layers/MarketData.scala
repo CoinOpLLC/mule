@@ -296,7 +296,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object TickDataSets extends KeyValueStores.KV[Label, TickData]
+  case object TickDataSets extends KeyValueStores.KV[Label, TickData]
 
   /**
     */
@@ -355,7 +355,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
     implicit lazy val cpShow: Show[Counterparty] = { import auto.show._; semiauto.show }
   }
 
-  object Counterparties extends KeyValueStores.KV[FUUID, Counterparty]
+  case object Counterparties extends KeyValueStores.KV[FUUID, Counterparty]
 
   /** Single effective counterparty: the `Exchange` itself.
     *   - [[MIC]]s are unique.
@@ -392,11 +392,11 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object Exchanges extends KeyValueStores.KV[MIC, Exchange]
+  case object Exchanges extends KeyValueStores.KV[MIC, Exchange]
 
   /**
     */
-  object ExchangeSets extends KeyValueStores.KV[Label, Exchanges.Key]
+  case object ExchangeSets extends KeyValueStores.KV[Label, Exchanges.Key]
 
   /** MDS := Market Data Source.
     */
@@ -447,7 +447,7 @@ trait MarketData { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object MDSs extends KeyValueStores.KV[Label, MDS]
+  case object MDSs extends KeyValueStores.KV[Label, MDS]
 
   /** placeholder */
   trait OrderBook

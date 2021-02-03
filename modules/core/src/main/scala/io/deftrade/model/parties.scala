@@ -50,7 +50,9 @@ object Party {
   implicit def partyShow: Show[Party] = { import auto.show._; semiauto.show }
 }
 
-object Parties extends KeyValueStores.KV[FUUID, Party]
+/**
+  */
+case object Parties extends KeyValueStores.KV[FUUID, Party]
 
 /** `NaturalPerson`s are `Party`s.
   */
@@ -82,7 +84,7 @@ object NaturalPerson {
 
 /**
   */
-object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
+case object NaturalPersons extends KeyValueStores.KV[FUUID, NaturalPerson]
 
 /**
   */
@@ -112,4 +114,6 @@ object LegalEntity {
   implicit def legalEntityShow: Show[LegalEntity] = { import auto.show._; semiauto.show }
 }
 
-object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]
+/**
+  */
+case object LegalEntities extends KeyValueStores.KV[FUUID, LegalEntity]

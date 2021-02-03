@@ -59,7 +59,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object Accounts extends KeyValueStores.KV[Long Refined IsAccountNo, Account]
+  case object Accounts extends KeyValueStores.KV[Long Refined IsAccountNo, Account]
 
   /** Each [[Account]] is created with a [[Roster]].
     */
@@ -186,7 +186,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def show: Show[Roster] = { import auto.show._; semiauto.show }
   }
 
-  object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
+  case object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
   import keyval.DtEnum
 

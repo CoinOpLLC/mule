@@ -110,7 +110,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /**
       */
-    object Orders extends KeyValueStores.KV[Long OpaqueKey Order, Order]
+    case object Orders extends KeyValueStores.KV[Long OpaqueKey Order, Order]
 
     /** What actually happened to the [[Order]] at the [[Market]].
       *
@@ -139,7 +139,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
       implicit lazy val cpShow: Show[Execution] = { import auto.show._; semiauto.show }
     }
 
-    object Executions extends ValueStores.VS[Execution]
+    case object Executions extends ValueStores.VS[Execution]
 
     def riskCheck: Order ToStreamOf Order
 

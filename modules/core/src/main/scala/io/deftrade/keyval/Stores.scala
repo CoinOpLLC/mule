@@ -32,7 +32,7 @@ import fs2.{ Pipe, Stream }
 
 /** Defines `Id` and other persistence helpers for a given value class `V`.
   */
-trait Stores[V] {
+trait Stores[V] extends Product {
 
   /**
     */

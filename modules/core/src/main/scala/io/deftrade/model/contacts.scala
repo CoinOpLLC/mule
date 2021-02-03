@@ -152,4 +152,4 @@ object Contact {
 
 /**
   */
-object Contacts extends ValueStores.SADT[Contact]
+case object Contacts extends ValueStores.SADT[Contact]
