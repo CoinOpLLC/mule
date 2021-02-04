@@ -19,7 +19,7 @@ import io.circe.{ Decoder, Encoder, Json }
   *   - protobuf
   *   - etc
   */
-sealed abstract class SADT private (protected val json: Json) {
+sealed abstract class SADT private (val json: Json) {
 
   /**
     */
@@ -38,10 +38,13 @@ sealed abstract class SADT private (protected val json: Json) {
   */
 object SADT {
 
+  implicit lazy val miscEq: Eq[SADT]     = Eq by (_.json)
+  implicit lazy val miscShow: Show[SADT] = Show show (_.json.show)
+
   /**
     */
   sealed abstract case class Aux[T: Decoder: Encoder](
-      final override protected val json: Json
+      final override val json: Json
   ) extends SADT(json) {
 
     /**
@@ -57,6 +60,11 @@ object SADT {
     final def canonicalString: String = json.noSpacesSortKeys
   }
 
+  object Aux {
+    implicit def miscEq[T]: Eq[Aux[T]]     = Eq by (_.json)
+    implicit def miscShow[T]: Show[Aux[T]] = Show show (_.json.show)
+  }
+
   /**
     */
   def from[T: Decoder: Encoder](t: T): SADT.Aux[T] =
@@ -66,7 +74,4 @@ object SADT {
     */
   def unsafeFrom[T: Decoder: Encoder](json: Json): SADT.Aux[T] =
     new Aux[T](json) {}
-
-  implicit lazy val miscEq: Eq[SADT]     = Eq by (_.json)
-  implicit lazy val miscShow: Show[SADT] = Show show (_.json.show)
 }

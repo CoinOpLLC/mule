@@ -2,7 +2,7 @@ package io.deftrade
 package model
 package augments
 
-import keyval.{ keyValueStore, valueStore }
+import keyval.{ csvKVS, csvVS, SADT }
 import capital._
 import model.layers._
 
@@ -10,46 +10,62 @@ import model.layers._
 import cats.{ Applicative, Eq, Foldable, Order, SemigroupK, Show }
 import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.effect.{ ContextShift, IO, Sync }
+import cats.effect.{ ContextShift, Sync }
+
+import keyval.CsvImplicits._
+import io.chrisdavenport.cormorant
+import cormorant.generic.semiauto._
+import cormorant.refined._
+import cormorant.implicits._
 
 import eu.timepit.refined.cats._
 
-trait csvStores {
-  self: ModuleTypes with Ledger =>
+trait csvStores { self: ModuleTypes with Ledger =>
 
   // implicit def X: ContextShift[IO] = ???
 
+  final val dataDir: String = """target/data"""
+
   lazy val ledgers: Ledgers = {
-    // val Right(tables: Ledgers) =
-    // for {
-    //   trades        <- valueStore[IO] at "target/trades.csv" ofContentAddressed Trades
-    //   folios        <- keyValueStore[IO] at "target/trades.csv" ofKeyChained Folios
-    //   portfolios    <- valueStore[IO] at "target/trades.csv" ofContentAddressed Portfolios
-    //   transactions  <- valueStore[IO] at "target/trades.csv" ofChainAddressed Transactions
-    //   memos         <- valueStore[IO] at "target/trades.csv" ofContentAddressed Metas
-    //   confirmations <- keyValueStore[IO] at "target/trades.csv" ofKeyChained Confirmations
-    // } yield Ledgers(trades, folios, portfolios, transactions, memos, confirmations)
-    // tables
-    ???
+    implicit def X: ContextShift[IO] = ???
+    val Right(ls: Ledgers) =
+      for {
+        trades       <- csvVS[IO] at dataDir ofContentAddressed Trades
+        folios       <- csvKVS[IO] at dataDir ofKeyChained Folios
+        portfolios   <- csvVS[IO] at dataDir ofContentAddressed Portfolios
+        transactions <- csvVS[IO] at dataDir ofChained Transactions
+        // memos         <- csvVS[IO] at dataDir ofContentAddressed Metas
+        confirmations <- csvKVS[IO] at dataDir ofKeyChained Confirmations
+      } yield Ledgers(trades, folios, portfolios, transactions, ???, confirmations)
+    ls
   }
 
   lazy val papers: Papers[IO] = {
-    ???
+    import capital.{ Forms, Instruments, Novations }
+    implicit def X: ContextShift[IO] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    val Right(ret: Papers[IO]) =
+      for {
+        // instruments <- csvKVS[IO] at dataDir ofKeyChained Instruments
+        // forms       <- csvKVS[IO] at dataDir ofKeyChained Forms
+        novations <- csvVS[IO] at dataDir ofChained Novations
+      } yield
+        Papers(
+          // instruments,
+          // forms,
+          ???,
+          ???,
+          novations
+        )
+    ret
   }
-  // object papers extends capital.Papers[IO] {
-  //   import capital.{ Forms, Instruments, Novations }
-  //   def instruments: Instruments.KeyValueStore[IO] = ???
-  //   def forms: Forms.KeyValueStore[IO]             = ???
-  //   def novations: Novations.ValueStore[IO]        = ???
-  // }
-
-// object Accounts {
+// lazy val accounts {
 //
 //   val Right((accounts, rosters, contacts)) = for {
-//     accounts <- keyValueStore[IO] at "accounts.csv" ofChained Account
-//     rosters  <- keyValueStore[IO] at "rosters.csv" ofChained Roster
-//     parties  <- keyValueStore[IO] at "parties.csv" ofChained Party
-//     contacts <- valueStore[IO] at "contacts.csv" ofContentAddressed Contact
+//     accounts <- csvKVS[IO] at dataDir ofChained Accounts
+//     rosters  <- csvKVS[IO] at dataDir ofChained Rosters
+//     parties  <- csvKVS[IO] at dataDir ofChained Parties
+//     contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
 //   } yield (accounts, rosters, parties, contacts)
 // }
 

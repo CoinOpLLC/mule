@@ -35,11 +35,11 @@ package object keyval extends keyval.csvStoreDsl {
     * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
     * useful for type member `T`, which is the (singleton) type of the id column label.
     */
-  private[keyval] final implicit val id = Symbol("id").witness
+  private[keyval] final val id = Symbol("id").witness
 
   /** [[Key]] column type literal witness - same purpose as [[id]].
     */
-  private[keyval] final implicit val key = Symbol("key").witness
+  private[keyval] final val key = Symbol("key").witness
 
   /** Just an alias. */
   type OpaqueKey[K, V] = Refined[K, V]

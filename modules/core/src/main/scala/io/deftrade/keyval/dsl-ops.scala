@@ -8,7 +8,6 @@ import cats.{ Eq, Order, Show }
 import cats.effect.{ ContextShift, Sync }
 
 import shapeless.{ HList, LabelledGeneric, Lazy }
-// import shapeless.labelled._
 
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
@@ -21,11 +20,11 @@ trait csvStoreDsl {
 
   /**
     */
-  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
+  def csvVS[F[_]: Sync: ContextShift] = VsOps[F]()
 
   /**
     */
-  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
+  def csvKVS[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
 /** csvStoreDsl for value stores
@@ -56,7 +55,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
             Fresh.shaContent[VS.Row]
@@ -82,7 +81,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
             Fresh.shaChain[VS.Row]
@@ -122,7 +121,7 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
         new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
 
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${KVS.productPrefix}"""
 
           final protected lazy val fresh: Fresh[KVS.Id, KVS.Row] =
             Fresh.shaChain[KVS.Row]

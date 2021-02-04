@@ -16,8 +16,6 @@
 
 package io.deftrade
 
-import keyval.{ keyValueStore, valueStore }
-
 import model.layers._
 import model.augments._
 
@@ -54,7 +52,7 @@ package object model
     //
     // necessary package level augmentation
     //
-    with IRS1065
+    with IRS1065 // replace or enhance as necessary
     //
     with csvStores { // replace or enhance as necessary
 

@@ -25,7 +25,7 @@ import cats.data.{ NonEmptyList }
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 
-import shapeless.labelled._
+import shapeless.labelled.FieldType
 
 import scala.collection.immutable.SortedMap
 

@@ -24,8 +24,6 @@ import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
 import refined.string.{ MatchesRegex }
 
-// import shapeless.syntax.singleton._
-
 /**
   */
 object Tax {
