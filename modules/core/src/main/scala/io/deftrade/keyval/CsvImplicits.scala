@@ -78,15 +78,16 @@ protected trait CsvImplicits {
 
   /**
     */
-  implicit def sadtGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
-    new Get[SADT.Aux[T]] {
+  // implicit def sadtGet[T: Encoder: Decoder]: Get[SADT] =
+  implicit def sadtGet: Get[SADT] =
+    new Get[SADT] {
 
       /**
         */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
+      def get(field: CSV.Field): Either[Error.DecodeFailure, SADT] =
         for {
           json <- parser.parse(field.x) leftMap toDecodeFailure
-        } yield SADT unsafeFrom json
+        } yield SADT(json)
     }
 
   /**

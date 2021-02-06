@@ -133,10 +133,10 @@ object ValueStores {
   abstract class SADT[V: Encoder: Decoder](
       implicit
       isV: V =:= V
-  ) extends ValueStores.Codec[V, keyval.SADT.Aux[V]](
-        v => NonEmptyList one (SADT from v),
+  ) extends ValueStores.Codec[V, keyval.SADT](
+        v => NonEmptyList one (SADT from [V] v),
         nel => {
-          val Right(ret) = nel.head.decoded
+          val Right(ret) = nel.head.sadt.as[V]
           ret
         }
       )

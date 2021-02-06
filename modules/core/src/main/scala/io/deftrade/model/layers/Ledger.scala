@@ -40,12 +40,13 @@ import fs2.Stream
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 trait Ledger { module: ModuleTypes =>
 
+  val metas: Metas.ValueStore[IO]
+
   case class Ledgers(
       trades: Trades.ValueStore[IO],
       folios: Folios.KeyValueStore[IO],
       portfolios: Portfolios.ValueStore[IO],
       transactions: Transactions.ValueStore[IO],
-      memos: Metas.ValueStore[IO],
       confirmations: Confirmations.KeyValueStore[IO]
   )
 
@@ -373,7 +374,7 @@ trait Ledger { module: ModuleTypes =>
       tradeA: Trades.Id,
       folioB: Folios.Key,
       tradeB: Trades.Id,
-      memo: Metas.Id
+      meta: Metas.Id
   )
 
   /** Because `Transaction`s are immutable, we model them as pure values.
@@ -388,9 +389,9 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         tradeB: Trades.Id,
-        memo: Metas.Id
+        meta: Metas.Id
     ): Transaction =
-      new Transaction(at, folioA, tradeA, folioB, tradeB, memo) {}
+      new Transaction(at, folioA, tradeA, folioB, tradeB, meta) {}
 
     /**
       */
@@ -399,9 +400,9 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         leg: Leg,
-        memo: Meta
+        meta: Meta
     ): IO[Transaction] =
-      multiLeg(folioA, tradeA, folioB, Trade(leg), memo)
+      multiLeg(folioA, tradeA, folioB, Trade(leg), meta)
 
     /**
       */
@@ -410,11 +411,11 @@ trait Ledger { module: ModuleTypes =>
         tradeA: Trades.Id,
         folioB: Folios.Key,
         trade: Trade,
-        memo: Meta
+        meta: Meta
     ): IO[Transaction] =
       for {
         tid <- trades put trade
-        mid <- memos put memo map (_._1)
+        mid <- metas put meta map (_._1)
       } yield Transaction(instant, folioA, tradeA, folioB, tid._1, mid)
 
     implicit lazy val transactionEq: Eq[Transaction]     = { import auto.eq._; semiauto.eq }
