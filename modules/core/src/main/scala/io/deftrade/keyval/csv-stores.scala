@@ -83,8 +83,7 @@ sealed protected abstract class CsvStore[F[_], V](
   */
 abstract class CsvValueStore[F[_], V](
     final val VS: ValueStores[V]
-)(implicit override val F: Sync[F], override val X: ContextShift[F])
-    extends CsvStore[F, V](VS) {
+) extends CsvStore[F, V](VS) {
 
   self: ValueStores[V]#ValueStore[F] =>
 
@@ -155,10 +154,13 @@ abstract class CsvValueStore[F[_], V](
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class CsvKeyValueStore[F[_]: Sync: ContextShift, K: Get: Put, V](
+abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     final val KVS: KeyValueStores[K, V]
-)(implicit override val F: Sync[F], override val X: ContextShift[F])
-    extends CsvStore[F, V](KVS) {
+// )(
+//   implicit
+//   override val F: Sync[F],
+//   override val X: ContextShift[F]
+) extends CsvStore[F, V](KVS) {
 
   self: KeyValueStores[K, V]#KeyValueStore[F] =>
 

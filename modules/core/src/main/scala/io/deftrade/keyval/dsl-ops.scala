@@ -29,7 +29,9 @@ trait csvStoreDsl {
 
 /** csvStoreDsl for value stores
   */
-final case class VsOps[F[_]: Sync: ContextShift]() {
+final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
+
+  val (x, y) = (ContextShift[F], Sync[F])
 
   /** `at` clause
     */
@@ -53,6 +55,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
       Result safe {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
+
+          implicit val X = x
+          implicit val F = y
 
           def path: Path =
             Paths get s"""${p}/${VS.productPrefix}"""
@@ -80,6 +85,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
+          implicit val X = x
+          implicit val F = y
+
           def path: Path =
             Paths get s"""${p}/${VS.productPrefix}"""
 
@@ -96,6 +104,8 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 /**
   */
 final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
+
+  val (x, y) = (ContextShift[F], Sync[F])
 
   /**
     */
@@ -119,6 +129,9 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
       Result safe {
 
         new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
+
+          implicit val X = x
+          implicit val F = y
 
           def path: Path =
             Paths get s"""${p}/${KVS.productPrefix}"""

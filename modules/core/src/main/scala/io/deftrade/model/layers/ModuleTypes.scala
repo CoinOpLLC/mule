@@ -21,7 +21,7 @@ package layers
 import money.{ Financial, Mny }
 
 import cats.Show
-import cats.effect.{ Sync }
+import cats.effect.{ ContextShift, Sync }
 
 /**
   * Module level abstract quantities and monetary amounts, which may be distinct types.
@@ -42,7 +42,7 @@ trait ModuleTypes {
 
   /**
     */
-  // implicit protected val X: ContextShift[IO]
+  implicit protected val X: ContextShift[IO]
 
   /**
     */
@@ -93,7 +93,6 @@ object ModuleTypes {
       extends ModuleTypes {
 
     final type IO[x] = F[x]
-    // final protected val X: ContextShift[F] = IO.contextShift
 
     final type MonetaryAmount = MA
     final type Quantity       = Q

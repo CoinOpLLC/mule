@@ -56,6 +56,10 @@ package object model
     //
     with csvStores { // replace or enhance as necessary
 
+  /** FIXME
+    */
+  implicit protected lazy val X: ContextShift[IO] = ???
+
   /**
     */
   final type UnitPartition[K, N] = Partition[K, N, Partition.IsNormalized]
