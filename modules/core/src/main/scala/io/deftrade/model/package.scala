@@ -25,6 +25,8 @@ import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyList, NonEmptyMap }
 import cats.effect.{ ContextShift, IO, Sync }
 
+import enumeratum.EnumEntry
+
 import eu.timepit.refined.cats._
 
 /**
@@ -54,11 +56,13 @@ package object model
     //
     with IRS1065 // replace or enhance as necessary
     //
-    with csvStores { // replace or enhance as necessary
+    with stdStores { // replace or enhance as necessary
 
   /** FIXME
     */
   implicit protected lazy val X: ContextShift[IO] = ???
+
+  implicit def orderInstance[E <: EnumEntry]: Order[E] = Order by (_.entryName)
 
   /**
     */

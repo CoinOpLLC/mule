@@ -5,7 +5,7 @@ package layers
 import keyval._
 
 import cats.implicits._
-import cats.{ Eq, Show }
+import cats.{ Eq, Order, Show }
 import cats.data.{ NonEmptyList, NonEmptySet }
 import cats.derived.{ auto, semiauto }
 
@@ -104,10 +104,6 @@ trait Accounts { self: Ledger with ModuleTypes =>
       )
   }
 
-  /** TODO: revert this to a tuple.
-    */
-  case class RosterValue(party: Parties.Key, role: Role, stake: Option[Quantity])
-
   /** Creation patterns for account management teams.
     */
   object Roster {
@@ -186,6 +182,15 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def show: Show[Roster] = { import auto.show._; semiauto.show }
   }
 
+  /** TODO: revert this to a tuple.
+    */
+  case class RosterValue(party: Parties.Key, role: Role, stake: Option[Quantity])
+
+  object RosterValue {
+    implicit lazy val accountEq: Eq[RosterValue]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val accountShow: Show[RosterValue] = { import auto.show._; semiauto.show }
+  }
+
   case object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
   import keyval.DtEnum
@@ -215,15 +220,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       * That [[Party]] which is the market participant
       * responsible for establishing the [[layers.Accounts.Account]].
       */
-    case object Principal extends Principal {
-
-      /**
-        * A test for all `Role`s ''other than'' `Princple`.
-        */
-      def unapply(role: Role): Option[Principal] =
-        if (role === this) this.some else none
-    }
-
+    case object Principal extends Principal
     @inline final def principal: Role = Principal
 
     /**

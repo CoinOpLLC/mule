@@ -146,8 +146,14 @@ trait Balances { self: ModuleTypes with Ledger with Accounting =>
     )(implicit C: Currency[C]): TrialBalance[C] = {
       val am: AccountingMap[AccountingKey, C] = (SwapKey.accountMap(keys, amount)).widenKeys
       TrialBalance(
-        debits |+| (am collectKeys Debit.unapply),
-        credits |+| (am collectKeys Credit.unapply)
+        debits |+| (am collectKeys {
+          case d: Debit => d.some
+          case _        => none
+        }),
+        credits |+| (am collectKeys {
+          case c: Credit => c.some
+          case _         => none
+        })
       )
     }
 

@@ -22,7 +22,7 @@ import io.circe.{ Decoder, Encoder, Json }
 sealed abstract case class SADT private (final val sadt: Json) {
 
   /** TODO: revisit this */
-  final def canonicalString: String = sadt.noSpacesSortKeys
+  final def canonicalString: String = SADT canonicalStringFor sadt
 }
 
 /**
@@ -35,7 +35,11 @@ object SADT {
 
   /**
     */
-  implicit class Aux[T: Decoder: Encoder](sadt: SADT) {
+  def canonicalStringFor(json: Json): String = json.noSpacesSortKeys
+
+  /**
+    */
+  implicit class Ops[T: Decoder: Encoder](sadt: SADT) {
 
     /**
       */

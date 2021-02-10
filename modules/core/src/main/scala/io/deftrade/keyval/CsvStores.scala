@@ -46,7 +46,7 @@ import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 sealed protected abstract class CsvStore[F[_], V](
     V: Stores[V]
-) extends CsvImplicits {
+) {
 
   self: Stores[V]#Store[F] =>
 
@@ -88,6 +88,8 @@ abstract class CsvValueStore[F[_], V](
   self: ValueStores[V]#ValueStore[F] =>
 
   import VS.{ Id, IdField, Row }
+
+  import CsvImplicits.{ errorToFail, printer }
 
   import cormorant.refined._
   import cormorant.implicits._
@@ -166,6 +168,8 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
 
   import KVS.{ IdField, Key, KeyField, Value }
 
+  import CsvImplicits.{ errorToFail, printer }
+
   import cormorant.refined._
   import cormorant.implicits._
 
@@ -173,9 +177,11 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     */
   implicit def readRecord[
       HV <: HList
-  ](implicit
-    lgav: LabelledGeneric.Aux[Value, HV],
-    llhv: Lazy[LabelledRead[HV]]): LabelledRead[Record] =
+  ](
+      implicit
+      lgav: LabelledGeneric.Aux[Value, HV],
+      llhv: Lazy[LabelledRead[HV]]
+  ): LabelledRead[Record] =
     new LabelledRead[Record] {
 
       val lrhr = LabelledRead[IdField :: KeyField :: HV]

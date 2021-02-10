@@ -3,7 +3,6 @@ package model
 package augments
 
 import keyval.{ csvKVS, csvVS, CsvImplicits, SADT }
-import CsvImplicits._
 import capital.{ Forms, Instruments, InstrumentsForms, Novations, Papers }
 import model.layers._
 import model.Metas
@@ -21,39 +20,37 @@ import cormorant.implicits._
 
 import eu.timepit.refined.cats._
 
-trait csvStores { self: ModuleTypes with Ledger =>
+trait stdStores extends CsvImplicits { self: ModuleTypes with Ledger =>
 
   final val dataDir: String = """target/data"""
 
   lazy val metas: Metas.ValueStore[IO] = {
-    // val Right(ret: model.Metas.ValueStore[IO]) =
-    //   for {
-    //     metas <- csvVS[IO] at dataDir ofContentAddressed Metas
-    //   } yield metas
-    def ret: Metas.ValueStore[IO] = ???
+    val Right(ret: model.Metas.ValueStore[IO]) =
+      for {
+        metas <- csvVS[IO] at dataDir ofContentAddressed Metas
+      } yield metas
     ret
   }
 
   lazy val people: People[IO] = {
-    // val Right(ret: People[IO])
-    // for {
-    //   parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
-    //   contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
-    // } yield People(parties, contacts)
-    def ret: People[IO] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    val Right(ret: People[IO]) =
+      for {
+        // parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
+        contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
+      } yield People(???, contacts)
     ret
   }
 
   lazy val papers: Papers[IO] = {
-    // @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    // val Right(ret: Papers[IO]) =
-    // for {
-    //   instruments      <- csvKVS[IO] at dataDir ofKeyChained Instruments
-    //   forms            <- csvVS[IO] at dataDir ofChained Forms
-    //   instrumentsForms <- csvKVS[IO] at dataDir ofKeyChained InstrumentsForms
-    //   novations        <- csvVS[IO] at dataDir ofChained Novations
-    // } yield Papers(instruments, forms, instrumentsForms, novations)
-    def ret: Papers[IO] = ???
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    val Right(ret: Papers[IO]) =
+      for {
+        // instruments      <- csvKVS[IO] at dataDir ofKeyChained Instruments
+        forms <- csvVS[IO] at dataDir ofChained Forms
+        // instrumentsForms <- csvKVS[IO] at dataDir ofKeyChained InstrumentsForms
+        novations <- csvVS[IO] at dataDir ofChained Novations
+      } yield Papers(???, forms, ???, novations)
     ret
   }
 
@@ -69,11 +66,11 @@ trait csvStores { self: ModuleTypes with Ledger =>
     ls
   }
 
-  // lazy val wutz = {
-  //   val Right(ret) = for {
-  //     accounts <- csvKVS[IO] at dataDir ofKeyChained Accounts
-  //     rosters  <- csvVS[IO] at dataDir ofChained Rosters
-  //   } yield (accounts, rosters)
-  //   ret
-  // }
+  lazy val accounts = {
+    val Right(ret) = for {
+      accounts <- csvKVS[IO] at dataDir ofKeyChained Accounts
+      rosters  <- csvVS[IO] at dataDir ofChained Rosters
+    } yield (accounts, rosters)
+    ret
+  }
 }
