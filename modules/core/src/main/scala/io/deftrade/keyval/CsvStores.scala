@@ -35,9 +35,8 @@ import file.{ pulls, FileHandle }
 // import scodec.bits.ByteVector
 
 import io.chrisdavenport.cormorant
+import cormorant.{ CSV, Error, Get, LabelledRead, LabelledWrite, Printer, Put }
 import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
-import cormorant._
-import cormorant.generic.semiauto._
 
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
@@ -77,6 +76,9 @@ sealed protected abstract class CsvStore[F[_], V](
   /**
     */
   protected def csvToRecord: Pipe[F, String, Result[Record]]
+
+  protected lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
+  protected def printer: Printer                = Printer.default
 }
 
 /**
@@ -87,15 +89,11 @@ abstract class CsvValueStore[F[_], V](
 
   self: ValueStores[V]#ValueStore[F] =>
 
-  import VS.{ Id, IdField, Row }
-
-  import CsvImplicits.{ errorToFail, printer }
-
-  import cormorant.refined._
   import cormorant.implicits._
+  import cormorant.refined._
+  import cormorant.generic.semiauto._
 
-  protected implicit def idPut = Put[Id]
-  protected implicit def idGet = Get[Id]
+  import VS.{ IdField, Row }
 
   /**
     */
@@ -158,20 +156,15 @@ abstract class CsvValueStore[F[_], V](
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     final val KVS: KeyValueStores[K, V]
-// )(
-//   implicit
-//   override val F: Sync[F],
-//   override val X: ContextShift[F]
 ) extends CsvStore[F, V](KVS) {
 
   self: KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KVS.{ IdField, Key, KeyField, Value }
-
-  import CsvImplicits.{ errorToFail, printer }
-
-  import cormorant.refined._
   import cormorant.implicits._
+  import cormorant.refined._
+  import cormorant.generic.semiauto._
+
+  import KVS.{ IdField, Key, KeyField, Value }
 
   /**
     */
@@ -217,9 +210,11 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     */
   implicit final def writeRecord[
       HV <: HList
-  ](implicit
-    lgav: LabelledGeneric.Aux[V, HV],
-    llhv: Lazy[LabelledWrite[HV]]): LabelledWrite[Record] =
+  ](
+      implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llhv: Lazy[LabelledWrite[HV]]
+  ): LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
       private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]

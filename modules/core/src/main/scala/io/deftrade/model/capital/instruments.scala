@@ -154,11 +154,22 @@ object Form {
   implicit lazy val formDecoder: Decoder[Form] = { import io.circe.refined._; deriveDecoder }
 }
 
-case object Forms extends ValueStores.SADT[Form]
+case object Forms extends ValueStores.SADT[Form] {
+
+  sealed abstract case class Link private (form: Id)
+
+  object Link {
+
+    def apply(link: Id): Link = new Link(link) {}
+
+    implicit lazy val linkEq: Eq[Link]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }
+  }
+}
 
 /**
   */
-case object InstrumentsForms extends KeyValueStores.KV[Instruments.Key, Forms.Id]
+case object InstrumentsForms extends KeyValueStores.KV[Instruments.Key, Forms.Link]
 
 /** Parameters common to multiple `Form`s.
   */

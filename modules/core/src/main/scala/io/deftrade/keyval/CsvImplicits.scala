@@ -20,12 +20,7 @@ trait CsvImplicits {
 
   /**
     */
-  private val toDecodeFailure: Throwable => Error.DecodeFailure =
-    fail => Error.DecodeFailure(NonEmptyList one fail.toString)
-
-  /**
-    */
-  implicit def fuuidGet: Get[FUUID] =
+  implicit lazy val fuuidGet: Get[FUUID] =
     new Get[FUUID] {
 
       /**
@@ -36,7 +31,7 @@ trait CsvImplicits {
 
   /**
     */
-  implicit def fuuidPut: Put[FUUID] =
+  implicit lazy val fuuidPut: Put[FUUID] =
     stringPut contramap (_.show)
 
   /**
@@ -71,12 +66,12 @@ trait CsvImplicits {
 
   /**
     */
-  implicit def jsonGet: Get[Json] =
+  implicit lazy val jsonGet: Get[Json] =
     new Get[Json] {
 
       def get(field: CSV.Field): Either[Error.DecodeFailure, Json] =
         for {
-          json <- parser.parse(field.x) leftMap toDecodeFailure
+          json <- parser parse field.x leftMap toDecodeFailure
         } yield json
     }
 
@@ -84,31 +79,9 @@ trait CsvImplicits {
     */
   implicit lazy val jsonPut: Put[Json] =
     stringPut contramap (SADT canonicalStringFor _)
-  // /**
-  //   */
-  // // implicit def sadtGet[T: Encoder: Decoder]: Get[SADT] =
-  // implicit def sadtGet: Get[SADT] =
-  //   new Get[SADT] {
-  //
-  //     /**
-  //       */
-  //     def get(field: CSV.Field): Either[Error.DecodeFailure, SADT] =
-  //       for {
-  //         json <- parser.parse(field.x) leftMap toDecodeFailure
-  //       } yield SADT(json)
-  //   }
-  //
-  // /**
-  //   */
-  // implicit lazy val sadtPut: Put[SADT] =
-  //   stringPut contramap (_.canonicalString)
-}
 
-/**
-  */
-object CsvImplicits {
-
-  private[deftrade] lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
-
-  private[deftrade] def printer: Printer = Printer.default
+  /**
+    */
+  private val toDecodeFailure: Throwable => Error.DecodeFailure =
+    fail => Error.DecodeFailure(NonEmptyList one fail.toString)
 }

@@ -46,12 +46,13 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     Mny fiat amount
 
   /** Usage such as `USD fiat amount`. */
-  final def fiat[N: Financial](amount: N) = apply(amount)
+  final def fiat[N: Financial](amount: N) =
+    apply(amount)
 
   /** TODO: don't trust, ''test'' all codes in `java.currency` in order to justify this impl */
-  final def code: Currency.Code = {
+  final def code: CurrencyLike.Code = {
 
-    val Right(c) = refineV[Currency.IsCode](jc.getCurrencyCode)
+    val Right(c) = refineV[CurrencyLike.IsCode](jc.getCurrencyCode)
     c
   }
 
@@ -103,23 +104,9 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
 }
 
 /**
+  * Currently only the more common ISO 4217 currencies.
   */
-object CurrencyLike {
-
-  import refined.cats._
-
-  /**
-    */
-  implicit lazy val order: Order[CurrencyLike] = Order by { _.code }
-}
-
-/** `Aux` pattern in all but name. */
-sealed trait Currency[C] extends CurrencyLike { final type Type = C }
-
-/**
-  * Some of the more common ISO 4217 currencies.
-  */
-object Currency extends DtEnum[CurrencyLike] { self =>
+object CurrencyLike extends DtEnum[CurrencyLike] { self =>
 
   /**
     * Three letter codes: 26 ^ 3 = 17576
@@ -209,3 +196,7 @@ object Currency extends DtEnum[CurrencyLike] { self =>
     */
   val values = findValues
 }
+
+/**
+  */
+sealed trait Currency[C] extends CurrencyLike { final type Type = C }
