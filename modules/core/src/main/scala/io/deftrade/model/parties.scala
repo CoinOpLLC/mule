@@ -28,7 +28,7 @@ import io.chrisdavenport.fuuid.FUUID
 
 /** Models financial market participants.
   */
-sealed abstract class Party {
+sealed trait Party {
   def name: Label
   def taxNo: Tax.No
   def contact: Contacts.Id
@@ -50,11 +50,31 @@ object Party {
   import refined.cats._
   implicit def partyEq: Eq[Party]     = { import auto.eq._; semiauto.eq }
   implicit def partyShow: Show[Party] = { import auto.show._; semiauto.show }
+
+  sealed abstract case class Value private (
+      name: Label,
+      taxNo: Tax.No,
+      contact: Contacts.Id,
+      meta: Metas.Id
+  ) extends Party
+
+  object Value {
+
+    def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id, meta: Metas.Id): Value =
+      new Value(name, taxNo, contact, meta) {}
+
+    implicit def partyEq: Eq[Party.Value]     = { import auto.eq._; semiauto.eq }
+    implicit def partyShow: Show[Party.Value] = { import auto.show._; semiauto.show }
+  }
 }
 
 /**
   */
-case object Parties extends KeyValueStores.KV[FUUID, Party]
+case object Parties
+    extends KeyValueStores.SimpleCodec[FUUID, Party, Party.Value](
+      party => { import party._; Party.Value(name, taxNo, contact, meta) },
+      identity[Party]
+    )
 
 /** `NaturalPerson`s are `Party`s.
   */

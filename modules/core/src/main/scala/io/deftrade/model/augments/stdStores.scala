@@ -37,9 +37,9 @@ trait stdStores extends CsvImplicits { self: ModuleTypes with Ledger =>
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     val Right(ret: People[IO]) =
       for {
-        // parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
+        parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
         contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
-      } yield People(???, contacts)
+      } yield People(parties, contacts)
     ret
   }
 
