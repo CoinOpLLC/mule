@@ -1,6 +1,7 @@
 package io.deftrade
-package keyval
+package keyval.csv
 
+import keyval.SADT
 import money._
 
 import cats.implicits._
@@ -16,7 +17,7 @@ import fuuid.FUUID
 import cormorant.implicits.stringPut
 import cormorant._
 
-trait CsvImplicits {
+trait implicits {
 
   /**
     */
@@ -85,3 +86,7 @@ trait CsvImplicits {
   private val toDecodeFailure: Throwable => Error.DecodeFailure =
     fail => Error.DecodeFailure(NonEmptyList one fail.toString)
 }
+
+/** You shouldn't need this.
+  */
+object implicits extends implicits

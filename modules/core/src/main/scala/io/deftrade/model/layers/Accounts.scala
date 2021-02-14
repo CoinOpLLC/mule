@@ -20,10 +20,6 @@ import io.chrisdavenport.fuuid.FUUID
   */
 trait Accounts { self: Ledger with ModuleTypes =>
 
-  /**
-    */
-  type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
-
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.
     */
@@ -39,6 +35,14 @@ trait Accounts { self: Ledger with ModuleTypes =>
     /**   TODO: domanin model issue: need to configure one of several ways of selecting UUIDs
       */
     protected[deftrade] def freshFolioKey = FUUID fromUUID java.util.UUID.randomUUID()
+
+    /**
+      */
+    private type IsNo = Interval.Closed[100000100100108L, 999999999999999L]
+
+    /**
+      */
+    type No = Long Refined IsNo
 
     /**
       */
@@ -59,7 +63,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  case object Accounts extends KeyValueStores.KV[Long Refined IsAccountNo, Account]
+  case object Accounts extends KeyValueStores.KV[Account.No, Account]
 
   /** Each [[Account]] is created with a [[Roster]].
     */

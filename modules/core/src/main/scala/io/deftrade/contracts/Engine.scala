@@ -58,8 +58,8 @@ object Engine {
       case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
       case One(n) =>
         n match {
-          case InCoin(ic) => ic match { case Currency(c2) => exch(c2) }
-          case InKind(_)  => ???
+          case InCoin(ic)  => ic match { case Currency(c2) => exch(c2) }
+          case InKind(wut) => ???
         }
     }
 

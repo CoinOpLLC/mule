@@ -94,7 +94,7 @@ trait Stores[V] extends Product {
 
     /**
       */
-    protected def fresh: Fresh[Id, Row]
+    protected def fresh: NextId[Id, Row]
 
     /** note this is pure and not effectful! */
     protected def nextId(row: Row, rows: Row*): Id =

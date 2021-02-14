@@ -56,7 +56,7 @@ package object model
     //
     with IRS1065 // replace or enhance as necessary
     //
-    with stdStores { // replace or enhance as necessary
+    with csvStores { // replace or enhance as necessary
 
   /** FIXME
     */

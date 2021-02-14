@@ -2,16 +2,17 @@ package io.deftrade
 package model
 package augments
 
-import keyval.{ csvKVS, csvVS, CsvImplicits, SADT }
+import keyval.csv
+import csv.{ csvKVS, csvVS }
 import capital.{ Forms, Instruments, InstrumentsForms, Novations, Papers }
 import model.layers._
 import model.Metas
 
 import cats.implicits._
-import cats.{ Applicative, Eq, Foldable, Order, SemigroupK, Show }
-import cats.kernel.CommutativeGroup
-import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.effect.{ ContextShift, Sync }
+// import cats.{ Order, Show }
+// import cats.kernel.CommutativeGroup
+// import cats.data.{ NonEmptyList, NonEmptyMap }
+// import cats.effect.{ ContextShift, Sync }
 
 import eu.timepit.refined
 import refined.cats._
@@ -21,7 +22,9 @@ import cormorant.implicits._
 import cormorant.refined._
 import cormorant.generic.semiauto._
 
-trait stdStores extends CsvImplicits { self: ModuleTypes with Ledger =>
+/** The batteries we include.
+  */
+trait csvStores extends csv.implicits { self: ModuleTypes with Ledger =>
 
   final val dataDir: String = """target/data"""
 
@@ -43,13 +46,9 @@ trait stdStores extends CsvImplicits { self: ModuleTypes with Ledger =>
     ret
   }
 
-  import cormorant.{ Get, Put }
-  val ggg = Get[Instruments.Key]
-  val hhh = Put[Option[Forms.Id]]
-
   lazy val papers: Papers[IO] = {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    val Right(ret: Papers[IO]) =
+    val Right(ret) =
       for {
         instruments      <- csvKVS[IO] at dataDir ofKeyChained Instruments
         forms            <- csvVS[IO] at dataDir ofChained Forms

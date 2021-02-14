@@ -41,7 +41,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
   /** The ''labeled'' type of the [[Key]] column.
     */
-  final type KeyField = FieldType[key.T, Key]
+  final type KeyField = FieldType[key.T, K]
 
   final type Row = (K, Option[V])
 

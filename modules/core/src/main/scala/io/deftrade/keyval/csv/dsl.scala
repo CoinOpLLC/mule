@@ -1,7 +1,6 @@
 package io.deftrade
 package keyval
-
-import impl._
+package csv
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -16,7 +15,7 @@ import fs2.Pipe
 
 import java.nio.file.{ Path, Paths }
 
-trait csvStoreDsl {
+trait dsl {
 
   /**
     */
@@ -27,7 +26,7 @@ trait csvStoreDsl {
   def csvKVS[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
-/** csvStoreDsl for value stores
+/** DSL for value stores
   */
 final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
 
@@ -63,7 +62,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
             Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            Fresh.shaContent[VS.Row]
+            NextId.shaContent[VS.Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
@@ -92,7 +91,7 @@ final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
             Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            Fresh.shaChain[VS.Row]
+            NextId.shaChain[VS.Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
@@ -136,8 +135,8 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
           def path: Path =
             Paths get s"""${p}/${KVS.productPrefix}"""
 
-          final protected lazy val fresh: Fresh[KVS.Id, KVS.Row] =
-            Fresh.shaChain[KVS.Row]
+          final protected lazy val fresh: NextId[KVS.Id, KVS.Row] =
+            NextId.shaChain[KVS.Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderKv
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderKv

@@ -73,7 +73,7 @@ object Party {
 case object Parties
     extends KeyValueStores.SimpleCodec[FUUID, Party, Party.Value](
       party => { import party._; Party.Value(name, taxNo, contact, meta) },
-      identity[Party]
+      value => { import value._; Party.apply(name, taxNo, contact, meta) }
     )
 
 /** `NaturalPerson`s are `Party`s.

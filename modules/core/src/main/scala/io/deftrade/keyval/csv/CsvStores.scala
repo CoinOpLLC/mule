@@ -16,7 +16,7 @@
 
 package io.deftrade
 package keyval
-package impl
+package csv
 
 import syntax._
 
@@ -93,18 +93,16 @@ abstract class CsvValueStore[F[_], V](
   import cormorant.refined._
   import cormorant.generic.semiauto._
 
-  import VS.{ IdField, Row }
+  import VS.{ IdField }
 
   /**
     */
   implicit final protected def readRecord[HV <: HList](
       implicit
-      lgav: LabelledGeneric.Aux[Row, HV],
-      llhv: Lazy[LabelledRead[HV]]
+      lgav: LabelledGeneric.Aux[V, HV],
+      lrhr: LabelledRead[IdField :: HV]
   ): LabelledRead[Record] =
     new LabelledRead[Record] {
-
-      implicit val lrhr = LabelledRead[IdField :: HV]
 
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
         lrhr.read(row, headers) map { hr =>
@@ -116,7 +114,7 @@ abstract class CsvValueStore[F[_], V](
     */
   final protected def deriveCsvDecoderV[HV <: HList](
       implicit
-      lgav: LabelledGeneric.Aux[Row, HV],
+      lgav: LabelledGeneric.Aux[V, HV],
       llhv: Lazy[LabelledRead[HV]]
   ): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
@@ -126,18 +124,18 @@ abstract class CsvValueStore[F[_], V](
     */
   implicit def writeRecord[
       HV <: HList
-  ](implicit
-    lgav: LabelledGeneric.Aux[V, HV],
-    llhv: Lazy[LabelledWrite[HV]]): LabelledWrite[Record] =
+  ](
+      implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      lwhr: LabelledWrite[IdField :: HV]
+  ): LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
-      private val lwhpr = LabelledWrite[IdField :: HV]
-
-      def headers: CSV.Headers = lwhpr.headers
+      def headers: CSV.Headers = lwhr.headers
 
       def write(pr: Record): CSV.Row =
         pr match {
-          case (i, v) => lwhpr write field[id.T](i) :: (lgav to v)
+          case (i, v) => lwhr write field[id.T](i) :: (lgav to v)
         }
     }
 
@@ -164,7 +162,7 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
   import cormorant.refined._
   import cormorant.generic.semiauto._
 
-  import KVS.{ IdField, Key, KeyField, Value }
+  import KVS.{ IdField, KeyField }
 
   /**
     */
@@ -172,24 +170,22 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
       HV <: HList
   ](
       implicit
-      lgav: LabelledGeneric.Aux[Value, HV],
-      llhv: Lazy[LabelledRead[HV]]
+      lgav: LabelledGeneric.Aux[V, HV],
+      lrhr: LabelledRead[IdField :: KeyField :: HV]
   ): LabelledRead[Record] =
     new LabelledRead[Record] {
-
-      val lrhr = LabelledRead[IdField :: KeyField :: HV]
 
       def read(row: CSV.Row, headers: CSV.Headers): Either[Error.DecodeFailure, Record] =
         row match {
 
-          case CSV.Row(
+          case CSV.Row( // empty row (sic)
               NonEmptyList(CSV.Field(i), List(CSV.Field(k)))
               ) if i === id.toString && k === key.toString =>
             lrhr.read(row, headers) map { hr =>
-              (hr.head, (hr.tail.head: Key, none[Value]))
+              (hr.head, (hr.tail.head: K, none[V]))
             }
 
-          case _ =>
+          case _ => // non-empty row (sic)
             lrhr.read(row, headers) map { hr =>
               (hr.head, (hr.tail.head, (lgav from hr.tail.tail).some))
             }
@@ -200,9 +196,11 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     */
   final protected def deriveCsvDecoderKv[
       HV <: HList
-  ](implicit
-    lgav: LabelledGeneric.Aux[V, HV],
-    llr: Lazy[LabelledRead[HV]]): Pipe[F, String, Result[Record]] =
+  ](
+      implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llr: Lazy[LabelledRead[HV]]
+  ): Pipe[F, String, Result[Record]] =
     readLabelledCompleteSafe[F, Record] andThen
       (_ map (_ leftMap errorToFail))
 
@@ -213,11 +211,10 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
   ](
       implicit
       lgav: LabelledGeneric.Aux[V, HV],
-      llhv: Lazy[LabelledWrite[HV]]
+      lwhpr: LabelledWrite[IdField :: KeyField :: HV]
   ): LabelledWrite[Record] =
     new LabelledWrite[Record] {
 
-      private val lwhpr = LabelledWrite[IdField :: KeyField :: HV]
       private val lwher = LabelledWrite[IdField :: KeyField :: HNil]
 
       def headers: CSV.Headers = lwhpr.headers
@@ -233,15 +230,19 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
     */
   final protected def deriveCsvEncoderKv[
       HV <: HList
-  ](implicit
-    lgav: LabelledGeneric.Aux[V, HV],
-    llw: Lazy[LabelledWrite[HV]]): Pipe[F, Record, String] =
+  ](
+      implicit
+      lgav: LabelledGeneric.Aux[V, HV],
+      llw: Lazy[LabelledWrite[HV]]
+  ): Pipe[F, Record, String] =
     writeLabelled(printer)
 }
 
 /** No part of this implementation tree depends on the `Spec`type.
   *
   * This is where we hide the fact that we're doing implementation inheritance.
+  *
+  * (Our API doesn't lock us into this, so we can change that implementation detail.)
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 sealed protected trait MemFile[F[_], V] {
@@ -255,29 +256,10 @@ sealed protected trait MemFile[F[_], V] {
     */
   def path: Path
 
-  final private lazy val appendHandles: Stream[F, FileHandle[F]] = {
-
-    import OpenOption._
-
-    val openOptions = Seq(
-      CREATE,
-      // READ,
-      WRITE,
-      APPEND,
-      SYNC
-      // DSYNC,
-    )
-
-    Stream resource (for {
-      blocker <- Blocker[F]
-      handle  <- FileHandle.fromPath(path, blocker, openOptions)
-    } yield handle)
-  }
-
   /**
     */
   final protected def readLines: Stream[F, String] =
-    (Stream resource Blocker[F]) flatMap { blocker =>
+    Stream resource Blocker[F] flatMap { blocker =>
       file.readAll[F](path, blocker, 1024 * 1024)
     } through
       text.utf8Decode through
@@ -285,20 +267,33 @@ sealed protected trait MemFile[F[_], V] {
 
   /**
     */
-  final protected def appendingSink: Pipe[F, String, Unit] =
+  final protected def appendingSink: Pipe[F, String, Unit] = {
+
+    import OpenOption._
+    def openOptions =
+      Seq(
+        CREATE,
+        // READ,
+        WRITE,
+        APPEND,
+        SYNC
+        // DSYNC,
+      )
+
+    def appendHandles: Stream[F, FileHandle[F]] =
+      Stream resource (for {
+        blocker <- Blocker[F]
+        handle  <- FileHandle.fromPath(path, blocker, openOptions)
+      } yield handle)
+
     for {
       handle <- appendHandles
       s      <- _
     } yield
       pulls
-        .writeAllToFileHandle(
-          Stream eval
-            (F pure s) through
-            text.utf8Encode,
-          handle
-        )
+        .writeAllToFileHandle(Stream eval s.pure[F] through text.utf8Encode, handle)
         .stream |> discardValue // nota bene this is intentional and necessary
-  // WriteCursor(out, 0).writeAll(in).void
+  }
 }
 
 /**
@@ -320,9 +315,9 @@ trait MemFileV[F[_], V] extends MemFile[F, V] {
 trait MemFileKV[F[_], K, V] extends MemFile[F, V] {
   self: CsvKeyValueStore[F, K, V] with KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KVS.{ Id, Key, Row, Value }
+  import KVS.{ Id, Row }
 
-  override protected def cacheLookup(key: Key): F[Option[(Id, List[Value])]] =
+  override protected def cacheLookup(key: K): F[Option[(Id, List[V])]] =
     ???
 
   override protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
