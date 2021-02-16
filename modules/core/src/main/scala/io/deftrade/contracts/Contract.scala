@@ -20,16 +20,28 @@ object Contract {
 
   type LzCon = Eval[Contract]
 
-  case object Zero                                                            extends Contract
-  sealed abstract case class One(n: Numéraire)                                extends Contract
-  sealed abstract case class Scale[N: Financial](o: Oracle[N], c: LzCon)      extends Contract
-  sealed abstract case class Give(c: LzCon)                                   extends Contract
-  sealed abstract case class When(o: Oracle[Boolean], c: LzCon)               extends Contract
-  sealed abstract case class Until(o: Oracle[Boolean], c: LzCon)              extends Contract
-  sealed abstract case class Anytime(o: Oracle[Boolean], c: LzCon)            extends Contract
-  sealed abstract case class Both(cA: LzCon, cB: LzCon)                       extends Contract
-  sealed abstract case class Pick(cA: LzCon, cB: LzCon)                       extends Contract
-  sealed abstract case class Branch(o: Oracle[Boolean], cT: LzCon, cF: LzCon) extends Contract
+  case object Zero                                                extends Contract
+  sealed abstract case class One private[Contract] (n: Numéraire) extends Contract
+  sealed abstract case class Give private[Contract] (c: LzCon)    extends Contract
+  sealed abstract case class Scale[N: Financial] private[Contract] (
+      o: Oracle[N],
+      c: LzCon
+  ) extends Contract
+
+  sealed abstract case class When private[Contract] (o: Oracle[Boolean], c: LzCon)  extends Contract
+  sealed abstract case class Until private[Contract] (o: Oracle[Boolean], c: LzCon) extends Contract
+  sealed abstract case class Anytime private[Contract] (
+      o: Oracle[Boolean],
+      c: LzCon
+  ) extends Contract
+
+  sealed abstract case class Both private[Contract] (cA: LzCon, cB: LzCon) extends Contract
+  sealed abstract case class Pick private[Contract] (cA: LzCon, cB: LzCon) extends Contract
+  sealed abstract case class Branch private[Contract] (
+      o: Oracle[Boolean],
+      cT: LzCon,
+      cF: LzCon
+  ) extends Contract
 
   implicit lazy val contractGroup: Group[Contract] =
     new Group[Contract] {

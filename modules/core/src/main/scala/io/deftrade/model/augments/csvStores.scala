@@ -4,9 +4,8 @@ package augments
 
 import keyval.csv
 import csv.{ csvKVS, csvVS }
-import capital.{ Forms, Instruments, InstrumentsForms, Novations, Papers }
 import model.layers._
-import model.Metas
+import model.pillars.Metas
 
 import cats.implicits._
 // import cats.{ Order, Show }
@@ -24,21 +23,21 @@ import cormorant.generic.semiauto._
 
 /** The batteries we include.
   */
-trait csvStores extends csv.implicits { self: ModuleTypes with Ledger =>
+trait csvStores extends csv.implicits { self: ModuleTypes with Person with Paper with Ledger =>
 
   final val dataDir: String = """target/data"""
 
   lazy val metas: Metas.ValueStore[IO] = {
-    val Right(ret: model.Metas.ValueStore[IO]) =
+    val Right(ret) =
       for {
         metas <- csvVS[IO] at dataDir ofContentAddressed Metas
       } yield metas
     ret
   }
 
-  lazy val people: People[IO] = {
+  lazy val people: People = {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    val Right(ret: People[IO]) =
+    val Right(ret) =
       for {
         parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
         contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
@@ -46,7 +45,7 @@ trait csvStores extends csv.implicits { self: ModuleTypes with Ledger =>
     ret
   }
 
-  lazy val papers: Papers[IO] = {
+  lazy val papers: Papers = {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     val Right(ret) =
       for {

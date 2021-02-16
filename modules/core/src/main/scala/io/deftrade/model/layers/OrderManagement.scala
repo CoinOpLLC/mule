@@ -19,6 +19,7 @@ package model
 package layers
 
 import keyval._, time._, money._
+import model.pillars.{ Meta, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }

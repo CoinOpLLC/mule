@@ -18,7 +18,7 @@ import io.chrisdavenport.fuuid.FUUID
 
 /** Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
   */
-trait Accounts { self: Ledger with ModuleTypes =>
+trait Accounts { self: ModuleTypes with Person with Ledger =>
 
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.

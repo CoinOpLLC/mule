@@ -1,6 +1,5 @@
 package io.deftrade
-package model
-package capital
+package model.pillars
 
 import refinements.failsafe
 

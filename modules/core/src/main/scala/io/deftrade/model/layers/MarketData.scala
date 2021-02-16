@@ -19,8 +19,8 @@ package model
 package layers
 
 import money._, keyval._, time._
-import capital.Instruments
 import refinements.{ Label }
+import model.pillars.{ Meta, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Monad, Order, Show }
@@ -43,7 +43,7 @@ import io.chrisdavenport.fuuid.FUUID
 
 /**
   */
-trait MarketData { self: Ledger with ModuleTypes =>
+trait MarketData { self: ModuleTypes with Paper with Ledger =>
 
   /**
     */

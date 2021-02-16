@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package io.deftrade
-package model
+package model.augments
 
 import keyval._, refinements._
 
@@ -37,18 +37,7 @@ sealed abstract case class Contact private (
     cell: Contact.USPhone,
     email: Contact.Email,
     url: Option[String Refined Url]
-) {
-
-  /** FIXME: `Accounts.contacts` dependency is unmapped */
-  def naturalPerson[F[_]: Sync](ssn: Tax.SSN): F[NaturalPerson] =
-    ???
-  // extract name from contact before persisting it
-
-  /** FIXME: `Accounts.contacts` dependency is unmapped */
-  def legalEntity[F[_]: Sync](ein: Tax.EIN): F[LegalEntity] =
-    // extract name from contact before persisting it
-    ???
-}
+)
 
 /**
   */

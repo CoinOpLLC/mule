@@ -20,14 +20,13 @@ import model.layers._
 import model.augments._
 
 import cats.implicits._
-import cats.{ Applicative, Eq, Foldable, Order, SemigroupK, Show }
+import cats.{ Applicative, Foldable, Order, SemigroupK }
 import cats.kernel.CommutativeGroup
+import cats.kernel.instances.MapMonoid
 import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.effect.{ ContextShift, IO, Sync }
+import cats.effect.{ ContextShift, IO }
 
 import enumeratum.EnumEntry
-
-import eu.timepit.refined.cats._
 
 /**
   * Records and computations defining a layered set of financial domain models and services.
@@ -41,6 +40,8 @@ package object model
     //
     // the full stack of layered capabilities
     //
+    with Person
+    with Paper
     with Ledger          // possibly distributed
     with Accounting      // debits, credits, and all that
     with Balances        // depends only on generic Accounting
@@ -62,7 +63,7 @@ package object model
     */
   implicit protected lazy val X: ContextShift[IO] = ???
 
-  implicit def orderInstance[E <: EnumEntry]: Order[E] = Order by (_.entryName)
+  // implicit def orderInstance[E <: EnumEntry]: Order[E] = Order by (_.entryName)
 
   /**
     */
@@ -146,6 +147,10 @@ package object model
     groupBy(kv, kvs: _*)(_._1) map (_ foldMap (_._2))
 
   implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
-    new MapCommutativeGroup[K, V]
-
+    new MapMonoid[K, V] with CommutativeGroup[Map[K, V]] {
+      def inverse(a: Map[K, V]): Map[K, V] =
+        a.foldLeft(Map.empty[K, V]) {
+          case (my, (k, x)) => my.updated(k, CommutativeGroup inverse x)
+        }
+    }
 }

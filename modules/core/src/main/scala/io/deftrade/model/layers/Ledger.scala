@@ -15,10 +15,11 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
-import time._, money._, keyval._, capital._
+import time._, money._, keyval._
+
+import model.pillars.{ Meta, Metas }
 
 import cats.implicits._
 
@@ -38,9 +39,7 @@ import fs2.Stream
 /** Models the performance and recording of [[Trade]]s between [[Folio]]s as [[Transaction]]s.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait Ledger { module: ModuleTypes =>
-
-  val metas: Metas.ValueStore[IO]
+trait Ledger { module: ModuleTypes with Person with Paper =>
 
   case class Ledgers(
       trades: Trades.ValueStore[IO],
@@ -52,6 +51,8 @@ trait Ledger { module: ModuleTypes =>
 
   val ledgers: Ledgers
   import ledgers._
+
+  val metas: Metas.ValueStore[IO]
 
   /**
     */
@@ -252,7 +253,7 @@ trait Ledger { module: ModuleTypes =>
       *
       * Implementation may differ for efficiency.
       */
-    def apply(ps: Position*): Folio = indexAndSum(ps.toList)
+    def apply(ps: Position*): Folio = ??? // indexAndSum(ps.toList)
 
     /**
       */
@@ -305,7 +306,7 @@ trait Ledger { module: ModuleTypes =>
 
     /**
       */
-    def apply(l: Leg, ls: Leg*): Trade = indexAndSum(l, ls: _*)
+    def apply(l: Leg, ls: Leg*): Trade = ??? // indexAndSum(l, ls: _*)
 
     /** Enables package deals, or portfolio valuation informed by covariance,
       * or other holistic methodology.

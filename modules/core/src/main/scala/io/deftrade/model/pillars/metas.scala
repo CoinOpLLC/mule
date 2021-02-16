@@ -1,5 +1,5 @@
 package io.deftrade
-package model
+package model.pillars
 
 import keyval._
 import refinements.{ Label, SHA }
