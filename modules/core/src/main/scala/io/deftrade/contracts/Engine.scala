@@ -1,14 +1,16 @@
 package io.deftrade
 package contracts
 
-import syntax._, time._, money._
+import syntax._, time._ // , money._
 
 import cats.implicits._
 import cats.{ Order, Show }
 import cats.evidence._
 
-import spire.syntax.field._
 import spire.math.Fractional
+import spire.algebra.Trig
+import spire.syntax.field._
+import spire.syntax.trig._
 
 /** [[eval]] lives here. */
 sealed trait Engine {
@@ -31,34 +33,36 @@ object Engine {
     * TODO: refine this model
     * TODO: expand to other models
     */
-  sealed abstract case class Pricing[C](
+  sealed abstract case class Pricing[N: Fractional, C](
       t0: Instant,
-      rateModel: Pricing.PR[Double]
+      rateModel: Pricing.PR[N]
   ) extends Engine {
 
     import Pricing._, Contract._, Numéraire._
 
+    import spire.syntax.field._
+
     /** */
-    final type Return = PR[Double]
+    final type Return = PR[N]
 
     /**
       * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
       * process which represents the distribution of possible `Contract` values a given
       * number of [[Pricing.TimeSteps]] from [[t0]].
       */
-    final def eval: Contract => PR[Double] = {
-      case Zero              => PR.bigK(0.0)
-      case Give(c)           => -eval(c.value)
-      case Scale(o, c)       => (Pricing eval o) * eval(c.value)
-      case Both(c1, c2)      => eval(c1.value) + eval(c2.value)
-      case Pick(c1, c2)      => eval(c1.value) max eval(c2.value)
-      case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
-      case When(o, c)        => disc(Pricing eval o, eval(c.value))
-      case Anytime(o, c)     => snell(Pricing eval o, eval(c.value))
-      case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
+    final def eval: Contract => PR[N] = {
+      case Zero                   => PR bigK Fractional[N].one
+      case Give(c)                => -eval(c.value)
+      case Scale(o: Oracle[N], c) => (Pricing eval o) * eval(c.value)
+      case Both(c1, c2)           => eval(c1.value) + eval(c2.value)
+      case Pick(c1, c2)           => eval(c1.value) max eval(c2.value)
+      case Branch(o, cT, cF)      => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
+      case When(o, c)             => disc(Pricing eval o, eval(c.value))
+      case Anytime(o, c)          => snell(Pricing eval o, eval(c.value))
+      case Until(o, c)            => PR.absorb(Pricing eval o, eval(c.value))
       case One(n) =>
         n match {
-          case InCoin(ic)  => ic match { case Currency(c2) => exch(c2) }
+          case InCoin(ic)  => ??? // ic match { case Currency(c2) => exch(c2) }
           case InKind(wut) => ???
         }
     }
@@ -75,7 +79,7 @@ object Engine {
       * Elsewhere, the result is its "fair" equivalent stochastic value
       * process in the same `C: Currency`.
       */
-    final def disc(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+    final def disc(cond: PR[Boolean], pr: PR[N]): PR[N] =
       discount(orQ, discrete)(cond, pr)
 
     /**
@@ -84,7 +88,7 @@ object Engine {
       * Uses the probability measure
       * associated with the type parameter [C: Currency].
       */
-    final def snell(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+    final def snell(cond: PR[Boolean], pr: PR[N]): PR[N] =
       discount(orMax, discrete)(cond, pr)
 
     /**
@@ -99,26 +103,26 @@ object Engine {
       *
       * FIXME: toy stub; implement for real.
       */
-    final def exch(n2: Numéraire): PR[Double] =
+    final def exch(n2: Numéraire): PR[N] =
       n2 match {
 
         case Numéraire.InCoin(c2) =>
           c2 |> discardValue
-          PR bigK 1.618
+          PR bigK Fractional[N].one * 1.618
 
         case Numéraire.InKind(k2) =>
           k2 |> discardValue
-          PR bigK 6.18
+          PR bigK Fractional[N].one * 6.18
       }
 
-    private def discount(bpq: BPQ, compound: Compounding)(
+    private def discount(bpq: BPQ[N], compound: Compounding[N])(
         cond: PR[Boolean],
-        pr: PR[Double]
-    ): PR[Double] = {
+        pr: PR[N]
+    ): PR[N] = {
 
-      def prevSlice: RV[Double] => RV[Double] = RV.prevSlice(0.5) // fair coin
+      def prevSlice: RV[N] => RV[N] = RV.prevSlice(Fractional[N].one * 0.5) // fair coin
 
-      def calc(bs: LL[RV[Boolean]], ps: LL[RV[Double]], rs: LL[RV[Double]]): LL[RV[Double]] =
+      def calc(bs: LL[RV[Boolean]], ps: LL[RV[N]], rs: LL[RV[N]]): LL[RV[N]] =
         (bs, ps, rs) match {
           case (predSlice #:: bs, procSlice #:: ps, rateSlice #:: rs) =>
             if (predSlice forall identity) // TODO: true for empty slice? do we ever see?
@@ -126,7 +130,7 @@ object Engine {
             else
               calc(bs, ps, rs) match {
                 case rest @ nextSlice #:: _ =>
-                  def thisSlice: RV[Double] = {
+                  def thisSlice: RV[N] = {
 
                     def discSlice =
                       prevSlice(nextSlice) zip
@@ -148,47 +152,40 @@ object Engine {
   /** */
   object Pricing {
 
-    /** This is as close as we get to Haskell's `[]`. */
+    /** This is as close as we get to Haskell's `[]`.
+      */
     type LL[A] = LazyList[A]
 
-    /** */
+    /**
+      */
     lazy val LL = LazyList
 
     /**
-      *  Toy model adapted from (but not identical to) the one used in the papers.
       */
-    def toy[C: Currency]: Pricing[C] =
-      new Pricing[C](
-        java.time.Instant.EPOCH,
-        Currency[C] match {
-          case Currency.CHF => rates(.0170, .00180)
-          case Currency.EUR => rates(.0165, .00025)
-          case Currency.GBP => rates(.0170, .00080)
-          case Currency.USD => rates(.0150, .00150)
-          case Currency.JPY => rates(.0110, .00250)
-          case _            => rates(.01967, .00289) // good enuf for now
-        }
-      ) {}
+    type Compounding[N] = N => N
 
     /** */
-    type Compounding = Double => Double
+    def discrete[N: Fractional]: Compounding[N] =
+      r => (Fractional[N].one + r / 100.0)
 
     /** */
-    lazy val discrete: Compounding = r => (1 + r / 100.0)
-
-    /** */
-    def continuous(step: TimeSteps): Compounding = r => Math.exp(r / 100.0) * step
+    def continuous[N: Fractional: Trig](step: TimeSteps): Compounding[N] =
+      r => Trig[N].exp(r / 100 * step * Fractional[N].one)
 
     /** TODO: refinements on inputs? */
-    case class LatticeModelParams(r: Double, sigma: Double, div: Double, step: Double) {
+    case class LatticeModelParams[N: Fractional: Trig](r: N, sigma: N, div: N, step: N) {
 
-      import Math.{ exp, sqrt }
+      val FN = Fractional[N]
+      val TN = Trig[N]
 
-      def up: Double   = exp(sigma * sqrt(step))
-      def down: Double = 1.0 / up
+      import FN.{ sqrt }
+      import TN.{ exp }
 
-      def p: Double = exp((r - div) * step - down) / (up - down) // FIXME singularity no good
-      def q: Double = 1.0 - p
+      def up: N   = exp(sigma * sqrt(step))
+      def down: N = 1.0 / up
+
+      def p: N = exp((r - div) * step - down) / (up - down) // FIXME singularity no good
+      def q: N = 1.0 - p
     }
 
     /** */
@@ -241,7 +238,7 @@ object Engine {
     /**
       * `random variable` representation.
       */
-    type RV[A] = LL[A]
+    type RV[N] = LL[N]
 
     /**
       * `random variable` primitives
@@ -252,9 +249,9 @@ object Engine {
         * Calculates a previous slice in a lattice by averaging each adjacent pair of values
         * in the specified slice.
         *
-        * TODO: `Double Refined [0,1]` would be nice here
+        * TODO: `N Refined [0,1]` would be nice here
         */
-      def prevSlice(p: Double)(slice: RV[Double]): RV[Double] = slice match {
+      def prevSlice[N: Fractional](p: N)(slice: RV[N]): RV[N] = slice match {
         case _ if slice.isEmpty     => LL.empty
         case (_ #:: t) if t.isEmpty => LL.empty
         case (h #:: th #:: tt)      => (h * (1 - p) + th * p) #:: prevSlice(p)(th #:: tt)
@@ -264,7 +261,7 @@ object Engine {
         * TODO: in the real world, this needs params, no?
         * TODO: can make some of these tail recursive internally?
         */
-      def probabilityLattice: LL[RV[Double]] = {
+      def probabilityLattice: LL[RV[Int]] = {
 
         def pathCounts: LL[RV[Int]] = {
 
@@ -277,8 +274,8 @@ object Engine {
           paths(LL(1))
         }
 
-        def probabilities(ps: LL[RV[Int]]): LL[RV[Double]] = ps match {
-          case h #:: t => (h map (_ / h.sum.toDouble)) #:: probabilities(t)
+        def probabilities(ps: LL[RV[Int]]): LL[RV[Int]] = ps match {
+          case h #:: t => (h map (_ / h.sum)) #:: probabilities(t)
         }
 
         pathCounts |> probabilities
@@ -297,8 +294,10 @@ object Engine {
         * and its associated probability. The following functions
         * implement this calculation.''
         */
-      def expectedValue(outcomes: RV[Double], probabilities: RV[Double]): Double =
+      def expectedValue[N: Fractional](outcomes: RV[N], probabilities: RV[Int]): N = {
+        implicit val monoid: cats.kernel.Monoid[N] = Fractional[N].additive
         outcomes zip probabilities foldMap { case (o, p) => o * p }
+      }
     }
 
     /**
@@ -313,12 +312,13 @@ object Engine {
     /**
       * `value process` primitives
       *
-      * Adapted from the ''How to Write a Financial Contract'' paper,
+      * Adapted from the ''How to Write a Fractional Contract'' paper,
       * via van Straaten's Haskell implementation.
       */
     object PR {
 
-      private[contracts] def apply[A](rvs: LL[RV[A]]): PR[A] = new PR(rvs)
+      private[contracts] def apply[A](rvs: LL[RV[A]]): PR[A] =
+        new PR(rvs)
 
       /** */
       def bigK[A](a: A): PR[A] =
@@ -385,8 +385,10 @@ object Engine {
         }
 
       /** */
-      def expectedValue(pr: PR[Double]): LL[Double] =
-        pr.rvs zip RV.probabilityLattice map { case (ps, os) => RV.expectedValue(ps, os) }
+      def expectedValue[N: Fractional](pr: PR[N]): LL[N] =
+        pr.rvs zip RV.probabilityLattice map {
+          case (ps, os) => RV.expectedValue(ps, os)
+        }
 
       /**
         * Conditions the value of a process on a [[PR]]`[Boolean]`.
@@ -400,13 +402,13 @@ object Engine {
         *
         * In states where `cond` is true, the result is therefore zero.
         */
-      def absorb(cond: PR[Boolean], pr: PR[Double]): PR[Double] =
+      def absorb[N: Fractional](cond: PR[Boolean], pr: PR[N]): PR[N] =
         PR(
           cond.rvs zip pr.rvs map {
             case (os, ps) =>
               os zip ps map {
                 case (false, p) => p
-                case (true, _)  => 0.0
+                case (true, _)  => Fractional[N].zero
               }
           }
         )
@@ -431,11 +433,11 @@ object Engine {
       *
       * FIXME: toy model; hardwired arithmetic
       */
-    def rates(rateNow: Double, delta: Double): PR[Double] = {
+    def rates[N: Fractional](rateNow: N, delta: N): PR[N] = {
 
-      def makeRateSlices(rate: Double, n: Int): LL[RV[Double]] = {
+      def makeRateSlices(rate: N, n: Int): LL[RV[N]] = {
 
-        def rateSlice: RV[Double] = LL.iterate(rate)(r => r + 2 * delta) take n
+        def rateSlice: RV[N] = LL.iterate(rate)(r => r + 2 * delta) take n
 
         rateSlice #:: makeRateSlices(rate - delta, n + 1)
       }
@@ -444,15 +446,15 @@ object Engine {
     }
 
     /** */
-    def eval[A](o: Observable[A]): PR[A] =
+    def eval[A](o: Oracle[A]): PR[A] =
       o match {
-        case Observable.Const(a) => PR.bigK(a)
-        case _                   => ???
+        case Oracle.Const(a) => PR.bigK(a)
+        case _               => ???
       }
 
-    private type BPQ = (Boolean, Double, Double) => Double
-    private lazy val orQ: BPQ   = (b, p, q) => if (b) p else q
-    private lazy val orMax: BPQ = (b, p, q) => if (b) p else p max q
+    private type BPQ[N] = (Boolean, N, N) => N
+    private def orQ[N]: BPQ[N]               = (b, p, q) => if (b) p else q
+    private def orMax[N: Fractional]: BPQ[N] = (b, p, q) => if (b) p else p max q
   }
 
   /**
@@ -489,3 +491,18 @@ object Engine {
   /** placeholder */
   object Performing
 }
+// /**
+//   *  Toy model adapted from (but not identical to) the one used in the papers.
+//   */
+// def toy[N: Fractional, C: Currency]: Pricing[N, C] =
+//   new Pricing[N, C](
+//     java.time.Instant.EPOCH,
+//     Currency[C] match {
+//       case Currency.CHF => rates(.0170, .00180)
+//       case Currency.EUR => rates(.0165, .00025)
+//       case Currency.GBP => rates(.0170, .00080)
+//       case Currency.USD => rates(.0150, .00150)
+//       case Currency.JPY => rates(.0110, .00250)
+//       case _            => rates(.01967, .00289) // good enuf for now
+//     }
+//   ) {}

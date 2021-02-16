@@ -15,22 +15,20 @@
  */
 
 package io.deftrade
-package model
-package capital
+package model.capital
 
-import time._, market._, money._, contracts._, keyval._, refinements._
+import model.LegalEntities
+
+import time._, money._, contracts._, keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.derived.{ auto, semiauto }
 
-import enumeratum.EnumEntry
-
 import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined }
 import refined.string.{ Url }
-import refined.numeric.{ Positive }
 import refined.cats._
 
 import keys.{ ISIN, USIN }
@@ -62,7 +60,6 @@ object Instrument {
 
   /**
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
   implicit def instrumentShow: Show[Instrument] = { import auto._; semiauto.show }
 }
 
@@ -70,6 +67,31 @@ object Instrument {
   * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
   */
 case object Instruments extends KeyValueStores.KV[USIN, Instrument]
+
+sealed abstract case class Foo private (
+    // final val symbol: Label,
+    // final val issuedBy: LegalEntities.Key,
+    // final val issuedIn: Option[CurrencyLike]
+) extends Numéraire.InKind
+
+/**
+  */
+object Foo {
+
+  def apply(
+      // symbol: Label,
+      // issuedBy: LegalEntities.Key,
+      // issuedIn: Option[CurrencyLike]
+  ): Foo =
+    new Foo(
+      // symbol,
+      // issuedBy,
+      // issuedIn
+    ) {}
+
+  implicit def instrumentEq: Eq[Foo]     = { import auto._; semiauto.eq }
+  implicit def instrumentShow: Show[Foo] = { import auto._; semiauto.show }
+}
 
 final case class Papers[F[_]](
     instruments: Instruments.KeyValueStore[F],
@@ -142,8 +164,6 @@ sealed abstract class Form extends Product with Serializable {
   */
 object Form {
 
-  import refined.cats._
-
   implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
   implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
 
@@ -154,6 +174,8 @@ object Form {
   implicit lazy val formDecoder: Decoder[Form] = { import io.circe.refined._; deriveDecoder }
 }
 
+/**
+  */
 case object Forms extends ValueStores.SADT[Form] {
 
   sealed abstract case class Link private (form: Id)
