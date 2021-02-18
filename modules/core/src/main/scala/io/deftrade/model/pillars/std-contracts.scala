@@ -1,6 +1,5 @@
 package io.deftrade
-package model
-package capital
+package model.pillars
 
 import time._, money._, contracts._
 

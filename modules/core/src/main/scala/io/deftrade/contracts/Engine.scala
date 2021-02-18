@@ -1,7 +1,7 @@
 package io.deftrade
 package contracts
 
-import syntax._, time._ // , money._
+import syntax._, time._, money._
 
 import cats.implicits._
 import cats.{ Order, Show }
@@ -10,7 +10,6 @@ import cats.evidence._
 import spire.math.Fractional
 import spire.algebra.Trig
 import spire.syntax.field._
-import spire.syntax.trig._
 
 /** [[eval]] lives here. */
 sealed trait Engine {
@@ -42,7 +41,8 @@ object Engine {
 
     import spire.syntax.field._
 
-    /** */
+    /**
+      */
     final type Return = PR[N]
 
     /**
@@ -51,19 +51,20 @@ object Engine {
       * number of [[Pricing.TimeSteps]] from [[t0]].
       */
     final def eval: Contract => PR[N] = {
-      case Zero                   => PR bigK Fractional[N].one
+      case Zero                   => PR.bigK(Fractional[N].one)
       case Give(c)                => -eval(c.value)
       case Scale(o: Oracle[N], c) => (Pricing eval o) * eval(c.value)
-      case Both(c1, c2)           => eval(c1.value) + eval(c2.value)
-      case Pick(c1, c2)           => eval(c1.value) max eval(c2.value)
+      case Both(cA, cB)           => eval(cA.value) + eval(cB.value)
+      case Pick(cA, cB)           => eval(cA.value) max eval(cB.value)
       case Branch(o, cT, cF)      => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
       case When(o, c)             => disc(Pricing eval o, eval(c.value))
       case Anytime(o, c)          => snell(Pricing eval o, eval(c.value))
       case Until(o, c)            => PR.absorb(Pricing eval o, eval(c.value))
       case One(n) =>
         n match {
-          case InCoin(ic)  => ??? // ic match { case Currency(c2) => exch(c2) }
-          case InKind(wut) => ???
+          case InCoin(Currency(c2)) => exch(c2)
+          case _: InCoin            => ???
+          case _: InKind            => ???
         }
     }
 
@@ -106,12 +107,10 @@ object Engine {
     final def exch(n2: Numéraire): PR[N] =
       n2 match {
 
-        case Numéraire.InCoin(c2) =>
-          c2 |> discardValue
+        case _: Numéraire.InCoin =>
           PR bigK Fractional[N].one * 1.618
 
-        case Numéraire.InKind(k2) =>
-          k2 |> discardValue
+        case _: Numéraire.InKind =>
           PR bigK Fractional[N].one * 6.18
       }
 
@@ -170,7 +169,7 @@ object Engine {
 
     /** */
     def continuous[N: Fractional: Trig](step: TimeSteps): Compounding[N] =
-      r => Trig[N].exp(r / 100 * step * Fractional[N].one)
+      r => Trig[N].exp(r / 100.0 * step)
 
     /** TODO: refinements on inputs? */
     case class LatticeModelParams[N: Fractional: Trig](r: N, sigma: N, div: N, step: N) {

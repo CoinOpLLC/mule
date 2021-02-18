@@ -1,8 +1,8 @@
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import keyval._
+import model.pillars.UnitPartition
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }

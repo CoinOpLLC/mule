@@ -15,8 +15,7 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import money.{ Financial, Mny }
 
@@ -31,7 +30,7 @@ import cats.effect.{ ContextShift, Sync }
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
   * Modules parameterized like this may create `Mny[MA, C] <=> (MI, Q)` codecs via a table of
-  * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
+  * [[Paper#Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
   */
 trait ModuleTypes {

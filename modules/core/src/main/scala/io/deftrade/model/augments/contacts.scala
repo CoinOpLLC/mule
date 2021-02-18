@@ -21,7 +21,6 @@ import keyval._, refinements._
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semiauto }
-import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.api.{ Refined }

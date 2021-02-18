@@ -15,10 +15,9 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
-import syntax._, time._, money._, keyval._
+import syntax._, time._, money._, keyval._, model.instances._
 
 import cats.implicits._
 import cats.{ Invariant }
@@ -453,8 +452,8 @@ trait Balances { self: ModuleTypes with Ledger with Accounting =>
     ): Stream[F, Transactions.Id] => F[AccrualReports.Id] =
       ???
   }
-}
 
-case object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
-  // lazy val Key = Folios.Key
+  case object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
+    // lazy val Key = Folios.Key
+  }
 }

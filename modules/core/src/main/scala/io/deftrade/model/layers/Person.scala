@@ -113,6 +113,11 @@ trait Person { module: ModuleTypes =>
 
     def apply(name: Label, ssn: Tax.SSN, contact: Contacts.Id, meta: Metas.Id): NaturalPerson =
       new NaturalPerson(name, ssn, contact, meta) {}
+
+    import refined.cats._
+
+    implicit lazy val naturalPersonEq: Eq[NaturalPerson]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val naturalPersonShow: Show[NaturalPerson] = { import auto.show._; semiauto.show }
   }
 
   /**
@@ -135,6 +140,11 @@ trait Person { module: ModuleTypes =>
 
     def apply(name: Label, ein: Tax.EIN, contact: Contacts.Id, meta: Metas.Id): LegalEntity =
       new LegalEntity(name, ein, contact, meta) {}
+
+    import refined.cats._
+
+    implicit lazy val legalEntityEq: Eq[LegalEntity]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val legalEntityShow: Show[LegalEntity] = { import auto.show._; semiauto.show }
   }
 
   /**

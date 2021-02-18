@@ -3,7 +3,7 @@ package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
 import model.pillars.keys.{ ISIN, USIN }
-import model.pillars.Metas
+import model.pillars.{ std, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -13,7 +13,11 @@ import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined }
 import refined.string.{ Url }
+import refined.numeric.Positive
 import refined.cats._
+
+import io.circe.{ Decoder, Encoder }
+import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
 
@@ -73,35 +77,11 @@ trait Paper { module: ModuleTypes with Person =>
     *
     * TODO: `Preamble`? `Exhibit`s? Other kinds of (linked or embedded) metadata?
     */
-  sealed abstract class Form extends Product with Serializable {
-
-    /** The `Contract` embedded within this `Form`.
-      */
-    def contract: Contract
-
-    /** The display name is the final case class name.
-      */
-    final def display: Label = {
-      val name: String = productPrefix
-      val Right(label) = refineV[IsLabel](name)
-      label
-    }
-  }
+  final type Form = Phorm
 
   /**
     */
-  object Form {
-
-    import io.circe.{ Decoder, Encoder }
-    import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
-
-    implicit lazy val formEq: Eq[Form]     = ??? // { import auto.eq._; semiauto.eq }
-    implicit lazy val formShow: Show[Form] = ??? // { import auto.show._; semiauto.show }
-    implicit lazy val formEncoder
-      : Encoder[Form] = ??? // { import io.circe.refined._; deriveEncoder }
-    implicit lazy val formDecoder
-      : Decoder[Form] = ??? // { import io.circe.refined._; deriveDecoder }
-  }
+  final lazy val Form = Phorm
 
   /**
     */
@@ -111,12 +91,140 @@ trait Paper { module: ModuleTypes with Person =>
 
     object Link {
 
-      def apply(link: Id): Link = new Link(link) {}
+      def apply(link: Id): Link =
+        new Link(link) {}
 
       implicit lazy val linkEq: Eq[Link]     = { import auto.eq._; semiauto.eq }
       implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }
     }
   }
+
+  /** Parameters common to multiple `Form`s.
+    */
+  sealed trait columns {
+
+    /** Tracks a (non-empty) set of `Instruments.Key`s
+      *
+      * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
+      */
+    sealed trait Tracker { self: Form =>
+      def members: Set[Instruments.Key]
+    }
+
+    /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
+    sealed trait Maturity { self: Form =>
+      def matures: ZonedDateTime
+    }
+
+    /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
+      * and expire on a certain day.
+      */
+    sealed trait Derivative extends Expiry with Strike {
+      def underlier: Instruments.Key
+    }
+
+    /** `Expiry` only applies to `Derivative`s.
+      */
+    sealed trait Expiry { self: Derivative =>
+      def expires: ZonedDateTime
+    }
+
+    /** `Strike`s only apply to `Derivative`s.
+      *
+      * TODO: {{{def logMoneynessStrike(strike: Quamtity, forward: Quamtity): Strike }}}
+      */
+    sealed trait Strike { self: Derivative =>
+      def strike: Quantity
+    }
+  }
+
+  /** Groups of related `Form`s.
+    */
+  sealed trait PrimaryCapital extends columns {
+
+    /**
+      */
+    sealed abstract case class CommonStock private (final val tclass: Option[Label]) extends Form
+
+    object CommonStock {
+
+      def apply(tclass: Option[Label]): CommonStock =
+        new CommonStock(tclass) {
+          final def contract: Contract =
+            contracts.zero
+        }
+
+      implicit lazy val cStkEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
+      implicit lazy val cStkShow: Show[CommonStock] = { import auto.show._; semiauto.show }
+
+      implicit lazy val cStkEncoder: Encoder[CommonStock] = {
+        import io.circe.refined._; deriveEncoder
+      }
+      implicit lazy val cStkDecoder: Decoder[CommonStock] = {
+        import io.circe.refined._; deriveDecoder
+      }
+    }
+
+    /**
+      */
+    case object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
+
+    // /**
+    //   */
+    // final case class PreferredStock(
+    //     series: Label,
+    //     preference: Quantity Refined Positive,
+    //     participating: Boolean,
+    //     dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
+    // ) extends Form {
+    //
+    //   /** FIXME: implement */
+    //   def contract: Contract = ???
+    // }
+    //
+    // /**
+    //   */
+    // case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
+    //
+    // /** Assume semiannual, Treasury-style coupons.
+    //   */
+    // final case class Bond(
+    //     coupon: Quantity, // per 100 face
+    //     issued: Instant,
+    //     matures: ZonedDateTime,
+    //     unpaidCoupons: List[ZonedDateTime], // soonest due first
+    //     paidCoupons: List[Instant] // most recent first
+    // ) extends Form
+    //     with Maturity {
+    //
+    //   /** FIXME: implement */
+    //   def contract: Contract = ???
+    // }
+    //
+    // /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
+    //   */
+    // case object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
+    //
+    // /**
+    //   */
+    // final case class Bill(
+    //     override val matures: ZonedDateTime
+    // ) extends Form
+    //     with Maturity {
+    //
+    //   import std.zeroCouponBond
+    //
+    //   /** A `Bill` is a kind of zero coupon bond. */
+    //   def contract: Contract =
+    //     zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
+    // }
+    //
+    // /** `Bills` are always issued by entities, never by natural persons.
+    //   */
+    // case object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
+  }
+
+  object layers extends PrimaryCapital
 
   /**
     */
@@ -155,126 +263,45 @@ trait Paper { module: ModuleTypes with Person =>
   /**
     */
   case object Novations extends ValueStores.VS[Novation]
+}
 
-  /** Parameters common to multiple `Form`s.
-    */
-  object columns {
+import refined.auto._
+sealed trait Phorm extends Product {
 
-    /** Tracks a (non-empty) set of `Instruments.Key`s
-      *
-      * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
-      */
-    sealed trait Tracker { self: Form =>
-      def members: Set[Instruments.Key]
-    }
-
-    /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
-    sealed trait Maturity { self: Form =>
-      def matures: ZonedDateTime
-    }
-
-    /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
-      * and expire on a certain day.
-      */
-    sealed trait Derivative extends Expiry with Strike { def underlier: Instruments.Key }
-
-    /** `Expiry` only applies to `Derivative`s.
-      */
-    sealed trait Expiry { self: Derivative =>
-      def expires: ZonedDateTime
-    }
-
-    /** `Strike`s only apply to `Derivative`s.
-      *
-      * TODO: {{{def logMoneynessStrike(strike: Quamtity, forward: Quamtity): Strike }}}
-      */
-    sealed trait Strike { self: Derivative =>
-      def strike: Quantity
-    }
-  }
-
-  final case class CommonStock(
-      tclass: Option[Label]
-  ) extends Form {
-
-    /** FIXME: implement */
-    def contract: Contract = ???
+  def contract: Contract
+  //
+  final def display: Label = {
+    val name: String = s"""$productPrefix::${contract.show}"""
+    val Right(label) = refineV[IsLabel](name)
+    label
   }
 }
-/** Groups of related `Form`s.
-  */
-// object PrimaryCapital {
-//
-//   import columns.Maturity
-//
+
+object Phorm {
+
+  implicit lazy val phormEq: Eq[Phorm]     = ??? // { import auto.eq._; semiauto.eq }
+  implicit lazy val phormShow: Show[Phorm] = ??? // { import auto.show._; semiauto.show }
+
+  implicit lazy val phormEncoder
+    : Encoder[Phorm] = ??? // { import io.circe.refined._; deriveEncoder }
+  implicit lazy val phormDecoder
+    : Decoder[Phorm] = ??? // { import io.circe.refined._; deriveDecoder }
+}
+
 /**
   */
-// final case class CommonStock(
-//     tclass: Option[Label]
-// ) extends Form {
-//
-//   /** FIXME: implement */
-//   def contract: Contract = ???
-// }
-//
-//   /**
-//     */
-//   case object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
-//
-//   /**
-//     */
-//   final case class PreferredStock(
-//       series: Label,
-//       preference: Double Refined Positive,
-//       participating: Boolean,
-//       dividend: Double Refined IsUnitInterval.`[0,1)` // ]
-//   ) extends Form {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
-//
-//   /** Assume semiannual, Treasury-style coupons.
-//     */
-//   final case class Bond(
-//       coupon: Double, // per 100 face
-//       issued: Instant,
-//       matures: ZonedDateTime,
-//       unpaidCoupons: List[ZonedDateTime], // soonest due first
-//       paidCoupons: List[Instant] // most recent first
-//   ) extends Form
-//       with Maturity {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
-//     */
-//   case object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
-//
-//   /**
-//     */
-//   final case class Bill(
-//       override val matures: ZonedDateTime
-//   ) extends Form
-//       with Maturity {
-//
-//     import std.zeroCouponBond
-//
-//     /** A `Bill` is a kind of zero coupon bond. */
-//     def contract: Contract =
-//       zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
-//   }
-//
-//   /** `Bills` are always issued by entities, never by natural persons.
-//     */
-//   case object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
-// }
+case object Phorms extends ValueStores.SADT[Phorm] {
+
+  sealed abstract case class Link private (form: Id)
+
+  object Link {
+
+    def apply(link: Id): Link = new Link(link) {}
+
+    implicit lazy val linkEq: Eq[Link]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }
+  }
+}
 
 // /** And by "vanilla" we mean an exchange traded derivative (ETD).
 //   */

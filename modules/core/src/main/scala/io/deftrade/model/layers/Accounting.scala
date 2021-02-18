@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 package io.deftrade
-package model
-package layers
+package model.layers
 
-import money.{ Currency, Financial }, keyval.DtEnum
+import money.{ Currency, Financial }
+import keyval.DtEnum
+import model.pillars.{ UnitPartition }
 
 import cats.implicits._
 

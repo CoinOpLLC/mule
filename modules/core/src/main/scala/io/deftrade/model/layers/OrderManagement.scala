@@ -15,11 +15,10 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import keyval._, time._, money._
-import model.pillars.{ Meta, Metas }
+import model.pillars.{ Meta, Metas, UnitPartition }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -36,7 +35,7 @@ import fs2.Stream
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
+trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketData =>
 
   /**
     */
@@ -156,7 +155,7 @@ trait OrderManagement { self: MarketData with Ledger with ModuleTypes =>
 
     /** Settlement updates the actual [[Folio]]s,
       * with [[Account]] specific (and this `Folio` specific)
-      * cash account [[capital.Instrument]]s substituted for the raw [[money.Currency]]
+      * cash account [[Paper#Instrument]]s substituted for the raw [[money.Currency]]
       * pseudo `Instrument` specified in the [[Order]] and enumerated within the [[Leg]]s
       * of the [[Trade]] specified in the [[Transaction]].
       *

@@ -1,6 +1,5 @@
 package io.deftrade
-package model
-package augments
+package model.augments
 
 import keyval.csv
 import csv.{ csvKVS, csvVS }
@@ -23,7 +22,9 @@ import cormorant.generic.semiauto._
 
 /** The batteries we include.
   */
-trait csvStores extends csv.implicits { self: ModuleTypes with Person with Paper with Ledger =>
+trait csvStores extends csv.implicits {
+
+  self: ModuleTypes with Person with Paper with Ledger with Accounts =>
 
   final val dataDir: String = """target/data"""
 

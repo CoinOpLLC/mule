@@ -15,8 +15,7 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import money._, keyval._, time._
 import refinements.{ Label }
@@ -43,7 +42,7 @@ import io.chrisdavenport.fuuid.FUUID
 
 /**
   */
-trait MarketData { self: ModuleTypes with Paper with Ledger =>
+trait MarketData { self: ModuleTypes with Person with Paper with Ledger =>
 
   /**
     */
@@ -308,7 +307,7 @@ trait MarketData { self: ModuleTypes with Paper with Ledger =>
     */
   type MIC = String Refined IsMIC // market venue
 
-  /** Public or private markets from which we obtain pricing information on [[capital.Instrument]]s.
+  /** Public or private markets from which we obtain pricing information on [[Paper#Instrument]]s.
     *
     * Note: "double entry bookkeeping" in the context of a shared [[Ledger]] with
     * multiple [[OrderManagement.OMS OMS gateways]] to externally traded `Instrument`s

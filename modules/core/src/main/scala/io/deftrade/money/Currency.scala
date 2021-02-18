@@ -58,15 +58,18 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
 
   /**
     */
-  final def numericCode: Int = jc.getNumericCode
+  final def numericCode: Int =
+    jc.getNumericCode
 
   /**
     */
-  final def displayName: String = jc.getDisplayName
+  final def displayName: String =
+    jc.getDisplayName
 
   /**
     */
-  final def symbol: String = jc.getSymbol
+  final def symbol: String =
+    jc.getSymbol
 
   /**
     */
@@ -77,18 +80,21 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     }
 
   /**
-    * pip: percentage in point https://en.wikipedia.org/wiki/Percentage_in_point
+    * `pip`: [[https://en.wikipedia.org/wiki/Percentage_in_point `p`ercentage `i`n `p`oint]]
     */
-  final def pip: BigDecimal = BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
+  final def pip: BigDecimal =
+    BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
 
   /**
     * Typically, two digits more than typical for a given currency but CHECK THE SOURCE k thx.
     */
-  final def pipScale: Int = defaultFractionDigits + 2
+  final def pipScale: Int =
+    defaultFractionDigits + 2
 
   /**
     */
-  def fractionDigits: Int = defaultFractionDigits
+  def fractionDigits: Int =
+    defaultFractionDigits
 
   /**
     */

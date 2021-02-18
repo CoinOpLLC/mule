@@ -2,7 +2,6 @@ package io.deftrade
 package contracts
 
 import money.Currency
-import model.capital.Instrument
 
 import cats.implicits._
 
@@ -16,7 +15,9 @@ sealed trait Numéraire
   */
 object Numéraire {
 
-  /** non-sealed extension point
+  /** Consideration which is fully fungible, highly frangible, and self-pricing.
+    *
+    * Non-sealed extension point.
     */
   trait InCoin extends Numéraire
 
@@ -32,19 +33,21 @@ object Numéraire {
     }
   }
 
-  /** non-sealed extension point
+  /** All other consideration. Non-sealed extension point.
     */
   trait InKind extends Numéraire
 
-  /**
+  /** Defined as ''whatever isn't `InCoin`''.
+    *
+    * Non fungability is achieved by default (`key`s are unique).
     */
   object InKind {
 
     /**
       */
     def unapply(n: Numéraire): Option[InKind] = n match {
-      case instrument @ Instrument(_, _, _) => instrument.some
-      case _                                => none
+      case InCoin(_)  => none
+      case ik: InKind => ik.some
     }
   }
 }
