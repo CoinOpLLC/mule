@@ -22,7 +22,7 @@ import model.pillars.{ UnitPartition }
 
 import cats.implicits._
 
-import enumeratum._
+import enumeratum.EnumEntry
 
 /**
   * Core accounting vocabulary.

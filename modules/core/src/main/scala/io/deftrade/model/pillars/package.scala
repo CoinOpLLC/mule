@@ -17,16 +17,6 @@
 package io.deftrade
 package model
 
-import model.layers._
-import model.augments._
-
-import cats.implicits._
-import cats.{ Applicative, Foldable, Order, SemigroupK }
-import cats.kernel.CommutativeGroup
-import cats.kernel.instances.MapMonoid
-import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.effect.{ ContextShift, IO }
-
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */

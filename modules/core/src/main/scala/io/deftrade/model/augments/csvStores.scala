@@ -24,7 +24,8 @@ import cormorant.generic.semiauto._
   */
 trait csvStores extends csv.implicits {
 
-  self: ModuleTypes with Person with Paper with Ledger with Accounts =>
+  // self: ModuleTypes with Person with Paper with Ledger with Accounts =>
+  self: ModuleTypes with Person with Paper with Ledger =>
 
   final val dataDir: String = """target/data"""
 
@@ -36,15 +37,15 @@ trait csvStores extends csv.implicits {
     ret
   }
 
-  lazy val people: People = {
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    val Right(ret) =
-      for {
-        parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
-        contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
-      } yield People(parties, contacts)
-    ret
-  }
+  // lazy val people: People = {
+  //   @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  //   val Right(ret) =
+  //     for {
+  //       parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
+  //       contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
+  //     } yield People(parties, contacts)
+  //   ret
+  // }
 
   lazy val papers: Papers = {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
@@ -70,11 +71,11 @@ trait csvStores extends csv.implicits {
     ls
   }
 
-  lazy val accounts = {
-    val Right(ret) = for {
-      accounts <- csvKVS[IO] at dataDir ofKeyChained Accounts
-      rosters  <- csvVS[IO] at dataDir ofChained Rosters
-    } yield (accounts, rosters)
-    ret
-  }
+  // lazy val accounts = {
+  //   val Right(ret) = for {
+  //     accounts <- csvKVS[IO] at dataDir ofKeyChained Accounts
+  //     rosters  <- csvVS[IO] at dataDir ofChained Rosters
+  //   } yield (accounts, rosters)
+  //   ret
+  // }
 }

@@ -16,60 +16,16 @@
 
 package io.deftrade
 
-import keyval.DtEnum
-import model.layers._
-import model.augments._
-
 import cats.implicits._
 import cats.{ Applicative, Foldable, Order, SemigroupK }
 import cats.kernel.CommutativeGroup
 import cats.kernel.instances.MapMonoid
 import cats.data.{ NonEmptyList, NonEmptyMap }
-import cats.effect.{ ContextShift, IO }
 
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
-package object model
-    extends ModuleTypes.Aux[
-      /* type IO[_]          = */ IO,
-      /* type MonetaryAmount = */ BigDecimal,
-      /* type Quantity       = */ Double
-    ]
-    //
-    // the full stack of layered capabilities
-    //
-    with Person
-    with Paper
-    with Ledger          // possibly distributed
-    with Accounting      // debits, credits, and all that
-    with Balances        // depends only on generic Accounting
-    with MarketData      // WIP; IBRK will be first integration
-    with OrderManagement // WIP; IBRK will be first integration
-    //
-    // PII firewalling simplified by eliminating dependencies:
-    // `Accounts` layer can be commented out!
-    //
-    with Accounts // binding of legal entities to sets of positions */
-    //
-    // necessary package level augmentation
-    //
-    with IRS1065 // replace or enhance as necessary
-    //
-    with csvStores { // replace or enhance as necessary
-
-  final lazy val Asset: DtEnum[Asset]        = ???
-  final lazy val Debt: DtEnum[Debt]          = ???
-  final lazy val Equity: DtEnum[Equity]      = ???
-  final lazy val Expense: DtEnum[Expense]    = ???
-  final lazy val Income: DtEnum[Income]      = ???
-  final lazy val Nettables: DtEnum[Nettable] = ???
-  final lazy val Reserve: DtEnum[Reserve]    = ???
-  final lazy val Revenue: DtEnum[Revenue]    = ???
-
-  /** FIXME
-    */
-  implicit protected lazy val X: ContextShift[IO] = ???
+package object model {
 
   /**
     */
