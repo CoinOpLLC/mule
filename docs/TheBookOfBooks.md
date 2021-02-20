@@ -19,14 +19,17 @@ In the spirit of **Domain Driven Design**, this document is meant to define a _u
 - Universal platform for all assets, real and virtual
   - Smart contracts for automated performance
   - "Dummy" contracts for legacy real world assets
-- composable `Contract` DSL and evaluation engines
+- algebraically composable `Contract`s
+  - creation `DSL`
+  - evaluation `Engine`s
   - public `Instrument`s embed standard `Contract`s
     - for e.g. publicly traded securities or a standard convertible note
   - private `Instrument`s embed custom `Contract`s
-  - `Form`s record the contract _state_ and its evolution over time
-  - `DSL`s for commercial time and money calculations
+  - `Form`s record the `Contract`s **_state_** and its _evolution over time_
+  - `DSL` includes commercial time and money calculation primitives
 - flexible `Ledger` data model
-  - chained cryptographic hashes as primary key types
+  - cryptographic hashes as primary key types
+  - simple (content-addressed `Set` index) or _chained_ (`List`)
 - `Account` management with privacy-first data model to protect PII
   - account and tax `Id`s are excluded from core `Ledger` data model
 - core `Accounting` balances and reporting
