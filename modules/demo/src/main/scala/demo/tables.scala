@@ -1,7 +1,7 @@
 package demo
 
 import io.deftrade._
-import syntax._, /* time._, money._, keyval._, */ model._, capital._
+import syntax._, /* time._, money._, keyval._, */ model._
 import cats.implicits._
 import cats.Eq
 import cats.effect.{ ContextShift, IO }

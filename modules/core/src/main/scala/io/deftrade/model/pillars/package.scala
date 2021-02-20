@@ -17,12 +17,17 @@
 package io.deftrade
 package model
 
-import cats.kernel.CommutativeGroup
-import cats.kernel.instances.MapMonoid
+/**
+  * Records and computations defining a layered set of financial domain models and services.
+  */
+package object pillars {
 
-final class MapCommutativeGroup[K, V: CommutativeGroup]
-    extends MapMonoid[K, V]
-    with CommutativeGroup[Map[K, V]] {
-  def inverse(a: Map[K, V]): Map[K, V] =
-    a.foldLeft(Map.empty[K, V]) { case (my, (k, x)) => my.updated(k, CommutativeGroup inverse x) }
+  /**
+    */
+  final type UnitPartition[K, N] = Partition[K, N, Partition.IsNormalized]
+
+  /**
+    */
+  final type ScaledPartition[K, N] = Partition[K, N, Partition.IsPositive]
+
 }

@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.deftrade
-package model
-package augments
+package model.augments
 
-import layers._
 import keyval.DtEnum
+
+import model.layers._
+import model.pillars._
 
 import cats.implicits._
 
 /**
   * IRS Form 1065 Schedule L ontology: partnerships and LLC's taxed as partnerships.
   */
-trait IRS1065 { self: ModuleTypes with Accounting =>
+trait IRS1065 {
+
+  self: ModuleTypes with Accounting =>
 
   /**
     */

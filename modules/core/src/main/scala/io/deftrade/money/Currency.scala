@@ -46,26 +46,30 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     Mny fiat amount
 
   /** Usage such as `USD fiat amount`. */
-  final def fiat[N: Financial](amount: N) = apply(amount)
+  final def fiat[N: Financial](amount: N) =
+    apply(amount)
 
   /** TODO: don't trust, ''test'' all codes in `java.currency` in order to justify this impl */
-  final def code: Currency.Code = {
+  final def code: CurrencyLike.Code = {
 
-    val Right(c) = refineV[Currency.IsCode](jc.getCurrencyCode)
+    val Right(c) = refineV[CurrencyLike.IsCode](jc.getCurrencyCode)
     c
   }
 
   /**
     */
-  final def numericCode: Int = jc.getNumericCode
+  final def numericCode: Int =
+    jc.getNumericCode
 
   /**
     */
-  final def displayName: String = jc.getDisplayName
+  final def displayName: String =
+    jc.getDisplayName
 
   /**
     */
-  final def symbol: String = jc.getSymbol
+  final def symbol: String =
+    jc.getSymbol
 
   /**
     */
@@ -76,18 +80,21 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
     }
 
   /**
-    * pip: percentage in point https://en.wikipedia.org/wiki/Percentage_in_point
+    * `pip`: [[https://en.wikipedia.org/wiki/Percentage_in_point `p`ercentage `i`n `p`oint]]
     */
-  final def pip: BigDecimal = BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
+  final def pip: BigDecimal =
+    BigDecimal(0L, scale = pipScale).ulp // ulp := unit of least precision
 
   /**
     * Typically, two digits more than typical for a given currency but CHECK THE SOURCE k thx.
     */
-  final def pipScale: Int = defaultFractionDigits + 2
+  final def pipScale: Int =
+    defaultFractionDigits + 2
 
   /**
     */
-  def fractionDigits: Int = defaultFractionDigits
+  def fractionDigits: Int =
+    defaultFractionDigits
 
   /**
     */
@@ -103,23 +110,9 @@ sealed trait CurrencyLike extends Numéraire.InCoin with EnumEntry with Serializ
 }
 
 /**
+  * Currently only the more common ISO 4217 currencies.
   */
-object CurrencyLike {
-
-  import refined.cats._
-
-  /**
-    */
-  implicit lazy val order: Order[CurrencyLike] = Order by { _.code }
-}
-
-/** `Aux` pattern in all but name. */
-sealed trait Currency[C] extends CurrencyLike { final type Type = C }
-
-/**
-  * Some of the more common ISO 4217 currencies.
-  */
-object Currency extends DtEnum[CurrencyLike] { self =>
+object CurrencyLike extends DtEnum[CurrencyLike] { self =>
 
   /**
     * Three letter codes: 26 ^ 3 = 17576
@@ -209,3 +202,7 @@ object Currency extends DtEnum[CurrencyLike] { self =>
     */
   val values = findValues
 }
+
+/**
+  */
+sealed trait Currency[C] extends CurrencyLike { final type Type = C }

@@ -208,22 +208,22 @@ What follows is a brief description of the `DSL` for contract specification, rep
    def unitOf(base: Numéraire): Contract
 
    /** Party acquires `c` multiplied by `n`. */
-   def scale(n: Observable[Double])(c: => Contract): Contract
+   def scale(n: Oracle[Double])(c: => Contract): Contract
 
    /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`. */
-   def branch(b: Observable[Boolean])(cT: => Contract)(cF: => Contract): Contract
+   def branch(b: Oracle[Boolean])(cT: => Contract)(cF: => Contract): Contract
 
    /** Party assumes role of counterparty with respect to `c`. */
    def give(c: => Contract): Contract = new Give(later(c)) {}
 
    /** Party will acquire c as soon as `b` is observed `true`.  */
-   def when(b: Observable[Boolean])(c: => Contract): Contract
+   def when(b: Oracle[Boolean])(c: => Contract): Contract
 
    /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
-   def until(b: Observable[Boolean])(c: => Contract): Contract
+   def until(b: Oracle[Boolean])(c: => Contract): Contract
 
    /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
-   def anytime(b: Observable[Boolean])(c: => Contract): Contract
+   def anytime(b: Oracle[Boolean])(c: => Contract): Contract
 
    /** Party immediately receives both `c1` and `c2`. */
    def both(c1: => Contract, c2: => Contract): Contract

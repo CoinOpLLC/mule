@@ -1,12 +1,9 @@
 package io.deftrade
-package model
-package capital
+package model.pillars
 
 import refinements.failsafe
 
 import cats.implicits._
-
-import shapeless.syntax.singleton._
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -21,8 +18,7 @@ object keys {
   /** An ISIN is a twelve character string that must match a certain regex, and whose characters
     * must pass a certain (Luhn) checksum.
     */
-  val MatchesRxIsin = """[A-Z]{2}[A-Z0-9]{9}[0-9]""".witness
-  type MatchesRxIsin = MatchesRegex[MatchesRxIsin.T]
+  type MatchesRxIsin = MatchesRegex["""[A-Z]{2}[A-Z0-9]{9}[0-9]"""] //"""
   type IsISIN        = MatchesRxIsin And CheckedIsin
   type ISIN          = String Refined IsISIN
 
@@ -155,8 +151,7 @@ object keys {
 
   /**
     */
-  val MatchesRxCusip = """[0-9]{3}[0-9A-Z]{3}[0-9]{3}""".witness
-  type MatchesRxCusip = MatchesRegex[MatchesRxCusip.T]
+  type MatchesRxCusip = MatchesRegex["""[0-9]{3}[0-9A-Z]{3}[0-9]{3}"""] //"""
   type IsCusip        = MatchesRxCusip And CheckedCusip
   type Cusip          = String Refined IsCusip
 
@@ -191,24 +186,21 @@ object keys {
   /** `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
     * `ConId`'s
     */
-  val MatchesRxIbrk = """\d{8}\d?""".witness // 8 or 9 char, all numbers (evidently)
-  type MatchesRxIbrk = MatchesRegex[MatchesRxIbrk.T]
+  type MatchesRxIbrk = MatchesRegex["""\d{8}\d?"""] // 8 or 9 numbers
   type IsIbrk        = MatchesRxIbrk
   type Ibrk          = String Refined IsIbrk
 
   /** `Unreg` identifiers represent unregistered securities, numbered by the firm.
     * TODO: revisit how these are defined.
     */
-  val MatchesRxUnreg = """\d{8}\d?""".witness
-  type MatchesRxUnreg = MatchesRegex[MatchesRxUnreg.T]
+  type MatchesRxUnreg = MatchesRegex["""\d{8,9}"""]
   type IsUnreg        = MatchesRxUnreg
   type Unreg          = String Refined IsUnreg
 
   /** `UsBan` identifiers represent bank account numbers in the US
     * TODO: Next up is IBAN
     */
-  val MatchesRxUsBan = """\d{8,10}""".witness
-  type MatchesRxUsBan = MatchesRegex[MatchesRxUsBan.T]
+  type MatchesRxUsBan = MatchesRegex["""\d{8,10}\"""]
   type IsUsBan        = MatchesRxUnreg // And CheckedUsBan
   type UsBan          = String Refined IsUsBan
 

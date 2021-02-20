@@ -25,7 +25,9 @@ import cats.data.{ NonEmptyList }
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 
-import shapeless.labelled._
+import shapeless.labelled.FieldType
+
+import io.circe.{ Decoder, Encoder }
 
 import scala.collection.immutable.SortedMap
 
@@ -39,7 +41,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
   /** The ''labeled'' type of the [[Key]] column.
     */
-  final type KeyField = FieldType[key.T, Key]
+  final type KeyField = FieldType[key.T, K]
 
   final type Row = (K, Option[V])
 
@@ -216,6 +218,53 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
   */
 final object KeyValueStores {
 
+  /**
+    */
+  abstract class Codec[K: Order, T, U](
+      f: Option[T] => NonEmptyList[Option[U]],
+      g: NonEmptyList[U] => T
+  )(
+      implicit final val IsV: U =:= U
+  ) extends KeyValueStores[K, U] {
+
+    final type Spec      = T
+    final type NelSpec   = NonEmptyList[T]
+    final type ValueSpec = U
+
+    final def toSpec(vs: NonEmptyList[ValueSpec]): Spec =
+      g(vs)
+
+    final def fromSpec(os: Option[Spec]): NonEmptyList[Option[ValueSpec]] =
+      f(os)
+
+    final def toNelSpec(spec: Spec): NelSpec =
+      NonEmptyList one spec
+
+    final def empty: Option[Spec] =
+      none
+
+    final implicit protected def nelSpecMonoid: Monoid[NelSpec] =
+      Monoid[NonEmptyList[Spec]]
+  }
+
+  /**
+    */
+  abstract class SimpleCodec[K: Order, T, U](
+      f: T => U,
+      g: U => T
+  ) extends KeyValueStores.Codec[K, T, U](
+        ot => ot.fold(NonEmptyList one none[U])(t => NonEmptyList one f(t).some),
+        us => g(us.head)
+      )
+
+  /**
+    */
+  abstract class SADT[K: Order, V: Encoder: Decoder]
+      extends KeyValueStores.SimpleCodec[K, V, keyval.SADT](
+        v => SADT from v,
+        u => { val Right(ret) = u.sadt.as[V]; ret }
+      )
+
   /** (Single, scalar) `Value`
     */
   abstract class KV[K: Order, V](
@@ -243,7 +292,7 @@ final object KeyValueStores {
       none
 
     final implicit protected def nelSpecMonoid: Monoid[NelSpec] =
-      Monoid[NonEmptyList[V]]
+      Monoid[NonEmptyList[Spec]]
   }
 
   /** Map of `K2`s and `V2`s

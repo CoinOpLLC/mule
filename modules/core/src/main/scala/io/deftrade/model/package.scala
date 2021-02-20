@@ -16,39 +16,16 @@
 
 package io.deftrade
 
-import model.layers._
-import model.augments._
-
 import cats.implicits._
 import cats.{ Applicative, Foldable, Order, SemigroupK }
-import cats.data.{ NonEmptyList, NonEmptyMap }
 import cats.kernel.CommutativeGroup
+import cats.kernel.instances.MapMonoid
+import cats.data.{ NonEmptyList, NonEmptyMap }
 
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
-package object model
-    extends ModuleTypes.Aux[
-      /* type MonetaryAmount = */ BigDecimal,
-      /* type Quantity       = */ Double
-    ]
-    //
-    // the full stack of layered capabilities
-    //
-    with Ledger          // possibly distributed
-    with Accounting      // debits, credits, and all that
-    with Balances        // depends only on generic Accounting
-    with MarketData      // WIP; IBRK will be first integration
-    with OrderManagement // WIP; IBRK will be first integration
-    //
-    // PII firewalling simplified by eliminating dependencies:
-    // `Accounts` layer can be commented out!
-    //
-    with Accounts // binding of legal entities to sets of positions */
-    //
-    // necessary package level augmentation
-    //
-    with IRS1065 { // replace or enhance as necessary
+package object model {
 
   /**
     */
@@ -122,20 +99,18 @@ package object model
       kvs: (K, V)*
   ): NonEmptyMap[K, V] =
     groupBy(kv, kvs: _*)(_._1) map (_ foldMap (_._2))
+}
 
-  implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
-    new MapCommutativeGroup[K, V]
+package model {
 
-///////////////////////////////////////////////////////////////////////////////////
+  object instances {
 
-  // object Accounts {`
-  //
-  //   val Right((accounts, rosters, contacts)) = for {
-  //     accounts <- keyValueStore[IO] at "accounts.csv" ofChained Account
-  //     rosters  <- keyValueStore[IO] at "rosters.csv" ofChained Roster
-  //     parties  <- keyValueStore[IO] at "parties.csv" ofChained Party
-  //     contacts <- valueStore[IO] at "contacts.csv" ofContentAddressed Contact
-  //   } yield (accounts, rosters, parties, contacts)
-  // }
-
+    implicit def catsFeralStdCommutativeGroup[K, V: CommutativeGroup]: CommutativeGroup[Map[K, V]] =
+      new MapMonoid[K, V] with CommutativeGroup[Map[K, V]] {
+        def inverse(a: Map[K, V]): Map[K, V] =
+          a.foldLeft(Map.empty[K, V]) {
+            case (my, (k, x)) => my.updated(k, CommutativeGroup inverse x)
+          }
+      }
+  }
 }

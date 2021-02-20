@@ -1,11 +1,11 @@
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import keyval._
+import model.pillars.UnitPartition
 
 import cats.implicits._
-import cats.{ Eq, Show }
+import cats.{ Eq, Order, Show }
 import cats.data.{ NonEmptyList, NonEmptySet }
 import cats.derived.{ auto, semiauto }
 
@@ -18,20 +18,14 @@ import io.chrisdavenport.fuuid.FUUID
 
 /** Models the relation of [[Party]]s to [[Folio]]s, including the definition of [[Role]]s.
   */
-trait Accounts { self: Ledger with ModuleTypes =>
-
-  /**
-    */
-  type IsAccountNo = Interval.Closed[100000100100108L, 999999999999999L]
+trait Accounts { self: ModuleTypes with Person with Ledger =>
 
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.
     */
-  sealed abstract case class Account(
-      roster: Rosters.Id,
-      open: Folios.Key,
-      escrowed: Folios.Key,
-      expected: Folios.Key
+  sealed abstract case class Account private (
+      final val roster: Rosters.Id,
+      final val positions: Portfolios.Id
   )
 
   /** Accounts are modelled as long lived entities that can evolve over time.
@@ -44,21 +38,23 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
     /**
       */
-    protected[deftrade] def apply(
-        roster: Rosters.Id,
-        open: Folios.Key,
-        escrowed: Folios.Key,
-        expected: Folios.Key
-    ): Account =
-      new Account(roster, open, escrowed, expected) {}
+    private type IsNo = Interval.Closed[100000100100108L, 999999999999999L]
 
     /**
       */
-    def fromRoster(roster: Rosters.Id): Account =
-      apply(roster, freshFolioKey, freshFolioKey, freshFolioKey)
+    type No = Long Refined IsNo
+
+    /**
+      */
+    protected[deftrade] def apply(
+        roster: Rosters.Id,
+        positions: Portfolios.Id
+    ): Account =
+      new Account(roster, positions) {}
 
     /** alt version FIXME: implement */
     def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
+      // freshFolioKey, freshFolioKey, freshFolioKey
       ???
 
     implicit def accountEq: Eq[Account]     = { import auto.eq._; semiauto.eq }
@@ -67,7 +63,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
 
   /**
     */
-  object Accounts extends KeyValueStores.KV[Long Refined IsAccountNo, Account]
+  case object Accounts extends KeyValueStores.KV[Account.No, Account]
 
   /** Each [[Account]] is created with a [[Roster]].
     */
@@ -111,10 +107,6 @@ trait Accounts { self: Ledger with ModuleTypes =>
         nonPrincipals = nps + (Role.Auditor -> (NonEmptySet one auditor))
       )
   }
-
-  /** TODO: revert this to a tuple.
-    */
-  case class RosterValue(party: Parties.Key, role: Role, stake: Option[Quantity])
 
   /** Creation patterns for account management teams.
     */
@@ -194,7 +186,16 @@ trait Accounts { self: Ledger with ModuleTypes =>
     implicit def show: Show[Roster] = { import auto.show._; semiauto.show }
   }
 
-  object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
+  /** TODO: revert this to a tuple.
+    */
+  case class RosterValue(party: Parties.Key, role: Role, stake: Option[Quantity])
+
+  object RosterValue {
+    implicit lazy val accountEq: Eq[RosterValue]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val accountShow: Show[RosterValue] = { import auto.show._; semiauto.show }
+  }
+
+  case object Rosters extends ValueStores.Codec[Roster, RosterValue](Roster.from, Roster.to)
 
   import keyval.DtEnum
 
@@ -223,15 +224,7 @@ trait Accounts { self: Ledger with ModuleTypes =>
       * That [[Party]] which is the market participant
       * responsible for establishing the [[layers.Accounts.Account]].
       */
-    case object Principal extends Principal {
-
-      /**
-        * A test for all `Role`s ''other than'' `Princple`.
-        */
-      def unapply(role: Role): Option[Principal] =
-        if (role === this) this.some else none
-    }
-
+    case object Principal extends Principal
     @inline final def principal: Role = Principal
 
     /**

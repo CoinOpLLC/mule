@@ -1,6 +1,5 @@
 package io.deftrade
-package model
-package capital
+package model.pillars
 
 import time._, money._, contracts._
 
@@ -10,7 +9,10 @@ import time._, money._, contracts._
 object std {
 
   import Financial.Ops
-  import Observable._
+  import Oracle._
+
+  def cash[N: Financial, C: Currency]: Contract =
+    one[C]
 
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](

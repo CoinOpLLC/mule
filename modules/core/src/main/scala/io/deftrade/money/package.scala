@@ -49,6 +49,8 @@ import cats.kernel.CommutativeGroup
   */
 package object money {
 
+  final val Currency = CurrencyLike
+
   /** TODO: This will break down in corner cases! Review how other projects handle this. */
   implicit def financialCommutativeGroup[MA: Financial]: CommutativeGroup[MA] =
     Financial[MA].commutativeGroup

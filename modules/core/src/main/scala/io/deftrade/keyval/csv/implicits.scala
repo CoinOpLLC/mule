@@ -1,12 +1,14 @@
 package io.deftrade
-package keyval
+package keyval.csv
 
+import keyval.SADT
 import money._
 
 import cats.implicits._
 import cats.data.NonEmptyList
 
-import io.circe.{ parser, Decoder, Encoder }
+// import io.circe.{ parser, Decoder, Encoder }
+import io.circe.{ parser, Json }
 
 import io.chrisdavenport.{ cormorant, fuuid }
 
@@ -15,22 +17,11 @@ import fuuid.FUUID
 import cormorant.implicits.stringPut
 import cormorant._
 
-protected trait CsvImplicits {
-
-  private[keyval] lazy val errorToFail: Error => Fail = Fail fromThrowable "csv failure"
+trait implicits {
 
   /**
     */
-  private[keyval] def printer: Printer = Printer.default
-
-  /**
-    */
-  private val toDecodeFailure: Throwable => Error.DecodeFailure =
-    fail => Error.DecodeFailure(NonEmptyList one fail.toString)
-
-  /**
-    */
-  implicit def fuuidGet: Get[FUUID] =
+  implicit lazy val fuuidGet: Get[FUUID] =
     new Get[FUUID] {
 
       /**
@@ -41,7 +32,7 @@ protected trait CsvImplicits {
 
   /**
     */
-  implicit def fuuidPut: Put[FUUID] =
+  implicit lazy val fuuidPut: Put[FUUID] =
     stringPut contramap (_.show)
 
   /**
@@ -65,8 +56,6 @@ protected trait CsvImplicits {
   implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
     new Get[N] {
 
-      /**
-        */
       def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
         N parse field.x leftMap toDecodeFailure
     }
@@ -78,24 +67,26 @@ protected trait CsvImplicits {
 
   /**
     */
-  implicit def sadtGet[T: Encoder: Decoder]: Get[SADT.Aux[T]] =
-    new Get[SADT.Aux[T]] {
+  implicit lazy val jsonGet: Get[Json] =
+    new Get[Json] {
 
-      /**
-        */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, SADT.Aux[T]] =
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Json] =
         for {
-          json <- parser.parse(field.x) leftMap toDecodeFailure
-        } yield SADT unsafeFrom json
+          json <- parser parse field.x leftMap toDecodeFailure
+        } yield json
     }
 
   /**
     */
-  implicit lazy val sadtPut: Put[SADT] =
-    stringPut contramap (_.canonicalString)
+  implicit lazy val jsonPut: Put[Json] =
+    stringPut contramap (SADT canonicalStringFor _)
 
+  /**
+    */
+  private val toDecodeFailure: Throwable => Error.DecodeFailure =
+    fail => Error.DecodeFailure(NonEmptyList one fail.toString)
 }
 
-/**
+/** You shouldn't need this.
   */
-object CsvImplicits extends CsvImplicits
+object implicits extends implicits

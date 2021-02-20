@@ -105,8 +105,9 @@ object ValueStores {
   abstract class Codec[T, U](
       f: T => NonEmptyList[U],
       g: NonEmptyList[U] => T
-  )(implicit final val IsV: U =:= U)
-      extends ValueStores[U] {
+  )(
+      implicit final val IsV: U =:= U
+  ) extends ValueStores[U] {
 
     final type Key2   = Nothing
     final type Value2 = T
@@ -121,6 +122,16 @@ object ValueStores {
       g(vs)
   }
 
+  /**
+    */
+  abstract class SimpleCodec[T, U](
+      f: T => U,
+      g: U => T
+  ) extends ValueStores.Codec[T, U](
+        t => NonEmptyList one f(t),
+        us => g(us.head)
+      )
+
   /** Serialized ADTs
     *
     *  `SADT` stores are content-addressed: entries are indexed with their own `sha`.
@@ -130,20 +141,15 @@ object ValueStores {
     *
     * Note this value is forgery resistant (up to the strength of the `sha`).
     */
-  abstract class SADT[V: Encoder: Decoder](
-      implicit
-      isV: V =:= V
-  ) extends ValueStores.Codec[V, keyval.SADT.Aux[V]](
-        v => NonEmptyList one (SADT from v),
-        nel => {
-          val Right(ret) = nel.head.decoded
-          ret
-        }
+  abstract class SADT[V: Encoder: Decoder]
+      extends ValueStores.SimpleCodec[V, keyval.SADT](
+        v => SADT from v,
+        u => { val Right(ret) = u.sadt.as[V]; ret }
       )
 
   /** Values
     */
-  abstract class V[V](
+  abstract class VS[V](
       implicit
       final val IsV: V =:= V
   ) extends ValueStores[V] {

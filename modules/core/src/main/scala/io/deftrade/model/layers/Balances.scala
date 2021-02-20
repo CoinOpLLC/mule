@@ -15,10 +15,9 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
-import syntax._, time._, money._, keyval._
+import syntax._, time._, money._, keyval._, model.instances._
 
 import cats.implicits._
 import cats.{ Invariant }
@@ -36,7 +35,7 @@ import refined.auto._
 
 /** Double entry [[Balance]] calculation from a [[fs2.Stream]] of [[Ledger.Transaction]]s.
   */
-trait Balances { self: Ledger with Accounting with ModuleTypes =>
+trait Balances { self: ModuleTypes with Ledger with Accounting =>
 
   import AccountingKey.syntax._
 
@@ -134,8 +133,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
         amount: Money[C]
     )(implicit C: Currency[C]): TrialBalance[C] =
       TrialBalance(
-        debits |+| (keys.debits priced -amount),
-        credits |+| (keys.credits priced amount)
+        debits |+| (keys.debits priced -amount).toSortedMap,
+        credits |+| (keys.credits priced amount).toSortedMap
       )
 
     /**
@@ -146,8 +145,14 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     )(implicit C: Currency[C]): TrialBalance[C] = {
       val am: AccountingMap[AccountingKey, C] = (SwapKey.accountMap(keys, amount)).widenKeys
       TrialBalance(
-        debits |+| (am collectKeys Debit.unapply),
-        credits |+| (am collectKeys Credit.unapply)
+        debits |+| (am collectKeys {
+          case d: Debit => d.some
+          case _        => none
+        }),
+        credits |+| (am collectKeys {
+          case c: Credit => c.some
+          case _         => none
+        })
       )
     }
 
@@ -206,7 +211,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     def revenues: Revenues[CurrencyTag]
   }
 
-  object IncomeStatement extends BalanceStores[IncomeStatement] {
+  case object IncomeStatement extends BalanceStores[IncomeStatement] {
 
     sealed abstract case class Aux[C] private[IncomeStatement] (
         final override val expenses: Expenses[C],
@@ -229,7 +234,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object CashFlowStatement extends BalanceStores[CashFlowStatement] {
+  case object CashFlowStatement extends BalanceStores[CashFlowStatement] {
 
     /**
       */
@@ -256,7 +261,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /**
     */
-  object BalanceSheet extends BalanceStores[BalanceSheet] {
+  case object BalanceSheet extends BalanceStores[BalanceSheet] {
 
     /**
       */
@@ -280,7 +285,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
 
   /** TODO: implement `Period` as a secondary index?
     */
-  object EquityStatement extends BalanceStores[EquityStatement] {
+  case object EquityStatement extends BalanceStores[EquityStatement] {
 
     sealed abstract case class Aux[C] private[EquityStatement] (
         override val debits: Debits[C],
@@ -347,7 +352,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     }
   }
 
-  object Reports extends KeyValueStores.KV[Folios.Key, Report]
+  case object Reports extends KeyValueStores.KV[Folios.Key, Report]
 
   /**
     */
@@ -390,7 +395,7 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Pipe[F, Transaction, CashReport] = ???
   }
 
-  object CashReports extends KeyValueStores.KV[Folios.Key, CashReport]
+  case object CashReports extends KeyValueStores.KV[Folios.Key, CashReport]
 
   /**
     */
@@ -447,8 +452,8 @@ trait Balances { self: Ledger with Accounting with ModuleTypes =>
     ): Stream[F, Transactions.Id] => F[AccrualReports.Id] =
       ???
   }
-}
 
-object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
-  // lazy val Key = Folios.Key
+  case object AccrualReports extends KeyValueStores.KV[Folios.Key, AccrualReport] {
+    // lazy val Key = Folios.Key
+  }
 }

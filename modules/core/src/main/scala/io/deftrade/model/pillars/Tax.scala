@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package io.deftrade
-package model
+package model.pillars
 
 import cats.implicits._
 
@@ -23,8 +23,6 @@ import refined.refineV
 import refined.api.{ Refined, Validate }
 import refined.boolean.{ And, Or }
 import refined.string.{ MatchesRegex }
-
-// import shapeless.syntax.singleton._
 
 /**
   */

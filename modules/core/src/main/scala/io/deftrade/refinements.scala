@@ -16,6 +16,8 @@
 
 package io.deftrade
 
+import shapeless.nat.{ _0, _1 }
+
 import cats.implicits._
 
 import eu.timepit.refined
@@ -28,9 +30,6 @@ import refined.api.{ Refined, Validate }
 import Interval.{ Closed => To }
 
 import scodec.bits.ByteVector
-
-// import shapeless.syntax.singleton._
-// import scala.language.existentials,
 
 /** A palette of domain specific refined types.
   */
@@ -148,7 +147,6 @@ object refinements {
   /**
     */
   object IsUnitInterval {
-    import _root_.shapeless.nat.{ _0, _1 }
     type `(0,1)` = Interval.Open[_0, _1]
     type `[0,1)` = Interval.ClosedOpen[_0, _1]
     type `(0,1]` = Interval.OpenClosed[_0, _1]

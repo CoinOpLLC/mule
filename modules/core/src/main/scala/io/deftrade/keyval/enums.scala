@@ -18,65 +18,56 @@ package io.deftrade
 package keyval
 
 import cats.implicits._
-import cats.Order
-import enumeratum.{ CatsEnum, Enum, EnumEntry }
+import cats.{ Hash, Order, Show }
+import enumeratum.{ Enum, EnumEntry }
 
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, Put }
 import cormorant.implicits.stringPut
 
-/** Mixin csv read and write capabilities per `Enum`[E] */
-trait CsvEnum[E <: EnumEntry] { self: Enum[E] =>
+import DtEnum.{ CSV, Cats }
 
-  import CsvEnum._
+/** The stacc'd enum type de maison.
+  */
+trait DtEnum[E <: EnumEntry] extends Enum[E] with Cats[E] with CSV[E]
 
-  /**
-    */
-  implicit lazy val get: Get[E] = enumGet(self)
+/** TODO: refactor such that Enums get less special treatment, which introduces dependencies.
+  */
+object DtEnum {
 
-  /**
-    */
-  implicit lazy val put: Put[E] = enumPut
-}
+  sealed trait Cats[E <: EnumEntry] { self: Enum[E] =>
 
-/** Integrates Enumeratum with Cormorant (CSV) */
-object CsvEnum {
+    private val name: E => String = _.entryName
 
-  /** Use these methods to create implicits per Enum. */
-  def enumGet[E <: EnumEntry](e: Enum[E]): Get[E] =
-    Get.tryOrMessage(
-      field => scala.util.Try(e withName field.x),
-      field => s"Failed to decode Enum: ${e.toString}: raw was `${field.toString}`"
+    /** `Hash` `Enum`s by `entryName`, consistent with universal `Eq`uals.
+      */
+    implicit final val enumHash: Hash[E] =
+      Hash by name
+
+    /** `Order` `Enum`s by `entryName`, consistent with universal `Eq`uals.
+      */
+    implicit final val enumOrder: Order[E] =
+      Order by name
+
+    /** `Show` `Enum`s by `entryName`, consistent with universal `Eq`uals.
+      */
+    implicit final val enumShow: Show[E] =
+      Show show name
+  }
+
+  sealed trait CSV[E <: EnumEntry] { self: Enum[E] with Cats[E] =>
+
+    /** `Get` an `Enum` `withName`.
+      */
+    implicit final lazy val enumGet: Get[E] =
+      Get tryOrMessage (
+        field => scala.util.Try(self withName field.x),
+        field => s"Failed to decode supposed Enum: `${self.toString}`: raw was `${field.toString}`"
     )
 
-  /**
-    */
-  def enumPut[E <: EnumEntry]: Put[E] = stringPut contramap (_.toString)
+    /** To `Put` is to `Show`.
+      */
+    implicit final lazy val enumPut: Put[E] =
+      Put[String] contramap (_.show)
+  }
 }
-
-/** Fully stacc'd enum type. */
-trait DtEnum[E <: EnumEntry] extends Enum[E] with CatsEnum[E] with CsvEnum[E] {
-
-  /**
-    * This is a hack to use `SortedSet`s etc
-    *
-    * TODO: reconsider... it is almost certainly wrong to do this, but why?
-    */
-  implicit val orderInstance: Order[E] = Order by (_.entryName)
-
-  /**
-    * TODO: is there a better alternative than an explicit downcast?
-    * Implementation relies on reasoning about set containment and downcast safety.
-    * Fragile at best.
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def unapply(key: EnumEntry): Option[E] =
-    if (values contains key) key.asInstanceOf[E].some else none
-
-  /**
-    */
-  def collect: PartialFunction[EnumEntry, E] = Function unlift unapply
-}
-
-/** namespace placeholder */
-object DtEnum

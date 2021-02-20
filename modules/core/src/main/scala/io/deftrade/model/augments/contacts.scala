@@ -14,24 +14,19 @@
  * limitations under the License.
  */
 package io.deftrade
-package model
+package model.augments
 
 import keyval._, refinements._
 
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semiauto }
-import cats.effect.Sync
 
 import eu.timepit.refined
 import refined.api.{ Refined }
 import refined.string.{ MatchesRegex, Url }
 
 import refined.cats._
-
-import io.circe.{ Decoder, Encoder }
-import io.circe.refined._
-import io.circe.generic.semiauto._
 
 /**
   */
@@ -41,25 +36,21 @@ sealed abstract case class Contact private (
     cell: Contact.USPhone,
     email: Contact.Email,
     url: Option[String Refined Url]
-) {
-
-  /** FIXME: `Accounts.contacts` dependency is unmapped */
-  def naturalPerson[F[_]: Sync](ssn: Tax.SSN): F[NaturalPerson] =
-    ???
-  // extract name from contact before persisting it
-
-  /** FIXME: `Accounts.contacts` dependency is unmapped */
-  def legalEntity[F[_]: Sync](ein: Tax.EIN): F[LegalEntity] =
-    // extract name from contact before persisting it
-    ???
-}
+)
 
 /**
   */
 object Contact {
 
+  import io.circe.{ Decoder, Encoder }
+  import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
+  // import io.circe.refined._
+
   implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semiauto.eq }
   implicit lazy val contactShow: Show[Contact] = { import auto.show._; semiauto.show }
+
+  implicit lazy val decoder: Decoder[Contact] = { import io.circe.refined._; deriveDecoder }
+  implicit lazy val encoder: Encoder[Contact] = { import io.circe.refined._; deriveEncoder }
 
   /**
     */
@@ -71,9 +62,6 @@ object Contact {
       url: Option[String Refined Url]
   ): Contact =
     new Contact(name, address, cell, email, url) {}
-
-  implicit lazy val decoder: Decoder[Contact] = deriveDecoder
-  implicit lazy val encoder: Encoder[Contact] = deriveEncoder
 
   /**
     */
@@ -90,8 +78,8 @@ object Contact {
     implicit lazy val nameEq: Eq[Name]     = semiauto.eq
     implicit lazy val nameShow: Show[Name] = semiauto.show
 
-    implicit lazy val decoder: Decoder[Name] = deriveDecoder
-    implicit lazy val encoder: Encoder[Name] = deriveEncoder
+    implicit lazy val decoder: Decoder[Name] = { import io.circe.refined._; deriveDecoder }
+    implicit lazy val encoder: Encoder[Name] = { import io.circe.refined._; deriveEncoder }
   }
 
   /**
@@ -111,8 +99,8 @@ object Contact {
     implicit lazy val usAddressEq: Eq[USAddress]     = semiauto.eq
     implicit lazy val usAddressShow: Show[USAddress] = semiauto.show
 
-    implicit lazy val decoder: Decoder[USAddress] = deriveDecoder
-    implicit lazy val encoder: Encoder[USAddress] = deriveEncoder
+    implicit lazy val decoder: Decoder[USAddress] = { import io.circe.refined._; deriveDecoder }
+    implicit lazy val encoder: Encoder[USAddress] = { import io.circe.refined._; deriveEncoder }
   }
 
   private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
@@ -152,4 +140,4 @@ object Contact {
 
 /**
   */
-object Contacts extends ValueStores.SADT[Contact]
+case object Contacts extends ValueStores.SADT[Contact]

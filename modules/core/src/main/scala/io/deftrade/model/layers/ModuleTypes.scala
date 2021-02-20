@@ -15,12 +15,12 @@
  */
 
 package io.deftrade
-package model
-package layers
+package model.layers
 
 import money.{ Financial, Mny }
 
 import cats.Show
+import cats.effect.{ ContextShift, Sync }
 
 /**
   * Module level abstract quantities and monetary amounts, which may be distinct types.
@@ -30,10 +30,22 @@ import cats.Show
   * are distinct types (e.g. [[scala.BigDecimal]] and [[scala.Double]], respectively.)
   *
   * Modules parameterized like this may create `Mny[MA, C] <=> (MI, Q)` codecs via a table of
-  * [[capital.Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
+  * [[Paper#Instrument]]s which function as stable, denominated currency (e.g. a bank account, or
   * a money market fund instrument.)
   */
 trait ModuleTypes {
+
+  /**
+    */
+  type IO[_]
+
+  /**
+    */
+  implicit protected val X: ContextShift[IO]
+
+  /**
+    */
+  implicit protected val Y: Sync[IO]
 
   /**
     */
@@ -70,19 +82,18 @@ object ModuleTypes {
 
   /**
     */
-  abstract class Aux[MA, Q]()(
-      implicit final protected val maFinancial: Financial[MA],
-      implicit final protected val qFinancial: Financial[Q],
-      implicit final protected val qShow: Show[Q],
-      implicit final protected val maShow: Show[MA]
-  ) extends ModuleTypes {
+  abstract class Aux[F[_], MA, Q]()(implicit
+                                    // final protected val X: ContextShift[F],
+                                    final protected val Y: Sync[F],
+                                    final protected val maFinancial: Financial[MA],
+                                    final protected val maShow: Show[MA],
+                                    final protected val qFinancial: Financial[Q],
+                                    final protected val qShow: Show[Q])
+      extends ModuleTypes {
 
-    /**
-      */
+    final type IO[x] = F[x]
+
     final type MonetaryAmount = MA
-
-    /**
-      */
-    final type Quantity = Q
+    final type Quantity       = Q
   }
 }

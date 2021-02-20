@@ -34,7 +34,7 @@ import java.security.MessageDigest
 /** Defines how to create a fresh '''globally unique''' key which
   * is suitable to be persisted.
   */
-sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
+sealed abstract case class NextId[K, V](final val next: (K, V) => K) {
 
   /**
     */
@@ -44,15 +44,15 @@ sealed abstract case class Fresh[K, V](final val next: (K, V) => K) {
 
 /**
   */
-object Fresh {
+object NextId {
 
   /**
     */
-  def apply[K, V](next: (K, V) => K): Fresh[K, V] = new Fresh(next) {}
+  def apply[K, V](next: (K, V) => K): NextId[K, V] = new NextId(next) {}
 
   /** Equivalent to `autoincrement` or `serial` from SQL.
     */
-  def zeroBasedIncr[K: Integral: Show, P]: Fresh[OpaqueKey[K, P], P] = {
+  def zeroBasedIncr[K: Integral: Show, P]: NextId[OpaqueKey[K, P], P] = {
 
     val K = Integral[K]; import K._
 
@@ -63,10 +63,10 @@ object Fresh {
 
   /** Simple content-addressed `Id` generation using secure hash (`SHA`)
     */
-  def shaContent[V: Show]: Fresh[SHA, V] = {
+  def shaContent[V: Show]: NextId[SHA, V] = {
     val md = MessageDigest getInstance SHA.Algo
 
-    new Fresh[SHA, V]((_, v) => {
+    new NextId[SHA, V]((_, v) => {
       md update (v.show getBytes "UTF-8")
       Refined unsafeApply ByteVector(md.digest).toBase58
     }) {}
@@ -78,11 +78,11 @@ object Fresh {
     * FIXME: the `Show` thing is just a hack; use scodec and CBOR
     * and pay attention to canonicalization
     */
-  def shaChain[V: Show]: Fresh[SHA, V] = {
+  def shaChain[V: Show]: NextId[SHA, V] = {
 
     val md = MessageDigest getInstance SHA.Algo
 
-    new Fresh[SHA, V]((j, v) => {
+    new NextId[SHA, V]((j, v) => {
       md update (SHA toByteVector j).toArray
       md update (v.show getBytes "UTF-8")
       Refined unsafeApply ByteVector(md.digest).toBase58

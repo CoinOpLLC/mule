@@ -1,34 +1,36 @@
 package io.deftrade
 package keyval
-
-import impl._
+package csv
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.effect.{ ContextShift, Sync }
 
 import shapeless.{ HList, LabelledGeneric, Lazy }
-// import shapeless.labelled._
 
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
 
+import fs2.Pipe
+
 import java.nio.file.{ Path, Paths }
 
-trait csvStoreDsl {
+trait dsl {
 
   /**
     */
-  def valueStore[F[_]: Sync: ContextShift] = VsOps[F]()
+  def csvVS[F[_]: Sync: ContextShift] = VsOps[F]()
 
   /**
     */
-  def keyValueStore[F[_]: Sync: ContextShift] = KvsOps[F]()
+  def csvKVS[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
-/** csvStoreDsl for value stores
+/** DSL for value stores
   */
-final case class VsOps[F[_]: Sync: ContextShift]() {
+final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
+
+  val (x, y) = (ContextShift[F], Sync[F])
 
   /** `at` clause
     */
@@ -53,14 +55,17 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
+          implicit val X = x
+          implicit val F = y
+
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            Fresh.shaContent[VS.Row]
+            NextId.shaContent[VS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
         }
       }
 
@@ -79,14 +84,17 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
+          implicit val X = x
+          implicit val F = y
+
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            Fresh.shaChain[VS.Row]
+            NextId.shaChain[VS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderV
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderV
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
         }
       }
   }
@@ -95,6 +103,8 @@ final case class VsOps[F[_]: Sync: ContextShift]() {
 /**
   */
 final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
+
+  val (x, y) = (ContextShift[F], Sync[F])
 
   /**
     */
@@ -119,14 +129,17 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
 
         new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
 
+          implicit val X = x
+          implicit val F = y
+
           def path: Path =
-            Paths get p
+            Paths get s"""${p}/${KVS.productPrefix}"""
 
-          final protected lazy val fresh: Fresh[KVS.Id, KVS.Row] =
-            Fresh.shaChain[KVS.Row]
+          final protected lazy val fresh: NextId[KVS.Id, KVS.Row] =
+            NextId.shaChain[KVS.Row]
 
-          final lazy val recordToCSV: Record PipeF String         = deriveCsvEncoderKv
-          final lazy val csvToRecord: String PipeF Result[Record] = deriveCsvDecoderKv
+          final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderKv
+          final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderKv
         }
       }
   }

@@ -1,10 +1,13 @@
 package io.deftrade
 package contracts
 
-import cats.{ Eval, Group }
+import money.Financial
+
+import cats.{ Eq, Eval, Group, Show }
+import Eval.later
 
 /**  This trait intentionally left blank. */
-sealed trait Contract
+sealed trait Contract extends Product
 
 /**
   * ADT definitions and constructors form the `Contract` specification DSL.
@@ -15,61 +18,105 @@ sealed trait Contract
   */
 object Contract {
 
+  implicit lazy val contractEq: Eq[Contract]     = Eq.fromUniversalEquals[Contract]
+  implicit lazy val contractShow: Show[Contract] = Show.show[Contract](_.toString)
+
   type LzCon = Eval[Contract]
-  import Eval.later
 
-  case object Zero                                                                extends Contract
-  sealed abstract case class One(n: Numéraire)                                    extends Contract
-  sealed abstract case class Scale(o: Observable[Double], c: LzCon)               extends Contract
-  sealed abstract case class Give(c: LzCon)                                       extends Contract
-  sealed abstract case class When(o: Observable[Boolean], c: LzCon)               extends Contract
-  sealed abstract case class Until(o: Observable[Boolean], c: LzCon)              extends Contract
-  sealed abstract case class Anytime(o: Observable[Boolean], c: LzCon)            extends Contract
-  sealed abstract case class Both(c1: LzCon, c2: LzCon)                           extends Contract
-  sealed abstract case class Pick(c1: LzCon, c2: LzCon)                           extends Contract
-  sealed abstract case class Branch(o: Observable[Boolean], cT: LzCon, cF: LzCon) extends Contract
+  case object Zero extends Contract
 
+  sealed abstract case class One private (n: Numéraire) extends Contract
+  object One { def apply(n: Numéraire): One = new One(n) {} }
+
+  sealed abstract case class Give private (c: LzCon) extends Contract
+  object Give { def apply(c: LzCon): Give = new Give(c) {} }
+
+  sealed abstract case class Scale[N: Financial] private (o: Oracle[N], c: LzCon) extends Contract
+  object Scale { def apply[N: Financial](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {} }
+
+  sealed abstract case class When private (o: Oracle[Boolean], c: LzCon) extends Contract
+  object When { def apply(o: Oracle[Boolean], c: LzCon): When = new When(o, c) {} }
+
+  sealed abstract case class Until private (o: Oracle[Boolean], c: LzCon) extends Contract
+  object Until { def apply(o: Oracle[Boolean], c: LzCon): Until = new Until(o, c) {} }
+
+  sealed abstract case class Anytime private (o: Oracle[Boolean], c: LzCon) extends Contract
+  object Anytime { def apply(o: Oracle[Boolean], c: LzCon): Anytime = new Anytime(o, c) {} }
+
+  sealed abstract case class Both private (cA: LzCon, cB: LzCon) extends Contract
+  object Both { def apply(cA: LzCon, cB: LzCon): Both = new Both(cA, cB) {} }
+
+  sealed abstract case class Pick private (cA: LzCon, cB: LzCon) extends Contract
+  object Pick { def apply(cA: LzCon, cB: LzCon): Pick = new Pick(cA, cB) {} }
+
+  sealed abstract case class Branch private (o: Oracle[Boolean], cT: LzCon, cF: LzCon)
+      extends Contract
+
+  object Branch {
+    def apply(o: Oracle[Boolean], cT: LzCon, cF: LzCon): Branch =
+      new Branch(o, cT, cF) {}
+  }
+
+  /** FIXME: Use `Group[Eval[Contract]]` instead!!!
+    */
   implicit lazy val contractGroup: Group[Contract] =
     new Group[Contract] {
       def empty: Contract                             = contracts.zero
-      def combine(x: Contract, y: Contract): Contract = contracts.both(x, y)
-      def inverse(a: Contract): Contract              = contracts give a
+      def combine(x: Contract, y: Contract): Contract = contracts.both(x)(y)
+      def inverse(a: Contract): Contract              = contracts.give(a)
     }
 
-  /** Tucked in here so `Contract` can stay `sealed` in source file. */
+  /** Tucked in here so `Contract` can stay `sealed` in source file.
+    */
   trait primitives {
 
-    /** Party immediately acquires one unit of `Numéraire` from counterparty. */
-    final def unitOf(base: Numéraire): Contract = new One(base) {}
+    /**
+      */
+    final def zero: Contract = Zero
 
-    /** Party acquires `c` multiplied by `n`. */
-    final def scale(n: Observable[Double])(c: => Contract): Contract = new Scale(n, later(c)) {}
+    /** Party immediately acquires one unit of `Numéraire` from counterparty.
+      */
+    final def unitOf(base: Numéraire): Contract =
+      One(base)
 
-    /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`. */
-    final def branch(b: Observable[Boolean])(
-        cT: => Contract
-    )(
-        cF: => Contract
-    ): Contract =
-      new Branch(b, later(cT), later(cF)) {}
+    /** Party assumes role of counterparty with respect to `c`.
+      */
+    final def give(c: => Contract): Contract =
+      Give(later(c))
 
-    /** Party assumes role of counterparty with respect to `c`. */
-    final def give(c: => Contract): Contract = new Give(later(c)) {}
+    /** Party acquires `c` multiplied by `n`.
+      */
+    final def scale[N: Financial](n: Oracle[N])(c: => Contract): Contract =
+      Scale(n, later(c))
 
-    /** Party will acquire c as soon as `b` is observed `true`.  */
-    final def when(b: Observable[Boolean])(c: => Contract): Contract = new When(b, later(c)) {}
+    /** Party will acquire c as soon as `b` is observed `true`.
+      */
+    final def when(b: Oracle[Boolean])(c: => Contract): Contract =
+      When(b, later(c))
 
-    /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`. */
-    final def until(b: Observable[Boolean], c: => Contract): Contract = new Until(b, later(c)) {}
+    /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`.
+      */
+    final def until(b: Oracle[Boolean])(c: => Contract): Contract =
+      Until(b, later(c))
 
-    /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true. */
-    final def anytime(b: Observable[Boolean])(c: => Contract): Contract =
-      new Anytime(b, later(c)) {}
+    /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true.
+      */
+    final def anytime(b: Oracle[Boolean])(c: => Contract): Contract =
+      Anytime(b, later(c))
 
-    /** Party immediately receives both `c1` and `c2`. */
-    final def both(c1: => Contract, c2: => Contract): Contract = new Both(later(c1), later(c2)) {}
+    /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`.
+      */
+    final def branch(b: Oracle[Boolean])(cT: => Contract)(cF: => Contract): Contract =
+      Branch(b, later(cT), later(cF))
 
-    /** Party immediately chooses between `c1` or `c2`. */
-    final def pick(c1: => Contract, c2: => Contract): Contract = new Pick(later(c1), later(c2)) {}
+    /** Party immediately receives both `cA` and `cB`.
+      */
+    final def both(cA: => Contract)(cB: => Contract): Contract =
+      Both(later(cA), later(cB))
+
+    /** Party immediately chooses between `cA` or `cB`.
+      */
+    final def pick(cA: => Contract)(cB: => Contract): Contract =
+      Pick(later(cA), later(cB))
   }
 }
