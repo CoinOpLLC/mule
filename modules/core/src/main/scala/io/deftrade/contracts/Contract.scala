@@ -70,7 +70,7 @@ object Contract {
     */
   trait primitives {
 
-    /**
+    /** Party acquires no rights or responsibilities.
       */
     final def zero: Contract = Zero
 
@@ -94,12 +94,13 @@ object Contract {
     final def when(b: Oracle[Boolean])(c: => Contract): Contract =
       When(b, later(c))
 
-    /** Party acquires `c` with the obligation to abandon it when `o` is observed `true`.
+    /** Party acquires `c` with the obligation to abandon it when `b` is observed `true`.
       */
     final def until(b: Oracle[Boolean])(c: => Contract): Contract =
       Until(b, later(c))
 
-    /** Once you acquire anytime obs c, you may acquire c at any time the observable obs is true.
+    /** Party acquires the right (but not the obligation)
+      * to acquire `c` at any time the oracle `b` is true.
       */
     final def anytime(b: Oracle[Boolean])(c: => Contract): Contract =
       Anytime(b, later(c))

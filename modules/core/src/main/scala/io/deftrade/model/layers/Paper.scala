@@ -2,8 +2,8 @@ package io.deftrade
 package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
-import model.pillars.keys.{ ISIN, USIN }
-import model.pillars.{ std, Metas }
+import model.slices.keys.{ ISIN, USIN }
+import model.slices.{ std, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -21,6 +21,8 @@ import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
 
+  /** `Store`s related to `Contract`s.
+    */
   final case class Papers(
       instruments: Instruments.KeyValueStore[IO],
       forms: Forms.ValueStore[IO],
@@ -28,6 +30,8 @@ trait Paper { module: ModuleTypes with Person =>
       novations: Novations.ValueStore[IO]
   )
 
+  /** `Store`s related to `Contract`s. TODO: something besides cake pattern please.
+    */
   val papers: Papers
 
   /** Models a tradeable thing.

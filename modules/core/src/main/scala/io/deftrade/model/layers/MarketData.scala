@@ -19,7 +19,7 @@ package model.layers
 
 import money._, keyval._, time._
 import refinements.{ Label }
-import model.pillars.{ Meta, Metas }
+import model.slices.{ Meta, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Monad, Order, Show }

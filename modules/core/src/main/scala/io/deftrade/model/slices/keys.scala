@@ -1,5 +1,5 @@
 package io.deftrade
-package model.pillars
+package model.slices
 
 import refinements.failsafe
 

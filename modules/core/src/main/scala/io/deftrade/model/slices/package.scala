@@ -20,7 +20,7 @@ package model
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
-package object pillars {
+package object slices {
 
   /**
     */

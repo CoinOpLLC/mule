@@ -15,7 +15,7 @@
  */
 
 package io.deftrade
-package model.pillars
+package model.slices
 
 import syntax._, money._, refinements.IsUnitInterval
 

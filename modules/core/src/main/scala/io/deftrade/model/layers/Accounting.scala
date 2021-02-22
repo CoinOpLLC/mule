@@ -18,7 +18,7 @@ package model.layers
 
 import money.{ Currency, Financial }
 import keyval.DtEnum
-import model.pillars.{ UnitPartition }
+import model.slices.{ UnitPartition }
 
 import cats.implicits._
 

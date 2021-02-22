@@ -19,7 +19,7 @@ package model.augments
 import keyval.DtEnum
 
 import model.layers._
-import model.pillars._
+import model.slices._
 
 import cats.implicits._
 

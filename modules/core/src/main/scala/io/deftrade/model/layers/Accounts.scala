@@ -2,7 +2,7 @@ package io.deftrade
 package model.layers
 
 import keyval._
-import model.pillars.UnitPartition
+import model.slices.UnitPartition
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
