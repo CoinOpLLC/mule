@@ -19,7 +19,9 @@ object std {
       maturity: Instant,
       face: Mny[N, C]
   ): Contract =
-    when(at(maturity)) { const(face.amount.to[Double]) * one }
+    when(at(maturity)) {
+      one * const(face.amount)
+    }
 
   /** */
   def europeanCall[N: Financial, C: Currency](

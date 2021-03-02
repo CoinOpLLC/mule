@@ -1,7 +1,8 @@
 package io.deftrade
 package contracts
 
-import money.Financial
+import spire.implicits._
+import spire.algebra.Field
 
 import cats.{ Eq, Eval, Group, Show }
 import Eval.later
@@ -31,8 +32,8 @@ object Contract {
   sealed abstract case class Give private (c: LzCon) extends Contract
   object Give { def apply(c: LzCon): Give = new Give(c) {} }
 
-  sealed abstract case class Scale[N: Financial] private (o: Oracle[N], c: LzCon) extends Contract
-  object Scale { def apply[N: Financial](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {} }
+  sealed abstract case class Scale[N: Field] private (o: Oracle[N], c: LzCon) extends Contract
+  object Scale { def apply[N: Field](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {} }
 
   sealed abstract case class When private (o: Oracle[Boolean], c: LzCon) extends Contract
   object When { def apply(o: Oracle[Boolean], c: LzCon): When = new When(o, c) {} }
@@ -72,7 +73,8 @@ object Contract {
 
     /** Party acquires no rights or responsibilities.
       */
-    final def zero: Contract = Zero
+    final def zero: Contract =
+      Zero
 
     /** Party immediately acquires one unit of `Numéraire` from counterparty.
       */
@@ -86,7 +88,7 @@ object Contract {
 
     /** Party acquires `c` multiplied by `n`.
       */
-    final def scale[N: Financial](n: Oracle[N])(c: => Contract): Contract =
+    final def scale[N: Field](n: Oracle[N])(c: => Contract): Contract =
       Scale(n, later(c))
 
     /** Party will acquire c as soon as `b` is observed `true`.
@@ -119,5 +121,29 @@ object Contract {
       */
     final def pick(cA: => Contract)(cB: => Contract): Contract =
       Pick(later(cA), later(cB))
+  }
+
+  implicit class ContractOps(val c: Contract) extends AnyVal {
+
+    def unary_- : Contract =
+      contracts.give(c)
+
+    def scaled[N: Field](n: Oracle[N]): Contract =
+      contracts.scale(n)(c)
+
+    def *[N: Field](n: Oracle[N]): Contract =
+      c scaled n
+
+    def when(b: Oracle[Boolean]): Contract =
+      contracts.when(b)(c)
+
+    def anytime(b: Oracle[Boolean]): Contract =
+      contracts.anytime(b)(c)
+
+    def until(b: Oracle[Boolean]): Contract =
+      contracts.until(b)(c)
+
+    def combine(c2: => Contract): Contract =
+      contracts.both(c)(c2)
   }
 }

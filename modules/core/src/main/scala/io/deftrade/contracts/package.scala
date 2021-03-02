@@ -42,10 +42,10 @@ package object contracts extends Contract.primitives {
   /**
     */
   def buy[N: Financial, C: Currency](c: => Contract, price: Money[N, C]): Contract =
-    both(c)(give { const(price.amount.to[Double]) * one })
+    c combine -one * const(price.amount)
 
   /**
     */
   def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
-    both(const(price.amount.to[Double]) * one)(give { c })
+    -c combine one * const(price.amount)
 }
