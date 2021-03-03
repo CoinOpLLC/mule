@@ -1,7 +1,7 @@
 package io.deftrade
 package contracts
 
-import syntax._, time._, money._
+import syntax._
 
 import cats.implicits._
 import cats.{ Order, Show }
@@ -10,6 +10,9 @@ import cats.evidence._
 import spire.math.Fractional
 import spire.algebra.Trig
 import spire.syntax.field._
+
+import java.time.{ Duration, Instant }
+import java.time.temporal.ChronoUnit.HOURS
 
 /** [[eval]] lives here. */
 sealed trait Engine {
@@ -62,9 +65,8 @@ object Engine {
       case Until(o, c)            => PR.absorb(Pricing eval o, eval(c.value))
       case One(n) =>
         n match {
-          case InCoin(Currency(c2)) => exch(c2)
-          case _: InCoin            => ???
-          case _: InKind            => ???
+          case InCoin(c2) => exch(c2)
+          case _          => ???
         }
     }
 
@@ -221,14 +223,18 @@ object Engine {
 
       /** */
       def at(ts: TimeSteps): DiscreteTime =
-        new DiscreteTime(ts) { def instant = t0 + timeStep * ts.toLong; def series = dts }
+        new DiscreteTime(ts) {
+          def instant = t0 plus (timeStep multipliedBy ts.toLong)
+          def series  = dts
+        }
     }
 
     /** */
     object DiscreteTimeSeries {
 
       /** not doing intra-day quanting... yet... */
-      val timeStep: Duration = 24.hours // one day
+      val timeStep: Duration =
+        Duration.of(24, HOURS) // one day
 
       /** */
       def apply(t0: Instant): DiscreteTimeSeries = new DiscreteTimeSeries(t0, timeStep) {}

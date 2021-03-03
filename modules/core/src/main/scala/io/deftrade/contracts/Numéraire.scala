@@ -1,8 +1,6 @@
 package io.deftrade
 package contracts
 
-import money.Currency
-
 import cats.implicits._
 
 /**
@@ -28,8 +26,8 @@ object Numéraire {
     /**
       */
     def unapply(n: Numéraire): Option[InCoin] = n match {
-      case Currency(c) => c.some
-      case _           => none
+      case c: InCoin => c.some
+      case _         => none
     }
   }
 
@@ -46,8 +44,8 @@ object Numéraire {
     /**
       */
     def unapply(n: Numéraire): Option[InKind] = n match {
-      case InCoin(_)  => none
-      case ik: InKind => ik.some
+      case k: InKind => k.some
+      case _         => none
     }
   }
 }

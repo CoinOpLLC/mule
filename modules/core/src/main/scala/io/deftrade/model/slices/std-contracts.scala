@@ -1,5 +1,5 @@
 package io.deftrade
-package model.pillars
+package model.slices
 
 import time._, money._, contracts._
 
@@ -12,14 +12,16 @@ object std {
   import Oracle._
 
   def cash[N: Financial, C: Currency]: Contract =
-    one[C]
+    one(Currency[C])
 
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](
       maturity: Instant,
       face: Mny[N, C]
   ): Contract =
-    when(at(maturity)) { const(face.amount.to[Double]) * one }
+    when(at(maturity)) {
+      one(Currency[C]) * const(face.amount)
+    }
 
   /** */
   def europeanCall[N: Financial, C: Currency](
@@ -27,7 +29,9 @@ object std {
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
-    when(at(expiry)) { optionally(buy(contract, strike)) }
+    when(at(expiry)) {
+      optionally(buy(contract, strike.amount, Currency[C]))
+    }
 
   /** */
   def americanCall[N: Financial, C: Currency](
@@ -35,5 +39,7 @@ object std {
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
-    anytime(before(expiry)) { optionally(buy(contract, strike)) }
+    anytime(before(expiry)) {
+      optionally(buy(contract, strike.amount, Currency[C]))
+    }
 }

@@ -2,8 +2,8 @@ package io.deftrade
 package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
-import model.pillars.keys.{ ISIN, USIN }
-import model.pillars.{ std, Metas }
+import model.slices.keys.{ ISIN, USIN }
+import model.slices.{ std, Metas }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -21,6 +21,8 @@ import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
 
+  /** `Store`s related to `Contract`s.
+    */
   final case class Papers(
       instruments: Instruments.KeyValueStore[IO],
       forms: Forms.ValueStore[IO],
@@ -28,6 +30,8 @@ trait Paper { module: ModuleTypes with Person =>
       novations: Novations.ValueStore[IO]
   )
 
+  /** `Store`s related to `Contract`s. TODO: something besides cake pattern please.
+    */
   val papers: Papers
 
   /** Models a tradeable thing.
@@ -69,19 +73,8 @@ trait Paper { module: ModuleTypes with Person =>
     */
   case object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
 
-  /** Represents [[contracts.Contract]] parameters and state.
-    *
-    * Instances of `Form` memorialize the state of a `Contract` at a given point in time.
-    *
-    * Embeds `Contract`s within `Instrument`s according to a uniform paramerter scheme.
-    *
-    * TODO: `Preamble`? `Exhibit`s? Other kinds of (linked or embedded) metadata?
-    */
-  final type Form = Phorm
-
-  /**
-    */
-  final lazy val Form = Phorm
+  final type Form = Foo
+  final lazy val Form = Foo
 
   /**
     */
@@ -265,8 +258,7 @@ trait Paper { module: ModuleTypes with Person =>
   case object Novations extends ValueStores.VS[Novation]
 }
 
-import refined.auto._
-sealed trait Phorm extends Product {
+sealed trait Foo extends Product {
 
   def contract: Contract
   //
@@ -277,32 +269,26 @@ sealed trait Phorm extends Product {
   }
 }
 
-object Phorm {
+object Foo {
 
-  implicit lazy val phormEq: Eq[Phorm]     = ??? // { import auto.eq._; semiauto.eq }
-  implicit lazy val phormShow: Show[Phorm] = ??? // { import auto.show._; semiauto.show }
+  implicit lazy val fooEq: Eq[Foo]     = { import auto.eq._; semiauto.eq }
+  implicit lazy val fooShow: Show[Foo] = { import auto.show._; semiauto.show }
 
-  implicit lazy val phormEncoder
-    : Encoder[Phorm] = ??? // { import io.circe.refined._; deriveEncoder }
-  implicit lazy val phormDecoder
-    : Decoder[Phorm] = ??? // { import io.circe.refined._; deriveDecoder }
+  implicit lazy val fooEncoder: Encoder[Foo] = { import io.circe.refined._; deriveEncoder }
+  implicit lazy val fooDecoder: Decoder[Foo] = { import io.circe.refined._; deriveDecoder }
 }
 
-/**
-  */
-case object Phorms extends ValueStores.SADT[Phorm] {
+sealed abstract case class Bar private (i: Int, s: String) extends Foo
 
-  sealed abstract case class Link private (form: Id)
+object Bar {
+  def apply(i: Int, s: String): Bar =
+    new Bar(i, s) { def contract = contracts.zero }
+  implicit lazy val barEq: Eq[Bar]     = { import auto.eq._; semiauto.eq }
+  implicit lazy val barShow: Show[Bar] = { import auto.show._; semiauto.show }
 
-  object Link {
-
-    def apply(link: Id): Link = new Link(link) {}
-
-    implicit lazy val linkEq: Eq[Link]     = { import auto.eq._; semiauto.eq }
-    implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }
-  }
+  implicit lazy val barEncoder: Encoder[Bar] = { deriveEncoder }
+  implicit lazy val barDecoder: Decoder[Bar] = { deriveDecoder }
 }
-
 // /** And by "vanilla" we mean an exchange traded derivative (ETD).
 //   */
 // object VanillaDerivatives {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package io.deftrade
-package model.pillars
+package model.slices
 
 import cats.implicits._
 

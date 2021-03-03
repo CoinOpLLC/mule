@@ -17,7 +17,7 @@ package io.deftrade
 package model.layers
 
 import keyval._, refinements._
-import model.pillars.{ Metas, Tax }
+import model.slices.{ Metas, Tax }
 
 import cats.implicits._
 import cats.{ Eq, Show }

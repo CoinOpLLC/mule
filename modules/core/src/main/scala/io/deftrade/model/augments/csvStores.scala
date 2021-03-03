@@ -4,7 +4,7 @@ package model.augments
 import keyval.csv
 import csv.{ csvKVS, csvVS }
 import model.layers._
-import model.pillars.Metas
+import model.slices.Metas
 
 import cats.implicits._
 // import cats.{ Order, Show }

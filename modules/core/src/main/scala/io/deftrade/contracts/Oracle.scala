@@ -1,10 +1,12 @@
 package io.deftrade
 package contracts
 
-import time._
+import spire.implicits._
+import spire.algebra.{ Bool, Field, NRoot, Order, Signed, Trig }
 
-import cats.implicits._
 import cats.{ Show }
+
+import java.time.Instant
 
 /**
   * `Oracle` values which affect [[Contract]] evaluation.
@@ -30,11 +32,9 @@ object Oracle {
   ) extends Oracle[A]
 
   object Branch {
-    def apply[A](
-        oB: Oracle[Boolean],
-        oT: Oracle[A],
-        oF: Oracle[A]
-    ): Branch[A] = new Branch(oB, oT, oF) {}
+
+    def apply[A](oB: Oracle[Boolean], oT: Oracle[A], oF: Oracle[A]): Branch[A] =
+      new Branch(oB, oT, oF) {}
   }
 
   sealed abstract case class Before private (t: Instant) extends Oracle[Boolean]
@@ -52,20 +52,17 @@ object Oracle {
   /**  */
   object Unary {
 
-    def apply[A](
-        op: Op[A],
-        o: Oracle[A]
-    ): Unary[A] = new Unary(op, o) {}
+    def apply[A](op: Op[A], o: Oracle[A]): Unary[A] =
+      new Unary(op, o) {}
 
     sealed abstract class Op[A](final val f: A => A)
 
-    case object Not extends Op[Boolean](!_)
-
-    case object Neg  extends Op[Double](-_)
-    case object Abs  extends Op[Double](math abs _)
-    case object Sqrt extends Op[Double](math sqrt _)
-    case object Exp  extends Op[Double](math exp _)
-    case object Log  extends Op[Double](math log _)
+    final case class Not[A: Bool]()   extends Op[A](x => Bool[A].xor(Bool[A].one, x))
+    final case class Neg[A: Field]()  extends Op[A](-_)
+    final case class Abs[A: Signed]() extends Op[A](Signed[A] abs _)
+    final case class Sqrt[A: NRoot]() extends Op[A](NRoot[A] sqrt _)
+    final case class Exp[A: Trig]()   extends Op[A](Trig[A] exp _)
+    final case class Log[A: Trig]()   extends Op[A](Trig[A] log _)
   }
 
   /**  */
@@ -86,23 +83,24 @@ object Oracle {
 
     sealed abstract class Op[A, B](final val f: (A, A) => B)
 
-    case object And  extends Op[Boolean, Boolean](_ & _)
-    case object Or   extends Op[Boolean, Boolean](_ | _)
-    case object Xnor extends Op[Boolean, Boolean](_ | _)
+    final case class And[A: Bool]()  extends Op[A, A](_ & _)
+    final case class Or[A: Bool]()   extends Op[A, A](_ | _)
+    final case class Xnor[A: Bool]() extends Op[A, A](_ | _)
 
-    case object Lt  extends Op[Double, Boolean](_ < _)
-    case object Lte extends Op[Double, Boolean](_ <= _)
-    case object Gt  extends Op[Double, Boolean](_ > _)
-    case object Gte extends Op[Double, Boolean](_ >= _)
-    case object Eq  extends Op[Double, Boolean](_ === _)
-    case object Neq extends Op[Double, Boolean](_ =!= _)
+    final case class Lt[A: Order]()  extends Op[A, Boolean](_ < _)
+    final case class Lte[A: Order]() extends Op[A, Boolean](_ <= _)
+    final case class Gt[A: Order]()  extends Op[A, Boolean](_ > _)
+    final case class Gte[A: Order]() extends Op[A, Boolean](_ >= _)
+    final case class Eq[A: Order]()  extends Op[A, Boolean](_ === _)
+    final case class Neq[A: Order]() extends Op[A, Boolean](_ =!= _)
 
-    case object Add extends Op[Double, Double](_ + _)
-    case object Sub extends Op[Double, Double](_ - _)
-    case object Mul extends Op[Double, Double](_ * _)
-    case object Div extends Op[Double, Double](_ / _)
-    case object Min extends Op[Double, Double](_ min _)
-    case object Max extends Op[Double, Double](_ max _)
+    final case class Min[A: Order]() extends Op[A, A](_ min _)
+    final case class Max[A: Order]() extends Op[A, A](_ max _)
+
+    final case class Add[A: Field]() extends Op[A, A](_ + _)
+    final case class Sub[A: Field]() extends Op[A, A](_ - _)
+    final case class Mul[A: Field]() extends Op[A, A](_ * _)
+    final case class Div[A: Field]() extends Op[A, A](_ / _)
   }
 
   import Unary._, Binary._
@@ -110,62 +108,64 @@ object Oracle {
   /** `const(x)` is an observable that has value x at any time. */
   def const[A](a: A): Oracle[A] = Const(a)
 
-  /** primitive */
   def before(t: Instant): Oracle[Boolean] = Before(t)
   def at(t: Instant): Oracle[Boolean]     = At(t)
 
-  def not(o: Oracle[Boolean]): Oracle[Boolean] = Unary(Not, o)
+  def not[A: Bool](o: Oracle[A]): Oracle[A] = Unary[A](Not(), o)
 
-  def abs(o: Oracle[Double]): Oracle[Double]  = Unary(Abs, o)
-  def sqrt(o: Oracle[Double]): Oracle[Double] = Unary(Sqrt, o)
-  def exp(o: Oracle[Double]): Oracle[Double]  = Unary(Exp, o)
-  def log(o: Oracle[Double]): Oracle[Double]  = Unary(Log, o)
+  def abs[A: Signed](o: Oracle[A]): Oracle[A] = Unary[A](Abs(), o)
 
-  /** derived */
+  def sqrt[A: NRoot](o: Oracle[A]): Oracle[A] = Unary[A](Sqrt(), o)
+
+  def exp[A: Trig](o: Oracle[A]): Oracle[A] = Unary[A](Exp(), o)
+  def log[A: Trig](o: Oracle[A]): Oracle[A] = Unary[A](Log(), o)
+
   def atOrAfter(t: Instant): Oracle[Boolean] = not(before(t))
 
-  /** */
   implicit class BooleanOps(val oL: Oracle[Boolean]) extends AnyVal {
-
-    def unary_! : Oracle[Boolean] = not(oL)
-
     def branch(cT: => Contract)(cF: => Contract): Contract = contracts.branch(oL)(cT)(cF)
 
     def branch[A](oT: => Oracle[A])(oF: => Oracle[A]): Oracle[A] = Branch(oL, oT, oF)
-
-    def and(oR: Oracle[Boolean]): Oracle[Boolean] = Binary(And, oL, oR)
-    def or(oR: Oracle[Boolean]): Oracle[Boolean]  = Binary(Or, oL, oR)
-    def ===(oR: Oracle[Boolean]): Oracle[Boolean] = Binary(Xnor, oL, oR)
   }
 
-  /** */
-  implicit class DoubleOps(val oL: Oracle[Double]) extends AnyVal {
+  implicit class BoolOps[A: Bool](oL: Oracle[A]) {
 
-    def *(c: => Contract): Contract = contracts.scale(oL)(c)
+    def unary_! : Oracle[A] = not(oL)
 
-    def unary_! : Oracle[Double] = Unary(Neg, oL)
+    def and(oR: Oracle[A]): Oracle[A] = Binary[A, A](And(), oL, oR)
+    def or(oR: Oracle[A]): Oracle[A]  = Binary[A, A](Or(), oL, oR)
+    def ===(oR: Oracle[A]): Oracle[A] = Binary[A, A](Xnor(), oL, oR)
+  }
 
-    def <(oR: Oracle[Double]): Oracle[Boolean]   = Binary(Lt, oL, oR)
-    def <=(oR: Oracle[Double]): Oracle[Boolean]  = Binary(Lte, oL, oR)
-    def >(oR: Oracle[Double]): Oracle[Boolean]   = Binary(Gt, oL, oR)
-    def >=(oR: Oracle[Double]): Oracle[Boolean]  = Binary(Gte, oL, oR)
-    def ===(oR: Oracle[Double]): Oracle[Boolean] = Binary(Eq, oL, oR)
-    def !==(oR: Oracle[Double]): Oracle[Boolean] = Binary(Neq, oL, oR)
+  implicit class OrderOps[A: Order](val oL: Oracle[A]) {
 
-    def +(oR: Oracle[Double]): Oracle[Double]   = Binary(Add, oL, oR)
-    def -(oR: Oracle[Double]): Oracle[Double]   = Binary(Sub, oL, oR)
-    def *(oR: Oracle[Double]): Oracle[Double]   = Binary(Mul, oL, oR)
-    def /(oR: Oracle[Double]): Oracle[Double]   = Binary(Div, oL, oR)
-    def min(oR: Oracle[Double]): Oracle[Double] = Binary(Min, oL, oR)
-    def max(oR: Oracle[Double]): Oracle[Double] = Binary(Max, oL, oR)
+    def <(oR: Oracle[A]): Oracle[Boolean]   = Binary[A, Boolean](Lt(), oL, oR)
+    def <=(oR: Oracle[A]): Oracle[Boolean]  = Binary[A, Boolean](Lte(), oL, oR)
+    def >(oR: Oracle[A]): Oracle[Boolean]   = Binary[A, Boolean](Gt(), oL, oR)
+    def >=(oR: Oracle[A]): Oracle[Boolean]  = Binary[A, Boolean](Gte(), oL, oR)
+    def ===(oR: Oracle[A]): Oracle[Boolean] = Binary[A, Boolean](Eq(), oL, oR)
+    def !==(oR: Oracle[A]): Oracle[Boolean] = Binary[A, Boolean](Neq(), oL, oR)
+
+    def min(oR: Oracle[A]): Oracle[A] = Binary[A, A](Min(), oL, oR)
+    def max(oR: Oracle[A]): Oracle[A] = Binary[A, A](Max(), oL, oR)
+  }
+
+  implicit class FieldOps[A: Field](val oL: Oracle[A]) {
+
+    def unary_- : Oracle[A] = Unary[A](Neg(), oL)
+
+    def +(oR: Oracle[A]): Oracle[A] = Binary[A, A](Add(), oL, oR)
+    def -(oR: Oracle[A]): Oracle[A] = Binary[A, A](Sub(), oL, oR)
+    def *(oR: Oracle[A]): Oracle[A] = Binary[A, A](Mul(), oL, oR)
+    def /(oR: Oracle[A]): Oracle[A] = Binary[A, A](Div(), oL, oR)
   }
 
   /** TODO: this needs pretty printing! */
   implicit def obsShow[A]: Show[Oracle[A]] = ???
 }
 
-/** Commonly seen observables. */
-object observables {
+/** Commonly seen oracles. */
+object oracles {
 
   /**
     *   Extremely useful and widely referenced benchmark.

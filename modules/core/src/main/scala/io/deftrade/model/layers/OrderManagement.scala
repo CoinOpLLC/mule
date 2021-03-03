@@ -18,7 +18,7 @@ package io.deftrade
 package model.layers
 
 import keyval._, time._, money._
-import model.pillars.{ Meta, Metas, UnitPartition }
+import model.slices.{ Meta, Metas, UnitPartition }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }

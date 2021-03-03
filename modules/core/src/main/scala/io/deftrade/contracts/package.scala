@@ -1,6 +1,6 @@
 package io.deftrade
 
-import money.{ Currency, Financial, Mny => Money }
+import spire.math.Fractional
 
 /**
   * Single import DSL for contract specification, representation and evaluation,
@@ -8,21 +8,20 @@ import money.{ Currency, Financial, Mny => Money }
   */
 package object contracts extends Contract.primitives {
 
-  import Financial.Ops
   import Oracle._
-  import Numéraire.InKind
+  import Numéraire._
 
   /** Party acquires one unit of [[money.Currency]].
     */
-  def one[C: Currency]: Contract =
-    unitOf(Currency[C])
+  def one(c: InCoin): Contract =
+    unitOf(c)
 
   /** Party acquires one unit of ''something'',
     * where that ''something'' (e.g. an [[model.Instrument instrument]])
     * is '''non-fungable'''.
     */
-  def one(i: InKind): Contract =
-    unitOf(i)
+  def one(k: InKind): Contract =
+    unitOf(k)
 
   /**
     */
@@ -41,11 +40,11 @@ package object contracts extends Contract.primitives {
 
   /**
     */
-  def buy[N: Financial, C: Currency](c: => Contract, price: Money[N, C]): Contract =
-    both(c)(give { const(price.amount.to[Double]) * one })
+  def buy[N: Fractional](c: => Contract, amount: N, coin: InCoin): Contract =
+    c combine -one(coin) * const(amount)
 
   /**
     */
-  def sell[N, C: Currency](c: Contract, price: Money[N, C])(implicit N: Financial[N]): Contract =
-    both(const(price.amount.to[Double]) * one)(give { c })
+  def sell[N: Fractional](c: => Contract, amount: N, coin: InCoin): Contract =
+    -c combine one(coin) * const(amount)
 }
