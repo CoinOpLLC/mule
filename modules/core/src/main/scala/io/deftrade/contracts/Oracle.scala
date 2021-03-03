@@ -1,12 +1,12 @@
 package io.deftrade
 package contracts
 
-import time._
-
 import spire.implicits._
 import spire.algebra.{ Bool, Field, NRoot, Order, Signed, Trig }
 
 import cats.{ Show }
+
+import java.time.Instant
 
 /**
   * `Oracle` values which affect [[Contract]] evaluation.

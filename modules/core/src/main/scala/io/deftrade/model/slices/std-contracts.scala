@@ -12,7 +12,7 @@ object std {
   import Oracle._
 
   def cash[N: Financial, C: Currency]: Contract =
-    one[C]
+    one(Currency[C])
 
   /**  */
   def zeroCouponBond[N: Financial, C: Currency](
@@ -20,7 +20,7 @@ object std {
       face: Mny[N, C]
   ): Contract =
     when(at(maturity)) {
-      one * const(face.amount)
+      one(Currency[C]) * const(face.amount)
     }
 
   /** */
@@ -29,7 +29,9 @@ object std {
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
-    when(at(expiry)) { optionally(buy(contract, strike)) }
+    when(at(expiry)) {
+      optionally(buy(contract, strike.amount, Currency[C]))
+    }
 
   /** */
   def americanCall[N: Financial, C: Currency](
@@ -37,5 +39,7 @@ object std {
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
-    anytime(before(expiry)) { optionally(buy(contract, strike)) }
+    anytime(before(expiry)) {
+      optionally(buy(contract, strike.amount, Currency[C]))
+    }
 }
