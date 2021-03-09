@@ -1,51 +1,35 @@
 package io.deftrade
 package contracts
 
-import cats.implicits._
-
 /**
   * In what do we price things?
   *
   */
-sealed trait Numéraire
+sealed trait Numéraire {
+
+  /** Each instance governed by an explicit [[Contract]].
+    */
+  def contract: Contract
+}
 
 /**
   */
 object Numéraire {
 
-  /** Consideration which is fully fungible, highly frangible, and self-pricing.
-    *
-    * Non-sealed extension point.
+  /** Non-sealed extension point for consideration which is
+    * fully fungible, highly frangible, and self-pricing.
     */
-  trait InCoin extends Numéraire
+  trait InCoin extends Numéraire { self =>
 
-  /**
-    */
-  object InCoin {
-
-    /**
+    /** As reified abstractions, all coins are immutably and identically governed.
       */
-    def unapply(n: Numéraire): Option[InCoin] = n match {
-      case c: InCoin => c.some
-      case _         => none
-    }
+    final def contract: Contract =
+      unitOf(self)
   }
 
-  /** All other consideration. Non-sealed extension point.
+  /** Non-sealed extension point for all other consideration: ''whatever isn't `InCoin`''.
+    *
+    * Governing contract must be specified by a sublcass.
     */
   trait InKind extends Numéraire
-
-  /** Defined as ''whatever isn't `InCoin`''.
-    *
-    * Non fungability is achieved by default (`key`s are unique).
-    */
-  object InKind {
-
-    /**
-      */
-    def unapply(n: Numéraire): Option[InKind] = n match {
-      case k: InKind => k.some
-      case _         => none
-    }
-  }
 }

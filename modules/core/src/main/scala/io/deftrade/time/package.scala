@@ -180,10 +180,10 @@ package object time extends time.api {
     def hours: Long   = d.toHours
     def days: Long    = d.toDays
 
-    def -(other: Duration): Duration = d minus other
     def +(other: Duration): Duration = d plus other
-    def /(divisor: Long): Duration   = d dividedBy divisor
+    def -(other: Duration): Duration = d minus other
     def *(scalar: Long): Duration    = d multipliedBy scalar
+    def /(divisor: Long): Duration   = d dividedBy divisor
 
     def toFiniteDuration: FiniteDuration =
       d.getNano match {
@@ -203,8 +203,8 @@ package object time extends time.api {
     def years: Int                = p.getYears
     def chronology: IsoChronology = p.getChronology
 
-    def -(other: TemporalAmount): Period = p minus other
     def +(other: TemporalAmount): Period = p plus other
+    def -(other: TemporalAmount): Period = p minus other
     def *(scalar: Int): Period           = p multipliedBy scalar
   }
 
@@ -213,8 +213,8 @@ package object time extends time.api {
   implicit class YearOps(val y: Year) extends AnyVal {
     def year: Int = y get ChronoField.YEAR
 
-    def -(amount: Period) = y minus amount
     def +(amount: Period) = y plus amount
+    def -(amount: Period) = y minus amount
   }
 
   /**

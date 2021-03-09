@@ -32,8 +32,16 @@ object Contract {
   sealed abstract case class Give private (c: LzCon) extends Contract
   object Give { def apply(c: LzCon): Give = new Give(c) {} }
 
-  sealed abstract case class Scale[N: Field] private (o: Oracle[N], c: LzCon) extends Contract
-  object Scale { def apply[N: Field](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {} }
+  sealed abstract case class Scale[N] private (
+      o: Oracle[N],
+      c: LzCon
+  )(
+      implicit val N: Field[N]
+  ) extends Contract
+
+  object Scale {
+    def apply[N: Field](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {}
+  }
 
   sealed abstract case class When private (o: Oracle[Boolean], c: LzCon) extends Contract
   object When { def apply(o: Oracle[Boolean], c: LzCon): When = new When(o, c) {} }
