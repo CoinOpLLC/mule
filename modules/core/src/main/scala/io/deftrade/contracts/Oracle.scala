@@ -110,7 +110,7 @@ object Oracle {
       oL: Oracle[A],
       oR: Oracle[A]
   ) extends Oracle[Boolean] {
-    final type ArgType = A
+    final type T = A
   }
 
   /**  */
@@ -124,7 +124,8 @@ object Oracle {
       new Predicate(op, oL, oR) {}
 
     sealed abstract class Op[A](final val p: (A, A) => Boolean) {
-      def apply(l: A, r: A): Boolean =
+      final type T = A
+      def apply(l: T, r: T): Boolean =
         p(l, r)
     }
 
@@ -137,15 +138,13 @@ object Oracle {
   }
 
   def eval[A](o: Oracle[A]): A = o match {
-    case Const(a)           => a
-    case Branch(b, oT, oF)  => if (eval(b)) eval(oT) else eval(oF)
-    case Before(t)          => now isBefore t
-    case At(t)              => (now isAfter t) && (now isBefore (t plusSeconds 60 * 60 * 24))
-    case Unary(op, o)       => op(eval(o))
-    case Binary(op, oL, oR) => op(eval(oL), eval(oR))
-
-    case pred @ Predicate(op, oL, oR) =>
-      op(eval[pred.ArgType](oL), eval[pred.ArgType](oR))
+    case Const(a)              => a
+    case Branch(b, oT, oF)     => if (eval(b)) eval(oT) else eval(oF)
+    case Before(t)             => now isBefore t
+    case At(t)                 => (now isAfter t) && (now isBefore (t plusSeconds 60 * 60 * 24))
+    case Unary(op, o)          => op(eval(o))
+    case Binary(op, oL, oR)    => op(eval(oL), eval(oR))
+    case Predicate(op, oL, oR) => op(eval[op.T](oL), eval[op.T](oR))
   }
 
   import Unary._, Binary._, Predicate._

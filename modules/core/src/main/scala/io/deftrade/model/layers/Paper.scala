@@ -51,9 +51,11 @@ trait Paper { module: ModuleTypes with Person =>
     def apply(
         symbol: Label,
         issuedBy: LegalEntities.Key,
-        issuedIn: Option[CurrencyLike]
+        issuedIn: Option[CurrencyLike],
     ): Instrument =
-      new Instrument(symbol, issuedBy, issuedIn) {}
+      new Instrument(symbol, issuedBy, issuedIn) { self =>
+        final def contract: Contract = contracts unitOf self
+      }
 
     /**
       */
@@ -72,9 +74,6 @@ trait Paper { module: ModuleTypes with Person =>
   /**
     */
   case object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
-
-  final type Form = Foo
-  final lazy val Form = Foo
 
   /**
     */
@@ -258,31 +257,31 @@ trait Paper { module: ModuleTypes with Person =>
   case object Novations extends ValueStores.VS[Novation]
 }
 
-sealed trait Foo extends Product {
+sealed trait Form extends Product {
 
-  def contract: Contract
+  // def contract: Contract
   //
   final def display: Label = {
-    val name: String = s"""$productPrefix::${contract.show}"""
+    val name: String = s"Form::$productPrefix"
     val Right(label) = refineV[IsLabel](name)
     label
   }
 }
 
-object Foo {
+object Form {
 
-  implicit lazy val fooEq: Eq[Foo]     = { import auto.eq._; semiauto.eq }
-  implicit lazy val fooShow: Show[Foo] = { import auto.show._; semiauto.show }
+  implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
+  implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
 
-  implicit lazy val fooEncoder: Encoder[Foo] = { import io.circe.refined._; deriveEncoder }
-  implicit lazy val fooDecoder: Decoder[Foo] = { import io.circe.refined._; deriveDecoder }
+  implicit lazy val formEncoder: Encoder[Form] = { deriveEncoder }
+  implicit lazy val formDecoder: Decoder[Form] = { deriveDecoder }
 }
 
-sealed abstract case class Bar private (i: Int, s: String) extends Foo
+sealed abstract case class Bar private (i: Int, s: String) extends Form
 
 object Bar {
   def apply(i: Int, s: String): Bar =
-    new Bar(i, s) { def contract = contracts.zero }
+    new Bar(i, s) {}
   implicit lazy val barEq: Eq[Bar]     = { import auto.eq._; semiauto.eq }
   implicit lazy val barShow: Show[Bar] = { import auto.show._; semiauto.show }
 

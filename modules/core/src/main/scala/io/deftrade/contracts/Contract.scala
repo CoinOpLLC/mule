@@ -1,7 +1,7 @@
 package io.deftrade
 package contracts
 
-import spire.implicits._
+// import spire.implicits._
 import spire.algebra.Field
 
 import cats.{ Eq, Eval, Group, Show }
@@ -37,7 +37,9 @@ object Contract {
       c: LzCon
   )(
       implicit val N: Field[N]
-  ) extends Contract
+  ) extends Contract {
+    final type T = N
+  }
 
   object Scale {
     def apply[N: Field](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {}

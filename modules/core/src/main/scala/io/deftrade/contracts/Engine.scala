@@ -35,7 +35,8 @@ object Engine {}
   * TODO: refine this model
   * TODO: expand to other models
   */
-sealed abstract case class Pricing[N: Fractional, C](
+sealed abstract case class Pricing[N: Fractional](
+    coin: Numéraire.InCoin,
     t0: Instant,
     rateModel: Pricing.PR[N]
 ) extends Engine {
@@ -53,11 +54,12 @@ sealed abstract case class Pricing[N: Fractional, C](
     * process which represents the distribution of possible `Contract` values a given
     * number of [[Pricing.TimeSteps]] from [[t0]].
     */
-  @SuppressWarnings(Array("org.wartremover.warts.Any", "org.wartremover.warts.AsInstanceOf"))
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   final def eval: Contract => PR[N] = {
-    case Zero              => PR.bigK(Fractional[N].one)
-    case Give(c)           => -eval(c.value)
-    case Scale(o, c)       => (Pricing eval o).asInstanceOf[PR[N]] * eval(c.value)
+    case Zero    => PR.bigK(Fractional[N].zero)
+    case Give(c) => -eval(c.value)
+    case s @ Scale(o, c) if s.N == Fractional[N] =>
+      (Pricing eval [s.T] o).asInstanceOf[PR[N]] * eval(c.value)
     case Both(cA, cB)      => eval(cA.value) + eval(cB.value)
     case Pick(cA, cB)      => eval(cA.value) max eval(cB.value)
     case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
@@ -66,8 +68,9 @@ sealed abstract case class Pricing[N: Fractional, C](
     case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
     case One(n) =>
       n match {
-        case c2: InCoin => exch(c2)
-        case k2: InKind => k2 |> discardValue; ???
+        case c: InCoin if coin == c => PR.bigK(Fractional[N].one)
+        case c2: InCoin             => exch(c2)
+        case k: InKind              => exch(k)
       }
   }
 
@@ -497,11 +500,11 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
       }
   }
 
-  def deliver(amount: N, coin: InCoin): Return = ???
-  def receive(amount: N, coin: InCoin): Return = ???
-
-  def deliver(contract: Contract): Return = ???
-  def receive(contract: Contract): Return = ???
+  def withdraw(amount: N, coin: InCoin): Return = ???
+  def transfer(amount: N, coin: InCoin): Return = ???
+  def deposit(amount: N, coin: InCoin): Return  = ???
+  def deliver(amount: N, kind: InKind): Return  = ???
+  def receive(amount: N, kind: InKind): Return  = ???
 }
 
 /** placeholder
