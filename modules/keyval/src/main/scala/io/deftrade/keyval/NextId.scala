@@ -20,8 +20,6 @@ package keyval
 import cats.implicits._
 import cats.Show
 
-import refinements.{ SHA }
-
 import spire.math.Integral
 import spire.syntax.field._
 

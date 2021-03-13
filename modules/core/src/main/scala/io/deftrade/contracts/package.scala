@@ -17,7 +17,7 @@ package object contracts extends Contract.primitives {
     unitOf(c)
 
   /** Party acquires one unit of ''something'',
-    * where that ''something'' (e.g. an [[model.Instrument instrument]])
+    * where that ''something'' (e.g. an [[model.std.Instrument instrument]])
     * is '''non-fungable'''.
     */
   def one(k: InKind): Contract =

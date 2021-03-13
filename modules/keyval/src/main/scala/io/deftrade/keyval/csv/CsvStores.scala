@@ -18,7 +18,7 @@ package io.deftrade
 package keyval
 package csv
 
-import syntax._
+// import syntax._
 
 import cats.implicits._
 import cats.data.{ NonEmptyList }
@@ -264,6 +264,11 @@ sealed protected trait MemFile[F[_], V] {
     } through
       text.utf8Decode through
       text.lines
+
+  val discardValue: Any => Unit = (_: Any) => ()
+  implicit final class PipeToFunction1[A](val a: A) {
+    def |>[B](f: A => B): B = f(a)
+  }
 
   /**
     */

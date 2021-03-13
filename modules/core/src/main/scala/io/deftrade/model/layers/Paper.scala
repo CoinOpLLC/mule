@@ -3,7 +3,7 @@ package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
 import model.slices.keys.{ ISIN, USIN }
-import model.slices.{ std, Metas }
+import model.slices.{ Metas }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -13,7 +13,6 @@ import eu.timepit.refined
 import refined.refineV
 import refined.api.{ Refined }
 import refined.string.{ Url }
-import refined.numeric.Positive
 import refined.cats._
 
 import io.circe.{ Decoder, Encoder }
@@ -95,6 +94,12 @@ trait Paper { module: ModuleTypes with Person =>
     */
   sealed trait columns {
 
+    /** Preference class of the shares represented by this `Instrument`.
+      */
+    sealed trait Preference { self: Form =>
+      def tclass: Option[Label]
+    }
+
     /** Tracks a (non-empty) set of `Instruments.Key`s
       *
       * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
@@ -136,62 +141,91 @@ trait Paper { module: ModuleTypes with Person =>
 
     /**
       */
-    sealed abstract case class CommonStock private (final val tclass: Option[Label]) extends Form
+    sealed abstract case class CommonStock private (final val tclass: Option[Label])
+        extends Form
+        with Preference
 
     object CommonStock {
 
-      def apply(tclass: Option[Label]): CommonStock =
-        new CommonStock(tclass) {
-          final def contract: Contract =
-            contracts.zero
-        }
+      import io.circe.refined._
+
+      private[deftrade] def apply(tclass: Option[Label]): CommonStock =
+        new CommonStock(tclass) {}
 
       implicit lazy val cStkEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
       implicit lazy val cStkShow: Show[CommonStock] = { import auto.show._; semiauto.show }
 
-      implicit lazy val cStkEncoder: Encoder[CommonStock] = {
-        import io.circe.refined._; deriveEncoder
-      }
-      implicit lazy val cStkDecoder: Decoder[CommonStock] = {
-        import io.circe.refined._; deriveDecoder
-      }
+      implicit lazy val cStkEncoder: Encoder[CommonStock] = { deriveEncoder }
+      implicit lazy val cStkDecoder: Decoder[CommonStock] = { deriveDecoder }
     }
 
     /**
       */
     case object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
 
-    // /**
-    //   */
+    /**
+      */
     // final case class PreferredStock(
     //     series: Label,
     //     preference: Quantity Refined Positive,
     //     participating: Boolean,
     //     dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
-    // ) extends Form {
-    //
-    //   /** FIXME: implement */
-    //   def contract: Contract = ???
-    // }
-    //
-    // /**
-    //   */
-    // case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
-    //
-    // /** Assume semiannual, Treasury-style coupons.
-    //   */
-    // final case class Bond(
-    //     coupon: Quantity, // per 100 face
-    //     issued: Instant,
-    //     matures: ZonedDateTime,
-    //     unpaidCoupons: List[ZonedDateTime], // soonest due first
-    //     paidCoupons: List[Instant] // most recent first
     // ) extends Form
-    //     with Maturity {
-    //
-    //   /** FIXME: implement */
-    //   def contract: Contract = ???
+    //     with Preference {
+    //   final def tclass: Option[Label] =
+    //     series.some
     // }
+
+    sealed abstract case class PreferredStock(
+        final val tclass: Option[Label],
+        // final val preference: Quantity Refined Positive,
+        final val participating: Boolean,
+        // final val dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
+    ) extends Form
+        with Preference
+
+    object PreferredStock {
+
+      import io.circe.refined._
+
+      private[deftrade] def apply(
+          tclass: Option[Label],
+          // preference: Quantity Refined Positive,
+          participating: Boolean,
+          // dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
+      ): PreferredStock =
+        new PreferredStock(
+          tclass,
+          // preference,
+          participating,
+          // dividend
+        ) {}
+
+      implicit lazy val pfStkEq: Eq[PreferredStock]     = { import auto.eq._; semiauto.eq }
+      implicit lazy val pfStkShow: Show[PreferredStock] = { import auto.show._; semiauto.show }
+
+      implicit lazy val pfStkEncoder: Encoder[PreferredStock] = { deriveEncoder }
+      implicit lazy val pfStkDecoder: Decoder[PreferredStock] = { deriveDecoder }
+    }
+
+    /**
+      */
+    case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
+
+    /** Assume semiannual, Treasury-style coupons.
+      */
+    final case class Bond(
+        coupon: Quantity, // per 100 face
+        issued: Instant,
+        matures: ZonedDateTime,
+        unpaidCoupons: List[ZonedDateTime], // soonest due first
+        paidCoupons: List[Instant] // most recent first
+    ) extends Form
+        with Maturity {
+
+      /** FIXME: implement */
+      def contract: Contract = ???
+    }
     //
     // /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
     //   */

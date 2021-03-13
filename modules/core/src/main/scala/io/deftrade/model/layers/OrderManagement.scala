@@ -18,7 +18,7 @@ package io.deftrade
 package model.layers
 
 import keyval._, time._, money._
-import model.slices.{ Meta, Metas, UnitPartition }
+import model.slices.{ Metas, UnitPartition }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -112,7 +112,7 @@ trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketDat
       */
     case object Orders extends KeyValueStores.KV[Long OpaqueKey Order, Order]
 
-    /** What actually happened to the [[Order]] at the [[Market]].
+    /** What actually happened to the [[OMS.Order order]] at the [[model.std.Market]].
       *
       * FIXME: canceled order signals are TBD.
       */

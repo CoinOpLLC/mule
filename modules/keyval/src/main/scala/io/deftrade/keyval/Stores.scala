@@ -17,8 +17,6 @@
 package io.deftrade
 package keyval
 
-import refinements.{ IsSHA, SHA }
-
 import cats.implicits._
 import cats.effect.{ ContextShift, Sync }
 

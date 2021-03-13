@@ -2,7 +2,7 @@ package io.deftrade
 package keyval.csv
 
 import keyval.SADT
-import money._
+// import money._
 
 import cats.implicits._
 import cats.data.NonEmptyList
@@ -37,36 +37,6 @@ trait implicits {
 
   /**
     */
-  implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
-    new Get[Mny[N, C]] {
-
-      /**
-        */
-      def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
-        Mny parse field.x leftMap toDecodeFailure
-    }
-
-  /**
-    */
-  implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
-    stringPut contramap Mny.format[N, C]
-
-  /**
-    */
-  implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
-    new Get[N] {
-
-      def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
-        N parse field.x leftMap toDecodeFailure
-    }
-
-  /**
-    */
-  implicit def financialPut[N: Financial]: Put[N] =
-    stringPut contramap (Financial[N] toString _)
-
-  /**
-    */
   implicit lazy val jsonGet: Get[Json] =
     new Get[Json] {
 
@@ -83,7 +53,7 @@ trait implicits {
 
   /**
     */
-  private val toDecodeFailure: Throwable => Error.DecodeFailure =
+  protected val toDecodeFailure: Throwable => Error.DecodeFailure =
     fail => Error.DecodeFailure(NonEmptyList one fail.toString)
 }
 

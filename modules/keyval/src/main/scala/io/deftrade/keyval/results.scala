@@ -15,6 +15,7 @@
  */
 
 package io.deftrade
+package keyval
 
 import cats.implicits._
 

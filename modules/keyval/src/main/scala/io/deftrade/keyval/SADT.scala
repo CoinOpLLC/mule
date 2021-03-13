@@ -19,10 +19,12 @@ import io.circe.{ Decoder, Encoder, Json }
   *   - protobuf
   *   - etc
   */
-sealed abstract case class SADT private (final val sadt: Json) {
+sealed abstract case class SADT private (final val json: Json) {
 
-  /** TODO: revisit this */
-  final def canonicalString: String = SADT canonicalStringFor sadt
+  /** TODO: revisit this
+    */
+  final def canonicalString: String =
+    SADT canonicalStringFor json
 }
 
 /**
@@ -31,11 +33,12 @@ object SADT {
 
   /**
     */
-  def apply(sadt: Json): SADT = new SADT(sadt) {}
+  def apply(json: Json): SADT = new SADT(json) {}
 
   /**
     */
-  def canonicalStringFor(json: Json): String = json.noSpacesSortKeys
+  def canonicalStringFor(json: Json): String =
+    json.noSpacesSortKeys // - known sketchy; CBOR / `borer` maybe?
 
   /**
     */
@@ -43,8 +46,8 @@ object SADT {
 
     /**
       */
-    final def as: Result[T] =
-      sadt.sadt.as[T] leftMap (x => Fail fromString x.toString)
+    final def as: Decoder.Result[T] =
+      sadt.json.as[T]
   }
 
   /**
@@ -52,6 +55,11 @@ object SADT {
   def from[T: Decoder: Encoder](t: T): SADT =
     SADT(t.asJson)
 
-  implicit lazy val miscEq: Eq[SADT]     = Eq by (_.sadt)
-  implicit lazy val miscShow: Show[SADT] = Show show (_.sadt.show)
+  implicit lazy val miscEq: Eq[SADT] =
+    Eq by (_.json)
+
+  implicit lazy val miscShow: Show[SADT] =
+    Show show { x =>
+      s"sadt:${x.json.show}"
+    }
 }

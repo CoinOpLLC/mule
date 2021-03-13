@@ -53,7 +53,7 @@ trait ModuleTypes {
 
   /**
     */
-  implicit protected val qFinancial: Financial[Quantity]
+  implicit protected val Quantity: Financial[Quantity]
 
   /**
     */
@@ -65,7 +65,7 @@ trait ModuleTypes {
 
   /**
     */
-  implicit protected val maFinancial: Financial[MonetaryAmount]
+  implicit protected val MonetaryAmount: Financial[MonetaryAmount]
 
   /**
     */
@@ -85,9 +85,9 @@ object ModuleTypes {
   abstract class Aux[F[_], MA, Q]()(implicit
                                     // final protected val X: ContextShift[F],
                                     final protected val Y: Sync[F],
-                                    final protected val maFinancial: Financial[MA],
+                                    final protected val MonetaryAmount: Financial[MA],
                                     final protected val maShow: Show[MA],
-                                    final protected val qFinancial: Financial[Q],
+                                    final protected val Quantity: Financial[Q],
                                     final protected val qShow: Show[Q])
       extends ModuleTypes {
 

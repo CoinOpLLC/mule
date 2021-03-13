@@ -262,7 +262,7 @@ final object KeyValueStores {
   abstract class SADT[K: Order, V: Encoder: Decoder]
       extends KeyValueStores.SimpleCodec[K, V, keyval.SADT](
         v => SADT from v,
-        u => { val Right(ret) = u.sadt.as[V]; ret }
+        u => { val Right(ret) = u.json.as[V]; ret }
       )
 
   /** (Single, scalar) `Value`

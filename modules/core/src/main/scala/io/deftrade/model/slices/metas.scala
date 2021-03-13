@@ -2,7 +2,7 @@ package io.deftrade
 package model.slices
 
 import keyval._
-import refinements.{ Label, SHA }
+import refinements.{ Label }
 
 import cats.implicits._
 import cats.{ Eq, Show }

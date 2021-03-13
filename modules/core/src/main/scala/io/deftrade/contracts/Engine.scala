@@ -473,7 +473,7 @@ object Pricing {
   */
 sealed abstract case class Performing[N: Fractional]() extends Engine {
 
-  import Pricing._, Contract._, Numéraire._
+  import Contract._, Numéraire._
 
   // import spire.syntax.field._
 

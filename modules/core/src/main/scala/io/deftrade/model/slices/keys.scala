@@ -1,7 +1,7 @@
 package io.deftrade
 package model.slices
 
-import refinements.failsafe
+import refinements.failsafe, keyval.Result
 
 import cats.implicits._
 

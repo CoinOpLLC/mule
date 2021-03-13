@@ -16,17 +16,28 @@
 
 package io.deftrade
 
+import shapeless.syntax.singleton._
+
+import cats.implicits._
 import cats.{ Order, Show }
 
 import eu.timepit.refined
 import refined.api.{ Refined, Validate }
 
+import scodec.bits.ByteVector
+
 /** Key value store algebras and implementations for persistence and caching of
   * domain value types (typically case classes).
   */
-package object keyval {
+package object keyval extends results.mixin {
 
-  import shapeless.syntax.singleton._
+  /** Just an alias.
+    */
+  type OpaqueKey[K, V] = Refined[K, V]
+
+  /**
+    */
+  type SHA = String Refined IsSHA
 
   /** The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
     *
@@ -38,13 +49,43 @@ package object keyval {
   /** [[Key]] column type literal witness - same purpose as [[id]].
     */
   private[keyval] final val key = Symbol("key").witness
-
-  /** Just an alias.
-    */
-  type OpaqueKey[K, V] = Refined[K, V]
 }
 
 package keyval {
+
+  /**
+    */
+  sealed abstract case class IsSHA()
+
+  /**
+    */
+  object IsSHA {
+
+    lazy val instance: IsSHA = new IsSHA() {}
+
+    implicit def isSha256Validate: Validate.Plain[String, IsSHA] =
+      Validate.fromPredicate(predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
+
+    def predicate(s: String): Boolean =
+      scala.util
+        .Try {
+          val Some(bs) = ByteVector fromBase58 s
+          bs.size === 32
+        }
+        .fold(_ => false, identity)
+  }
+
+  /**
+    */
+  object SHA {
+
+    /** Chosen project-wide (for now) */
+    val Algo = "SHA-256"
+
+    /**
+      */
+    def toByteVector(sha: SHA) = ByteVector fromValidBase58 sha.value
+  }
 
   /**
     */

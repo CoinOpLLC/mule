@@ -136,15 +136,15 @@ object ValueStores {
     *
     *  `SADT` stores are content-addressed: entries are indexed with their own `sha`.
     *
-    * Therefore, if you have a `sha` (from a [[model.Transaction]], for instance) ''and'' access to
-    * a `SADT` key value store containing the value, you have access to the value itself.
+    * Therefore, if you have a `sha`, ''and'' access to
+    * a `SADT` key value store containing the value, ''then'' you have access to the value itself.
     *
     * Note this value is forgery resistant (up to the strength of the `sha`).
     */
   abstract class SADT[V: Encoder: Decoder]
       extends ValueStores.SimpleCodec[V, keyval.SADT](
         v => SADT from v,
-        u => { val Right(ret) = u.sadt.as[V]; ret }
+        u => { val Right(ret) = u.json.as[V]; ret }
       )
 
   /** Values

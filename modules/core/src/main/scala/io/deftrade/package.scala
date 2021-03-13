@@ -19,7 +19,7 @@ package io
 /**
   * Foundational toolkit for applications serving '''financial market participants'''.
   */
-package object deftrade extends deftrade.results.mixin {
+package object deftrade {
 
   /**
     * Informs wart remover (and code reviewers) that the value is intentionally discarded.

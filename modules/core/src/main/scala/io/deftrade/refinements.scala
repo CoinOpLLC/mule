@@ -18,18 +18,14 @@ package io.deftrade
 
 import shapeless.nat.{ _0, _1 }
 
-import cats.implicits._
-
 import eu.timepit.refined
 import eu.timepit.refined.boolean._
 import refined.collection.{ Forall, Size }
 import refined.numeric.{ Interval, LessEqual, Positive }
 import refined.string.{ MatchesRegex, Trimmed }
-import refined.api.{ Refined, Validate }
+import refined.api.{ Refined }
 // import Inference.==>
 import Interval.{ Closed => To }
-
-import scodec.bits.ByteVector
 
 /** A palette of domain specific refined types.
   */
@@ -107,42 +103,6 @@ object refinements {
   /** A short, pure ASCII, all printable, no whitespace `Label`.
     */
   type Ascii24 = String Refined IsAscii24
-
-  /**
-    */
-  sealed abstract case class IsSHA()
-
-  /**
-    */
-  object IsSHA {
-
-    lazy val instance: IsSHA = new IsSHA() {}
-
-    implicit def isSha256Validate: Validate.Plain[String, IsSHA] =
-      Validate.fromPredicate(predicate, t => s"$t is not a Base58 encoded 256 bit value", instance)
-
-    def predicate(s: String): Boolean =
-      failsafe {
-        val Some(bs) = ByteVector fromBase58 s
-        bs.size === 32
-      }
-  }
-
-  /**
-    */
-  type SHA = String Refined IsSHA
-
-  /**
-    */
-  object SHA {
-
-    /** Chosen project-wide (for now) */
-    val Algo = "SHA-256"
-
-    /**
-      */
-    def toByteVector(sha: SHA) = ByteVector fromValidBase58 sha.value
-  }
 
   /**
     */

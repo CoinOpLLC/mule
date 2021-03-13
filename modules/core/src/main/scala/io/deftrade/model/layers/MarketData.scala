@@ -100,7 +100,7 @@ trait MarketData { self: ModuleTypes with Person with Paper with Ledger =>
     /**
       */
     def tick(implicit C: Currency[C]): MonetaryAmount =
-      maFinancial from [BigDecimal] C.pip //  / 10 // this is a thing now
+      MonetaryAmount from [BigDecimal] C.pip //  / 10 // this is a thing now
 
     /**
       */
@@ -194,7 +194,7 @@ trait MarketData { self: ModuleTypes with Person with Paper with Ledger =>
     /**
       */
     def quote: (Money[C2], Money[C2]) = {
-      val single = C1(maFinancial.one)
+      val single = C1(MonetaryAmount.one)
       (buy(single), sell(single))
     }
 

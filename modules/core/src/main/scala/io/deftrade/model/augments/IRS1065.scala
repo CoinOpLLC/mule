@@ -169,7 +169,7 @@ trait IRS1065 {
   }
 
   /**
-    * As a [[Credit]], a `Reserve` can represent:
+    * As a [[model.std.Credit credit]], a `Reserve` can represent:
     *   - an equity portion,
     *   - a "bad debt" (asset) contra account
     *   - an estimated future liability

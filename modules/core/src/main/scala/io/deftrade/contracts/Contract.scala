@@ -7,7 +7,8 @@ import spire.algebra.Field
 import cats.{ Eq, Eval, Group, Show }
 import Eval.later
 
-/**  This trait intentionally left blank. */
+/**  This trait intentionally left blank.
+ */
 sealed trait Contract extends Product
 
 /**

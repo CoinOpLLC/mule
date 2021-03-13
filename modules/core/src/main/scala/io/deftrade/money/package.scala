@@ -35,7 +35,7 @@ import cats.kernel.CommutativeGroup
   *           - entails [[cats.kernel.CommutativeGroup]] and [[spire.math.Fractional]]
   *       - a type `C` for which a [[Currency]]`[C]` instance is in implicit scope
   *           - `C` distinct for each supported currency
-  *       - [[model.Money]][C] binds the `N` type in [[Mny]], leaving one parameter free
+  *       - [[model.std.Money]][C] binds the `N` type in [[Mny]], leaving one parameter free
   *         (the currency `C`)
   *
   *   TODO: Integration with [[eu.timepit.refined.api.Refined]] via `RefType[F[_,_]]`

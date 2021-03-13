@@ -214,7 +214,7 @@ trait Ledger { module: ModuleTypes with Person with Paper =>
     */
   final type Entry = (Entry.Key, Entry.Value)
 
-  /** How much of a given [[Paper#Instrument]] is held.
+  /** How much of a given [[Paper.Instrument]] is held.
     *
     * Can also be thought of as a [[Trade]] [[Leg]] at rest.
     *

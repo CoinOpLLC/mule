@@ -17,7 +17,7 @@
 package io.deftrade
 package money
 
-import io.deftrade.syntax._
+import syntax._, keyval.Result
 
 import cats._
 import cats.implicits._

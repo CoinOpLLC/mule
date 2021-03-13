@@ -20,9 +20,45 @@ import cormorant.implicits._
 import cormorant.refined._
 import cormorant.generic.semiauto._
 
+sealed trait csvDomainSpecificImplicits extends csv.implicits {
+
+  import cormorant._
+  import money._
+
+  /**
+    */
+  implicit def moneyGet[N: Financial, C: Currency]: Get[Mny[N, C]] =
+    new Get[Mny[N, C]] {
+
+      /**
+        */
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
+        Mny parse field.x leftMap toDecodeFailure
+    }
+
+  /**
+    */
+  implicit def moneyPut[N: Financial, C: Currency]: Put[Mny[N, C]] =
+    stringPut contramap Mny.format[N, C]
+
+  /**
+    */
+  implicit def financialGet[N](implicit N: Financial[N]): Get[N] =
+    new Get[N] {
+
+      def get(field: CSV.Field): Either[Error.DecodeFailure, N] =
+        N parse field.x leftMap toDecodeFailure
+    }
+
+  /**
+    */
+  implicit def financialPut[N: Financial]: Put[N] =
+    stringPut contramap (Financial[N] toString _)
+}
+
 /** The batteries we include.
   */
-trait csvStores extends csv.implicits {
+trait csvStores extends csvDomainSpecificImplicits {
 
   // self: ModuleTypes with Person with Paper with Ledger with Accounts =>
   self: ModuleTypes with Person with Paper with Ledger =>

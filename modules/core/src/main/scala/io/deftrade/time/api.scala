@@ -17,7 +17,7 @@
 package io.deftrade
 package time
 
-import syntax._
+import syntax._, keyval.Result
 
 import cats.{ Hash, Order, Show }
 import cats.evidence._

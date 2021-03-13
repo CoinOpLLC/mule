@@ -38,9 +38,9 @@ def module(id: String, d: String) =
   Project(id, file(s"modules/$id"))
     .settings(moduleName := id, name := id, description := d)
 
-lazy val core = module(
-  "core",
-  """foundational finance value types and functions"""
+lazy val keyval = module(
+  "keyval",
+  """key value algebra"""
 ).settings(common)
   .settings(
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
@@ -49,15 +49,27 @@ lazy val core = module(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
 
-lazy val demo = module("demo", "something to run")
-  .dependsOn(core)
+lazy val core = module(
+  "core",
+  """foundational finance value types and functions"""
+).dependsOn(keyval)
   .settings(common)
   .settings(
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
   )
   .settings(
-    libraryDependencies ++= pureConfigs ++ funlibs ++ enumerata ++ refined ++ doobies ++ testers
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
+
+// lazy val demo = module("demo", "something to run")
+//   .dependsOn(core)
+//   .settings(common)
+//   .settings(
+//     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
+//   )
+//   .settings(
+//     libraryDependencies ++= pureConfigs ++ funlibs ++ enumerata ++ refined ++ doobies ++ testers
+//   )
 // .settings(
 //   libraryDependencies ++= funlibs ++ enumerata ++ refined ++
 //     pureConfigs ++

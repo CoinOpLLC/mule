@@ -21,10 +21,6 @@ import keyval.DtEnum, contracts.Numéraire
 
 import enumeratum.EnumEntry
 
-import cats.implicits._
-// import cats.instances.string._
-import cats.Order
-
 import eu.timepit.refined
 import refined.refineV
 import refined.api.Refined

@@ -17,7 +17,7 @@
 package io.deftrade
 package model.slices
 
-import syntax._, money._, refinements.IsUnitInterval
+import syntax._, money._, refinements.IsUnitInterval, keyval.{ Fail, Result }
 
 import cats.implicits._
 import cats.{ Contravariant, Eq, Order, Show }

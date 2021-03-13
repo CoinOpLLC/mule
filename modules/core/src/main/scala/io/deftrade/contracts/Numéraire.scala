@@ -7,7 +7,7 @@ package contracts
   */
 sealed trait Numéraire {
 
-  /** Each instance governed by an explicit [[Contract]].
+  /** Each instance governed by an explicit [[contracts.Contract contract]].
     */
   def contract: Contract
 }

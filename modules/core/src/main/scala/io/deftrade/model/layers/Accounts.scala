@@ -5,7 +5,7 @@ import keyval._
 import model.slices.UnitPartition
 
 import cats.implicits._
-import cats.{ Eq, Order, Show }
+import cats.{ Eq, Show }
 import cats.data.{ NonEmptyList, NonEmptySet }
 import cats.derived.{ auto, semiauto }
 
