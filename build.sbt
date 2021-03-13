@@ -48,6 +48,9 @@ lazy val keyval = module(
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
   )
+  .settings(
+    libraryDependencies += "io.chrisdavenport" %% "cats-time" % "0.3.4" % Test
+  )
 
 lazy val core = module(
   "core",

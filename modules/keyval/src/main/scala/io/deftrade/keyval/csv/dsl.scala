@@ -19,11 +19,11 @@ trait dsl {
 
   /**
     */
-  def csvVS[F[_]: Sync: ContextShift] = VsOps[F]()
+  def vs[F[_]: Sync: ContextShift] = VsOps[F]()
 
   /**
     */
-  def csvKVS[F[_]: Sync: ContextShift] = KvsOps[F]()
+  def kvs[F[_]: Sync: ContextShift] = KvsOps[F]()
 }
 
 /** DSL for value stores

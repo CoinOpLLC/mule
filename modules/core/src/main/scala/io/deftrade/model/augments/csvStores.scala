@@ -2,7 +2,7 @@ package io.deftrade
 package model.augments
 
 import keyval.csv
-import csv.{ csvKVS, csvVS }
+import csv.{ kvs, vs }
 import model.layers._
 import model.slices.Metas
 
@@ -68,7 +68,7 @@ trait csvStores extends csvDomainSpecificImplicits {
   lazy val metas: Metas.ValueStore[IO] = {
     val Right(ret) =
       for {
-        metas <- csvVS[IO] at dataDir ofContentAddressed Metas
+        metas <- vs[IO] at dataDir ofContentAddressed Metas
       } yield metas
     ret
   }
@@ -77,8 +77,8 @@ trait csvStores extends csvDomainSpecificImplicits {
   //   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   //   val Right(ret) =
   //     for {
-  //       parties  <- csvKVS[IO] at dataDir ofKeyChained Parties
-  //       contacts <- csvVS[IO] at dataDir ofContentAddressed Contacts
+  //       parties  <- kvs[IO] at dataDir ofKeyChained Parties
+  //       contacts <- vs[IO] at dataDir ofContentAddressed Contacts
   //     } yield People(parties, contacts)
   //   ret
   // }
@@ -87,10 +87,10 @@ trait csvStores extends csvDomainSpecificImplicits {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
     val Right(ret) =
       for {
-        instruments      <- csvKVS[IO] at dataDir ofKeyChained Instruments
-        forms            <- csvVS[IO] at dataDir ofChained Forms
-        instrumentsForms <- csvKVS[IO] at dataDir ofKeyChained InstrumentsForms
-        novations        <- csvVS[IO] at dataDir ofChained Novations
+        instruments      <- kvs[IO] at dataDir ofKeyChained Instruments
+        forms            <- vs[IO] at dataDir ofChained Forms
+        instrumentsForms <- kvs[IO] at dataDir ofKeyChained InstrumentsForms
+        novations        <- vs[IO] at dataDir ofChained Novations
       } yield Papers(instruments, forms, instrumentsForms, novations)
     ret
   }
@@ -98,19 +98,19 @@ trait csvStores extends csvDomainSpecificImplicits {
   lazy val ledgers: Ledgers = {
     val Right(ls: Ledgers) =
       for {
-        trades        <- csvVS[IO] at dataDir ofContentAddressed Trades
-        folios        <- csvKVS[IO] at dataDir ofKeyChained Folios
-        portfolios    <- csvVS[IO] at dataDir ofContentAddressed Portfolios
-        transactions  <- csvVS[IO] at dataDir ofChained Transactions
-        confirmations <- csvKVS[IO] at dataDir ofKeyChained Confirmations
+        trades        <- vs[IO] at dataDir ofContentAddressed Trades
+        folios        <- kvs[IO] at dataDir ofKeyChained Folios
+        portfolios    <- vs[IO] at dataDir ofContentAddressed Portfolios
+        transactions  <- vs[IO] at dataDir ofChained Transactions
+        confirmations <- kvs[IO] at dataDir ofKeyChained Confirmations
       } yield Ledgers(trades, folios, portfolios, transactions, confirmations)
     ls
   }
 
   // lazy val accounts = {
   //   val Right(ret) = for {
-  //     accounts <- csvKVS[IO] at dataDir ofKeyChained Accounts
-  //     rosters  <- csvVS[IO] at dataDir ofChained Rosters
+  //     accounts <- kvs[IO] at dataDir ofKeyChained Accounts
+  //     rosters  <- vs[IO] at dataDir ofChained Rosters
   //   } yield (accounts, rosters)
   //   ret
   // }
