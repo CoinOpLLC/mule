@@ -28,18 +28,17 @@ import Arbitrary.arbitrary
   */
 object arbitraryMvt {
 
-  import invoices._
-  import mvt._
+  import model._
+  import mk._
 
-  import csv.implicits._
-  import io.chrisdavenport.cormorant
-  import cormorant.generic.semiauto._
-  import cormorant.refined._
-  import cormorant.implicits._
+  // import csv.implicits._
+  // import io.chrisdavenport.cormorant
+  // import cormorant.generic.semiauto._
+  // import cormorant.refined._
+  // import cormorant.implicits._
 
-  lazy val Right(contactsVS) = csv.vs[IO] at "target/contacts.csv" ofContentAddressed Contacts
-
-  lazy val Right(costsKVS) = costs[IO]
+  lazy val Right(costsKVS)   = costs[IO]
+  lazy val Right(contactsVS) = contacts[IO]
 
   def drift[A](aa: Gen[A]): Gen[Stream[IO, A]] =
     for (a <- aa) yield Stream eval (IO delay a)

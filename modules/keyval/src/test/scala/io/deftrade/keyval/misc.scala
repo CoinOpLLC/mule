@@ -2,6 +2,7 @@ package io.deftrade
 package test
 
 import keyval._
+import csv.implicits._
 
 import shapeless.nat.{ _0, _1 }
 
@@ -21,6 +22,9 @@ import refined.cats._
 import refined.auto._
 
 import io.chrisdavenport.cormorant
+import cormorant.implicits._
+import cormorant.refined._
+import cormorant.generic.semiauto._
 
 import io.chrisdavenport.fuuid
 import fuuid.{ FUUID, FUUIDGen }
@@ -29,128 +33,9 @@ import io.chrisdavenport.cats.time._
 
 import fs2.{ Stream }
 
-import org.scalacheck._
-// import org.scalacheck.cats.implicits._
-import org.scalacheck.ScalacheckShapeless._
-import Arbitrary.arbitrary
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import java.time.Instant
-
-/**
-  */
-sealed abstract case class Contact private (
-    final val name: Contact.Name,
-    final val address: Contact.USAddress,
-    final val cell: Contact.USPhone,
-    final val email: Contact.Email,
-    final val url: Option[String Refined Url]
-)
-
-/**
-  */
-object Contact {
-
-  import io.circe.{ Decoder, Encoder }
-  import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
-  // import io.circe.refined._
-
-  implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semiauto.eq }
-  implicit lazy val contactShow: Show[Contact] = { import auto.show._; semiauto.show }
-
-  implicit lazy val decoder: Decoder[Contact] = { import io.circe.refined._; deriveDecoder }
-  implicit lazy val encoder: Encoder[Contact] = { import io.circe.refined._; deriveEncoder }
-
-  /**
-    */
-  def apply(
-      name: Contact.Name,
-      address: Contact.USAddress,
-      cell: Contact.USPhone,
-      email: Contact.Email,
-      url: Option[String Refined Url]
-  ): Contact =
-    new Contact(name, address, cell, email, url) {}
-
-  /**
-    */
-  case class Name(
-      first: Label,
-      middle: Option[Label],
-      last: Label
-  )
-
-  /**
-    */
-  object Name {
-
-    implicit lazy val nameEq: Eq[Name]     = semiauto.eq
-    implicit lazy val nameShow: Show[Name] = semiauto.show
-
-    implicit lazy val decoder: Decoder[Name] = { import io.circe.refined._; deriveDecoder }
-    implicit lazy val encoder: Encoder[Name] = { import io.circe.refined._; deriveEncoder }
-  }
-
-  /**
-    */
-  case class USAddress(
-      street: Label,
-      street2: Option[Label],
-      city: Label,
-      state: String Refined MatchesRegex["""[A-Z]{2}"""], // """
-      zip: USZip
-  )
-
-  /**
-    */
-  object USAddress {
-
-    implicit lazy val usAddressEq: Eq[USAddress]     = semiauto.eq
-    implicit lazy val usAddressShow: Show[USAddress] = semiauto.show
-
-    implicit lazy val decoder: Decoder[USAddress] = { import io.circe.refined._; deriveDecoder }
-    implicit lazy val encoder: Encoder[USAddress] = { import io.circe.refined._; deriveEncoder }
-  }
-
-  private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
-
-  /**
-    */
-  final val TenDigit = digits(10)
-
-  /**
-    */
-  final type IsUSPhone = MatchesRegex[TenDigit.type]
-
-  /**
-    */
-  final type USPhone = String Refined IsUSPhone
-
-  /**
-    */
-  final val Zip = s"${digits(5)}|${digits(5 + 4)}"
-
-  /**
-    */
-  final type IsUSZip = MatchesRegex[Zip.type]
-
-  /**
-    */
-  final type USZip = String Refined IsUSZip
-
-  /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
-  final val IsEmail =
-    """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
-
-  /**
-    */
-  final type Email = String Refined MatchesRegex[IsEmail.type]
-}
-
-/**
-  */
-case object Contacts extends ValueStores.SADT[Contact]
 
 object email {
 
@@ -167,32 +52,154 @@ object email {
   final type Email = String Refined IsEmail
 }
 
-/**
-  */
-sealed trait Nut extends EnumEntry with Serializable
+object model {
 
-/**
-  */
-object Nut extends DtEnum[Nut] {
+  import email._
 
-  case object Peanut     extends Nut
-  case object Hazelnut   extends Nut
-  case object Almond     extends Nut
-  case object Cashew     extends Nut
-  case object Walnut     extends Nut
-  case object Pecan      extends Nut
-  case object Pistaschio extends Nut
-  case object Brazil     extends Nut
+  final type `[0,1)` = Interval.ClosedOpen[_0, _1]
 
-  lazy val values = findValues
-}
+  final val Dollar = "USD"
+  final type Dollars = BigDecimal Refined Dollar.type
 
-object invoices {
+  implicit class PrinterGoBrrr(val amount: BigDecimal) extends AnyVal {
 
-  import keyval._
-  import OpaqueKey._
+    def asDollars: Dollars =
+      Refined unsafeApply amount
+  }
 
-  import test.email._
+  /**
+    */
+  sealed abstract case class Contact private (
+      final val name: Contact.Name,
+      final val address: Contact.USAddress,
+      final val cell: Contact.USPhone,
+      final val email: Contact.Email,
+      final val url: Option[String Refined Url]
+  )
+
+  /**
+    */
+  object Contact {
+
+    import io.circe.{ Decoder, Encoder }
+    import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
+    // import io.circe.refined._
+
+    implicit lazy val contactEq: Eq[Contact]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val contactShow: Show[Contact] = { import auto.show._; semiauto.show }
+
+    implicit lazy val decoder: Decoder[Contact] = { import io.circe.refined._; deriveDecoder }
+    implicit lazy val encoder: Encoder[Contact] = { import io.circe.refined._; deriveEncoder }
+
+    /**
+      */
+    def apply(
+        name: Contact.Name,
+        address: Contact.USAddress,
+        cell: Contact.USPhone,
+        email: Contact.Email,
+        url: Option[String Refined Url]
+    ): Contact =
+      new Contact(name, address, cell, email, url) {}
+
+    /**
+      */
+    case class Name(
+        first: Label,
+        middle: Option[Label],
+        last: Label
+    )
+
+    /**
+      */
+    object Name {
+
+      implicit lazy val nameEq: Eq[Name]     = semiauto.eq
+      implicit lazy val nameShow: Show[Name] = semiauto.show
+
+      implicit lazy val decoder: Decoder[Name] = { import io.circe.refined._; deriveDecoder }
+      implicit lazy val encoder: Encoder[Name] = { import io.circe.refined._; deriveEncoder }
+    }
+
+    /**
+      */
+    case class USAddress(
+        street: Label,
+        street2: Option[Label],
+        city: Label,
+        state: String Refined MatchesRegex["""[A-Z]{2}"""], // """
+        zip: USZip
+    )
+
+    /**
+      */
+    object USAddress {
+
+      implicit lazy val usAddressEq: Eq[USAddress]     = semiauto.eq
+      implicit lazy val usAddressShow: Show[USAddress] = semiauto.show
+
+      implicit lazy val decoder: Decoder[USAddress] = { import io.circe.refined._; deriveDecoder }
+      implicit lazy val encoder: Encoder[USAddress] = { import io.circe.refined._; deriveEncoder }
+    }
+
+    private def digits(n: Int) = s"""[0-9]{${n.toString}}"""
+
+    /**
+      */
+    final val TenDigit = digits(10)
+
+    /**
+      */
+    final type IsUSPhone = MatchesRegex[TenDigit.type]
+
+    /**
+      */
+    final type USPhone = String Refined IsUSPhone
+
+    /**
+      */
+    final val Zip = s"${digits(5)}|${digits(5 + 4)}"
+
+    /**
+      */
+    final type IsUSZip = MatchesRegex[Zip.type]
+
+    /**
+      */
+    final type USZip = String Refined IsUSZip
+
+    /** TODO: [[http://www.regular-expressions.info/email.html investigate further]] */
+    final val IsEmail =
+      """[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"""
+
+    /**
+      */
+    final type Email = String Refined MatchesRegex[IsEmail.type]
+  }
+
+  /**
+    */
+  case object Contacts extends ValueStores.SADT[Contact]
+
+  /**
+    */
+  sealed trait Nut extends EnumEntry with Serializable
+
+  /**
+    */
+  object Nut extends DtEnum[Nut] {
+
+    case object Peanut     extends Nut
+    case object Hazelnut   extends Nut
+    case object Almond     extends Nut
+    case object Cashew     extends Nut
+    case object Walnut     extends Nut
+    case object Pecan      extends Nut
+    case object Pistaschio extends Nut
+    case object Brazil     extends Nut
+
+    lazy val values = findValues
+  }
 
   sealed abstract case class Party private (
       final val handle: Label,
@@ -200,79 +207,12 @@ object invoices {
   )
 
   object Party {
+
     def apply(handle: Label, email: Email): Party =
       new Party(handle, email) {}
   }
 
   case object Parties extends KeyValueStores.KV[FUUID, Party]
-
-  sealed trait Dollar
-  final type Dollars = BigDecimal Refined Dollar
-
-  sealed abstract case class Invoice private (
-      final val asOf: Instant,
-      final val nut: Nut,
-      final val quantity: Int Refined Positive,
-      final val from: Parties.Key,
-      final val to: Parties.Key,
-      final val amount: Dollars,
-      final val memo: Label
-  )
-
-  object Invoice {
-
-    def apply(
-        asOf: Instant,
-        nut: Nut,
-        quantity: Int Refined Positive,
-        from: Parties.Key,
-        to: Parties.Key,
-        amount: Dollars,
-        memo: Label
-    ): Invoice =
-      new Invoice(asOf = Instant.now, nut, quantity, from, to, amount, memo) {}
-
-    def mk(
-        nut: String,
-        jars: Int,
-        from: Parties.Key,
-        to: Parties.Key,
-        total: Double,
-        instructions: String = ""
-    ): Result[Invoice] = Result safe {
-
-      val Right(quantity) = refineV[Positive](jars min 1)
-      val Right(memo)     = refineV[IsLabel](s"special instructions: $instructions")
-      val Right(amount)   = refineV[Dollar](BigDecimal(total))
-
-      Invoice(asOf = Instant.now, Nut withName nut, quantity, from, to, amount, memo)
-    }
-
-    implicit lazy val invoiceEq: Eq[Invoice]     = { import auto.eq._; semiauto.eq }
-    implicit lazy val invoiceShow: Show[Invoice] = { import auto.show._; semiauto.show }
-  }
-
-  case object Invoices extends KeyValueStores.KV[Long OpaqueKey Invoice, Invoice]
-
-  def invoices[F[_]: Sync: ContextShift]: Result[Invoices.KeyValueStore[F]] = {
-    import csv.implicits._
-    import io.chrisdavenport.cormorant
-    import cormorant.generic.semiauto._
-    import cormorant.refined._
-    import cormorant.implicits._
-    csv.kvs[F] at "target/invoices.csv" ofKeyChained Invoices
-  }
-}
-
-/**
-  */
-object mvt {
-
-  import invoices._
-
-  type `[0,1)` = Interval.ClosedOpen[_0, _1]
-
-  implicit def contextShiftIO: ContextShift[IO] = IO contextShift global
 
   /**
     */
@@ -342,13 +282,58 @@ object mvt {
   }
 
   case object Products extends KeyValueStores.KV[Label, Product]
-  import csv.implicits._
-  import cormorant.generic.semiauto._
-  import cormorant.refined._
-  import cormorant.implicits._
 
-  def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
-    csv.kvs[F] at "target/products.csv" ofKeyChained Products
+  sealed abstract case class Invoice private (
+      final val asOf: Instant,
+      final val nut: Nut,
+      final val quantity: Int Refined Positive,
+      final val from: Parties.Key,
+      final val to: Parties.Key,
+      final val amount: Dollars,
+      final val memo: Label
+  )
+
+  object Invoice {
+
+    def apply(
+        asOf: Instant,
+        nut: Nut,
+        quantity: Int Refined Positive,
+        from: Parties.Key,
+        to: Parties.Key,
+        amount: Dollars,
+        memo: Label
+    ): Invoice =
+      new Invoice(asOf = Instant.now, nut, quantity, from, to, amount, memo) {}
+
+    def mk(
+        nut: String,
+        jars: Int,
+        from: Parties.Key,
+        to: Parties.Key,
+        total: Double,
+        instructions: String = ""
+    ): Result[Invoice] = Result safe {
+
+      val Right(quantity) = refineV[Positive](jars min 1)
+      val Right(memo)     = refineV[IsLabel](s"special instructions: $instructions")
+
+      Invoice(
+        asOf = Instant.now,
+        Nut withName nut,
+        quantity,
+        from,
+        to,
+        BigDecimal(total).asDollars,
+        memo
+      )
+    }
+
+    implicit lazy val invoiceEq: Eq[Invoice]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val invoiceShow: Show[Invoice] = { import auto.show._; semiauto.show }
+  }
+
+  case object Invoices extends KeyValueStores.KV[Long OpaqueKey Invoice, Invoice]
 
   /**
     */
@@ -394,14 +379,28 @@ object mvt {
 
   case object Costs extends KeyValueStores.KV[FUUID, Cost]
 
-  def costs[F[_]: Sync: ContextShift]: Result[Costs.KeyValueStore[F]] = {
-    import csv.implicits._
-    import io.chrisdavenport.cormorant
-    import cormorant.generic.semiauto._
-    import cormorant.refined._
-    import cormorant.implicits._
+}
 
-    // csv.kvs[F] at "target/costs.csv" ofKeyChained Costs
-    ???
-  }
+object mk {
+
+  implicit def __FIXME__contextShiftIO: ContextShift[IO] = IO contextShift global
+
+  import model._
+
+  import keyval._
+  import OpaqueKey._
+
+  final val dataDir = """target/testdata"""
+
+  def invoices[F[_]: Sync: ContextShift]: Result[Invoices.KeyValueStore[F]] =
+    csv.kvs[F] at dataDir ofKeyChained Invoices
+
+  def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
+    csv.kvs[F] at dataDir ofKeyChained Products
+
+  def costs[F[_]: Sync: ContextShift]: Result[Costs.KeyValueStore[F]] =
+    csv.kvs[F] at dataDir ofKeyChained Costs
+
+  def contacts[F[_]: Sync: ContextShift] =
+    csv.vs[F] at dataDir ofContentAddressed Contacts
 }
