@@ -69,6 +69,24 @@ object model {
 
   /**
     */
+  sealed trait Nut extends EnumEntry with Serializable
+
+  object Nut extends DtEnum[Nut] {
+
+    case object Peanut     extends Nut
+    case object Hazelnut   extends Nut
+    case object Almond     extends Nut
+    case object Cashew     extends Nut
+    case object Walnut     extends Nut
+    case object Pecan      extends Nut
+    case object Pistaschio extends Nut
+    case object Brazil     extends Nut
+
+    lazy val values = findValues
+  }
+
+  /**
+    */
   sealed abstract case class Contact private (
       final val name: Contact.Name,
       final val address: Contact.USAddress,
@@ -77,8 +95,6 @@ object model {
       final val url: Option[String Refined Url]
   )
 
-  /**
-    */
   object Contact {
 
     import io.circe.{ Decoder, Encoder }
@@ -177,30 +193,10 @@ object model {
     final type Email = String Refined MatchesRegex[IsEmail.type]
   }
 
-  /**
-    */
   case object Contacts extends ValueStores.SADT[Contact]
 
   /**
     */
-  sealed trait Nut extends EnumEntry with Serializable
-
-  /**
-    */
-  object Nut extends DtEnum[Nut] {
-
-    case object Peanut     extends Nut
-    case object Hazelnut   extends Nut
-    case object Almond     extends Nut
-    case object Cashew     extends Nut
-    case object Walnut     extends Nut
-    case object Pecan      extends Nut
-    case object Pistaschio extends Nut
-    case object Brazil     extends Nut
-
-    lazy val values = findValues
-  }
-
   sealed abstract case class Party private (
       final val handle: Label,
       final val email: Email,
@@ -378,7 +374,6 @@ object model {
   }
 
   case object Costs extends KeyValueStores.KV[FUUID, Cost]
-
 }
 
 object mk {

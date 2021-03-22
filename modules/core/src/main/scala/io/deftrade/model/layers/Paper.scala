@@ -6,7 +6,7 @@ import model.slices.keys.{ ISIN, USIN }
 import model.slices.{ Metas }
 
 import cats.implicits._
-import cats.{ Eq, Order, Show }
+import cats.{ Defer, Eq, Monad, Order, Show }
 import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
@@ -22,7 +22,7 @@ trait Paper { module: ModuleTypes with Person =>
 
   /** `Store`s related to `Contract`s.
     */
-  final case class Papers(
+  case class Papers(
       instruments: Instruments.KeyValueStore[IO],
       forms: Forms.ValueStore[IO],
       instrumentsForms: InstrumentsForms.KeyValueStore[IO],
@@ -41,7 +41,7 @@ trait Paper { module: ModuleTypes with Person =>
       final val symbol: Label,
       final val issuedBy: LegalEntities.Key,
       final val issuedIn: Option[CurrencyLike]
-  ) extends Numéraire.InKind
+  )
 
   /**
     */
@@ -52,23 +52,31 @@ trait Paper { module: ModuleTypes with Person =>
         issuedBy: LegalEntities.Key,
         issuedIn: Option[CurrencyLike],
     ): Instrument =
-      new Instrument(symbol, issuedBy, issuedIn) { self =>
-        final def contract: Contract = contracts unitOf self
-      }
+      new Instrument(symbol, issuedBy, issuedIn) {}
 
-    /**
-      */
-    implicit def instrumentEq: Eq[Instrument] = { import auto._; semiauto.eq }
-
-    /**
-      */
+    implicit def instrumentEq: Eq[Instrument]     = { import auto._; semiauto.eq }
     implicit def instrumentShow: Show[Instrument] = { import auto._; semiauto.show }
+
+    sealed abstract case class Key private (final val usin: USIN) extends Numéraire.InKind
+    object Key {
+
+      /** FIXME implement
+        */
+      private[deftrade] def apply(usin: USIN): Key =
+        new Key(usin) {
+
+          final def contract[F[_]: Monad: Defer]: F[Contract] =
+            ???
+        }
+      implicit def instrumentKeyOrder: Order[Key] = { import auto._; semiauto.order }
+      implicit def instrumentKeyShow: Show[Key]   = { import auto._; semiauto.show }
+    }
   }
 
   /** Indexed by CUSIPs and other formats.
     * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
     */
-  case object Instruments extends KeyValueStores.KV[USIN, Instrument]
+  case object Instruments extends KeyValueStores.KV[Instrument.Key, Instrument]
 
   /**
     */
@@ -214,7 +222,7 @@ trait Paper { module: ModuleTypes with Person =>
 
     /** Assume semiannual, Treasury-style coupons.
       */
-    final case class Bond(
+    case class Bond(
         coupon: Quantity, // per 100 face
         issued: Instant,
         matures: ZonedDateTime,

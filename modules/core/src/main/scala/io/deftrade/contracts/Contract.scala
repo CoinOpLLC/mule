@@ -8,7 +8,7 @@ import cats.{ Eq, Eval, Group, Show }
 import Eval.later
 
 /**  This trait intentionally left blank.
- */
+  */
 sealed trait Contract extends Product
 
 /**
@@ -23,19 +23,21 @@ object Contract {
   implicit lazy val contractEq: Eq[Contract]     = Eq.fromUniversalEquals[Contract]
   implicit lazy val contractShow: Show[Contract] = Show.show[Contract](_.toString)
 
-  type LzCon = Eval[Contract]
+  /** Deferred Contract
+    */
+  type DefCon = Eval[Contract]
 
   case object Zero extends Contract
 
   sealed abstract case class One private (n: Numéraire) extends Contract
   object One { def apply(n: Numéraire): One = new One(n) {} }
 
-  sealed abstract case class Give private (c: LzCon) extends Contract
-  object Give { def apply(c: LzCon): Give = new Give(c) {} }
+  sealed abstract case class Give private (c: DefCon) extends Contract
+  object Give { def apply(c: DefCon): Give = new Give(c) {} }
 
   sealed abstract case class Scale[N] private (
       o: Oracle[N],
-      c: LzCon
+      c: DefCon
   )(
       implicit val N: Field[N]
   ) extends Contract {
@@ -43,29 +45,29 @@ object Contract {
   }
 
   object Scale {
-    def apply[N: Field](o: Oracle[N], c: LzCon): Scale[N] = new Scale(o, c) {}
+    def apply[N: Field](o: Oracle[N], c: DefCon): Scale[N] = new Scale(o, c) {}
   }
 
-  sealed abstract case class When private (o: Oracle[Boolean], c: LzCon) extends Contract
-  object When { def apply(o: Oracle[Boolean], c: LzCon): When = new When(o, c) {} }
+  sealed abstract case class When private (o: Oracle[Boolean], c: DefCon) extends Contract
+  object When { def apply(o: Oracle[Boolean], c: DefCon): When = new When(o, c) {} }
 
-  sealed abstract case class Until private (o: Oracle[Boolean], c: LzCon) extends Contract
-  object Until { def apply(o: Oracle[Boolean], c: LzCon): Until = new Until(o, c) {} }
+  sealed abstract case class Until private (o: Oracle[Boolean], c: DefCon) extends Contract
+  object Until { def apply(o: Oracle[Boolean], c: DefCon): Until = new Until(o, c) {} }
 
-  sealed abstract case class Anytime private (o: Oracle[Boolean], c: LzCon) extends Contract
-  object Anytime { def apply(o: Oracle[Boolean], c: LzCon): Anytime = new Anytime(o, c) {} }
+  sealed abstract case class Anytime private (o: Oracle[Boolean], c: DefCon) extends Contract
+  object Anytime { def apply(o: Oracle[Boolean], c: DefCon): Anytime = new Anytime(o, c) {} }
 
-  sealed abstract case class Both private (cA: LzCon, cB: LzCon) extends Contract
-  object Both { def apply(cA: LzCon, cB: LzCon): Both = new Both(cA, cB) {} }
+  sealed abstract case class Both private (cA: DefCon, cB: DefCon) extends Contract
+  object Both { def apply(cA: DefCon, cB: DefCon): Both = new Both(cA, cB) {} }
 
-  sealed abstract case class Pick private (cA: LzCon, cB: LzCon) extends Contract
-  object Pick { def apply(cA: LzCon, cB: LzCon): Pick = new Pick(cA, cB) {} }
+  sealed abstract case class Pick private (cA: DefCon, cB: DefCon) extends Contract
+  object Pick { def apply(cA: DefCon, cB: DefCon): Pick = new Pick(cA, cB) {} }
 
-  sealed abstract case class Branch private (o: Oracle[Boolean], cT: LzCon, cF: LzCon)
+  sealed abstract case class Branch private (o: Oracle[Boolean], cT: DefCon, cF: DefCon)
       extends Contract
 
   object Branch {
-    def apply(o: Oracle[Boolean], cT: LzCon, cF: LzCon): Branch =
+    def apply(o: Oracle[Boolean], cT: DefCon, cF: DefCon): Branch =
       new Branch(o, cT, cF) {}
   }
 

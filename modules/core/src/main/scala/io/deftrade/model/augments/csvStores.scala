@@ -5,25 +5,28 @@ import keyval.csv
 import csv.{ kvs, vs }
 import model.layers._
 import model.slices.Metas
+import model.slices.keys.IsUSIN
 
 import cats.implicits._
 // import cats.{ Order, Show }
 // import cats.kernel.CommutativeGroup
-// import cats.data.{ NonEmptyList, NonEmptyMap }
+import cats.data.{ NonEmptyList }
 // import cats.effect.{ ContextShift, Sync }
 
+import money._
+
 import eu.timepit.refined
+import refined.refineV
 import refined.cats._
 
 import io.chrisdavenport.cormorant
+import cormorant._
 import cormorant.implicits._
 import cormorant.refined._
 import cormorant.generic.semiauto._
 
 sealed trait csvDomainSpecificImplicits extends csv.implicits {
-
-  import cormorant._
-  import money._
+  self: ModuleTypes with Paper =>
 
   /**
     */
@@ -33,7 +36,7 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
       /**
         */
       def get(field: CSV.Field): Either[Error.DecodeFailure, Mny[N, C]] =
-        Mny parse field.x leftMap toDecodeFailure
+        Mny parse [N, C] field.x leftMap toDecodeFailure
     }
 
   /**
@@ -54,9 +57,24 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
     */
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
+
+  /**
+    */
+  implicit def instrumentKeyGet: Get[Instrument.Key] =
+    new Get[Instrument.Key] {
+      def get(field: CSV.Field): Either[Error.DecodeFailure, Instrument.Key] =
+        refineV[IsUSIN](field.x) map Instrument.Key.apply leftMap { reason =>
+          Error.DecodeFailure(NonEmptyList one reason)
+        }
+    }
+
+  /**
+    */
+  implicit def instrumentKeyPut: Put[Instrument.Key] =
+    stringPut contramap (_.usin.value)
 }
 
-/** The batteries we include.
+/**
   */
 trait csvStores extends csvDomainSpecificImplicits {
 

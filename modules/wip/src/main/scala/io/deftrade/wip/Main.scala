@@ -164,5 +164,5 @@ object FansiCrap {
 //   }
 // }
 
-// type LzCon = Lazy[Contract]
+// type DefCon = Lazy[Contract]
 // import Lazy.later
