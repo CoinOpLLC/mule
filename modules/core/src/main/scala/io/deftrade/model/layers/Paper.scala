@@ -3,10 +3,10 @@ package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
 import model.slices.keys.{ ISIN, USIN }
-import model.slices.{ Metas }
+import model.slices.{ ContractKey, Metas }
 
 import cats.implicits._
-import cats.{ Defer, Eq, Monad, Order, Show }
+import cats.{ Eq, Order, Show }
 import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
@@ -19,6 +19,8 @@ import io.circe.{ Decoder, Encoder }
 import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
+
+  final type Form = model.slices.Form
 
   /** `Store`s related to `Contract`s.
     */
@@ -54,29 +56,14 @@ trait Paper { module: ModuleTypes with Person =>
     ): Instrument =
       new Instrument(symbol, issuedBy, issuedIn) {}
 
-    implicit def instrumentEq: Eq[Instrument]     = { import auto._; semiauto.eq }
-    implicit def instrumentShow: Show[Instrument] = { import auto._; semiauto.show }
-
-    sealed abstract case class Key private (final val usin: USIN) extends Numéraire.InKind
-    object Key {
-
-      /** FIXME implement
-        */
-      private[deftrade] def apply(usin: USIN): Key =
-        new Key(usin) {
-
-          final def contract[F[_]: Monad: Defer]: F[Contract] =
-            ???
-        }
-      implicit def instrumentKeyOrder: Order[Key] = { import auto._; semiauto.order }
-      implicit def instrumentKeyShow: Show[Key]   = { import auto._; semiauto.show }
-    }
+    implicit def instrumentEq: Eq[Instrument]     = { import auto.eq._; semiauto.eq }
+    implicit def instrumentShow: Show[Instrument] = { import auto.show._; semiauto.show }
   }
 
   /** Indexed by CUSIPs and other formats.
     * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
     */
-  case object Instruments extends KeyValueStores.KV[Instrument.Key, Instrument]
+  case object Instruments extends KeyValueStores.KV[ContractKey, Instrument]
 
   /**
     */
@@ -97,168 +84,6 @@ trait Paper { module: ModuleTypes with Person =>
       implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }
     }
   }
-
-  /** Parameters common to multiple `Form`s.
-    */
-  sealed trait columns {
-
-    /** Preference class of the shares represented by this `Instrument`.
-      */
-    sealed trait Preference { self: Form =>
-      def tclass: Option[Label]
-    }
-
-    /** Tracks a (non-empty) set of `Instruments.Key`s
-      *
-      * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
-      */
-    sealed trait Tracker { self: Form =>
-      def members: Set[Instruments.Key]
-    }
-
-    /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
-    sealed trait Maturity { self: Form =>
-      def matures: ZonedDateTime
-    }
-
-    /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
-      * and expire on a certain day.
-      */
-    sealed trait Derivative extends Expiry with Strike {
-      def underlier: Instruments.Key
-    }
-
-    /** `Expiry` only applies to `Derivative`s.
-      */
-    sealed trait Expiry { self: Derivative =>
-      def expires: ZonedDateTime
-    }
-
-    /** `Strike`s only apply to `Derivative`s.
-      *
-      * TODO: {{{def logMoneynessStrike(strike: Quamtity, forward: Quamtity): Strike }}}
-      */
-    sealed trait Strike { self: Derivative =>
-      def strike: Quantity
-    }
-  }
-
-  /** Groups of related `Form`s.
-    */
-  sealed trait PrimaryCapital extends columns {
-
-    /**
-      */
-    sealed abstract case class CommonStock private (final val tclass: Option[Label])
-        extends Form
-        with Preference
-
-    object CommonStock {
-
-      import io.circe.refined._
-
-      private[deftrade] def apply(tclass: Option[Label]): CommonStock =
-        new CommonStock(tclass) {}
-
-      implicit lazy val cStkEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
-      implicit lazy val cStkShow: Show[CommonStock] = { import auto.show._; semiauto.show }
-
-      implicit lazy val cStkEncoder: Encoder[CommonStock] = { deriveEncoder }
-      implicit lazy val cStkDecoder: Decoder[CommonStock] = { deriveDecoder }
-    }
-
-    /**
-      */
-    case object CommonStocks extends KeyValueStores.KV[Instruments.Key, CommonStock]
-
-    /**
-      */
-    // final case class PreferredStock(
-    //     series: Label,
-    //     preference: Quantity Refined Positive,
-    //     participating: Boolean,
-    //     dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
-    // ) extends Form
-    //     with Preference {
-    //   final def tclass: Option[Label] =
-    //     series.some
-    // }
-
-    sealed abstract case class PreferredStock(
-        final val tclass: Option[Label],
-        // final val preference: Quantity Refined Positive,
-        final val participating: Boolean,
-        // final val dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
-    ) extends Form
-        with Preference
-
-    object PreferredStock {
-
-      import io.circe.refined._
-
-      private[deftrade] def apply(
-          tclass: Option[Label],
-          // preference: Quantity Refined Positive,
-          participating: Boolean,
-          // dividend: Quantity Refined IsUnitInterval.`[0,1)` // ]
-      ): PreferredStock =
-        new PreferredStock(
-          tclass,
-          // preference,
-          participating,
-          // dividend
-        ) {}
-
-      implicit lazy val pfStkEq: Eq[PreferredStock]     = { import auto.eq._; semiauto.eq }
-      implicit lazy val pfStkShow: Show[PreferredStock] = { import auto.show._; semiauto.show }
-
-      implicit lazy val pfStkEncoder: Encoder[PreferredStock] = { deriveEncoder }
-      implicit lazy val pfStkDecoder: Decoder[PreferredStock] = { deriveDecoder }
-    }
-
-    /**
-      */
-    case object PreferredStocks extends KeyValueStores.KV[Instruments.Key, PreferredStock]
-
-    /** Assume semiannual, Treasury-style coupons.
-      */
-    case class Bond(
-        coupon: Quantity, // per 100 face
-        issued: Instant,
-        matures: ZonedDateTime,
-        unpaidCoupons: List[ZonedDateTime], // soonest due first
-        paidCoupons: List[Instant] // most recent first
-    ) extends Form
-        with Maturity {
-
-      /** FIXME: implement */
-      def contract: Contract = ???
-    }
-    //
-    // /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
-    //   */
-    // case object Bonds extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bond]
-    //
-    // /**
-    //   */
-    // final case class Bill(
-    //     override val matures: ZonedDateTime
-    // ) extends Form
-    //     with Maturity {
-    //
-    //   import std.zeroCouponBond
-    //
-    //   /** A `Bill` is a kind of zero coupon bond. */
-    //   def contract: Contract =
-    //     zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0))
-    // }
-    //
-    // /** `Bills` are always issued by entities, never by natural persons.
-    //   */
-    // case object Bills extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Bill]
-  }
-
-  object layers extends PrimaryCapital
 
   /**
     */
@@ -299,37 +124,44 @@ trait Paper { module: ModuleTypes with Person =>
   case object Novations extends ValueStores.VS[Novation]
 }
 
-sealed trait Form extends Product {
+// sealed trait Form extends Product
+//
+// object Form {
+//
+//   implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
+//   implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
+//
+//   implicit lazy val formEncoder: Encoder[Form] = { deriveEncoder }
+//   implicit lazy val formDecoder: Decoder[Form] = { deriveDecoder }
+// }
 
-  // def contract: Contract
-  //
-  final def display: Label = {
-    val name: String = s"Form::$productPrefix"
-    val Right(label) = refineV[IsLabel](name)
-    label
-  }
-}
+// sealed abstract case class ContractKey private (final val usin: USIN) extends Numéraire.InKind
+// object ContractKey {
+//
+//   /** FIXME implement
+//     */
+//   private[deftrade] def apply(usin: USIN): ContractKey =
+//     new ContractKey(usin) {
+//
+//       final def contract[F[_]: Monad: Defer]: F[Contract] =
+//         ???
+//     }
+//   implicit def instrumentKeyOrder: Order[ContractKey] = { import auto._; semiauto.order }
+//   implicit def instrumentKeyShow: Show[ContractKey]   = { import auto._; semiauto.show }
+// }
+//
 
-object Form {
-
-  implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
-  implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
-
-  implicit lazy val formEncoder: Encoder[Form] = { deriveEncoder }
-  implicit lazy val formDecoder: Decoder[Form] = { deriveDecoder }
-}
-
-sealed abstract case class Bar private (i: Int, s: String) extends Form
-
-object Bar {
-  def apply(i: Int, s: String): Bar =
-    new Bar(i, s) {}
-  implicit lazy val barEq: Eq[Bar]     = { import auto.eq._; semiauto.eq }
-  implicit lazy val barShow: Show[Bar] = { import auto.show._; semiauto.show }
-
-  implicit lazy val barEncoder: Encoder[Bar] = { deriveEncoder }
-  implicit lazy val barDecoder: Decoder[Bar] = { deriveDecoder }
-}
+// sealed abstract case class Bar private (i: Int, s: String) extends Form
+//
+// object Bar {
+//   def apply(i: Int, s: String): Bar =
+//     new Bar(i, s) {}
+//   implicit lazy val barEq: Eq[Bar]     = { import auto.eq._; semiauto.eq }
+//   implicit lazy val barShow: Show[Bar] = { import auto.show._; semiauto.show }
+//
+//   implicit lazy val barEncoder: Encoder[Bar] = { deriveEncoder }
+//   implicit lazy val barDecoder: Decoder[Bar] = { deriveDecoder }
+// }
 // /** And by "vanilla" we mean an exchange traded derivative (ETD).
 //   */
 // object VanillaDerivatives {

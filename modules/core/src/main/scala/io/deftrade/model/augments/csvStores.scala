@@ -4,7 +4,7 @@ package model.augments
 import keyval.csv
 import csv.{ kvs, vs }
 import model.layers._
-import model.slices.Metas
+import model.slices.{ ContractKey, Metas }
 import model.slices.keys.IsUSIN
 
 import cats.implicits._
@@ -60,17 +60,17 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
 
   /**
     */
-  implicit def instrumentKeyGet: Get[Instrument.Key] =
-    new Get[Instrument.Key] {
-      def get(field: CSV.Field): Either[Error.DecodeFailure, Instrument.Key] =
-        refineV[IsUSIN](field.x) map Instrument.Key.apply leftMap { reason =>
+  implicit def instrumentKeyGet: Get[ContractKey] =
+    new Get[ContractKey] {
+      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey] =
+        refineV[IsUSIN](field.x) map ContractKey.apply leftMap { reason =>
           Error.DecodeFailure(NonEmptyList one reason)
         }
     }
 
   /**
     */
-  implicit def instrumentKeyPut: Put[Instrument.Key] =
+  implicit def instrumentKeyPut: Put[ContractKey] =
     stringPut contramap (_.usin.value)
 }
 

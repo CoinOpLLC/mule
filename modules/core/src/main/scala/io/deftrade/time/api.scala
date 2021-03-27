@@ -338,6 +338,24 @@ trait api {
       Instant from _
     ) with Hash[Instant] with Order[Instant]
 
+  implicit lazy val shoZonedDateTime =
+    new Show[ZonedDateTime] with Hash[ZonedDateTime] with Order[ZonedDateTime] {
+
+      private val formatter = DateTimeFormatter.ISO_ZONED_DATE_TIME
+
+      def show(x: ZonedDateTime): String =
+        formatter format x
+
+      def parse(s: String): Result[ZonedDateTime] =
+        Result safe (ZonedDateTime from (formatter parse s))
+
+      def hash(x: ZonedDateTime): Int =
+        x.hashCode
+
+      def compare(x: ZonedDateTime, y: ZonedDateTime): Int =
+        x compareTo y
+    }
+
   /** TODO: expand on these */
   implicit lazy val monthOrder: Order[Month] = Order.fromComparable[Month]
 }
