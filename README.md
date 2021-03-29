@@ -21,17 +21,16 @@ Trading "algo"s implement _state_ as DDD _aggregate-entities_
 - this is `CQRS/ES` and can be used to replicate / restore application or session state
   - Results of these computations should be recomputable by replaying the event stream and *discarding the effects*.
 
-### in-memory data definitions use `ADT`s and `SACC`s.
+### in-memory data definitions use `SADT`s and `SACC`s.
 
-- **`ADT`** := algebraic data type
-    - enable principled `codec` derivation
-    - binary (scodec)
-    - csv (cormorant)
-    - jdbc (doobie)
-- **`SACC`** := sealed abstract case class
-- "unforgable" typed values
-    - private constructor
-    - no copy method
+- **`SADT`** := serialized algebraic data type with principled `codec` derivation
+  - json (circe)
+  - csv (cormorant)
+  - binary (scodec)
+  - jdbc (doobie)
+- **`SACC`** := sealed abstract case classes for "unforgable" typed values
+  - private constructors
+  - no copy methods
 
 ### persistence roadmap
 - spreadsheet integration via csv file based persistence with json for adts
@@ -49,7 +48,7 @@ Trading "algo"s implement _state_ as DDD _aggregate-entities_
 - `cats.evidence` integration
 
 
-A project of [CoinOpLLC](https://coinopllc.com).
+A project of [CoinOp LLC](https://coinopllc.com).
 
 ### NO WARRANTY
 

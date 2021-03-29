@@ -1,6 +1,8 @@
 `deftrade`: The Book of Books
 ---
 
+For the Developer:
+
 This document describes `deftrade`, a **foundational toolkit** for composing applications that serve investment funds, asset exchanges, and other **financial market participants**.
 
 Developers will use `deftrade` to build systems that allow traders, market makers, deal makers, portfolio managers, and clients to operate within a _universal and distributed_ financial bookkeeping platform.
@@ -93,6 +95,8 @@ As a simple example, consider a publicly traded common stock which issues a divi
 <!-- research test bed for Ricardian smart contracts -->
 <!-- `deftrade` is `corda` for hobbit capital in the real economy -->
 
+<!-- `deftrade` is a _model_ in the functional-reactive sense: prefer _models_ to "presentations" ("Fran" paper - MS Research '97) -->
+
 ## What does it mean to "keep a set of books?"
 
 Organizations of all kinds and in all ages have "kept books", and the literature on history and practice is vast.
@@ -173,7 +177,7 @@ The composite `Contract` governing an `Trade` - the quantities of instruments pr
     object GavcTrasowaHa extends Contract // == zero, of course
     ```
 
-### Numéraire: the units of account
+### `Numéraire`: units of account
 
 `Numéraire` is formal finance term which, contrary to what an understandably naive anglophone might think, signifies the **denominator** (not numerator) for `Contract`s and `transaction`s.
 
@@ -181,21 +185,37 @@ There are exactly two ways we can "settle the bill", so to speak: `InCoin`, and 
 
 The application level is where we declare the policy decisions about details associated with both modes.
 
-#### InCoin: Money and Currency
+Two significant feature of the `Numéraire`:
+- it **_is_** a (primitive)`Contract` - see primitives above
+- it also **_has_** a `Contract`, embedded in an effect type `F[_]` with both `Monad` and `Defer` typeclass instances.
+
+#### `InCoin`: money and currency
 
 `Money` has the following properties of interest in this model:
  - Money is an amount denominated in a (supported) **`Currency`**
  - Money is **fungable**
  - Money is **self-pricing** (within its denomination)
 
- Most kinds of debt are simply `Contract`s for future `Money`.
+ The embeded `Contract` for all `InCoin` denominations is _self referencing_.
 
-#### InKind: other things we can receive in consideration
+#### `InKind`: all other consideration
 
-For example:
+Most kinds of debt are simply `Contract`s for future `Money`; as such they constitute non self-referential `InKind` contracts. Equity "call" options constitute another.
+
+_Some_ `InKind` contracts are self referential, like `InCoin`:
  - `Contract`s for **equity** (e.g shares of common stock)
  - `Contract`s for **real property** (e.g. commercial property leases)
  - `Contract`s for **physical delivery of commodities** (e.g. tanks of propane)
+
+ These types of self-referential `InKind` contracts represent a bidirectional channel, defined by the `Contract`:
+ - delivering:
+   - a subscription to privately published information (e.g. board minutes)
+   - a calendar of dividend distributions
+- receiving:
+  - votes
+  - other elections?
+
+Point being: equity is both a pub/sub system and a voting platform; aspects not commonly considered when conjering the "stock market".
 
 ### Contract DSL
 
@@ -232,7 +252,27 @@ What follows is a brief description of the `DSL` for contract specification, rep
    def pick(c1: => Contract, c2: => Contract): Contract
 ```
 
-#### Observables and oracles
+#### `Oracle`s
+
+Rather than the aphasic glossalila attributed to the pithia of the classical hellenic world, in _**our**_ system, `Oracle`s deliver truth.
+
+There are a number of different kinds of oracles:
+- time
+- parametric state
+  - e.g. strike and expiry for a call option
+- (private) state
+  - e.g. principle amount due on a term loan
+- issuer commands
+  - e.g. callable bond issuer exercising option
+- holder commands
+  - e.g. equity call buyer exercising option
+- ledger derived facts
+  - e.g. "credit rating" (underwriting metric)
+- market data
+  - e.g. S&P 500 quarterly closing level
+  - e.g. WSJ prime rate
+
+Note that not all contracts will use all kinds of oracles.
 
 TODO: investigate potential for DeFi integration (which seems high)
 
@@ -242,21 +282,45 @@ Use an `Engine` to `eval`uate a `Contract`s and obtain a result. That result may
 
 The difference between "workflow automation" and "smart contract execution" is a matter of degree, perspective, and counterparty platform integration.
 
-There are currently three kinds of `Engine`s:
+There are currently two kinds of `Engine`s:
 
 #### Pricing
 
 Evaluate the `Contract` in the specified `Currency`, returning a **real valued process** which represents the distribution of possible `Contract` values a given number of `TimeSteps` from `t0`.
 
-#### Scheduling
-
-Produces calendar schedules of actions for humans to follow up on:
- - make and expect payments, exercise options, etc.
- - uses automation tools as integrations become available
 
 #### Performing
 
 Automated `Contract` performance, including the capacity to commit Transactions to the Ledger.
+
+Note that "automation" may include flows provided standard cloud based document signing platform providers (such as DocuSign). From the perspective of the `Contract` issuer, the humans are just mechanical Turks providing inputs which the signing platform "lifts" into to `Oracle` status (providing both type safety and legal binding, if done right).
+
+For drop-down into manual workflows, `Engine.eval` produces calendar schedules of actions for humans to follow up on:
+ - make and expect payments, exercise options, etc.
+ - uses automation tools as integrations become available
+
+##### Transaction Driver Transfers
+
+```scala
+  Oracle
+  ======        __________     ______
+  holder =====>|          |==>|      |==> command(ck: ContractKey, amount: Quantity,
+  issuer =====>| Contract |   | F[_] |            sender: Portfolios.Key,
+  other  =====>| FSM      |   |      |            receiver: Portfolios.Key)
+           +==>|__________|==>|___^__|==+ state
+           |                      ^     |
+           |                 flatMap()  |
+           +============================+
+```
+
+`command` | description
+---: | :---
+deliver | send to recipient
+expect | await the arrival of
+
+If both `sender` and `receiver` are _local_, we can effect the transfer immediately and natively.
+
+If either is a portfolio representing a _contra account_ for a gateway, additional automation and/or manual steps must be provisioned.
 
 ### Evolution of the Instrument graph
 
@@ -321,6 +385,12 @@ There can be more than one leg in an M&A transaction:
 
 TODO: `Provenance` factorization
 
+### Contract interaction examples and use cases
+
+####
+
+What happens when you have a covered call position, and the call your are short gets exercised against you, even if it makes no sense economically to do so? (e.g. the call buying counterparty may have been shorting a stock and needs to deliver that stock, even though the call option (that you sold them) expired "worthless".
+
 ### References
 
 - Original papers at [Microsoft Resarch](https://www.microsoft.com/en-us/research/publication/composing-contracts-an-adventure-in-financial-engineering/)
@@ -337,518 +407,6 @@ TODO: `Provenance` factorization
 ## The Tables
 
 This section specifies the data model.
-
-### The `keyval` package.
-
-The business data object lifecycle procedes inexorably:
-
-`In Memory ==> ... ==> On Ice`
-
-Every persistence in between can be viewed as a _cache_ of some kind.
-
-This exposition will cover the two endpoints (where `On Ice` is taken to be `.csv`).
-
-#### Immutable, append-only data model
-
-Tracing the evolution of the value associated with a key, by folding the values associated with that key to provide a "sum" of some kind, is the technique by which "state variables" are created and maintained within memory.
-
-Recording only the intent to delete identified data, and not the actual data, is usually a good practice. The exception would be where data _must_ be erased (e.g. for regulatory reasons). It will be necesssary to make a snapshot of the folded-up structure in a table or file which **completely replaces** the previous data in order to physically delete data. This will become necessary over time if bounded storage requirements are respected.
-
-#### Indexing Types
-
-`deftrade` defines a [convention over configuration](https://en.wikipedia.org/wiki/Convention_over_configuration) system for `Id`s and `Key`s.
-
-##### Id
-
-The generation of unique primary key `Id` instances has been left to the database itself in past architectures. Our approach is to compute a cryptographic `Id` over the set of persisted `Row`s representing an atomic append operation. These sets of rows may be independent (and therefore content addressable), or `chained` together such that the `Id` of each atomic `Row` set is dependent on the `Id` computed for each previous append.
-
-`Order` and `Show` typeclass instances are defined naturally for `Id`.
-
-The specific secure hash algorithm is bound by the application developers.
-
-##### Key
-
-`Key` types must have `Order` and `Show` typeclass instances defined and in scope.
-
-Typical `Key` types:
-- domain legible (e.g. `AccountNo`)
-- opaque types (e.g. `UUID`s)
-- `Id` types of other tables
-- `Key` types of other tables
-
-##### Value
-
-Most often represents some kind of [value object](https://medium.com/swlh/value-objects-to-the-rescue-28c563ad97c6). Always requires typeclass instances for `Eq`, and `Show`. Note, `Value` is not the same as `Spec` (more later).
-
-#### Primary Index Conventions
-
-In contrast to some other programming conventions, a `type Foo` may not contain instances of, nor depend upon, type `Foo.Id` or `Foo.Key`.
-
-Stated simply: there will be no `id: Id` or `key: Key` fields within domain types! Index types are stored separately at every level of the storage hierarchy (e.g. `key`s in an in-memory `scala.collection.Map`)
-
-However, **foreign keys** which reference other domain value types are permitted within value types.
-
-#### Data Vault Modeling
-
-It is assumed that `keyval` package clients will generally pursue [Data Vault](https://en.wikipedia.org/wiki/Data_vault_modeling) style modeling and use `hub`s and `link`s to define graphs of `value types` defined by `business key`s.
-
-A `link` in "Data Vault" terms (foreign key) must be either be a business key or an `Id` (the identifier of an immutable record) from some `Table`.
-
-`Business Keys`
-: - integral or string types with domain specific formats and semantics
-  - possibly opaque (like a `UUID`), possibly public (like an `ISIN`)
-  - may index `KeyValue` stores directly
-  - _via negativa_, "**Real** business keys only change when the **business** changes!" (cite: lore).
-
-`Essential Attributes`
-: - ubiquitous
-  - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
-  - permit **tactical denormalization**
-    - deviates from strict Data Vault methodology
-    - mixes `satelite` fields in with `link` or `hub` shaped relations
-    - no redundancy from denormalizing due to ubiquity
-
-`Optional Attributes`
-: - always `link`ed, never denormalized.
-  - single, polymorphic fields recorded as Serialized Algebraic Data Types (`SADT`s)
-  - persisted / indexed as binary in Mongo and Postgres
-  - simple `JSON` to begin
-    - [IPLD compliant](https://specs.ipld.io/#ipld-codecs) (barely)
-    - TODO: `DAG-JSON`, `DAG-CBOR`
-
-### Persistence Algebras
-
-There are two types of `Store`s: `Value` and `KeyValue`.
-- Value stores persist immutable (in memory) values
-- KeyValue stores persist associative arrays of (key, value) pairs
-- Both use the root WithValue type to augment companion objects of `type V`
-  - define (specific) `Id` and (generic) `Record` types for _both_ kinds of `Store`.
-
-#### `Stores`
-
-A cryptographic hash function (secure hash algorithm: `sha`) is the basis of index computation.
-
-**Note**: the following `scala` code is _simplified_ for exposition.
-
-```scala
-/** assume for example - other choices would work here as well */
-   type SHA = String Refined IsSHA256AsBase58
-
-/** magical code! elides many details about canonical formats and codecs! */
-   def sha[A](a: A): SHA = { ... }
-```
-Assume a suitable type `Row` that represents the bits to be persisted in association with a given `Id`. (`Row` will be elaborated in the following section.)
-
-We can use `sha` to compute a unique `Id` based only on instances of `Row`:
-
-```scala
-type Id = SHA
-
-/** content address for row */
-def rowSHA: Row => Id =
-  row => sha(row)
-```
-Or, we can use a previous `Id` (computed from some prior `Row`)
-to compute a new (`hash chain`ed) `Id` for a given `Row`.
-
-```scala
-/** chain `Id`s together into a sequence using `sha` */
-def chain: Id => Id => Id =
- i => j => sha((i, j))
-
-/** chained address for row */
-def chainedRowSHA: Id => Row => Id =
-  id => row => chain(id)(sha(row))
-```
-
-**Note:** An `Id` calculated via `sha` can (and often does) span **multiple** `Rows`.
-
-```scala
-/** content addressed `Id` spanning multiple `Row`s.
-  *
-  * single `sha` validates single transaction semantics
-  */
-def rowsSHA: (Row, List[Row]) => Id =
-  (row, rows) => rows.foldLeft(rowSHA(row))((s, r) => chain(s)(sha(r)))
-
-/** chained addressed `Id`s spanning multiple `Row`s (single transaction) */
-def chainedRowsSHA: Id => (Row, List[Row]) => Id =
-  id => (row, rows) => chain(id)(rowsSHA(row, rows))
-```
-
-This specifies all the types and methods necessary to compute `Id`s for any `Store`.
-
-```scala
-/** once again simplified for exposition
-  */
-trait Stores[V] {
-
- // bound type members
- //
- type Id    = SHA  /*: Order */
- type Value = V    /*: Eq */
-
- // free type members
- //
- type Row   // what we append, prefixed with Id
- type Spec  // what we get and put
-
- // derived type members
- //
- type Record = (Id, Row)
-}
-```
-
-### `ValueStore`s
-```scala
-trait ValueStores[V] extends Stores[V] {
-  type Row = V
-}
-```
-The `Row` type is simply bound to the  `Value` type.
-
-#### content address models a `Set`
-
-Id | Value
-:--- | ---:
-`a = rowSHA` | 42.00
-`b = rowSHA` | 33.33
-`a = rowSHA` | 42.00
-
-Here we compute the `Id` of the `Row` using a secure hash function
-(`sha`). This simple convention entails `Set` semantics: identical `Row`s hash to the same `Id`.
-
-Consider:
-
-```scala
-type Spec     = Value
-type Shape[_] = Set[_]
-type Model    = Shape[Spec]
-
-val example: Model = Set(33.33, 42.00)
-```
-
-Note: duplicate row are elided when `append`ed, and this elision is signaled in the API.
-
-Because the `Id` may be computed directly given the `Value`, or "content", to be referenced, this type of value store can be called `content addressed`.
-
-Note: The sequential order of committed `Value`s is not guaranteed to be maintained. In particular, the physical presence of a `Record` which precedes another cannot be taken as indication, let alone proof, that there is a temporal ordering between them which is defined by the `ValueStore` (such ordering may be defined elsewhere withing a specific data model).
-
-#### chained address models a `List`
-
-Id | Value
-:--- | ---:
-`a = chainedRowSHA(_)` | 42.00
-`b = chainedRowSHA(a)` | 33.33
-`c = chainedRowSHA(b)` | 42.00
-
-This is _also_ a pure immutable `value store`, but with `chain`ed `Id`s. No longer content addressable! Duplicate `Row`s will hash to distinct `Id`s due to chaining.
-These value stores entail `List` semantics: in particular, the order of commitment may be proved by the `Id` sequence.
-
-Consider:
-```scala
-type Spec     = Value
-type Shape[_] = List[_]
-type Model    = Shape[Spec]
-
-val example: Model = List(42.00, 33.33, 42.00)
-```
-
-Note in particular that a _block_ of chained `Id`s forms a
-function `Id => Id` (input to output) permitting blocks themselves to be chained (!).
-
-`Store`s of this shape are used for `model.Transaction`s.
-
-All `Shape` specializations of `ValueStore` may use *either* `content address` or `chained address` functions to compute `Id`.
-
-#### specialization for non-empty Maps
-
-```scala
-type K2 /*: Order */
-type V2 /*: Eq */
-type Value = (K2, V2)
-```
-
-Id            | (K2 |      V2)
-:------------ | --- | --------:
-`a = rowsSHA` | USD | 10,000.00
-`a`           | XAU |    420.33
-`b = rowsSHA` | XAU |    397.23
-
-This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, V2]`.
-`Id`s are computed across all `Row`s belonging
-to the same `Map`.
-
-```scala
-type Spec     = NonEmptyMap[K2, V2]
-
-val example: Model = Set (
-  Map (
-    USD ->  10000.00,
-    XAU ->    420.33
-  ),
-  Map (
-    XAU ->    397.23
-  )
-)
-```
-
-`ValueStore`s of this shape are used e.g. to model `Trade`s (with `content address`ing).
-
-#### specialization for non-empty Lists.
-
-Id |  Value
-:--- | ---:
-`a = chainedRowSHA(_)`  | XAU
-`b = chainedRowsSHA(a)` | XAU
-`b`                     | CHF
-`c = chainedRowsSHA(b)` | USD
-`c`                     | USD
-
-This is a value store of `Nel[Value]` rows.
-
-Rows that are committed together get the same `Id`.
-
-```scala
-     type Spec     = Nel[Value]
-
-val example: Model =
-  Set(
-    Nel(XAU),
-    Nel(XAU ,
-        CHF),
-    Nel(USD ,
-        USD)
-  )
-```
-
-`Store`s with this specialization are used in this example to implement a set of lists of arbitrary currencies.
-
-**TODO:** make this example a set of `Command` or `Event` values of some kind - that shows off the `Shape`.
-
-#### specialization for Maps of non-empty Lists.
-
-```scala
-type K2 /*: Order */
-type V2 /*: Eq */
-type Value = (K2, V2)
-```
-
-May use either content address or chained address for `Id`.
-Duplicate rows must be appended within a single call that computes a single `Id`.
-
-Id            | (K2 |      V2)
-:------------ | --- | --------:
-`a = rowsSHA` | USD |10,000.00
-`a`           | USD | 5,000.00
-`a`           | USD | 5,000.00
-`a`           | XAU |   420.33
-`b = rowsSHA` | XAU |   397.23
-
-This is a pure value store `(K2, V2)` tuples, which are the rows of a `Map[K2, Nel[V2]]`.
-`Id`s are computed across all `Row`s belonging to the same `Map`.
-
-In the example above, a `Map[K2, V2]` of size 3 is followed by a `Map` of size 1.
-
-```scala
-
-type Shape[_] = Set[_] // or List[_]  for chained address!
-type Spec     = Map[K2, Nel[V2]]
-
-val example: Model =
-  Set (
-    Map (
-      USD -> Nel(10000.00 ,
-                  5000.00 ,
-                  5000.00),
-      XAU -> Nel(  420.33)
-    ),
-    Map (
-      XAU -> Nel(  397.23)
-    )
-  )
-```
-### `KeyValueStores`
-
-The `KeyValueStore` type represents a family of persistence algebras with parametric effect type, indexed by an ordered key type. This key type is typically bound to a business key type from the domain model.
-
-
-
-The use of chained address for `Id` is mandatory.
-
-Rational: since we are tracing the dynamic evolution of a value indexed by a key,
-multiple instances of the same `Row` entail positional significance in the data model.
-(We can write the same row multiple times, and it matters in what order we write it.)
-
-```scala
-trait KeyValueStores[K, V] extends Stores[V] {
-  type Key  = K /*: Order */
-  type Row  = (Key, Option[Value])
-}
-```
-
-Id | (Key | Option[Value])
-:--- | --- | ---:
-`a = chainedRowSHA(_)` | USD | 10,000.00
-`b = chainedRowSHA(_)` | XAU | 420.33
-`c = chainedRowSHA(b)` | XAU | 397.23
-`d = chainedRowSHA(a)` | USD | 5,000.00
-
-This is a key value store. The `Value` for a given `Key` evolves over time and the store records each evolution, maintaining the entire `Value` history for each `Key`.
-
-Note: `Id`s are chained per `Key`, (`keychaining`), which has these implications:
-
-- the evolution of the value for a single key can be extracted from the store and
-transferred or validated without additional context.
-- intermediate `Id` state must be maintained per key
-   - (`Map[Key, Id]`)
-   - scales with the number of unique keys!
-- chaining arbitrary blocks together is no longer straightforward
-   - (entails a `Map[Key, Id] => Map[Key, Id]` somewhere handy)
-
-```scala
-     type Spec     = Value
-
-     val example: Model =
-       Map(
-         USD -> 5000.00,
-         XAU ->  397.23
-       )
-```
-
-`Store`s of this shape are used in this example to map a currency to an amount.
-
-#### specialization for non-empty Lists
-
-Id | (Key | Option[Value])
-:--- | --- | ---:
-`a = chainedRowSHA(_)`  | IBan.09993 | XAU
-`b = chainedRowsSHA(_)` | IBan.06776 | XAU
-`b`                     | IBan.06776 | CHF
-`c = chainedRowSHA(_)`  | UsBan.5321 | USD
-`d = chainedRowSHA(b)`  | IBan.06776 | USD
-
-This is a key value store of `Nel[Value]`s.
-
-Note that `Row`s that are committed together get the same `Id`.
-
-However, _all_ rows contribute to the data model!
-
-```scala
-type Shape[_] = Map[Key, _]
-type Spec     = Nel[Value]
-
-val example: Model =
-  Map(
-    IBan.06776 -> Nel(XAU ,
-                      CHF ,
-                      USD),
-    IBan.09993 -> Nel(XAU),
-    UsBan.5321 -> Nel(USD),
-  )
-```
-
-`Store`s of this shape are used in this example to implement a list of permitted currencies per account.
-
----
-
-#### specialization for Maps
-```scala
-type K2 /*: Order */
-type V2 /*: Eq */
-type Value = (K2, V2)
-type Row  = (Key, Option[(K2, Option[V2])])
-```
-
-Id | (Key | Option[(K2 | Option[V2])])
-:--- | --- | --- | ---:
-`a = chainedRowSHA(_)` | UsBan.5321 | USD | 10,000.00
-`b = chainedRowSHA(_)` | IBan.09993 | XAU |    420.33
-`c = chainedRowSHA(_)` | IBan.06776 | XAU |    397.23
-`d = chainedRowSHA(a)` | UsBan.5321 | USD |  5,000.00
-
-This is a key value store of `Map[K2, V2]` rows.
-
-```scala
-     type Shape[_] = Map[Key, _]
-     type Spec     = Map[K2, V2]
-
-     val example: Model =
-       Map(
-         IBan.06776 -> Map(XAU ->  397.23),
-         IBan.09993 -> Map(XAU ->  420.33),
-         UsBan.5321 -> Map(USD -> 5000.00),
-       )
-```
-
-`Store`s of this shape are used for `model.Folio`s
-
----
-
-#### specialization for `Map`s of `Nel`s
-
-Id | (Key | Option[(K2 | Option[V2])])
-:--- | --- | --- | ---:
-`a = chainedRowSHA(_)` | UsBan.5321 | USD | 10,000.00
-`b = chainedRowSHA(_)` | IBan.09993 | XAU |    420.33
-`c = chainedRowSHA(_)` | IBan.06776 | XAU |    397.23
-`d = chainedRowSHA(a)` | UsBan.5321 | USD |  5,000.00
-
-This is a key value store of `Map[K2, Nel[V2]]` rows
-(the most general structure supported).
-
-Note: same data commits as the previous example, but different semantics.
-
-
-```scala
-
-  type Shape[_] = Map[Key, _]
-  type Spec     = Map[K2, Nel[V2]]
-
-  val example: Model =
-    Map(
-      IBan.06776 -> Map(XAU -> Nel(  397.23)),
-      IBan.09993 -> Map(XAU -> Nel(  420.33)),
-      UsBan.5321 -> Map(USD -> Nel(10000.00  ,
-                                    5000.00)),
-    )
-```
-
-`Store`s of this shape are used for e.g. ???
-TODO: identify use case, again probably using events as values
-
----
-
-#### "deleting" a `Key`
-
-`Value`s are `nullable` in the `WithKey` context.
-
-In this example, the value associated with the key `USD` is semantically deleted.
-
-Id | (Key | Option[Value])
-:--- | --- | ---:
-`z` = chainedRowSHA(`_`) | USD | `null`
-
-For `Map[Map]` and `Map[Map[Nel]]` specializations, `null`ify both the `K2` field for a given `Key`.
-
-Id | (Key | Option[(K2 | Option[V2])])
-:--- | --- | --- | ---:
-`x` = chainedRowSHA(`d`) | UsBan.5321 | `null` | `null`
-
-#### "deleting" a `K2`
-
-For `Map[Map]` and `Map[Map[Nel]]` specializations,
-`null`ify the `V2` field for a given `(Key, K2)`.
-
-Id | (Key | Option[(K2 | Option[V2])])
-:--- | --- | --- | ---:
-`y` = chainedRowSHA(`c`) | IBan.06776 | `XAU` | `null`
-
----
-
-## The Table of Tables
-
-This sections describes how the data models are layered and relate to each other.
 
 ### The `model` package.
 
@@ -1021,11 +579,26 @@ Reference Data
 
 Market data and Historical data are both used within various `Pricing` modules (described in a subsequent section).
 
+TODO: Cite FRAN97 and explain how the system is functionally reactive - "updates like a spreadsheet" - with respect to market data.
+
 #### Order Management
+
+There is a discipline to the bidding process for proposed transactions between two parties. This discipline is historically durable and observed across timescales (from weeks and months, which is the timescale of real estate) to microseconds, which mark time for market makers that employ HFT technology.
+
+The `Execution` of `Order`s, accomplished with the `Transaction`s already described, implements this discipline within our model. The `Order` events can be used to propose transactions for any asset from buildings to bitcoin.
+
+The important points is that `Order` issuance, modification, and cancelation are decoupled from `Execution` (`Transaction` recording) in the `Market`.
+
+Similarly, `Execution` is decoupled from the recording of `Confirmation`s.
+
+This temporal decoupling introduces flexibility which historical practice suggests is valuable, and to which market participants are accustomed. However, it also creates complexity and data, which must be tracked.
+
+Reference for the order/execution pipeline: [Functional and Reactive Domain Modeling, section 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
+
+TODO: need diagram of Ghosh's Kleisli pipe: Order -> Execution -> Confirmation -> Allocation
 
 Ubiquitous within the domain is the acronym,`OMS`, which stands for **Order Management System**. Financial markets, especially publicly traded markets, are often grouped and accessed together over a session based API which manages the order lifecycle.
 
-Reference for the order/execution pipeline: [Functional and Reactive Domain Modeling, section 4.4](https://livebook.manning.com/#!/book/functional-and-reactive-domain-modeling/chapter-4/270)
 
 ##### Orders
 
@@ -1183,19 +756,60 @@ While least one `Party` **must** be specified for each role in the roster, the d
   - responsible party for a liability
   - shareholder for equity
   - business unit chief for revenue and expenses
+  - etc.
+
+  A complete enumeration and definition is beyond the scope of this specification.
 
 `Agent`
-: The primary delegate selected by the `Principal`s. A `Princple` is their own `Agent` unless otherwise specified.
+: The primary delegate selected by the `Principal`s.
+
+  A `Princple` is their own `Agent` unless otherwise specified.
 
 `Manager`
-: The primary delegate selected by the `Agent`. `Party`(s) with responsibility for, and authority over,
-the disposition of assets in the `Account`. In particular, `Manager`s may initiate actions which will result in `Transaction`s settling to the `Account`.
+: The primary delegate selected by the `Agent`. `Party`(s) with responsibility for, and authority over, the disposition of assets in the `Account`. In particular, `Manager`s (and **only** `Managers`) may initiate actions which will result in `Transaction`s settling to the `Account`.
+
+  An `Agent` is their own `Manager` unless otherwise specified.
 
 `Auditor`
 : First class participants, with a package of rights and responsibilities. `Auditor`s will have a (possibly limited) view into the state of the `Ledger`, and (optionally) the ability to block the **settlement** of a `Transaction` (but not its **record**) to the `Ledger` (i.e. "break trades"), or even to initiate the recording of a `Transaction`.
-  - Actions of the `Auditor` may include the publishing of specific summaries of its views into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s.
+  - Actions of the `Auditor` may include the publishing of specific summaries of its views into the `Ledger` to establish common knowledge for participants in `Ledger` `Transaction`s. Therefore an `Auditor` can be considered as a kind of `Oracle`.
   - Note: the `Auditor` need not be a regulatory entity; in particular this role might be suited e.g. to a "risk manager" in the context of a hedge fund.
   - Note further: an `Auditor` function could be something as low level (and automatable) as certifying that a set of Folios has never "double spent" - that everything that came out of it had gone into it at some point in the past.
+
+---
+## The Table of Tables
+
+This sections describes how the data models are layered and relate to each other.
+
+The tables are specified using the [`keval` package](keval.md).
+
+### Data Vault Modeling
+
+Tables are described using [Data Vault](https://en.wikipedia.org/wiki/Data_vault_modeling) style modeling, and to use `hub`s and `link`s to define graphs of `value types` defined by `business key`s.
+
+A `link` in "Data Vault" terms (foreign key) must be either be a business key or an `Id` (the identifier of an immutable record) from some `Table`.
+
+`Business Keys`
+: - integral or string types with domain specific formats and semantics
+  - possibly opaque (like a `UUID`), possibly public (like an `ISIN`)
+  - may index `KeyValue` stores directly
+  - _via negativa_, "**Real** business keys only change when the **business** changes!" (cite: lore).
+
+`Essential Attributes`
+: - ubiquitous
+  - canonical (or projectable from a canonical form, e.g. `CUSIP` projected from `ISIN`)
+  - permit **tactical denormalization**
+    - deviates from strict Data Vault methodology
+    - mixes `satelite` fields in with `link` or `hub` shaped relations
+    - no redundancy from denormalizing due to ubiquity
+
+`Optional Attributes`
+: - always `link`ed, never denormalized.
+  - single, polymorphic fields recorded as Serialized Algebraic Data Types (`SADT`s)
+  - persisted / indexed as binary in Mongo and Postgres
+  - simple `JSON` to begin
+    - [IPLD compliant](https://specs.ipld.io/#ipld-codecs) (barely)
+    - TODO: `DAG-JSON`, `DAG-CBOR`
 
 ### Table Specifications by Cohort
 
@@ -1234,7 +848,7 @@ Name | Store[`Spec`] | Publishes | Links | Attrs
 
 Name | Store[`Spec`] | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
-**Accounts** | KVS[`AccountNo`, `Account`] | Key | `roster: Roster.Id`, `positions: Portfolios.Id` |
+**Accounts** | KVS[`Account.No`, `Account`] | Key | `roster: Roster.Id`, `positions: Portfolios.Id` |
 **Rosters** | VS.Codec[`Roster`] | Id | `party: Parties.Key` | `role: Role`, `stake: Option[Quantity]`
 
 #### Entities
@@ -1269,3 +883,21 @@ Name | Shape | Publishes | Links | Attrs
 ---- | --------------- |-----------------|-------------------------------|----------------------------------------------------------------------------------------
 ---|---|---|---|---|---
 **SASHs** | KVS[`*.Id`, `SASH`] | Id | `signer: Parties.Key` | `sig: Sig`
+
+### Laws of the Model Algebra
+
+TODO: placeholders; these need further development
+
+The idea is to be inspired by Debashish Ghosh's exortation for find laws in your business logic; this is what makes it an _algebra_.
+
+#### Single Spend
+
+Law: When summed over all `Folio`s, the total amount of each `Numéraire` is zero.
+
+#### Complete Confirmation Coverage
+
+Law: the set union of `Confirmation`s exactly equals the set union of `Folio`s.
+
+#### Contract Pricing Arbitrage Neutrality
+
+Law: the `Contract` pricing `Engine` obeys arbitrage neutrality
