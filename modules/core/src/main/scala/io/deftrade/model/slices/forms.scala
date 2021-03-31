@@ -11,7 +11,7 @@ import refinements.{ Label }
 import spire.math.Fractional
 
 import cats.implicits._
-import cats.{ Defer, Eq, Monad, Order, Show }
+import cats.{ Contravariant, Defer, Eq, Monad, Order, Show }
 import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
@@ -23,19 +23,24 @@ import io.circe.{ Decoder, Encoder }
 import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 import io.circe.refined._
 
-sealed abstract case class ContractKey private (final val usin: USIN) extends Numéraire.InKind
+/**
+  */
+trait ContractKey extends Numéraire.InKind {
+
+  val usin: USIN
+}
+
+/**
+  */
 object ContractKey {
 
-  /** FIXME implement
-    */
-  private[deftrade] def apply(usin: USIN): ContractKey =
-    new ContractKey(usin) {
+  implicit def contractKeyOrder: Order[ContractKey] =
+    Order by (_.usin)
 
-      final def contract[F[_]: Monad: Defer]: F[Contract] =
-        ???
-    }
-  implicit def contractKeyOrder: Order[ContractKey] = { import auto.order._; semiauto.order }
-  implicit def contractKeyShow: Show[ContractKey]   = { import auto.show._; semiauto.show }
+  implicit def contractKeyShow: Show[ContractKey] =
+    Contravariant[Show].contramap(Show[USIN])(_.usin)
+  // implicit def contractKeyOrder: Order[ContractKey] = { import auto.order._; semiauto.order }
+  // implicit def contractKeyShow: Show[ContractKey]   = { import auto.show._; semiauto.show }
 }
 
 sealed trait Form extends Product
@@ -205,10 +210,183 @@ object PrimaryCapital {
   // case object Bills extends KeyValueStores.KV[ContractKey, Bill]
 }
 
-/** TODO:
-  * `Oracle` events:
-  * - Equity Financing
-  * - Liquidity
-  * - Dissolution
-  */
-object ConvertibleNote
+// /** And by "vanilla" we mean an exchange traded derivative (ETD).
+//   */
+// object VanillaDerivatives {
+//
+//   /**
+//     */
+//   sealed trait PutCall extends EnumEntry
+//
+//   /**
+//     */
+//   object PutCall extends DtEnum[PutCall] {
+//     case object Put  extends PutCall
+//     case object Call extends PutCall
+//     lazy val values = findValues
+//   }
+//
+//   /**
+//     */
+//   final case class Index(
+//       members: Set[Instruments.Key]
+//   ) extends Form
+//       with columns.Tracker {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   case object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
+//
+//   /** Exchange Traded Derivative - Future (ETD) */
+//   final case class XtFuture(
+//       expires: ZonedDateTime,
+//       underlier: Instruments.Key,
+//       strike: Double
+//   ) extends Form
+//       with columns.Derivative {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   case object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
+//
+//   /** Exchange Traded Derivative - Option (ETD) */
+//   final case class XtOption(
+//       val putCall: PutCall,
+//       override val expires: ZonedDateTime,
+//       override val underlier: Instruments.Key,
+//       override val strike: Double
+//   ) extends Form
+//       with columns.Derivative {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /** TODO: recheck that `Isin` thing... */
+//   case object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
+//
+//   /**
+//     */
+//   final case class XtFutureOption(
+//       val putCall: PutCall,
+//       override val expires: ZonedDateTime,
+//       // override val underlier: XtFutures.Key,
+//       // override val underlier: ExchangeTradedInstruments.Key,
+//       override val underlier: Instruments.Key,
+//       override val strike: Double
+//   ) extends Form
+//       with columns.Derivative {
+//
+//     /** FIXME: implement */
+//     def strikeAmount: Double = ???
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   case object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
+//
+//   /**
+//     */
+//   final case class XtIndexOption(
+//       val putCall: PutCall,
+//       override val expires: ZonedDateTime,
+//       override val underlier: Instruments.Key,
+//       override val strike: Double
+//   ) extends Form
+//       with columns.Derivative {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   case object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
+// }
+//
+// /** Private lending instruments.
+//   *
+//   * TODO: do these next
+//   */
+// object Lending {
+//
+//   /**
+//     */
+//   final case class BulletPayment(
+//       matures: ZonedDateTime
+//   ) extends Form
+//       with columns.Maturity {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   final case class CreditLine(
+//       matures: ZonedDateTime,
+//       frequency: Frequency // = Frequency.F1Q
+//   ) extends Form
+//       with columns.Maturity {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     */
+//   final case class AmortizingLoan(
+//       matures: ZonedDateTime,
+//       frequency: Frequency // = Frequency.F1M
+//   ) extends Form
+//       with columns.Maturity {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+//
+//   /**
+//     * TODO:
+//     * `Oracle` events:
+//     * - Equity Financing
+//     * - Liquidity
+//     * - Dissolution
+//     */
+//   final case class ConvertibleNote(
+//       matures: ZonedDateTime,
+//       discount: Double Refined IsUnitInterval.`[0,1)`,
+//       cap: Option[Double Refined Positive]
+//   ) extends Form
+//       with columns.Maturity {
+//
+//     /** FIXME: implement */
+//     def contract: Contract = ???
+//   }
+// }
+
+// /** Groups of related `Form`s.
+//   */
+// object forms
+//     extends PrimaryCapital  // nececssary
+//     with VanillaDerivatives // fun
+//     with Lending // as one does
+// with Fx                 // WIP
+// with Exotics            // primarily for hedge funds
+// with Ibor               // primariy for banks
+
+// /** Necessary annotations for data loaded from external sources. */
+// private[deftrade] trait Provenance {
+//   def sourcedAt: Instant
+//   def sourcedFrom: String Refined Url
+// }

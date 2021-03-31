@@ -3,10 +3,10 @@ package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
 import model.slices.keys.{ ISIN, USIN }
-import model.slices.{ ContractKey, Metas }
+import model.slices.{ ContractKey => CK, Metas }
 
 import cats.implicits._
-import cats.{ Eq, Order, Show }
+import cats.{ Contravariant, Defer, Eq, Monad, Order, Show }
 import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
@@ -19,6 +19,33 @@ import io.circe.{ Decoder, Encoder }
 import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
+
+  sealed abstract case class ContractKey private (
+      final val usin: USIN
+  ) extends CK
+
+  object ContractKey {
+
+    def apply(usin: USIN): ContractKey =
+      new ContractKey(usin) { self =>
+        final def contract[F[_]: Monad: Defer]: F[Contract] = {
+
+          // Note: papers.instrumentsForms has everything you need to define the contract
+          // (and it's in scope!)
+          // papers.instrumentForms get self flatMap { _ match {
+          //  case Foo(b, c1, c2) =>
+          // } }
+          def res: Contract = ???
+          res.pure[F]
+        }
+      }
+
+    implicit def contractKeyOrder: Order[ContractKey] =
+      Order by (_.usin)
+
+    implicit def contractKeyShow: Show[ContractKey] =
+      Contravariant[Show].contramap(Show[USIN])(_.usin)
+  }
 
   final type Form = model.slices.Form
 
@@ -123,217 +150,3 @@ trait Paper { module: ModuleTypes with Person =>
     */
   case object Novations extends ValueStores.VS[Novation]
 }
-
-// sealed trait Form extends Product
-//
-// object Form {
-//
-//   implicit lazy val formEq: Eq[Form]     = { import auto.eq._; semiauto.eq }
-//   implicit lazy val formShow: Show[Form] = { import auto.show._; semiauto.show }
-//
-//   implicit lazy val formEncoder: Encoder[Form] = { deriveEncoder }
-//   implicit lazy val formDecoder: Decoder[Form] = { deriveDecoder }
-// }
-
-// sealed abstract case class ContractKey private (final val usin: USIN) extends Numéraire.InKind
-// object ContractKey {
-//
-//   /** FIXME implement
-//     */
-//   private[deftrade] def apply(usin: USIN): ContractKey =
-//     new ContractKey(usin) {
-//
-//       final def contract[F[_]: Monad: Defer]: F[Contract] =
-//         ???
-//     }
-//   implicit def instrumentKeyOrder: Order[ContractKey] = { import auto._; semiauto.order }
-//   implicit def instrumentKeyShow: Show[ContractKey]   = { import auto._; semiauto.show }
-// }
-//
-
-// sealed abstract case class Bar private (i: Int, s: String) extends Form
-//
-// object Bar {
-//   def apply(i: Int, s: String): Bar =
-//     new Bar(i, s) {}
-//   implicit lazy val barEq: Eq[Bar]     = { import auto.eq._; semiauto.eq }
-//   implicit lazy val barShow: Show[Bar] = { import auto.show._; semiauto.show }
-//
-//   implicit lazy val barEncoder: Encoder[Bar] = { deriveEncoder }
-//   implicit lazy val barDecoder: Decoder[Bar] = { deriveDecoder }
-// }
-// /** And by "vanilla" we mean an exchange traded derivative (ETD).
-//   */
-// object VanillaDerivatives {
-//
-//   /**
-//     */
-//   sealed trait PutCall extends EnumEntry
-//
-//   /**
-//     */
-//   object PutCall extends DtEnum[PutCall] {
-//     case object Put  extends PutCall
-//     case object Call extends PutCall
-//     lazy val values = findValues
-//   }
-//
-//   /**
-//     */
-//   final case class Index(
-//       members: Set[Instruments.Key]
-//   ) extends Form
-//       with columns.Tracker {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   case object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
-//
-//   /** Exchange Traded Derivative - Future (ETD) */
-//   final case class XtFuture(
-//       expires: ZonedDateTime,
-//       underlier: Instruments.Key,
-//       strike: Double
-//   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   case object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
-//
-//   /** Exchange Traded Derivative - Option (ETD) */
-//   final case class XtOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
-//   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /** TODO: recheck that `Isin` thing... */
-//   case object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
-//
-//   /**
-//     */
-//   final case class XtFutureOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       // override val underlier: XtFutures.Key,
-//       // override val underlier: ExchangeTradedInstruments.Key,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
-//   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def strikeAmount: Double = ???
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   case object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
-//
-//   /**
-//     */
-//   final case class XtIndexOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
-//   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   case object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
-// }
-//
-// /** Private lending instruments.
-//   *
-//   * TODO: do these next
-//   */
-// object Lending {
-//
-//   /**
-//     */
-//   final case class BulletPayment(
-//       matures: ZonedDateTime
-//   ) extends Form
-//       with columns.Maturity {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   final case class CreditLine(
-//       matures: ZonedDateTime,
-//       frequency: Frequency // = Frequency.F1Q
-//   ) extends Form
-//       with columns.Maturity {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   final case class AmortizingLoan(
-//       matures: ZonedDateTime,
-//       frequency: Frequency // = Frequency.F1M
-//   ) extends Form
-//       with columns.Maturity {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-//
-//   /**
-//     */
-//   final case class ConvertibleNote(
-//       matures: ZonedDateTime,
-//       discount: Double Refined IsUnitInterval.`[0,1)`,
-//       cap: Option[Double Refined Positive]
-//   ) extends Form
-//       with columns.Maturity {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
-// }
-
-// /** Groups of related `Form`s.
-//   */
-// object forms
-//     extends PrimaryCapital  // nececssary
-//     with VanillaDerivatives // fun
-//     with Lending // as one does
-// with Fx                 // WIP
-// with Exotics            // primarily for hedge funds
-// with Ibor               // primariy for banks
-
-// /** Necessary annotations for data loaded from external sources. */
-// private[deftrade] trait Provenance {
-//   def sourcedAt: Instant
-//   def sourcedFrom: String Refined Url
-// }

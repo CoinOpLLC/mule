@@ -4,7 +4,7 @@ package model.augments
 import keyval.csv
 import csv.{ kvs, vs }
 import model.layers._
-import model.slices.{ ContractKey, Metas }
+import model.slices.{ Metas }
 import model.slices.keys.IsUSIN
 
 import cats.implicits._

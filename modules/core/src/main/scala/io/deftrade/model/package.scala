@@ -16,90 +16,13 @@
 
 package io.deftrade
 
-import cats.implicits._
-import cats.{ Applicative, Foldable, Order, SemigroupK }
 import cats.kernel.CommutativeGroup
 import cats.kernel.instances.MapMonoid
-import cats.data.{ NonEmptyList, NonEmptyMap }
 
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
-package object model {
-
-  /**
-    */
-  def groupBy[
-      F[_]: Applicative: Foldable: SemigroupK,
-      K,
-      A
-  ](fas: F[A])(f: A => K): Map[K, F[A]] = {
-
-    val SA = SemigroupK[F].algebra[A]
-    import SA.combine
-
-    fas.foldLeft(Map.empty[K, F[A]]) { (acc, a) =>
-      val key = f(a)
-      val v   = a.pure[F]
-      acc + (key -> (acc get key).fold(v)(vs => combine(vs, v)))
-    }
-  }
-
-  /**
-    */
-  def groupBy[
-      F[_]: Applicative: Foldable: SemigroupK,
-      K: Order,
-      A
-  ](a: A, fas: F[A])(f: A => K): NonEmptyMap[K, F[A]] = {
-
-    val SA = SemigroupK[F].algebra[A]
-    import SA.combine
-
-    val k = f(a)
-
-    fas.foldLeft(NonEmptyMap.one(k, a.pure[F])) { (acc, a) =>
-      val k = f(a)
-      val v = a.pure[F]
-      acc add k -> acc(k).fold(v)(vs => combine(vs, v))
-    }
-  }
-
-  /**
-    */
-  def groupBy[K: Order, A](a: A, as: A*)(f: A => K): NonEmptyMap[K, NonEmptyList[A]] =
-    as.foldLeft(NonEmptyMap.one(f(a), NonEmptyList one a)) { (acc, a) =>
-      val k = f(a)
-      acc add k -> acc(k).fold(NonEmptyList one a)(a :: _)
-    }
-
-  /**
-    */
-  def index[F[_]: Applicative: Foldable: SemigroupK, K, V](
-      kvs: F[(K, V)]
-  ): Map[K, F[V]] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs map (_._2))
-    }
-
-  /**
-    */
-  def indexAndSum[F[_]: Applicative: Foldable: SemigroupK, K: Order, V: CommutativeGroup](
-      kvs: F[(K, V)]
-  ): Map[K, V] =
-    groupBy(kvs)(_._1) map {
-      case (k, kvs) => (k, kvs foldMap (_._2))
-    }
-
-  /**
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  def indexAndSum[K: Order, V: CommutativeGroup](
-      kv: (K, V),
-      kvs: (K, V)*
-  ): NonEmptyMap[K, V] =
-    groupBy(kv, kvs: _*)(_._1) map (_ foldMap (_._2))
-}
+package object model {}
 
 package model {
 

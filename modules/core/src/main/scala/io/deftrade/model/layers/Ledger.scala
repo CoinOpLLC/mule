@@ -19,7 +19,7 @@ package model.layers
 
 import time._, money._, keyval._
 
-import model.slices.{ Meta, Metas }
+import model.slices.{ indexAndSum, Meta, Metas }
 
 import cats.implicits._
 
@@ -253,7 +253,8 @@ trait Ledger { module: ModuleTypes with Person with Paper =>
       *
       * Implementation may differ for efficiency.
       */
-    def apply(ps: Position*): Folio = ??? // indexAndSum(ps.toList)
+    def apply(ps: Position*): Folio =
+      indexAndSum(ps: _*)
 
     /**
       */

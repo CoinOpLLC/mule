@@ -17,6 +17,13 @@
 package io.deftrade
 package model
 
+import cats.implicits._
+import cats.{ Order }
+import cats.kernel.CommutativeGroup
+import cats.data.{ NonEmptyList, NonEmptyMap }
+
+import scala.collection.immutable.SortedMap
+
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
@@ -29,5 +36,37 @@ package object slices {
   /**
     */
   final type ScaledPartition[K, N] = Partition[K, N, Partition.IsPositive]
+
+  /**
+    */
+  def groupBy[K: Order, A](as: A*)(f: A => K): Map[K, List[A]] =
+    as.foldLeft(SortedMap.empty[K, List[A]]) { (acc, a) =>
+      val k = f(a)
+      acc + (k -> (acc get k).fold(List.empty[A])(a :: _))
+    }
+
+  /**
+    */
+  def indexAndSum[K: Order, V: CommutativeGroup](
+      kvs: (K, V)*
+  ): Map[K, V] =
+    groupBy(kvs: _*)(_._1) map { case (k, kvs) => (k, kvs map (_._2) foldMap identity) }
+
+  /**
+    */
+  def groupBy[K: Order, A](a: A, as: A*)(f: A => K): NonEmptyMap[K, NonEmptyList[A]] =
+    as.foldLeft(NonEmptyMap.one(f(a), NonEmptyList one a)) { (acc, a) =>
+      val k = f(a)
+      acc add k -> acc(k).fold(NonEmptyList one a)(a :: _)
+    }
+
+  /**
+    */
+  @SuppressWarnings(Array("org.wartremover.warts.Any"))
+  def indexAndSum[K: Order, V: CommutativeGroup](
+      kv: (K, V),
+      kvs: (K, V)*
+  ): NonEmptyMap[K, V] =
+    groupBy(kv, kvs: _*)(_._1) map (_ foldMap (_._2))
 
 }
