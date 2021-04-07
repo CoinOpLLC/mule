@@ -4,7 +4,8 @@ package contracts
 // import spire.implicits._
 import spire.algebra.Field
 
-import cats.{ Eq, Eval, Group, Show }
+import cats.implicits._
+import cats.{ Eq, Eval, Group, Monad, Show }
 import Eval.later
 
 /**  This trait intentionally left blank.
@@ -60,8 +61,18 @@ object Contract {
   sealed abstract case class Both private (cA: DefCon, cB: DefCon) extends Contract
   object Both { def apply(cA: DefCon, cB: DefCon): Both = new Both(cA, cB) {} }
 
-  sealed abstract case class Pick private (cA: DefCon, cB: DefCon) extends Contract
-  object Pick { def apply(cA: DefCon, cB: DefCon): Pick = new Pick(cA, cB) {} }
+  sealed abstract case class Pick[F[_]: Monad] private (cT: DefCon, cF: DefCon) extends Contract {
+    def election: Oracle.Election[F]
+    def choice: F[Contract]
+  }
+  object Pick {
+    def apply[F[_]: Monad](cT: DefCon, cF: DefCon): Pick[F] =
+      new Pick[F](cT, cF) {
+        def election: Oracle.Election[F] = ???
+        def choice: F[Contract] =
+          for { b <- election.result } yield (if (b) cT.value else cF.value)
+      }
+  }
 
   sealed abstract case class Branch private (o: Oracle[Boolean], cT: DefCon, cF: DefCon)
       extends Contract
@@ -132,8 +143,8 @@ object Contract {
 
     /** Party immediately chooses between `cA` or `cB`.
       */
-    final def pick(cA: => Contract)(cB: => Contract): Contract =
-      Pick(later(cA), later(cB))
+    final def pick[F[_]: Monad](cT: => Contract)(cF: => Contract): Contract =
+      Pick[F](later(cT), later(cF))
   }
 
   implicit class ContractOps(val c: Contract) extends AnyVal {

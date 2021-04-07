@@ -3,6 +3,8 @@ package model.slices
 
 import time._, money._, contracts._
 
+import cats.Monad
+
 /**
   * A "batteries included" library of common standardized contracts.
   */
@@ -24,22 +26,22 @@ object std {
     }
 
   /** */
-  def europeanCall[N: Financial, C: Currency](
+  def europeanCall[F[_]: Monad, N: Financial, C: Currency](
       contract: => Contract,
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
     when(at(expiry)) {
-      optionally(buy(contract, strike.amount, Currency[C]))
+      optionally[F](buy(contract, strike.amount, Currency[C]))
     }
 
   /** */
-  def americanCall[N: Financial, C: Currency](
+  def americanCall[F[_]: Monad, N: Financial, C: Currency](
       contract: => Contract,
       strike: Mny[N, C],
       expiry: Instant,
   ): Contract =
     anytime(before(expiry)) {
-      optionally(buy(contract, strike.amount, Currency[C]))
+      optionally[F](buy(contract, strike.amount, Currency[C]))
     }
 }

@@ -484,16 +484,16 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
   /**
     */
   final def eval: Contract => Return = {
-    case Zero              => ???
-    case Give(c)           => ???
-    case Scale(o, c)       => ???
-    case Both(cA, cB)      => ???
-    case Pick(cA, cB)      => ???
-    case Branch(o, cT, cF) => ???
-    case When(o, c)        => ???
-    case Anytime(o, c)     => ???
-    case Until(o, c)       => ???
-    case One(n) =>
+    case Zero                         => ???
+    case contract @ Give(c)           => ???
+    case contract @ Scale(o, c)       => ???
+    case contract @ Both(cA, cB)      => ???
+    case contract @ Pick(cT, cF)      => ???
+    case contract @ Branch(o, cT, cF) => ???
+    case contract @ When(o, c)        => ???
+    case contract @ Anytime(o, c)     => ???
+    case contract @ Until(o, c)       => ???
+    case contract @ One(n) =>
       n match {
         case c: InCoin => ???
         case k: InKind => ???

@@ -35,6 +35,13 @@ trait Paper { module: ModuleTypes with Person =>
           // papers.instrumentForms get self flatMap { _ match {
           //  case Foo(b, c1, c2) =>
           // } }
+
+          // import std.zeroCouponBond
+
+          // /** A `Bill` is a kind of zero coupon bond. */
+          // def contract[F[_]: Monad]: F[Contract] =
+          //   zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0)).pure[F]
+
           def res: Contract = ???
           res.pure[F]
         }

@@ -15,15 +15,26 @@ import Instant.now
   * We follow the approach taken by [[http://netrium.org/ Netrium]]
   * (make `Oracle` an GADT.)
   *
+  * TODO: does Oracle need to be a free monad, as well? or non strict?
+  * `Eval` would address both
   */
 sealed trait Oracle[A]
 
-/**  */
+/**
+  */
 object Oracle {
+
+  sealed abstract case class Election[F[_]: cats.Monad] private (final val result: F[Boolean])
+      extends Oracle[F[Boolean]]
+
+  object Election {
+    def apply[F[_]: cats.Monad](result: F[Boolean]): Election[F] = new Election(result) {}
+  }
 
   sealed abstract case class Const[A] private (final val a: A) extends Oracle[A]
   object Const {
-    def apply[A](a: A): Const[A] = new Const(a) {}
+    def apply[A](a: A): Const[A] =
+      new Const(a) {}
   }
 
   sealed abstract case class Branch[A] private (oB: Oracle[Boolean], oT: Oracle[A], oF: Oracle[A])

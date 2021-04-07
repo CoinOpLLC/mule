@@ -10,6 +10,8 @@ import refinements.{ Label }
 
 import spire.math.Fractional
 
+import enumeratum.EnumEntry
+
 import cats.implicits._
 import cats.{ Contravariant, Defer, Eq, Monad, Order, Show }
 import cats.derived.{ auto, semiauto }
@@ -58,7 +60,7 @@ object Form {
   */
 object columns {
 
-  final type Quantity = Double
+  final type Quantity = Quantity
 
   /** ShareClass class of the shares represented by this `Instrument`.
     */
@@ -76,6 +78,7 @@ object columns {
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
   sealed trait Maturity { self: Form =>
+    def issued: Instant
     def matures: ZonedDateTime
   }
 
@@ -109,14 +112,9 @@ object PrimaryCapital {
 
   /**
     */
-  sealed abstract case class CommonStock private (final val shareClass: Option[Label])
-      extends Form
-      with ShareClass
+  final case class CommonStock(shareClass: Option[Label]) extends Form with ShareClass
 
   object CommonStock {
-
-    private[deftrade] def apply(shareClass: Option[Label]): CommonStock =
-      new CommonStock(shareClass) {}
 
     implicit lazy val cStkEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
     implicit lazy val cStkShow: Show[CommonStock] = { import auto.show._; semiauto.show }
@@ -126,28 +124,14 @@ object PrimaryCapital {
     */
   case object CommonStocks extends KeyValueStores.KV[ContractKey, CommonStock]
 
-  sealed abstract case class PreferredStock private (
-      final val shareClass: Option[Label],
-      final val preference: Quantity Refined Positive,
-      final val participating: Boolean,
+  final case class PreferredStock(
+      shareClass: Option[Label],
+      // preference: Quantity Refined Positive,
+      participating: Boolean,
   ) extends Form
       with ShareClass
 
   object PreferredStock {
-
-    def apply(
-        shareClass: Label,
-        preference: Quantity Refined Positive,
-        participating: Boolean,
-    ): PreferredStock =
-      apply(shareClass.some, preference, participating)
-
-    private[deftrade] def apply(
-        shareClass: Option[Label],
-        preference: Quantity Refined Positive,
-        participating: Boolean,
-    ): PreferredStock =
-      new PreferredStock(shareClass, preference, participating) {}
 
     implicit lazy val pfStkEq: Eq[PreferredStock]     = { import auto.eq._; semiauto.eq }
     implicit lazy val pfStkShow: Show[PreferredStock] = { import auto.show._; semiauto.show }
@@ -161,25 +145,16 @@ object PrimaryCapital {
     *
     * TODO: Note that the state is cursor-like; evolve this further.
     */
-  sealed abstract case class Bond private (
-      final val coupon: Quantity, // per 100 face
-      final val issued: Instant,
-      final val matures: ZonedDateTime,
-      final val unpaidCoupons: List[ZonedDateTime], // soonest due first
-      final val paidCoupons: List[Instant] // most recent first
+  final case class Bond(
+      // coupon: Quantity, // per 100 face
+      issued: Instant,
+      matures: ZonedDateTime,
+      // unpaidCoupons: List[ZonedDateTime], // soonest due first
+      // paidCoupons: List[Instant] // most recent first
   ) extends Form
       with Maturity
 
   object Bond {
-
-    def apply(
-        coupon: Quantity, // per 100 face
-        issued: Instant,
-        matures: ZonedDateTime,
-        unpaidCoupons: List[ZonedDateTime], // soonest due first
-        paidCoupons: List[Instant] // most recent first
-    ): Bond =
-      new Bond(coupon, issued, matures, unpaidCoupons, paidCoupons) {}
 
     implicit lazy val bondEq: Eq[Bond]     = { import auto.eq._; semiauto.eq }
     implicit lazy val bondShow: Show[Bond] = { import auto.show._; semiauto.show }
@@ -189,30 +164,30 @@ object PrimaryCapital {
     */
   case object Bonds extends KeyValueStores.KV[ContractKey, Bond]
 
-  // /**
-  //   */
-  // sealed abstract case class Bill(
-  //     override val matures: ZonedDateTime
-  // ) extends Form
-  //     with Maturity {
-  //
-  //   import std.zeroCouponBond
-  //
-  //   // /** A `Bill` is a kind of zero coupon bond. */
-  //   // def contract[F[_]: Monad]: F[Contract] =
-  //   //   zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0)).pure[F]
-  // }
-  //
-  // object Bill
-  //
-  // /** `Bills` are always issued by entities, never by natural persons.
-  //   */
-  // case object Bills extends KeyValueStores.KV[ContractKey, Bill]
+  /**
+    */
+  final case class Bill(
+      issued: Instant,
+      matures: ZonedDateTime
+  ) extends Form
+      with Maturity
+
+  object Bill {
+
+    implicit lazy val bondEq: Eq[Bill]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val bondShow: Show[Bill] = { import auto.show._; semiauto.show }
+  }
+
+  /** `Bills` are always issued by entities, never by natural persons.
+    */
+  case object Bills extends KeyValueStores.KV[ContractKey, Bill]
 }
 
-// /** And by "vanilla" we mean an exchange traded derivative (ETD).
-//   */
+/** And by "vanilla" we mean an exchange traded derivative (ETD), no over-the-counter (OTC)
+  */
 // object VanillaDerivatives {
+//
+//   final type Quantity = Double
 //
 //   /**
 //     */
@@ -229,91 +204,67 @@ object PrimaryCapital {
 //   /**
 //     */
 //   final case class Index(
-//       members: Set[Instruments.Key]
+//       members: Set[ContractKey]
 //   ) extends Form
-//       with columns.Tracker {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
+//       with columns.Tracker
 //
 //   /**
 //     */
-//   case object Indexes extends KeyValueStores.KV[ExchangeTradedInstruments.Key, Index]
+//   case object Indexes extends KeyValueStores.KV[ContractKey, Index]
 //
 //   /** Exchange Traded Derivative - Future (ETD) */
 //   final case class XtFuture(
 //       expires: ZonedDateTime,
-//       underlier: Instruments.Key,
-//       strike: Double
+//       underlier: ContractKey,
+//       strike: Quantity
 //   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
+//       with columns.Derivative
 //
 //   /**
 //     */
-//   case object XtFutures extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtFuture]
+//   case object XtFutures extends KeyValueStores.KV[ContractKey, XtFuture]
 //
 //   /** Exchange Traded Derivative - Option (ETD) */
 //   final case class XtOption(
 //       val putCall: PutCall,
 //       override val expires: ZonedDateTime,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
+//       override val underlier: PrimaryCapital.CommonStocks.Key,
+//       override val strike: Quantity
 //   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
+//       with columns.Derivative
 //
 //   /** TODO: recheck that `Isin` thing... */
-//   case object XtOptions extends KeyValueStores.KV[ExchangeTradedInstruments.Key, XtOption]
+//   case object XtOptions extends KeyValueStores.KV[ContractKey, XtOption]
 //
 //   /**
 //     */
 //   final case class XtFutureOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       // override val underlier: XtFutures.Key,
-//       // override val underlier: ExchangeTradedInstruments.Key,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
+//       putCall: PutCall,
+//       expires: ZonedDateTime,
+//       underlier: XtFutures.Key,
+//       strike: Quantity
 //   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def strikeAmount: Double = ???
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
+//       with columns.Derivative
 //
 //   /**
 //     */
-//   case object XtFutureOptions extends KeyValueStores.KV[XtFutures.Key, XtFutureOption]
+//   case object XtFutureOptions extends KeyValueStores.KV[ContractKey, XtFutureOption]
 //
 //   /**
 //     */
 //   final case class XtIndexOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       override val underlier: Instruments.Key,
-//       override val strike: Double
+//       putCall: PutCall,
+//       expires: ZonedDateTime,
+//       underlier: Indexes.Key,
+//       strike: Quantity
 //   ) extends Form
-//       with columns.Derivative {
-//
-//     /** FIXME: implement */
-//     def contract: Contract = ???
-//   }
+//       with columns.Derivative
 //
 //   /**
 //     */
-//   case object XtIndexOptions extends KeyValueStores.KV[Indexes.Key, XtIndexOption]
+//   case object XtIndexOptions extends KeyValueStores.KV[ContractKey, XtIndexOption]
 // }
+
 //
 // /** Private lending instruments.
 //   *

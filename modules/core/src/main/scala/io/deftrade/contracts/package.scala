@@ -28,15 +28,15 @@ package object contracts extends Contract.primitives {
   def allOf(cs: LazyList[Contract]): Contract =
     cs.fold(zero) { both(_)(_) }
 
-  /**
-    */
-  def bestOf(cs: LazyList[Contract]): Contract =
-    cs.fold(zero) { pick(_)(_) }
+  // /**
+  //   */
+  // def bestOf(cs: LazyList[Contract]): Contract =
+  //   cs.fold(zero) { pick(_)(_) }
 
   /** If `c` is worth something, take it.
     */
-  def optionally(c: => Contract): Contract =
-    pick(c)(zero)
+  def optionally[F[_]: cats.Monad](c: => Contract): Contract =
+    pick[F](c)(zero)
 
   /**
     */
