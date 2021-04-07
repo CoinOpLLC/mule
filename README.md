@@ -1,4 +1,5 @@
-# `deftrade`
+# `deftrade
+
 
 A stream algebra for financial market participants.
 

@@ -43,7 +43,7 @@ lazy val keyval = module(
   """key value algebra"""
 ).settings(common)
   .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
   )
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
@@ -58,7 +58,7 @@ lazy val core = module(
 ).dependsOn(keyval)
   .settings(common)
   .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
   )
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
