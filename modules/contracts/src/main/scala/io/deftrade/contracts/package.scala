@@ -33,11 +33,11 @@ package object contracts extends Contract.primitives {
   // def bestOf(cs: LazyList[Contract]): Contract =
   //   cs.fold(zero) { pick(_)(_) }
 
-  /** If `c` is worth something, take it.
-    */
-  def optionally[F[_]: cats.Monad](c: => Contract): Contract =
-    pick[F](c)(zero)
-
+  // /** If `c` is worth something, take it.
+  //   */
+  // def optionally[F[_]: cats.Monad](c: => Contract): Contract =
+  //   pick[F](c)(zero)
+  //
   /**
     */
   def buy[N: Fractional](c: => Contract, amount: N, coin: InCoin): Contract =

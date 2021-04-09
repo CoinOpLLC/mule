@@ -4,7 +4,6 @@ package contracts
 // import spire.implicits._
 import spire.algebra.Field
 
-import cats.implicits._
 import cats.{ Eq, Eval, Group, Monad, Show }
 import Eval.later
 
@@ -38,15 +37,12 @@ object Contract {
 
   sealed abstract case class Scale[N] private (
       o: Oracle[N],
-      c: DefCon
-  )(
-      implicit val N: Field[N]
-  ) extends Contract {
-    final type T = N
-  }
+      c: DefCon,
+      N: Field[N]
+  ) extends Contract
 
   object Scale {
-    def apply[N: Field](o: Oracle[N], c: DefCon): Scale[N] = new Scale(o, c) {}
+    def apply[N: Field](o: Oracle[N], c: DefCon): Scale[N] = new Scale(o, c, Field[N]) {}
   }
 
   sealed abstract case class When private (o: Oracle[Boolean], c: DefCon) extends Contract
@@ -61,15 +57,16 @@ object Contract {
   sealed abstract case class Both private (cA: DefCon, cB: DefCon) extends Contract
   object Both { def apply(cA: DefCon, cB: DefCon): Both = new Both(cA, cB) {} }
 
-  sealed abstract case class Pick[F[_]: Monad] private (cT: DefCon, cF: DefCon) extends Contract {
+  sealed abstract case class Pick[F[_]] private (cT: DefCon, cF: DefCon) extends Contract {
     def election: Oracle.Election[F]
     def choice: F[Contract]
   }
   object Pick {
     def apply[F[_]: Monad](cT: DefCon, cF: DefCon): Pick[F] =
       new Pick[F](cT, cF) {
-        def election: Oracle.Election[F] = ???
-        def choice: F[Contract] =
+        import cats.implicits._
+        final def election: Oracle.Election[F] = ???
+        final def choice: F[Contract] =
           for { b <- election.result } yield (if (b) cT.value else cF.value)
       }
   }

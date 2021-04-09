@@ -38,6 +38,17 @@ def module(id: String, d: String) =
   Project(id, file(s"modules/$id"))
     .settings(moduleName := id, name := id, description := d)
 
+lazy val contracts = module(
+  "contracts",
+  """smart contract definition and evaluation"""
+).settings(common)
+  .settings(
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
+  )
+  .settings(
+    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
+  )
+
 lazy val keyval = module(
   "keyval",
   """key value algebra"""
@@ -56,6 +67,7 @@ lazy val core = module(
   "core",
   """foundational finance value types and functions"""
 ).dependsOn(keyval)
+  .dependsOn(contracts)
   .settings(common)
   .settings(
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)

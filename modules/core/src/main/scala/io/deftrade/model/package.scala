@@ -22,7 +22,7 @@ import cats.kernel.instances.MapMonoid
 /**
   * Records and computations defining a layered set of financial domain models and services.
   */
-package object model {}
+package object model
 
 package model {
 

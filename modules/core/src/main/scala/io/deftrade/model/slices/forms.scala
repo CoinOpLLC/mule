@@ -30,6 +30,8 @@ import io.circe.refined._
 trait ContractKey extends Numéraire.InKind {
 
   val usin: USIN
+
+  def contract[F[_]: Monad: Defer]: F[Contract]
 }
 
 /**
@@ -41,8 +43,6 @@ object ContractKey {
 
   implicit def contractKeyShow: Show[ContractKey] =
     Contravariant[Show].contramap(Show[USIN])(_.usin)
-  // implicit def contractKeyOrder: Order[ContractKey] = { import auto.order._; semiauto.order }
-  // implicit def contractKeyShow: Show[ContractKey]   = { import auto.show._; semiauto.show }
 }
 
 sealed trait Form extends Product
@@ -60,7 +60,7 @@ object Form {
   */
 object columns {
 
-  final type Quantity = Quantity
+  final type Quantity = Double
 
   /** ShareClass class of the shares represented by this `Instrument`.
     */

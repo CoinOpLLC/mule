@@ -17,7 +17,8 @@
 package io.deftrade
 package money
 
-import keyval.DtEnum, contracts.Numéraire
+import keyval.DtEnum
+import contracts.Numéraire
 
 import enumeratum.EnumEntry
 

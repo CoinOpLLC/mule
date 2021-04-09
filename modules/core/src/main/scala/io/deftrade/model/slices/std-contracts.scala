@@ -25,23 +25,23 @@ object std {
       one(Currency[C]) * const(face.amount)
     }
 
-  /** */
-  def europeanCall[F[_]: Monad, N: Financial, C: Currency](
-      contract: => Contract,
-      strike: Mny[N, C],
-      expiry: Instant,
-  ): Contract =
-    when(at(expiry)) {
-      optionally[F](buy(contract, strike.amount, Currency[C]))
-    }
-
-  /** */
-  def americanCall[F[_]: Monad, N: Financial, C: Currency](
-      contract: => Contract,
-      strike: Mny[N, C],
-      expiry: Instant,
-  ): Contract =
-    anytime(before(expiry)) {
-      optionally[F](buy(contract, strike.amount, Currency[C]))
-    }
+  // /** */
+  // def europeanCall[F[_]: Monad, N: Financial, C: Currency](
+  //     contract: => Contract,
+  //     strike: Mny[N, C],
+  //     expiry: Instant,
+  // ): Contract =
+  //   when(at(expiry)) {
+  //     optionally[F](buy(contract, strike.amount, Currency[C]))
+  //   }
+  //
+  // /** */
+  // def americanCall[F[_]: Monad, N: Financial, C: Currency](
+  //     contract: => Contract,
+  //     strike: Mny[N, C],
+  //     expiry: Instant,
+  // ): Contract =
+  //   anytime(before(expiry)) {
+  //     optionally[F](buy(contract, strike.amount, Currency[C]))
+  //   }
 }

@@ -54,7 +54,8 @@ trait Paper { module: ModuleTypes with Person =>
       Contravariant[Show].contramap(Show[USIN])(_.usin)
   }
 
-  final type Form = model.slices.Form
+  import model.slices.Form
+  // trait Form extends model.slices.Form
 
   /** `Store`s related to `Contract`s.
     */

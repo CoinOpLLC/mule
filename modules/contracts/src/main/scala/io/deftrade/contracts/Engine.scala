@@ -1,8 +1,6 @@
 package io.deftrade
 package contracts
 
-import syntax._
-
 import cats.implicits._
 import cats.{ Order, Show }
 import cats.evidence._
@@ -56,16 +54,18 @@ sealed abstract case class Pricing[N: Fractional](
     */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   final def eval: Contract => PR[N] = {
-    case Zero    => PR.bigK(Fractional[N].zero)
-    case Give(c) => -eval(c.value)
-    case s @ Scale(o, c) if s.N == Fractional[N] =>
-      (Pricing eval [s.T] o).asInstanceOf[PR[N]] * eval(c.value)
+    case Zero              => PR.bigK(Fractional[N].zero)
+    case Give(c)           => -eval(c.value)
     case Both(cA, cB)      => eval(cA.value) + eval(cB.value)
     case Pick(cA, cB)      => eval(cA.value) max eval(cB.value)
     case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
     case When(o, c)        => disc(Pricing eval o, eval(c.value))
     case Anytime(o, c)     => snell(Pricing eval o, eval(c.value))
     case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
+    case Scale(o, c, n) if n == Fractional[N] => {
+      (Pricing eval o.asInstanceOf[Oracle[N]]).asInstanceOf[PR[N]] * eval(c.value)
+    }
+    case Scale(_, _, _) => ??? // wrong N
     case One(n) =>
       n match {
         case c: InCoin if coin == c => PR.bigK(Fractional[N].one)
@@ -287,7 +287,7 @@ object Pricing {
         case h #:: t => (h map (_ / h.sum)) #:: probabilities(t)
       }
 
-      pathCounts |> probabilities
+      probabilities(pathCounts)
     }
 
     /**
@@ -484,19 +484,19 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
   /**
     */
   final def eval: Contract => Return = {
-    case Zero                         => ???
-    case contract @ Give(c)           => ???
-    case contract @ Scale(o, c)       => ???
-    case contract @ Both(cA, cB)      => ???
-    case contract @ Pick(cT, cF)      => ???
-    case contract @ Branch(o, cT, cF) => ???
-    case contract @ When(o, c)        => ???
-    case contract @ Anytime(o, c)     => ???
-    case contract @ Until(o, c)       => ???
-    case contract @ One(n) =>
+    case Zero            => ???
+    case Give(_)         => ???
+    case Scale(_, _, _)  => ???
+    case Both(_, _)      => ???
+    case Pick(_, _)      => ???
+    case Branch(_, _, _) => ???
+    case When(_, _)      => ???
+    case Anytime(_, _)   => ???
+    case Until(_, _)     => ???
+    case One(n) =>
       n match {
-        case c: InCoin => ???
-        case k: InKind => ???
+        case _: InCoin => ???
+        case _: InKind => ???
       }
   }
 

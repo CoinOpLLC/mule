@@ -24,11 +24,11 @@ sealed trait Oracle[A]
   */
 object Oracle {
 
-  sealed abstract case class Election[F[_]: cats.Monad] private (final val result: F[Boolean])
+  sealed abstract case class Election[F[_]] private (final val result: F[Boolean])
       extends Oracle[F[Boolean]]
 
   object Election {
-    def apply[F[_]: cats.Monad](result: F[Boolean]): Election[F] = new Election(result) {}
+    def apply[F[_]](result: F[Boolean]): Election[F] = new Election(result) {}
   }
 
   sealed abstract case class Const[A] private (final val a: A) extends Oracle[A]
@@ -156,6 +156,7 @@ object Oracle {
     case Unary(op, o)          => op(eval(o))
     case Binary(op, oL, oR)    => op(eval(oL), eval(oR))
     case Predicate(op, oL, oR) => op(eval[op.T](oL), eval[op.T](oR))
+    case Election(b)           => b // gotta be wrong
   }
 
   import Unary._, Binary._, Predicate._
