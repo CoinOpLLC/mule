@@ -2,11 +2,17 @@ package io.deftrade
 package contracts
 
 import cats.implicits._
-import cats.{ Order, Show }
-import cats.evidence._
+import cats.{ Contravariant, Order, Show }
+import cats.kernel.Monoid
+import cats.derived.{ auto, semiauto }
+
+// import eu.timepit.refined
+// import refined.cats._
+
+import io.chrisdavenport.cats.time._
 
 import spire.math.Fractional
-import spire.algebra.Trig
+import spire.algebra.{ Field, Trig }
 import spire.syntax.field._
 
 import java.time.{ Duration, Instant }
@@ -50,25 +56,25 @@ sealed abstract case class Pricing[N: Fractional](
   /**
     * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
     * process which represents the distribution of possible `Contract` values a given
-    * number of [[Pricing.TimeSteps]] from [[t0]].
+    * number of time steps from [[t0]].
     */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   final def eval: Contract => PR[N] = {
-    case Zero              => PR.bigK(Fractional[N].zero)
-    case Give(c)           => -eval(c.value)
-    case Both(cA, cB)      => eval(cA.value) + eval(cB.value)
-    case Pick(cA, cB)      => eval(cA.value) max eval(cB.value)
-    case Branch(o, cT, cF) => PR.cond(Pricing eval o)(eval(cT.value))(eval(cF.value))
-    case When(o, c)        => disc(Pricing eval o, eval(c.value))
-    case Anytime(o, c)     => snell(Pricing eval o, eval(c.value))
-    case Until(o, c)       => PR.absorb(Pricing eval o, eval(c.value))
+    case Zero            => PR.konstant(Fractional[N].zero)
+    case Give(c)         => -eval(c.value)
+    case Both(c, d)      => eval(c.value) + eval(d.value)
+    case Pick(c, d)      => eval(c.value) max eval(d.value)
+    case Branch(b, t, f) => PR.cond(Pricing eval b)(eval(t.value))(eval(f.value))
+    case When(b, c)      => disc(Pricing eval b, eval(c.value))
+    case Anytime(w, c)   => snell(Pricing eval w, eval(c.value))
+    case Until(b, c)     => PR.absorb(Pricing eval b, eval(c.value))
     case Scale(o, c, n) if n == Fractional[N] => {
       (Pricing eval o.asInstanceOf[Oracle[N]]).asInstanceOf[PR[N]] * eval(c.value)
     }
-    case Scale(_, _, _) => ??? // wrong N
+    case Scale(_, _, _) => ??? // wrong N FIXME: convert and recurse! LOLOLOL
     case One(n) =>
       n match {
-        case c: InCoin if coin == c => PR.bigK(Fractional[N].one)
+        case c: InCoin if coin == c => PR.konstant(Fractional[N].one)
         case c2: InCoin             => exch(c2)
         case k: InKind              => exch(k)
       }
@@ -114,10 +120,10 @@ sealed abstract case class Pricing[N: Fractional](
     n2 match {
 
       case _: Numéraire.InCoin =>
-        PR bigK Fractional[N].one * 1.618
+        PR konstant Fractional[N].one * 1.618
 
       case _: Numéraire.InKind =>
-        PR bigK Fractional[N].one * 6.18
+        PR konstant Fractional[N].one * 6.18
     }
 
   private def discount(bpq: BPQ[N], compound: Compounding[N])(
@@ -174,78 +180,75 @@ object Pricing {
     r => (Fractional[N].one + r / 100.0)
 
   /** */
-  def continuous[N: Fractional: Trig](step: TimeSteps): Compounding[N] =
+  def continuous[N: Fractional: Trig](step: Int): Compounding[N] =
     r => Trig[N].exp(r / 100.0 * step)
 
-  /** TODO: refinements on inputs? */
+  /** TODO: refinements on inputs?
+    */
   case class LatticeModelParams[N: Fractional: Trig](r: N, sigma: N, div: N, step: N) {
 
-    val FN = Fractional[N]
-    val TN = Trig[N]
+    private val FN = Fractional[N]; import FN.{ sqrt }
+    private val TN = Trig[N]; import TN.{ exp }
 
-    import FN.{ sqrt }
-    import TN.{ exp }
+    final val up: N   = exp(sigma * sqrt(step))
+    final val down: N = 1.0 / up
 
-    def up: N   = exp(sigma * sqrt(step))
-    def down: N = 1.0 / up
-
-    def p: N = exp((r - div) * step - down) / (up - down) // FIXME singularity no good
-    def q: N = 1.0 - p
+    final val p: N = exp((r - div) * step - down) / (up - down)
+    final val q: N = 1.0 - p
   }
 
-  /** */
-  type TimeSteps = Int
+  /**
+    */
+  sealed abstract case class DiscreteTime private (
+      step: Int,
+      instant: Instant,
+      series: DiscreteTimeSeries
+  ) {
 
-  /** */
-  sealed abstract case class DiscreteTime(step: Int) {
-
-    /** */
-    def instant: Instant
-
-    /** */
-    def series: DiscreteTimeSeries
-
-    /** */
     final def next: DiscreteTime = series at step + 1
   }
 
-  /** FIXME: implement */
   object DiscreteTime {
 
-    /** */
-    implicit def discreteTimeOrder: Order[DiscreteTime] = ???
+    def apply(step: Int, instant: Instant, series: DiscreteTimeSeries): DiscreteTime =
+      new DiscreteTime(step, instant, series) {}
 
-    /** */
-    implicit def showDiscreteTime: Show[DiscreteTime] = ???
+    implicit lazy val discreteTimeEq: Order[DiscreteTime]  = { import auto.order._; semiauto.order }
+    implicit lazy val discreteTimeShow: Show[DiscreteTime] = { import auto.show._; semiauto.show }
   }
 
-  /** */
+  /**
+    */
   sealed abstract case class DiscreteTimeSeries private (
       t0: Instant,
       timeStep: Duration
   ) { dts =>
 
-    /** */
-    def at(ts: TimeSteps): DiscreteTime =
-      new DiscreteTime(ts) {
-        def instant = t0 plus (timeStep multipliedBy ts.toLong)
-        def series  = dts
-      }
-  }
-
-  /** */
-  object DiscreteTimeSeries {
-
-    /** not doing intra-day quanting... yet... */
-    val timeStep: Duration =
-      Duration.of(24, HOURS) // one day
-
-    /** */
-    def apply(t0: Instant): DiscreteTimeSeries = new DiscreteTimeSeries(t0, timeStep) {}
+    /**
+      */
+    def at(ts: Int) = DiscreteTime(
+      step = ts,
+      instant = t0 plus (timeStep multipliedBy ts.toLong),
+      series = dts
+    )
   }
 
   /**
-    * `random variable` representation.
+    */
+  object DiscreteTimeSeries {
+
+    private[contracts] def apply(t0: Instant, timeStep: Duration): DiscreteTimeSeries =
+      new DiscreteTimeSeries(t0, timeStep) {}
+
+    def apply(t0: Instant): DiscreteTimeSeries =
+      apply(t0, Duration.of(24, HOURS))
+
+    implicit lazy val dtsOrder: Order[DiscreteTimeSeries] = { import auto.order._; semiauto.order }
+    implicit lazy val dtsShow: Show[DiscreteTimeSeries]   = { import auto.show._; semiauto.show }
+  }
+
+  /**
+    * Here, a `random variable` is just a lazy list.
     */
   type RV[N] = LL[N]
 
@@ -258,7 +261,7 @@ object Pricing {
       * Calculates a previous slice in a lattice by averaging each adjacent pair of values
       * in the specified slice.
       *
-      * TODO: `N Refined [0,1]` would be nice here
+      * TODO: `(p: N Refined [0,1])` would be nice here
       */
     def prevSlice[N: Fractional](p: N)(slice: RV[N]): RV[N] = slice match {
       case _ if slice.isEmpty     => LL.empty
@@ -303,8 +306,8 @@ object Pricing {
       * and its associated probability. The following functions
       * implement this calculation.''
       */
-    def expectedValue[N: Fractional](outcomes: RV[N], probabilities: RV[Int]): N = {
-      implicit val monoid: cats.kernel.Monoid[N] = Fractional[N].additive
+    def expectedValue[N](outcomes: RV[N], probabilities: RV[Int])(implicit N: Fractional[N]): N = {
+      implicit val monoid: Monoid[N] = N.additive
       outcomes zip probabilities foldMap { case (o, p) => o * p }
     }
   }
@@ -315,7 +318,7 @@ object Pricing {
   final case class PR[A] private (val rvs: LL[RV[A]]) extends AnyVal {
     def take(n: Int)                           = PR.take(this, n)
     def horizon                                = PR horizon this
-    def forall(implicit isBool: A === Boolean) = PR forall (isBool substitute this)
+    def forall(implicit IsBool: A =:= Boolean) = PR forall (IsBool substituteCo this)
   }
 
   /**
@@ -330,7 +333,7 @@ object Pricing {
       new PR(rvs)
 
     /** */
-    def bigK[A](a: A): PR[A] =
+    def konstant[A](a: A): PR[A] =
       PR(LL continually (LL continually a))
 
     /**  */
@@ -393,7 +396,8 @@ object Pricing {
           }
       }
 
-    /** */
+    /**
+      */
     def expectedValue[N: Fractional](pr: PR[N]): LL[N] =
       pr.rvs zip RV.probabilityLattice map {
         case (ps, os) => RV.expectedValue(ps, os)
@@ -403,37 +407,39 @@ object Pricing {
       * Conditions the value of a process on a [[PR]]`[Boolean]`.
       *
       * Given a boolean-valued process `cond`, `absorb` transforms the real-valued proess
-      * `pr`, expressed with type parameter C : [[money.Currency]],
-      * into another real-valued process.
+      * `pr` into another real-valued process.
       *
       * For any state, the result is the expected value of receiving p's value
       * if the region `cond` will never be true, and receiving zero in the contrary.
       *
       * In states where `cond` is true, the result is therefore zero.
       */
-    def absorb[N: Fractional](cond: PR[Boolean], pr: PR[N]): PR[N] =
+    def absorb[N](cond: PR[Boolean], pr: PR[N])(implicit N: Fractional[N]): PR[N] =
       PR(
         cond.rvs zip pr.rvs map {
           case (os, ps) =>
             os zip ps map {
               case (false, p) => p
-              case (true, _)  => Fractional[N].zero
+              case (true, _)  => N.zero
             }
         }
       )
 
-    /** */
-    implicit def prOrder[A]: Order[PR[A]] = ???
+    implicit def prOrder[A: Order]: Order[PR[A]] =
+      Order by (_.rvs)
 
-    /** */
-    implicit def prShow[A]: Show[PR[A]] = ???
+    implicit def prShow[A: Show]: Show[PR[A]] =
+      Contravariant[Show].contramap(Show[LL[RV[A]]])(_.rvs)
 
-    /**
-      * A [[spire.math.Fractional]] `N` means a `Fractional PR[N].
-      *
-      * FIXME: implement!
-      */
-    implicit def prFractional[N: Fractional]: Fractional[PR[N]] = ???
+    implicit def prField[N](implicit N: Field[N]): Field[PR[N]] =
+      new Field.WithDefaultGCD[PR[N]] {
+        def zero: PR[N]                      = konstant(N.zero)
+        def one: PR[N]                       = konstant(N.one)
+        def negate(x: PR[N]): PR[N]          = lift(N.negate)(x)
+        def plus(x: PR[N], y: PR[N]): PR[N]  = lift2(N.plus)(x, y)
+        def times(x: PR[N], y: PR[N]): PR[N] = lift2(N.times)(x, y)
+        def div(x: PR[N], y: PR[N]): PR[N]   = lift2(N.div)(x, y)
+      }
   }
 
   /**
@@ -454,17 +460,31 @@ object Pricing {
     PR(makeRateSlices(rateNow, 1))
   }
 
-  /** */
-  def eval[A](o: Oracle[A]): PR[A] =
-    o match {
-      case Oracle.Const(a) => PR.bigK(a)
-      case _               => ???
-    }
+  /**
+    */
+  def eval[A](a: Contract.Oracle[A]): PR[A] =
+    PR.konstant(a.value)
 
   private type BPQ[N] = (Boolean, N, N) => N
   private def orQ[N]: BPQ[N]               = (b, p, q) => if (b) p else q
   private def orMax[N: Fractional]: BPQ[N] = (b, p, q) => if (b) p else p max q
 }
+
+// /**
+//   *  Toy model adapted from (but not identical to) the one used in the papers.
+//   */
+// def toy[N: Fractional, C: Currency]: Pricing[N, C] =
+//   new Pricing[N, C](
+//     java.time.Instant.EPOCH,
+//     Currency[C] match {
+//       case Currency.CHF => rates(.0170, .00180)
+//       case Currency.EUR => rates(.0165, .00025)
+//       case Currency.GBP => rates(.0170, .00080)
+//       case Currency.USD => rates(.0150, .00150)
+//       case Currency.JPY => rates(.0110, .00250)
+//       case _            => rates(.01967, .00289) // good enuf for now
+//     }
+//   ) {}
 
 /** `Contract` performance.
   *
@@ -510,19 +530,3 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
 /** placeholder
   */
 object Performing {}
-
-// /**
-//   *  Toy model adapted from (but not identical to) the one used in the papers.
-//   */
-// def toy[N: Fractional, C: Currency]: Pricing[N, C] =
-//   new Pricing[N, C](
-//     java.time.Instant.EPOCH,
-//     Currency[C] match {
-//       case Currency.CHF => rates(.0170, .00180)
-//       case Currency.EUR => rates(.0165, .00025)
-//       case Currency.GBP => rates(.0170, .00080)
-//       case Currency.USD => rates(.0150, .00150)
-//       case Currency.JPY => rates(.0110, .00250)
-//       case _            => rates(.01967, .00289) // good enuf for now
-//     }
-//   ) {}

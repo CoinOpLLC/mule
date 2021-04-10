@@ -20,6 +20,8 @@ sealed trait Contract extends Product
   */
 object Contract {
 
+  final type Oracle[A] = Eval[A]
+
   implicit lazy val contractEq: Eq[Contract]     = Eq.fromUniversalEquals[Contract]
   implicit lazy val contractShow: Show[Contract] = Show.show[Contract](_.toString)
 
@@ -67,7 +69,7 @@ object Contract {
         import cats.implicits._
         final def election: Oracle.Election[F] = ???
         final def choice: F[Contract] =
-          for { b <- election.result } yield (if (b) cT.value else cF.value)
+          for { b <- election.result.value } yield (if (b) cT.value else cF.value)
       }
   }
 

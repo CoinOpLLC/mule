@@ -48,6 +48,9 @@ lazy val contracts = module(
   .settings(
     libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
   )
+  .settings(
+    libraryDependencies += "io.chrisdavenport" %% "cats-time" % "0.3.4"
+  )
 
 lazy val keyval = module(
   "keyval",
