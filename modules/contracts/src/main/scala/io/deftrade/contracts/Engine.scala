@@ -2,7 +2,7 @@ package io.deftrade
 package contracts
 
 import cats.implicits._
-import cats.{ Contravariant, Order, Show }
+import cats.{ Contravariant, Eval, Order, Show }
 import cats.kernel.Monoid
 import cats.derived.{ auto, semiauto }
 
@@ -39,19 +39,21 @@ object Engine {}
   * TODO: refine this model
   * TODO: expand to other models
   */
-sealed abstract case class Pricing[N: Fractional](
+sealed abstract case class Pricing[N](
     coin: Numéraire.InCoin,
     t0: Instant,
     rateModel: Pricing.PR[N]
-) extends Engine {
-
-  import Pricing._, Contract._, Numéraire._
-
-  import spire.syntax.field._
+)(implicit
+  N: Fractional[N])
+    extends Engine {
 
   /**
     */
-  final type Return = PR[N]
+  final type Return = Pricing.PR[N]
+
+  import Pricing._, Contract._, Numéraire._
+
+  import PR.{ absorb, cond, konst }
 
   /**
     * Evaluate the `Contract` in the specified [[money.Currency]], returning a real valued
@@ -60,24 +62,25 @@ sealed abstract case class Pricing[N: Fractional](
     */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   final def eval: Contract => PR[N] = {
-    case Zero            => PR.konstant(Fractional[N].zero)
-    case Give(c)         => -eval(c.value)
-    case Both(c, d)      => eval(c.value) + eval(d.value)
-    case Pick(c, d)      => eval(c.value) max eval(d.value)
-    case Branch(b, t, f) => PR.cond(Pricing eval b)(eval(t.value))(eval(f.value))
-    case When(b, c)      => disc(Pricing eval b, eval(c.value))
-    case Anytime(w, c)   => snell(Pricing eval w, eval(c.value))
-    case Until(b, c)     => PR.absorb(Pricing eval b, eval(c.value))
-    case Scale(o, c, n) if n == Fractional[N] => {
-      (Pricing eval o.asInstanceOf[Oracle[N]]).asInstanceOf[PR[N]] * eval(c.value)
-    }
-    case Scale(_, _, _) => ??? // wrong N FIXME: convert and recurse! LOLOLOL
+
+    case Zero => konst(N.zero)
     case One(n) =>
       n match {
-        case c: InCoin if coin == c => PR.konstant(Fractional[N].one)
+        case c: InCoin if coin == c => konst(N.one)
         case c2: InCoin             => exch(c2)
         case k: InKind              => exch(k)
       }
+    case Scale(o, c, n) if n == N => konst(o.value.asInstanceOf[N]) * eval(c.value)
+    case Scale(_, _, _)           => ??? // wrong N FIXME: convert and recurse! LOLOLOL
+    case Give(c)                  => -eval(c.value)
+
+    case When(b, c)    => disc(konst(b.value), eval(c.value))
+    case Until(b, c)   => absorb(konst(b.value), eval(c.value))
+    case Anytime(w, c) => snell(konst(w.value), eval(c.value))
+
+    case Branch(b, t, f) => cond(konst(b.value)) { eval(t.value) } { eval(f.value) }
+    case Both(c, d)      => eval(c.value) + eval(d.value)
+    case Pick(c, d)      => eval(c.value) max eval(d.value)
   }
 
   /**
@@ -120,10 +123,10 @@ sealed abstract case class Pricing[N: Fractional](
     n2 match {
 
       case _: Numéraire.InCoin =>
-        PR konstant Fractional[N].one * 1.618
+        PR konst Fractional[N].one * 1.618
 
       case _: Numéraire.InKind =>
-        PR konstant Fractional[N].one * 6.18
+        PR konst Fractional[N].one * 6.18
     }
 
   private def discount(bpq: BPQ[N], compound: Compounding[N])(
@@ -332,11 +335,21 @@ object Pricing {
     private[contracts] def apply[A](rvs: LL[RV[A]]): PR[A] =
       new PR(rvs)
 
-    /** */
-    def konstant[A](a: A): PR[A] =
+    /** Also known as `bigK` in the papers.
+      */
+    def konst[A](a: A): PR[A] =
       PR(LL continually (LL continually a))
 
-    /**  */
+    /**
+      */
+    def flow[A](a: Eval[A]): PR[A] = {
+      val step: Eval[A] => (A, Eval[A]) =
+        a => { val aa = Eval defer a; (a.value, aa) }
+      ???
+    }
+
+    /**
+      */
     def date(t: Instant): PR[DiscreteTime] = {
 
       def timeSlices(slice: RV[DiscreteTime]): LL[RV[DiscreteTime]] = {
@@ -433,8 +446,8 @@ object Pricing {
 
     implicit def prField[N](implicit N: Field[N]): Field[PR[N]] =
       new Field.WithDefaultGCD[PR[N]] {
-        def zero: PR[N]                      = konstant(N.zero)
-        def one: PR[N]                       = konstant(N.one)
+        def zero: PR[N]                      = konst(N.zero)
+        def one: PR[N]                       = konst(N.one)
         def negate(x: PR[N]): PR[N]          = lift(N.negate)(x)
         def plus(x: PR[N], y: PR[N]): PR[N]  = lift2(N.plus)(x, y)
         def times(x: PR[N], y: PR[N]): PR[N] = lift2(N.times)(x, y)
@@ -459,11 +472,6 @@ object Pricing {
 
     PR(makeRateSlices(rateNow, 1))
   }
-
-  /**
-    */
-  def eval[A](a: Contract.Oracle[A]): PR[A] =
-    PR.konstant(a.value)
 
   private type BPQ[N] = (Boolean, N, N) => N
   private def orQ[N]: BPQ[N]               = (b, p, q) => if (b) p else q

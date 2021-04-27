@@ -2,7 +2,7 @@ package io.deftrade
 package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
-import model.slices.keys.{ ISIN, USIN }
+import model.slices.keys._
 import model.slices.{ ContractKey => CK, Metas }
 
 import cats.implicits._
@@ -20,20 +20,21 @@ import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
 
-  sealed abstract case class ContractKey private (
-      final val usin: USIN
-  ) extends CK
+  sealed abstract case class ContractKey[IsP] private (
+      final val key: String Refined IsP
+  ) extends CK[IsP]
+      with Numéraire.InKind
 
   object ContractKey {
 
-    def apply(usin: USIN): ContractKey =
-      new ContractKey(usin) { self =>
+    def apply[IsP](key: String Refined IsP): ContractKey[IsP] =
+      new ContractKey(key) { self =>
         final def contract[F[_]: Monad: Defer]: F[Contract] = {
 
           // Note: papers.instrumentsForms has everything you need to define the contract
           // (and it's in scope!)
           // papers.instrumentForms get self flatMap { _ match {
-          //  case Foo(b, c1, c2) =>
+          //  case Bond(b, c1, c2) =>
           // } }
 
           // import std.zeroCouponBond
@@ -47,11 +48,11 @@ trait Paper { module: ModuleTypes with Person =>
         }
       }
 
-    implicit def contractKeyOrder: Order[ContractKey] =
-      Order by (_.usin)
+    implicit def contractKeyOrder[IsP]: Order[ContractKey[IsP]] =
+      Order by (_.key)
 
-    implicit def contractKeyShow: Show[ContractKey] =
-      Contravariant[Show].contramap(Show[USIN])(_.usin)
+    implicit def contractKeyShow[IsP]: Show[ContractKey[IsP]] =
+      Contravariant[Show].contramap(Show[String Refined IsP])(_.key)
   }
 
   import model.slices.Form
@@ -98,11 +99,11 @@ trait Paper { module: ModuleTypes with Person =>
   /** Indexed by CUSIPs and other formats.
     * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
     */
-  case object Instruments extends KeyValueStores.KV[ContractKey, Instrument]
+  case object Instruments extends KeyValueStores.KV[ContractKey[IsUSIN], Instrument]
 
   /**
     */
-  case object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
+  case object ExchangeTradedInstruments extends KeyValueStores.KV[ContractKey[IsISIN], Instrument]
 
   /**
     */

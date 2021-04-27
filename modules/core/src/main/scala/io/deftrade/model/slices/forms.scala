@@ -3,12 +3,12 @@ package model.slices
 
 import keyval._
 import time._
-import contracts.{ Contract, Numéraire }
 import money.Currency
-import model.slices.keys.{ USIN }
+import model.slices.keys._
 import refinements.{ Label }
 
 import spire.math.Fractional
+// import spire.compat.numeric
 
 import enumeratum.EnumEntry
 
@@ -27,22 +27,25 @@ import io.circe.refined._
 
 /**
   */
-trait ContractKey extends Numéraire.InKind {
+trait ContractKey[IsP] {
 
-  val usin: USIN
-
-  def contract[F[_]: Monad: Defer]: F[Contract]
+  val key: String Refined IsP
 }
 
 /**
   */
 object ContractKey {
 
-  implicit def contractKeyOrder: Order[ContractKey] =
-    Order by (_.usin)
+  // def contract[F[_]: Monad: Defer](ck: ContractKey): F[Contract]
 
-  implicit def contractKeyShow: Show[ContractKey] =
-    Contravariant[Show].contramap(Show[USIN])(_.usin)
+  implicit def contractKeyOrder[IsP]: Order[ContractKey[IsP]] =
+    Order by (_.key)
+
+  implicit def contractKeyShow[IsP]: Show[ContractKey[IsP]] =
+    Contravariant[Show].contramap(Show[String Refined IsP])(_.key)
+
+  implicit def contractKeyEncoder[IsP]: Encoder[ContractKey[IsP]] = ???
+  implicit def contractKeyDecoder[IsP]: Decoder[ContractKey[IsP]] = ???
 }
 
 sealed trait Form extends Product
@@ -56,24 +59,16 @@ object Form {
   implicit lazy val formDecoder: Decoder[Form] = { deriveDecoder }
 }
 
-/** Parameters common to multiple `Form`s.
-  */
-object columns {
+sealed trait Columns[N] {
 
-  final type Quantity = Double
+  /**
+    */
+  final type Quantity = N
 
   /** ShareClass class of the shares represented by this `Instrument`.
     */
   sealed trait ShareClass { self: Form =>
     def shareClass: Option[Label]
-  }
-
-  /** Tracks a (non-empty) set of `Instruments.Key`s
-    *
-    * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
-    */
-  sealed trait Tracker { self: Form =>
-    def members: Set[ContractKey]
   }
 
   /** Bonds (primary capital) `mature` (as opposed to `expire`.) */
@@ -82,16 +77,18 @@ object columns {
     def matures: ZonedDateTime
   }
 
-  /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
-    * and expire on a certain day.
-    */
-  sealed trait Derivative extends Expiry with Strike {
-    def underlier: ContractKey
-  }
+  // /** Tracks a (non-empty) set of `Instruments.Key`s
+  //   *
+  //   * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
+  //   */
+  // sealed trait Tracker { self: Form =>
+  //   def members: Trackers.Key
+  // }
+  // case object Trackers extends KeyValueStores.KV[USIN, USIN]
 
   /** `Expiry` only applies to `Derivative`s.
     */
-  sealed trait Expiry { self: Derivative =>
+  sealed trait Expiry { self: Form with Strike =>
     def expires: ZonedDateTime
   }
 
@@ -99,22 +96,29 @@ object columns {
     *
     * TODO: {{{def logMoneynessStrike(strike: Quamtity, forward: Quamtity): Strike }}}
     */
-  sealed trait Strike { self: Derivative =>
+  sealed trait Strike { self: Form with Expiry =>
     def strike: Quantity
+  }
+
+  /** All derivative contracts (such as `Future`s) are assumed to be struck at a certain price,
+    * and expire on a certain day.
+    */
+  sealed trait Derivative[IsP] extends Expiry with Strike { self: Form =>
+    def underlier: ContractKey[IsP]
   }
 }
 
-/**
+/** The batteries we included.
+  *
+  * TODO: modularize - the SADT derivation is too fragile rn
   */
-object PrimaryCapital {
-
-  import columns._
+object CapitalStack extends Columns[Double] {
 
   /**
     */
   final case class CommonStock(shareClass: Option[Label]) extends Form with ShareClass
 
-  object CommonStock {
+  case object CommonStock {
 
     implicit lazy val cStkEq: Eq[CommonStock]     = { import auto.eq._; semiauto.eq }
     implicit lazy val cStkShow: Show[CommonStock] = { import auto.show._; semiauto.show }
@@ -122,12 +126,11 @@ object PrimaryCapital {
 
   /**
     */
-  case object CommonStocks extends KeyValueStores.KV[ContractKey, CommonStock]
+  case object CommonStocks extends KeyValueStores.KV[ContractKey[IsCUSIP], CommonStock]
 
-  final case class PreferredStock(
-      shareClass: Option[Label],
-      // preference: Quantity Refined Positive,
-      participating: Boolean,
+  final case class PreferredStock(shareClass: Option[Label],
+                                  preference: Quantity Refined Positive,
+                                  participating: Boolean,
   ) extends Form
       with ShareClass
 
@@ -139,19 +142,18 @@ object PrimaryCapital {
 
   /**
     */
-  case object PreferredStocks extends KeyValueStores.KV[ContractKey, PreferredStock]
+  case object PreferredStocks extends KeyValueStores.KV[ContractKey[IsCUSIP], PreferredStock]
 
   /** Assume semiannual, Treasury-style coupons.
     *
     * TODO: Note that the state is cursor-like; evolve this further.
     */
-  final case class Bond(
-      // coupon: Quantity, // per 100 face
-      issued: Instant,
-      matures: ZonedDateTime,
-      // unpaidCoupons: List[ZonedDateTime], // soonest due first
-      // paidCoupons: List[Instant] // most recent first
-  ) extends Form
+  final case class Bond(face: Quantity,
+                        coupon: Quantity, // per 100 face
+                        issued: Instant,
+                        matures: ZonedDateTime,
+                        defaulted: Option[Instant])
+      extends Form
       with Maturity
 
   object Bond {
@@ -162,11 +164,12 @@ object PrimaryCapital {
 
   /** `Bonds` (as opposed to loans) are always issued by entities, never by natural persons.
     */
-  case object Bonds extends KeyValueStores.KV[ContractKey, Bond]
+  case object Bonds extends KeyValueStores.KV[ContractKey[IsISIN], Bond]
 
   /**
     */
   final case class Bill(
+      face: Quantity,
       issued: Instant,
       matures: ZonedDateTime
   ) extends Form
@@ -180,90 +183,94 @@ object PrimaryCapital {
 
   /** `Bills` are always issued by entities, never by natural persons.
     */
-  case object Bills extends KeyValueStores.KV[ContractKey, Bill]
-}
+  case object Bills extends KeyValueStores.KV[ContractKey[IsISIN], Bill]
 
-/** And by "vanilla" we mean an exchange traded derivative (ETD), no over-the-counter (OTC)
-  */
-// object VanillaDerivatives {
-//
-//   final type Quantity = Double
-//
-//   /**
-//     */
-//   sealed trait PutCall extends EnumEntry
-//
-//   /**
-//     */
-//   object PutCall extends DtEnum[PutCall] {
-//     case object Put  extends PutCall
-//     case object Call extends PutCall
-//     lazy val values = findValues
-//   }
-//
-//   /**
-//     */
-//   final case class Index(
-//       members: Set[ContractKey]
-//   ) extends Form
-//       with columns.Tracker
-//
-//   /**
-//     */
-//   case object Indexes extends KeyValueStores.KV[ContractKey, Index]
-//
-//   /** Exchange Traded Derivative - Future (ETD) */
-//   final case class XtFuture(
-//       expires: ZonedDateTime,
-//       underlier: ContractKey,
-//       strike: Quantity
-//   ) extends Form
-//       with columns.Derivative
-//
-//   /**
-//     */
-//   case object XtFutures extends KeyValueStores.KV[ContractKey, XtFuture]
-//
-//   /** Exchange Traded Derivative - Option (ETD) */
-//   final case class XtOption(
-//       val putCall: PutCall,
-//       override val expires: ZonedDateTime,
-//       override val underlier: PrimaryCapital.CommonStocks.Key,
-//       override val strike: Quantity
-//   ) extends Form
-//       with columns.Derivative
-//
-//   /** TODO: recheck that `Isin` thing... */
-//   case object XtOptions extends KeyValueStores.KV[ContractKey, XtOption]
-//
-//   /**
-//     */
-//   final case class XtFutureOption(
-//       putCall: PutCall,
-//       expires: ZonedDateTime,
-//       underlier: XtFutures.Key,
-//       strike: Quantity
-//   ) extends Form
-//       with columns.Derivative
-//
-//   /**
-//     */
-//   case object XtFutureOptions extends KeyValueStores.KV[ContractKey, XtFutureOption]
-//
-//   /**
-//     */
-//   final case class XtIndexOption(
-//       putCall: PutCall,
-//       expires: ZonedDateTime,
-//       underlier: Indexes.Key,
-//       strike: Quantity
-//   ) extends Form
-//       with columns.Derivative
-//
-//   /**
-//     */
-//   case object XtIndexOptions extends KeyValueStores.KV[ContractKey, XtIndexOption]
 // }
+//
+// /** And by "vanilla" we mean an exchange traded derivative (ETD), no over-the-counter (OTC)
+//   */
+// sealed abstract class VanillaDerivatives[N: Fractional: Show] extends PrimaryCapital[N] {
+
+  /**
+    */
+  sealed trait PutCall extends EnumEntry
+
+  /**
+    */
+  object PutCall extends DtEnum[PutCall] {
+    case object Put  extends PutCall
+    case object Call extends PutCall
+    lazy val values = findValues
+  }
+
+  // /**
+  //   */
+  // final case class Index(members: Set[ContractKey]) extends Form with Tracker
+  //
+  // object Index {
+  //
+  //   implicit lazy val indexEq: Eq[Index]     = { import auto.eq._; semiauto.eq }
+  //   implicit lazy val indexShow: Show[Index] = { import auto.show._; semiauto.show }
+  // }
+  //
+  // /**
+  //   */
+  // case object Indexes extends KeyValueStores.KV[ContractKey, Index]
+
+  /** Exchange Traded Derivative - Future (ETD) */
+  final case class XtFuture(expires: ZonedDateTime,
+                            underlier: ContractKey[IsISIN],
+                            strike: Quantity)
+      extends Form
+      with Derivative[IsISIN]
+
+  object XtFuture {
+
+    implicit lazy val xtFutureEq: Eq[XtFuture]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val xtFutureShow: Show[XtFuture] = { import auto.show._; semiauto.show }
+  }
+
+  /**
+    */
+  case object XtFutures extends KeyValueStores.KV[ContractKey[IsISIN], XtFuture]
+  //
+  // /** Exchange Traded Derivative - Option (ETD) */
+  // final case class XtOption(putCall: PutCall,
+  //                     expires: ZonedDateTime,
+  //                     underlier: CommonStocks.Key,
+  //                     strike: Quantity)
+  //     extends Form
+  //     with Derivative
+  //
+  // /** TODO: recheck that `Isin` thing... */
+  // case object XtOptions extends KeyValueStores.KV[ContractKey, XtOption]
+  //
+  // /**
+  //   */
+  // final case class XtFutureOption(putCall: PutCall,
+  //                           expires: ZonedDateTime,
+  //                           underlier: XtFutures.Key,
+  //                           strike: Quantity)
+  //     extends Form
+  //     with Derivative
+  //
+  // /**
+  //   */
+  // case object XtFutureOptions extends KeyValueStores.KV[ContractKey, XtFutureOption]
+  //
+  // /**
+  //   */
+  // final case class XtIndexOption(putCall: PutCall,
+  //                          expires: ZonedDateTime,
+  //                          underlier: Indexes.Key,
+  //                          strike: Quantity)
+  //     extends Form
+  //     with Derivative
+  //
+  // /**
+  //   */
+  // case object XtIndexOptions extends KeyValueStores.KV[ContractKey, XtIndexOption]
+}
 
 //
 // /** Private lending instruments.

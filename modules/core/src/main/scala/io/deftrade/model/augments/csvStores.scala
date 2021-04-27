@@ -17,6 +17,7 @@ import money._
 
 import eu.timepit.refined
 import refined.refineV
+import refined.api.Validate
 import refined.cats._
 
 import io.chrisdavenport.cormorant
@@ -60,18 +61,18 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
 
   /**
     */
-  implicit def instrumentKeyGet: Get[ContractKey] =
-    new Get[ContractKey] {
-      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey] =
-        refineV[IsUSIN](field.x) map ContractKey.apply leftMap { reason =>
+  implicit def instrumentKeyGet[IsP: Validate[String, *]]: Get[ContractKey[IsP]] =
+    new Get[ContractKey[IsP]] {
+      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey[IsP]] =
+        refineV[IsP](field.x) map ContractKey.apply leftMap { reason =>
           Error.DecodeFailure(NonEmptyList one reason)
         }
     }
 
   /**
     */
-  implicit def instrumentKeyPut: Put[ContractKey] =
-    stringPut contramap (_.usin.value)
+  implicit def instrumentKeyPut[IsP: Validate[String, *]]: Put[ContractKey[IsP]] =
+    stringPut contramap (_.key.value)
 }
 
 /**

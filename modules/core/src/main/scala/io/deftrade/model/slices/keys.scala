@@ -18,25 +18,37 @@ object keys {
   /** An ISIN is a twelve character string that must match a certain regex, and whose characters
     * must pass a certain (Luhn) checksum.
     */
-  type MatchesRxIsin = MatchesRegex["""[A-Z]{2}[A-Z0-9]{9}[0-9]"""] //"""
-  type IsISIN        = MatchesRxIsin And CheckedIsin
+  type MatchesRxIsin = MatchesRegex["""[A-Z]{2}[A-Z0-9]{9}[0-9]"""] //""" ide syntax color hack
+  type IsISIN        = MatchesRxIsin And CheckedISIN
   type ISIN          = String Refined IsISIN
 
-  /**
-    */
-  sealed abstract case class CheckedIsin()
+  object ISIN {
+
+    /** May fail, so return a result.
+      */
+    def fromUSIN(isin: USIN): Result[ISIN] = ???
+
+    /** Note these transforms should not fail.
+      */
+    def fromCUSIP(cusip: CUSIP): ISIN = ???
+    // def fromSEDOL(sedol: SEDOL): ISIN = ???
+  }
 
   /**
     */
-  object CheckedIsin {
+  sealed abstract case class CheckedISIN private ()
+
+  /**
+    */
+  object CheckedISIN {
 
     /**
       */
-    lazy val instance: CheckedIsin = new CheckedIsin() {}
+    object instance extends CheckedISIN
 
     /**
       */
-    implicit def isinValidate: Validate.Plain[String, CheckedIsin] =
+    implicit def isinValidate: Validate.Plain[String, CheckedISIN] =
       Validate.fromPredicate(predicate, t => s"$t is not Luhny", instance)
 
     /** * TODO need to add country checks,
@@ -64,113 +76,81 @@ object keys {
   }
 
   /** Pseudo `ISIN` matches `ISIN` regex, but uses the 9 digit body for proprietary mappings. */
-  type IsPsin = MatchesRxIsin And CheckedPsin // sic
-  type Psin   = String Refined IsPsin
+  type IsPSIN = MatchesRxIsin And CheckedPSIN // sic
+  type PSIN   = String Refined IsPSIN
 
-  /**
-    */
-  sealed abstract case class CheckedPsin()
-
-  /**
-    */
-  object CheckedPsin {
+  object PSIN {
 
     /**
       */
-    lazy val instance: CheckedPsin = new CheckedPsin() {}
+    def fromUnregistered(unreg: Unregistered): PSIN = ???
+
+    def toUnregistered(psin: PSIN): Result[Unregistered] = ???
+
+    /** TODO: how does option sybology jibe with ISINs?
+      */
+    def fromIBRK(ibrk: IBRK): PSIN = ???
+  }
+
+  /**
+    */
+  sealed abstract case class CheckedPSIN private ()
+
+  /**
+    */
+  object CheckedPSIN {
 
     /**
       */
-    implicit def isinValidate: Validate.Plain[String, CheckedPsin] =
+    object instance extends CheckedPSIN
+
+    /** TODO: this needs to be specified.
+      * For now, whatever passes regex is OK.
+      */
+    implicit def isinValidate: Validate.Plain[String, CheckedPSIN] =
       Validate.fromPredicate(predicate, t => s"$t is not Luhny", instance)
 
     private def predicate(isin: String): Boolean =
-      failsafe {
-
-        val digits = for {
-          c <- isin
-          d <- Character.digit(c, 36).toString
-        } yield d.asDigit
-
-        val check = for ((d, i) <- digits.reverse.zipWithIndex) yield luhn(d, i)
-
-        check.sum % 10 === 0
-      }
+      true
   }
+  // ISIN entails USIN
+  // PSIN entails USIN
 
   /** How deftrade canonicalizes securities identifiers:
     * Use `ISIN`s where non-isin uses use reserved country codes: {X*, ZZ}
     *
     * Universal Security Identifying Number: USIN
     */
-  type IsUSIN = IsISIN Or IsPsin
+  type IsUSIN = IsISIN Or IsPSIN
   type USIN   = String Refined IsUSIN
 
   /**
     */
-  object USIN {
+  type MatchesRxCUSIP = MatchesRegex["""[0-9]{3}[0-9A-Z]{3}[0-9]{3}"""] //"""
+  type IsCUSIP        = MatchesRxCUSIP And CheckedCUSIP
+  type CUSIP          = String Refined IsCUSIP
+  object CUSIP {
 
-    /** the least we can do
-      */
-    def from(s: String): Result[USIN] = ???
-
-    /**
-      */
-    def fromIsin(isin: ISIN): ISIN = ???
-
-    /**
-      */
-    def fromCusip(cusip: Cusip): ISIN = ???
-    // def fromSedol(sedol: Sedol): ISIN = ???
-
-    /**
-      */
-    def fromUnreg(unreg: Unreg): Psin = ???
-
-    /**
-      */
-    def fromIbrk(ibrk: Ibrk): Psin = ???
-
-    /**
-      */
-    def toIsin(usin: USIN): Result[ISIN] = ???
-
-    /**
-      */
-    def toCusip(usin: USIN): Result[Cusip] = ???
-    // def toSedol(usin: USIN): Result[Sedol] = ???
-
-    /**
-      */
-    def toUnreg(usin: USIN): Result[Unreg] = ???
-
-    /**
-      */
-    def toIbrk(usin: USIN): Result[Ibrk] = ???
+    def from(s: String): Result[CUSIP]      = ???
+    def fromISIN(isin: ISIN): Result[CUSIP] = ???
   }
-
-  /**
-    */
-  type MatchesRxCusip = MatchesRegex["""[0-9]{3}[0-9A-Z]{3}[0-9]{3}"""] //"""
-  type IsCusip        = MatchesRxCusip And CheckedCusip
-  type Cusip          = String Refined IsCusip
 
   /** A CUSIP is a nine character string that must match a certain regex, and whose characters
     * must pass a certain (Luhn) checksum.
     */
-  sealed abstract case class CheckedCusip()
+  sealed abstract case class CheckedCUSIP private ()
 
   /**
     */
-  object CheckedCusip {
+  object CheckedCUSIP {
 
     /**
       */
-    lazy val instance: CheckedCusip = new CheckedCusip() {}
+    object instance extends CheckedCUSIP
 
     /**
       */
-    implicit def cusipValidate: Validate.Plain[String, CheckedCusip] =
+    implicit def cusipValidate: Validate.Plain[String, CheckedCUSIP] =
       Validate.fromPredicate(predicate, t => s"$t is not legit", instance)
 
     private def predicate(isin: String): Boolean =
@@ -183,30 +163,44 @@ object keys {
       }
   }
 
-  /** `Ibrk` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
+  /** `IBRK` identifiers represent [[https://interactivebrokers.com Interactive Brokers]]
     * `ConId`'s
     */
   type MatchesRxIbrk = MatchesRegex["""\d{8}\d?"""] // 8 or 9 numbers
-  type IsIbrk        = MatchesRxIbrk
-  type Ibrk          = String Refined IsIbrk
+  type IsIBRK        = MatchesRxIbrk
+  type IBRK          = String Refined IsIBRK
+  object IBRK {
+    def from(s: String): Result[IBRK] = ???
+  }
 
-  /** `Unreg` identifiers represent unregistered securities, numbered by the firm.
+  /** `Unregistered` identifiers represent unregistered securities, numbered by the firm.
     * TODO: revisit how these are defined.
     */
   type MatchesRxUnreg = MatchesRegex["""\d{8,9}"""]
-  type IsUnreg        = MatchesRxUnreg
-  type Unreg          = String Refined IsUnreg
+  type IsUnregistered = MatchesRxUnreg
+  type Unregistered   = String Refined IsUnregistered
+  object Unregistered {
+    def from(s: String): Result[Unregistered] = ???
+  }
 
-  /** `UsBan` identifiers represent bank account numbers in the US
+  /** `UsBAN` identifiers represent bank account numbers in the US
     * TODO: Next up is IBAN
     */
   type MatchesRxUsBan = MatchesRegex["""\d{8,10}\"""]
   type IsUsBan        = MatchesRxUnreg // And CheckedUsBan
-  type UsBan          = String Refined IsUsBan
+  type UsBAN          = String Refined IsUsBan
+  object UsBAN {
+    def from(s: String): Result[UsBAN] = ???
+  }
 
   ////////////////////////////////////////////////
 
   // https://en.wikipedia.org/wiki/Luhn_algorithm
   private[deftrade] def luhn(digit: Int, idx: Int): Int =
-    if (idx % 2 === 0) digit else (digit * 2) / 10 + (digit * 2) % 10
+    if (idx % 2 === 0)
+      digit
+    else {
+      val d2 = digit * 2
+      d2 / 10 + d2 % 10
+    }
 }
