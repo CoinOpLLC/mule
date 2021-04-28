@@ -3,10 +3,11 @@ package model.layers
 
 import time._, money._, contracts._, keyval._, refinements._
 import model.slices.keys._
-import model.slices.{ ContractKey => CK, Metas }
+import model.slices.{ CapitalStack, Metas }
 
 import cats.implicits._
 import cats.{ Contravariant, Defer, Eq, Monad, Order, Show }
+import cats.data.NonEmptyList
 import cats.derived.{ auto, semiauto }
 
 import eu.timepit.refined
@@ -22,20 +23,32 @@ trait Paper { module: ModuleTypes with Person =>
 
   sealed abstract case class ContractKey[IsP] private (
       final val key: String Refined IsP
-  ) extends CK[IsP]
+  ) extends model.slices.ContractKey[IsP]
       with Numéraire.InKind
 
   object ContractKey {
 
-    def apply[IsP](key: String Refined IsP): ContractKey[IsP] =
+    import CapitalStack._
+
+    def apply(key: String Refined IsUSIN): ContractKey[IsUSIN] =
       new ContractKey(key) { self =>
         final def contract[F[_]: Monad: Defer]: F[Contract] = {
 
           // Note: papers.instrumentsForms has everything you need to define the contract
           // (and it's in scope!)
-          // papers.instrumentForms get self flatMap { _ match {
-          //  case Bond(b, c1, c2) =>
-          // } }
+
+          val x = for {
+            links <- papers.instrumentsForms getAll self
+            ls: List[Forms.Link] = links match {
+              case Some(NonEmptyList(h, t)) => h :: t
+              case None                     => Nil
+            }
+            form <- (ls map (link => papers.forms get link.form)).sequence
+          } yield form
+
+          //  map {
+          //   case Some(Bond(face, coupon, issued, matures, defaulted)) => ???
+          // }
 
           // import std.zeroCouponBond
 
@@ -113,8 +126,8 @@ trait Paper { module: ModuleTypes with Person =>
 
     object Link {
 
-      def apply(link: Id): Link =
-        new Link(link) {}
+      def apply(form: Id): Link =
+        new Link(form) {}
 
       implicit lazy val linkEq: Eq[Link]     = { import auto.eq._; semiauto.eq }
       implicit lazy val linkShow: Show[Link] = { import auto.show._; semiauto.show }

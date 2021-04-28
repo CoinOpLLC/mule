@@ -198,8 +198,13 @@ object CapitalStack extends Columns[Double] {
   /**
     */
   object PutCall extends DtEnum[PutCall] {
+
     case object Put  extends PutCall
     case object Call extends PutCall
+
+    implicit lazy val putCallEncoder: Encoder[PutCall] = { deriveEncoder }
+    implicit lazy val putCallDecoder: Decoder[PutCall] = { deriveDecoder }
+
     lazy val values = findValues
   }
 
@@ -233,18 +238,26 @@ object CapitalStack extends Columns[Double] {
   /**
     */
   case object XtFutures extends KeyValueStores.KV[ContractKey[IsISIN], XtFuture]
-  //
-  // /** Exchange Traded Derivative - Option (ETD) */
-  // final case class XtOption(putCall: PutCall,
-  //                     expires: ZonedDateTime,
-  //                     underlier: CommonStocks.Key,
-  //                     strike: Quantity)
-  //     extends Form
-  //     with Derivative
-  //
-  // /** TODO: recheck that `Isin` thing... */
-  // case object XtOptions extends KeyValueStores.KV[ContractKey, XtOption]
-  //
+
+  /** Exchange Traded Derivative - Option (ETD) */
+  final case class XtOption(putCall: PutCall,
+                            expires: ZonedDateTime,
+                            // underlier: CommonStocks.Key,
+                            underlier: ContractKey[IsISIN],
+                            strike: Quantity)
+      extends Form
+      with Derivative[IsISIN]
+
+  object XtOption {
+
+    implicit lazy val xtOptionEq: Eq[XtOption]     = { import auto.eq._; semiauto.eq }
+    implicit lazy val xtOptionShow: Show[XtOption] = { import auto.show._; semiauto.show }
+  }
+
+  /** TODO: recheck that `Isin` thing... */
+  case object XtOptions extends KeyValueStores.KV[ContractKey[IsISIN], XtOption]
+  // case object XtOptions extends KeyValueStores.KV[CommonStocks.Key, XtOption]
+
   // /**
   //   */
   // final case class XtFutureOption(putCall: PutCall,

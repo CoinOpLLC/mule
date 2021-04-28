@@ -61,10 +61,11 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
 
   /**
     */
-  implicit def instrumentKeyGet[IsP: Validate[String, *]]: Get[ContractKey[IsP]] =
-    new Get[ContractKey[IsP]] {
-      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey[IsP]] =
-        refineV[IsP](field.x) map ContractKey.apply leftMap { reason =>
+  implicit def instrumentKeyGet: Get[ContractKey[IsUSIN]] =
+    // implicit def instrumentKeyGet[IsP: Validate[String, *]]: Get[ContractKey[IsP]] =
+    new Get[ContractKey[IsUSIN]] {
+      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey[IsUSIN]] =
+        refineV[IsUSIN](field.x) map ContractKey.apply leftMap { reason =>
           Error.DecodeFailure(NonEmptyList one reason)
         }
     }
