@@ -23,8 +23,8 @@ trait Paper { module: ModuleTypes with Person =>
 
   sealed abstract case class ContractKey[IsP] private (
       final val key: String Refined IsP
-  ) extends model.slices.ContractKey[IsP]
-      with Numéraire.InKind
+  ) extends Numéraire.InKind[IO]
+      with model.slices.ContractKey[IsP]
 
   object ContractKey {
 
@@ -32,17 +32,14 @@ trait Paper { module: ModuleTypes with Person =>
 
     def apply(key: String Refined IsUSIN): ContractKey[IsUSIN] =
       new ContractKey(key) { self =>
-        final def contract[F[_]: Monad: Defer]: F[Contract] = {
+        final def contract: IO[Contract] = {
 
           // Note: papers.instrumentsForms has everything you need to define the contract
           // (and it's in scope!)
 
           val x = for {
             links <- papers.instrumentsForms getAll self
-            ls: List[Forms.Link] = links match {
-              case Some(NonEmptyList(h, t)) => h :: t
-              case None                     => Nil
-            }
+            ls = links.fold(List.empty[Forms.Link]) { case NonEmptyList(h, t) => h :: t }
             form <- (ls map (link => papers.forms get link.form)).sequence
           } yield form
 
@@ -57,7 +54,7 @@ trait Paper { module: ModuleTypes with Person =>
           //   zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0)).pure[F]
 
           def res: Contract = ???
-          res.pure[F]
+          res.pure[IO]
         }
       }
 

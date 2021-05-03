@@ -77,15 +77,6 @@ sealed trait Columns[N] {
     def matures: ZonedDateTime
   }
 
-  // /** Tracks a (non-empty) set of `Instruments.Key`s
-  //   *
-  //   * Enumerating the components of an [[forms.Index]] such as the DJIA is the typical use case.
-  //   */
-  // sealed trait Tracker { self: Form =>
-  //   def members: Trackers.Key
-  // }
-  // case object Trackers extends KeyValueStores.KV[USIN, USIN]
-
   /** `Expiry` only applies to `Derivative`s.
     */
   sealed trait Expiry { self: Form with Strike =>
@@ -113,6 +104,10 @@ sealed trait Columns[N] {
   * TODO: modularize - the SADT derivation is too fragile rn
   */
 object CapitalStack extends Columns[Double] {
+
+  /////////////////
+  // PrimaryCapital
+  /////////////////
 
   /**
     */
@@ -185,11 +180,9 @@ object CapitalStack extends Columns[Double] {
     */
   case object Bills extends KeyValueStores.KV[ContractKey[IsISIN], Bill]
 
-// }
-//
-// /** And by "vanilla" we mean an exchange traded derivative (ETD), no over-the-counter (OTC)
-//   */
-// sealed abstract class VanillaDerivatives[N: Fractional: Show] extends PrimaryCapital[N] {
+  //////////////////
+  // Derivatives
+  /////////////////
 
   /**
     */
@@ -208,19 +201,14 @@ object CapitalStack extends Columns[Double] {
     lazy val values = findValues
   }
 
-  // /**
-  //   */
-  // final case class Index(members: Set[ContractKey]) extends Form with Tracker
-  //
-  // object Index {
-  //
-  //   implicit lazy val indexEq: Eq[Index]     = { import auto.eq._; semiauto.eq }
-  //   implicit lazy val indexShow: Show[Index] = { import auto.show._; semiauto.show }
-  // }
-  //
-  // /**
-  //   */
-  // case object Indexes extends KeyValueStores.KV[ContractKey, Index]
+  object Index {
+
+    final type Identifier = ContractKey[IsISIN]
+  }
+
+  /**
+    */
+  case object Indexes extends KeyValueStores.KV[Index.Identifier, CommonStocks.Key]
 
   /** Exchange Traded Derivative - Future (ETD) */
   final case class XtFuture(expires: ZonedDateTime,
@@ -239,14 +227,13 @@ object CapitalStack extends Columns[Double] {
     */
   case object XtFutures extends KeyValueStores.KV[ContractKey[IsISIN], XtFuture]
 
-  /** Exchange Traded Derivative - Option (ETD) */
+  /** Exchange Traded Derivative - Option */
   final case class XtOption(putCall: PutCall,
                             expires: ZonedDateTime,
-                            // underlier: CommonStocks.Key,
-                            underlier: ContractKey[IsISIN],
+                            underlier: CommonStocks.Key,
                             strike: Quantity)
       extends Form
-      with Derivative[IsISIN]
+      with Derivative[IsCUSIP]
 
   object XtOption {
 
@@ -255,8 +242,7 @@ object CapitalStack extends Columns[Double] {
   }
 
   /** TODO: recheck that `Isin` thing... */
-  case object XtOptions extends KeyValueStores.KV[ContractKey[IsISIN], XtOption]
-  // case object XtOptions extends KeyValueStores.KV[CommonStocks.Key, XtOption]
+  case object XtOptions extends KeyValueStores.KV[CommonStocks.Key, XtOption]
 
   // /**
   //   */

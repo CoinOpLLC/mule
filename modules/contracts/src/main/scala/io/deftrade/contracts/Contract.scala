@@ -1,10 +1,10 @@
 package io.deftrade
 package contracts
 
-// import spire.implicits._
+import spire.math.Fractional
 import spire.algebra.Field
 
-import cats.{ Eq, Eval, Group, Monad, Show }
+import cats.{ Eq, Eval, Group, Id, Monad, Show }
 import Eval.later
 
 /**  This trait intentionally left blank.
@@ -31,8 +31,8 @@ object Contract {
 
   case object Zero extends Contract
 
-  sealed abstract case class One private (n: Numéraire) extends Contract
-  object One { def apply(n: Numéraire): One = new One(n) {} }
+  sealed abstract case class One[F[_]] private (n: Numéraire[F]) extends Contract
+  object One { def apply[F[_]](n: Numéraire[F]): One[F] = new One[F](n) {} }
 
   sealed abstract case class Give private (c: DefCon) extends Contract
   object Give { def apply(c: DefCon): Give = new Give(c) {} }
@@ -101,8 +101,8 @@ object Contract {
 
     /** Party immediately acquires one unit of `Numéraire` from counterparty.
       */
-    final def unitOf(base: Numéraire): Contract =
-      One(base)
+    final def unitOf[F[_]](base: Numéraire[F]): Contract =
+      One[F](base)
 
     /** Party assumes role of counterparty with respect to `c`.
       */
@@ -144,8 +144,8 @@ object Contract {
       */
     final def pick[F[_]: Monad](cT: => Contract)(cF: => Contract): Contract =
       Pick[F](later(cT), later(cF))
-  }
 
+  }
   implicit class ContractOps(val c: Contract) extends AnyVal {
 
     def unary_- : Contract =
@@ -169,4 +169,47 @@ object Contract {
     def combine(c2: => Contract): Contract =
       contracts.both(c)(c2)
   }
+}
+
+trait api extends Contract.primitives {
+
+  import Numéraire._, Oracle._
+  import spire.implicits._
+
+  /** Party acquires one unit of [[money.Currency]].
+    */
+  def one(c: InCoin): Contract =
+    unitOf[Id](c)
+
+  /** Party acquires one unit of ''something'',
+    * where that ''something'' (e.g. an [[model.std.Instrument instrument]])
+    * is '''non-fungable'''.
+    */
+  def one[F[_]](k: InKind[F]): Contract =
+    unitOf[F](k)
+
+  /**
+    */
+  def allOf(cs: LazyList[Contract]): Contract =
+    cs.fold(zero) { both(_)(_) }
+
+  // /**
+  //   */
+  // def bestOf(cs: LazyList[Contract]): Contract =
+  //   cs.fold(zero) { pick(_)(_) }
+
+  // /** If `c` is worth something, take it.
+  //   */
+  // def optionally[F[_]: cats.Monad](c: => Contract): Contract =
+  //   pick[F](c)(zero)
+  //
+  /**
+    */
+  def buy[N: Fractional](c: => Contract, amount: N, coin: InCoin): Contract =
+    c combine -one(coin) * const(amount)
+
+  /**
+    */
+  def sell[N: Fractional](c: => Contract, amount: N, coin: InCoin): Contract =
+    -c combine one(coin) * const(amount)
 }
