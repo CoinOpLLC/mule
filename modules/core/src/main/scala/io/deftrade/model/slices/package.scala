@@ -31,11 +31,11 @@ package object slices {
 
   /**
     */
-  final type UnitPartition[K, N] = Partition[K, N, Partition.IsNormalized]
+  final type UnitPartio[K, N] = Partio[K, N, Partio.IsNormalized]
 
   /**
     */
-  final type ScaledPartition[K, N] = Partition[K, N, Partition.IsPositive]
+  final type ScaledPartio[K, N] = Partio[K, N, Partio.IsPositive]
 
   /**
     */

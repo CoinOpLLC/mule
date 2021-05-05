@@ -24,21 +24,21 @@ trait Paper { module: ModuleTypes with Person =>
   sealed abstract case class ContractKey[IsP] private (
       final val key: String Refined IsP
   ) extends Numéraire.InKind[IO]
-      with model.slices.ContractKey[IsP]
 
   object ContractKey {
 
     import CapitalStack._
 
-    def apply(key: String Refined IsUSIN): ContractKey[IsUSIN] =
+    def usin(key: String Refined IsUSIN): ContractKey[IsUSIN] =
       new ContractKey(key) { self =>
+
         final def contract: IO[Contract] = {
 
           // Note: papers.instrumentsForms has everything you need to define the contract
           // (and it's in scope!)
 
           val x = for {
-            links <- papers.instrumentsForms getAll self
+            links <- papers.instrumentsForms getAll key
             ls = links.fold(List.empty[Forms.Link]) { case NonEmptyList(h, t) => h :: t }
             form <- (ls map (link => papers.forms get link.form)).sequence
           } yield form
@@ -109,11 +109,11 @@ trait Paper { module: ModuleTypes with Person =>
   /** Indexed by CUSIPs and other formats.
     * An `Instrument` ''evolves'' over time as the `form.Contract` state is updated.
     */
-  case object Instruments extends KeyValueStores.KV[ContractKey[IsUSIN], Instrument]
+  case object Instruments extends KeyValueStores.KV[USIN, Instrument]
 
   /**
     */
-  case object ExchangeTradedInstruments extends KeyValueStores.KV[ContractKey[IsISIN], Instrument]
+  case object ExchangeTradedInstruments extends KeyValueStores.KV[ISIN, Instrument]
 
   /**
     */

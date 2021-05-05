@@ -25,59 +25,62 @@ object Contract {
   implicit lazy val contractEq: Eq[Contract]     = Eq.fromUniversalEquals[Contract]
   implicit lazy val contractShow: Show[Contract] = Show.show[Contract](_.toString)
 
-  /** Deferred Contract
-    */
-  type DefCon = Eval[Contract]
-
   case object Zero extends Contract
 
   sealed abstract case class One[F[_]] private (n: Numéraire[F]) extends Contract
   object One { def apply[F[_]](n: Numéraire[F]): One[F] = new One[F](n) {} }
 
-  sealed abstract case class Give private (c: DefCon) extends Contract
-  object Give { def apply(c: DefCon): Give = new Give(c) {} }
+  sealed abstract case class Give private (c: Eval[Contract]) extends Contract
+  object Give { def apply(c: Eval[Contract]): Give = new Give(c) {} }
 
   sealed abstract case class Scale[N] private (
       o: Oracle[N],
-      c: DefCon,
+      c: Eval[Contract],
       N: Field[N]
   ) extends Contract
 
   object Scale {
-    def apply[N: Field](o: Oracle[N], c: DefCon): Scale[N] = new Scale(o, c, Field[N]) {}
+    def apply[N: Field](o: Oracle[N], c: Eval[Contract]): Scale[N] =
+      new Scale(o, c, Field[N]) {}
   }
 
-  sealed abstract case class When private (o: Oracle[Boolean], c: DefCon) extends Contract
-  object When { def apply(o: Oracle[Boolean], c: DefCon): When = new When(o, c) {} }
+  sealed abstract case class When private (o: Oracle[Boolean], c: Eval[Contract]) extends Contract
+  object When { def apply(o: Oracle[Boolean], c: Eval[Contract]): When = new When(o, c) {} }
 
-  sealed abstract case class Until private (o: Oracle[Boolean], c: DefCon) extends Contract
-  object Until { def apply(o: Oracle[Boolean], c: DefCon): Until = new Until(o, c) {} }
+  sealed abstract case class Until private (o: Oracle[Boolean], c: Eval[Contract]) extends Contract
+  object Until { def apply(o: Oracle[Boolean], c: Eval[Contract]): Until = new Until(o, c) {} }
 
-  sealed abstract case class Anytime private (o: Oracle[Boolean], c: DefCon) extends Contract
-  object Anytime { def apply(o: Oracle[Boolean], c: DefCon): Anytime = new Anytime(o, c) {} }
+  sealed abstract case class Anytime private (o: Oracle[Boolean], c: Eval[Contract])
+      extends Contract
+  object Anytime {
+    def apply(o: Oracle[Boolean], c: Eval[Contract]): Anytime = new Anytime(o, c) {}
+  }
 
-  sealed abstract case class Both private (cA: DefCon, cB: DefCon) extends Contract
-  object Both { def apply(cA: DefCon, cB: DefCon): Both = new Both(cA, cB) {} }
+  sealed abstract case class Both private (a: Eval[Contract], b: Eval[Contract]) extends Contract
+  object Both { def apply(a: Eval[Contract], b: Eval[Contract]): Both = new Both(a, b) {} }
 
-  sealed abstract case class Pick[F[_]] private (cT: DefCon, cF: DefCon) extends Contract {
+  sealed abstract case class Pick[F[_]] private (a: Eval[Contract], b: Eval[Contract])
+      extends Contract {
     def election: Oracle.Election[F]
     def choice: F[Contract]
   }
   object Pick {
-    def apply[F[_]: Monad](cT: DefCon, cF: DefCon): Pick[F] =
-      new Pick[F](cT, cF) {
+    def apply[F[_]: Monad](t: Eval[Contract], f: Eval[Contract]): Pick[F] =
+      new Pick[F](t, f) {
         import cats.implicits._
         final def election: Oracle.Election[F] = ???
         final def choice: F[Contract] =
-          for { b <- election.result.value } yield (if (b) cT.value else cF.value)
+          for { b <- election.result.value } yield (if (b) t.value else f.value)
       }
   }
 
-  sealed abstract case class Branch private (o: Oracle[Boolean], cT: DefCon, cF: DefCon)
+  sealed abstract case class Branch private (o: Oracle[Boolean],
+                                             t: Eval[Contract],
+                                             f: Eval[Contract])
       extends Contract
 
   object Branch {
-    def apply(o: Oracle[Boolean], cT: DefCon, cF: DefCon): Branch =
+    def apply(o: Oracle[Boolean], cT: Eval[Contract], cF: Eval[Contract]): Branch =
       new Branch(o, cT, cF) {}
   }
 
@@ -132,18 +135,18 @@ object Contract {
 
     /** Party acquires `cT` if `b` is `true` ''at the moment of acquistion'', else acquires `cF`.
       */
-    final def branch(b: Oracle[Boolean])(cT: => Contract)(cF: => Contract): Contract =
-      Branch(b, later(cT), later(cF))
+    final def branch(b: Oracle[Boolean])(t: => Contract)(f: => Contract): Contract =
+      Branch(b, later(t), later(f))
 
     /** Party immediately receives both `cA` and `cB`.
       */
-    final def both(cA: => Contract)(cB: => Contract): Contract =
-      Both(later(cA), later(cB))
+    final def both(a: => Contract)(b: => Contract): Contract =
+      Both(later(a), later(b))
 
     /** Party immediately chooses between `cA` or `cB`.
       */
-    final def pick[F[_]: Monad](cT: => Contract)(cF: => Contract): Contract =
-      Pick[F](later(cT), later(cF))
+    final def pick[F[_]: Monad](t: => Contract)(f: => Contract): Contract =
+      Pick[F](later(t), later(f))
 
   }
   implicit class ContractOps(val c: Contract) extends AnyVal {
