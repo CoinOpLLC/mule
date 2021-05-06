@@ -302,7 +302,7 @@ trait IRS1065 {
       */
     def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(K, K)] =
       (sk.from, sk.to) match {
-        case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
+        case (UnitPartio.Single(f), UnitPartio.Single(t)) => (f, t).some
       }
 
     /**
@@ -333,7 +333,7 @@ trait IRS1065 {
       */
     def unapply[K <: AccountingKey](sk: SwapKey[K]): Option[(K, K)] =
       (sk.from, sk.to) match {
-        case (UnitPartition.Single(f), UnitPartition.Single(t)) => (f, t).some
+        case (UnitPartio.Single(f), UnitPartio.Single(t)) => (f, t).some
       }
 
     /**

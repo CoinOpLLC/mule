@@ -38,18 +38,20 @@ import scala.collection.immutable.{ SortedMap, SortedSet }
 /**
   * Models a total stake, and the stakeholders thereof.
   *
-  * (A pot, divided.)
+  * From the Latin
+  * [[https://en.wiktionary.org/wiki/partio#Etymology_1  partio]]:
+  * share, part, apportion; divide, distribute.
   */
 /**  */
-sealed abstract case class Partition[K: Order, N: Financial, Q] private (
+sealed abstract case class Partio[K: Order, N: Financial, Q] private (
     final val kvs: NonEmptyMap[K, N Refined Q]
 ) {
 
-  import Partition.{ IsNormalized, IsPositive }
+  import Partio.{ IsNormalized, IsPositive }
 
-  final type Repr            = Partition[K, N, Q]
-  final type ScaledPartition = Partition[K, N, IsPositive]
-  final type UnitPartition   = Partition[K, N, IsNormalized]
+  final type Repr         = Partio[K, N, Q]
+  final type ScaledPartio = Partio[K, N, IsPositive]
+  final type UnitPartio   = Partio[K, N, IsNormalized]
 
   final type Qualified  = N Refined Q
   final type Normalized = N Refined IsNormalized
@@ -68,15 +70,15 @@ sealed abstract case class Partition[K: Order, N: Financial, Q] private (
   /**
     */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final def scaled(n: Positive): ScaledPartition =
-    Partition(kvs.map { v =>
+  final def scaled(n: Positive): ScaledPartio =
+    Partio(kvs.map { v =>
       val Right(pv) = refineV[IsPositive](v.value * n.value) // how do we know? ;)
       pv
     })
 
-  /** Creates a `Partition` of total `n`, proportional to self. `n` must be positive.
+  /** Creates a `Partio` of total `n`, proportional to self. `n` must be positive.
     */
-  final def proRated(n: N): Result[ScaledPartition] =
+  final def proRated(n: N): Result[ScaledPartio] =
     (for { pn <- refineV[IsPositive](n) } yield scaled(pn)) leftMap Fail.fromString
 
   /**
@@ -108,12 +110,12 @@ sealed abstract case class Partition[K: Order, N: Financial, Q] private (
   final def assigned(
       portion: Normalized,
       from: K,
-      to: UnitPartition,
+      to: UnitPartio,
   ): Result[Repr] =
     if ((keys contains from) && (to.keys forall (k => !(keys contains k)))) {
       // this match {
-      //   case Partition(_)     => ??? // FIXME Result of (Partition unsafe ???)
-      //   case UnitPartition(_) => ??? // FIXME UnitPartition unsafe ???
+      //   case Partio(_)     => ??? // FIXME Result of (Partio unsafe ???)
+      //   case UnitPartio(_) => ??? // FIXME UnitPartio unsafe ???
       // }
       ???
     } else {
@@ -133,21 +135,21 @@ sealed abstract case class Partition[K: Order, N: Financial, Q] private (
 
   /**  */
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  final def normalized(implicit IsQ: IsPositive =:= Q): UnitPartition = {
+  final def normalized(implicit IsQ: IsPositive =:= Q): UnitPartio = {
     import refined.auto._
-    UnitPartition unsafe (kvs map (_.value / total)).toSortedMap // this is fine
+    UnitPartio unsafe (kvs map (_.value / total)).toSortedMap // this is fine
   }
 
-  /** Partition only */
+  /** Partio only */
   final def retired(key: K): Result[Repr] = ???
 
-  /** Partition only */
-  final def diluted(key: K, share: N): Result[ScaledPartition] = ???
+  /** Partio only */
+  final def diluted(key: K, share: N): Result[ScaledPartio] = ???
 
 }
 
 /** */
-object Partition {
+object Partio {
 
   final type IsPositive = refined.numeric.Positive
 
@@ -156,36 +158,36 @@ object Partition {
   /** */
   private[model] def apply[K: Order, N: Financial, Q](
       kvs: NonEmptyMap[K, N Refined Q]
-  ): Partition[K, N, Q] =
-    new Partition(kvs) {}
+  ): Partio[K, N, Q] =
+    new Partio(kvs) {}
 
   private[deftrade] def unsafe[K: Order, N: Financial](
       sm: SortedMap[K, N Refined IsPositive]
-  ): ScaledPartition[K, N] = Partition(NonEmptyMap fromMapUnsafe sm)
+  ): ScaledPartio[K, N] = Partio(NonEmptyMap fromMapUnsafe sm)
 
   /** total shares outstanding computed from the sum of `shares` */
   def fromShares[K: Order, N: Financial](
       share: (K, N Refined IsPositive),
       shares: (K, N Refined IsPositive)*
-  ): ScaledPartition[K, N] = {
+  ): ScaledPartio[K, N] = {
 
     val kvs: NonEmptyMap[K, N Refined IsPositive] = NonEmptyList(share, shares.toList).toNem
-    ScaledPartition(kvs)
+    ScaledPartio(kvs)
   }
 
   /**
-    * Creates an allocation function (`N => Partition`) from a set of tranches,
+    * Creates an allocation function (`N => Partio`) from a set of tranches,
     * with a designated key for the remainder (equity).
     */
   def waterfall[K: Order, N: Financial](
       tranches: Map[K, N],
       equity: K
-  ): Result[N => ScaledPartition[K, N]] = ???
+  ): Result[N => ScaledPartio[K, N]] = ???
 
   /** */
   def waterfall[K: Order, N: Financial](
       tranches: K => N Refined IsPositive,
-  ): N => ScaledPartition[K, N] = ???
+  ): N => ScaledPartio[K, N] = ???
 
   /** def ipsa loquitur */
   def currified[K: Order, N: Financial](
@@ -196,43 +198,43 @@ object Partition {
       amount: N Refined IsPositive
   ) = compute(keys)(amount) |> apply[K, N, IsPositive]
 
-  implicit def partitionEq[K: Order, N: Financial, Q]: Eq[Partition[K, N, Q]] = {
+  implicit def partitionEq[K: Order, N: Financial, Q]: Eq[Partio[K, N, Q]] = {
     import auto.eq._; semiauto.eq
   }
 
-  implicit def partitionShow[K: Show, N: Show, Q]: Show[Partition[K, N, Q]] =
+  implicit def partitionShow[K: Show, N: Show, Q]: Show[Partio[K, N, Q]] =
     Contravariant[Show].contramap(Show[NonEmptyMap[K, N Refined Q]])(_.kvs)
 }
 
-object ScaledPartition {
+object ScaledPartio {
 
-  protected final type Positive[N] = N Refined Partition.IsPositive
+  protected final type Positive[N] = N Refined Partio.IsPositive
 
   /**
     */
   def apply[K: Order, N: Financial](
       kvs: NonEmptyMap[K, Positive[N]]
-  ): ScaledPartition[K, N] =
-    Partition(kvs)
+  ): ScaledPartio[K, N] =
+    Partio(kvs)
 }
 
 /** Conventional creation patterns. */
-object UnitPartition {
+object UnitPartio {
 
-  import Partition.{ IsNormalized, IsPositive }
+  import Partio.{ IsNormalized, IsPositive }
 
   /** Whole pie for me. */
-  def single[K: Order, N: Financial](k: K): UnitPartition[K, N] =
+  def single[K: Order, N: Financial](k: K): UnitPartio[K, N] =
     unsafe(SortedMap(k -> Financial[N].one))
 
   /** What every pizza slicer aims for. */
-  def fair[K: Order, N: Financial](ks: K*): Result[UnitPartition[K, N]] =
+  def fair[K: Order, N: Financial](ks: K*): Result[UnitPartio[K, N]] =
     Result(for {
       k <- ks.headOption if SortedSet(ks: _*).size === ks.size
     } yield fairExact(NonEmptySet(k, SortedSet((ks drop 1): _*))))
 
   /** */
-  def fairExact[K: Order, N: Financial](ks: NonEmptySet[K]): UnitPartition[K, N] = {
+  def fairExact[K: Order, N: Financial](ks: NonEmptySet[K]): UnitPartio[K, N] = {
     val N        = Fractional[N]; import N._
     val oneSlice = one / (N fromLong ks.size)
     val slices   = SortedMap(ks.toList.map(_ -> oneSlice): _*)
@@ -242,10 +244,10 @@ object UnitPartition {
   /** Total shares outstanding computed from the sum of `shares`. */
   def fromShares[K: Order, N: Financial](
       shares: (K, N Refined IsPositive)*
-  ): Result[UnitPartition[K, N]] =
+  ): Result[UnitPartio[K, N]] =
     shares.toList match {
       case Nil    => Fail("wut").asLeft
-      case h :: t => Result safe { Partition.fromShares(h, t: _*).normalized }
+      case h :: t => Result safe { Partio.fromShares(h, t: _*).normalized }
     }
 
   /** `n` shares issued; sum of slices must equal whole pie */
@@ -253,7 +255,7 @@ object UnitPartition {
       n: N Refined IsPositive
   )(
       ps: (K, N Refined IsPositive)*
-  ): Result[UnitPartition[K, N]] = {
+  ): Result[UnitPartio[K, N]] = {
     import refined.auto._
     val N              = Fractional[N]; import N._
     val computedShares = ps.map(_._2.value).fold(zero)(plus)
@@ -262,12 +264,12 @@ object UnitPartition {
   }
 
   /** `exact` slices are claimed by the caller; this is checked. */
-  def exact[K: Order, N: Financial](shares: (K, N)*): Result[UnitPartition[K, N]] = {
+  def exact[K: Order, N: Financial](shares: (K, N)*): Result[UnitPartio[K, N]] = {
     val VF = Fractional[N]; import VF._
     shares.map(_._2).fold(zero)(plus) match {
       case x if one === x => Result of unsafe(SortedMap(shares: _*))
       case noUnity =>
-        Result fail s"UnitPartition: ${shares.toString} total ${noUnity.toString}"
+        Result fail s"UnitPartio: ${shares.toString} total ${noUnity.toString}"
     }
   }
 
@@ -275,7 +277,7 @@ object UnitPartition {
   object Single {
 
     /** Extracts a single key, if that's what's there. */
-    def unapply[K: Order, N: Financial](p: UnitPartition[K, N]): Option[K] =
+    def unapply[K: Order, N: Financial](p: UnitPartio[K, N]): Option[K] =
       p.kvs.toNel.toList match {
         case (k, _) :: Nil => k.some
         case _             => none
@@ -283,8 +285,8 @@ object UnitPartition {
   }
 
   /** checks only that values are normalized */
-  private[deftrade] def unsafe[K: Order, N: Financial](kvs: SortedMap[K, N]): UnitPartition[K, N] =
-    Partition(NonEmptyMap fromMapUnsafe (for {
+  private[deftrade] def unsafe[K: Order, N: Financial](kvs: SortedMap[K, N]): UnitPartio[K, N] =
+    Partio(NonEmptyMap fromMapUnsafe (for {
       (k, v) <- kvs
     } yield {
       val Right(nv) = refineV[IsNormalized](v) // this is fine

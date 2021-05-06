@@ -4,7 +4,7 @@ package contracts
 import spire.implicits._
 import spire.algebra.{ Bool, Field, NRoot, Order, Signed, Trig }
 
-import cats.{ Eval, Show }
+import cats.{ Eval }
 
 import java.time.Instant
 import Instant.now

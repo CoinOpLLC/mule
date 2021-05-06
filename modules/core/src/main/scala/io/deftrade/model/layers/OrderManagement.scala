@@ -18,7 +18,7 @@ package io.deftrade
 package model.layers
 
 import keyval._, time._, money._
-import model.slices.{ Metas, UnitPartition }
+import model.slices.{ Metas, UnitPartio }
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
@@ -39,7 +39,7 @@ trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketDat
 
   /**
     */
-  type Allocation = UnitPartition[Folios.Key, Quantity]
+  type Allocation = UnitPartio[Folios.Key, Quantity]
 
   /** Namespace placeholder */
   object Allocation

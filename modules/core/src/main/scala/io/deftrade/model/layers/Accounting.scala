@@ -18,7 +18,7 @@ package model.layers
 
 import money.{ Currency, Financial }
 import keyval.DtEnum
-import model.slices.{ UnitPartition }
+import model.slices.{ UnitPartio }
 
 import cats.implicits._
 
@@ -223,11 +223,11 @@ trait Accounting { self: ModuleTypes =>
     * We call the assingment of fractional amounts to certain accounting keys a ''treatment'',
     * following terminology common in the accounting field.
     */
-  type Treatment[K <: AccountingKey] = UnitPartition[K, MonetaryAmount]
+  type Treatment[K <: AccountingKey] = UnitPartio[K, MonetaryAmount]
 
   /**
     */
-  final val Treatment = UnitPartition
+  final val Treatment = UnitPartio
 
   /**
     * General form of a "double (bookkeeping) entry" key.

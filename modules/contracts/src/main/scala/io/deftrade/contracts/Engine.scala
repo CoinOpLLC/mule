@@ -39,7 +39,7 @@ object Engine {}
   * TODO: refine this model
   * TODO: expand to other models
   */
-sealed abstract case class Pricing[N](
+sealed abstract case class Pricing[F[_], N](
     coin: Numéraire.InCoin,
     t0: Instant,
     rateModel: Pricing.PR[N]
@@ -64,11 +64,11 @@ sealed abstract case class Pricing[N](
   final def eval: Contract => PR[N] = {
 
     case Zero => konst(N.zero)
-    case One(n) =>
+    case One(n: Numéraire[F]) =>
       n match {
         case c: InCoin if coin == c => konst(N.one)
         case c2: InCoin             => exch(c2)
-        case k: InKind              => exch(k)
+        case k: InKind[F]           => exch(k)
       }
     case Scale(o, c, n) if n == N => konst(o.value.asInstanceOf[N]) * eval(c.value)
     case Scale(_, _, _)           => ??? // wrong N FIXME: convert and recurse! LOLOLOL
@@ -119,13 +119,13 @@ sealed abstract case class Pricing[N](
     *
     * FIXME: toy stub; implement for real.
     */
-  final def exch(n2: Numéraire): PR[N] =
+  final def exch(n2: Numéraire[F]): PR[N] =
     n2 match {
 
       case _: Numéraire.InCoin =>
         PR konst Fractional[N].one * 1.618
 
-      case _: Numéraire.InKind =>
+      case _: Numéraire.InKind[F] =>
         PR konst Fractional[N].one * 6.18
     }
 
@@ -494,12 +494,14 @@ object Pricing {
 //     }
 //   ) {}
 
+import cats.effect.{ ContextShift, Sync }
+
 /** `Contract` performance.
   *
   * - automated
   * - manual (workflow scheduling)
   */
-sealed abstract case class Performing[N: Fractional]() extends Engine {
+sealed abstract case class Performing[F[_]: Sync: ContextShift, N: Fractional]() extends Engine {
 
   import Contract._, Numéraire._
 
@@ -507,7 +509,7 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
 
   /**
     */
-  final type Return = cats.effect.IO[Unit]
+  final type Return = F[Unit]
 
   /**
     */
@@ -523,16 +525,16 @@ sealed abstract case class Performing[N: Fractional]() extends Engine {
     case Until(_, _)     => ???
     case One(n) =>
       n match {
-        case _: InCoin => ???
-        case _: InKind => ???
+        case _: InCoin    => ???
+        case _: InKind[F] => ???
       }
   }
 
-  def withdraw(amount: N, coin: InCoin): Return = ???
-  def transfer(amount: N, coin: InCoin): Return = ???
-  def deposit(amount: N, coin: InCoin): Return  = ???
-  def deliver(amount: N, kind: InKind): Return  = ???
-  def receive(amount: N, kind: InKind): Return  = ???
+  def withdraw(amount: N, coin: InCoin): Return   = ???
+  def transfer(amount: N, coin: InCoin): Return   = ???
+  def deposit(amount: N, coin: InCoin): Return    = ???
+  def deliver(amount: N, kind: InKind[F]): Return = ???
+  def receive(amount: N, kind: InKind[F]): Return = ???
 }
 
 /** placeholder

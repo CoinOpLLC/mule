@@ -440,7 +440,7 @@ This is where the policy decision to choose generic tax accounting for entities 
 
 Also, this is where we bind the `MonetaryAmount` type (and thus `Money`) to `BigDecimal`, while other `Financial` `Quantity`s bind to `Double`. Again, other instanting objects could make other decisions; see the API docs (and the code!) for more details.
 
-#### `Partition`s
+#### `Partio`s
 
 Models anything from the division of a pizza to the equity capital of a firm per partner.
 

@@ -2,7 +2,7 @@ package io.deftrade
 package model.layers
 
 import keyval._
-import model.slices.UnitPartition
+import model.slices.UnitPartio
 
 import cats.implicits._
 import cats.{ Eq, Show }
@@ -68,7 +68,7 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
   /** Each [[Account]] is created with a [[Roster]].
     */
   sealed abstract case class Roster private (
-      principals: UnitPartition[Parties.Key, Quantity],
+      principals: UnitPartio[Parties.Key, Quantity],
       private val nps: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
   ) {
 
@@ -116,7 +116,7 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
     implicit def valueEq: Eq[Roster]     = { import auto.eq._; semiauto.eq }
 
     private[deftrade] def apply(
-        principals: UnitPartition[Parties.Key, Quantity],
+        principals: UnitPartio[Parties.Key, Quantity],
         nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
     ): Roster =
       new Roster(principals, nonPrincipals) {}
@@ -134,7 +134,7 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
             case _ => ??? // (sic)
           }
       }
-      val Right(principals) = UnitPartition exact (xs: _*)
+      val Right(principals) = UnitPartio exact (xs: _*)
       Roster(principals, nonPrincipals)
     }
 
@@ -152,7 +152,7 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
 
     /** most general public creation method */
     def from(
-        principals: UnitPartition[Parties.Key, Quantity],
+        principals: UnitPartio[Parties.Key, Quantity],
         nonPrincipals: Map[Role.NonPrincipal, NonEmptySet[Parties.Key]]
     ) =
       Roster(
@@ -165,19 +165,19 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
     /** By default, all share in [[Roster.nonPrincipals]] responsibilities equally,
       * regardless of their share of the principle pie.
       */
-    def fromPrinciples(principals: UnitPartition[Parties.Key, Quantity]): Roster =
+    def fromPrinciples(principals: UnitPartio[Parties.Key, Quantity]): Roster =
       from(principals, Map.empty)
 
     /**
       */
     def single(entity: Parties.Key): Roster =
-      fromPrinciples(principals = UnitPartition single entity)
+      fromPrinciples(principals = UnitPartio single entity)
 
     /** Splits partition equally among [[Role.Principal]]s.
       */
     def equalSplitFrom(ps: Parties.Key*): Result[Roster] =
       for {
-        slices <- UnitPartition fair [Parties.Key, Quantity] (ps: _*)
+        slices <- UnitPartio fair [Parties.Key, Quantity] (ps: _*)
       } yield fromPrinciples(slices)
 
     /**

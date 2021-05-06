@@ -58,22 +58,6 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
     */
   implicit def financialPut[N: Financial]: Put[N] =
     stringPut contramap (Financial[N] toString _)
-
-  /**
-    */
-  implicit def instrumentKeyGet: Get[ContractKey[IsUSIN]] =
-    // implicit def instrumentKeyGet[IsP: Validate[String, *]]: Get[ContractKey[IsP]] =
-    new Get[ContractKey[IsUSIN]] {
-      def get(field: CSV.Field): Either[Error.DecodeFailure, ContractKey[IsUSIN]] =
-        refineV[IsUSIN](field.x) map ContractKey.apply leftMap { reason =>
-          Error.DecodeFailure(NonEmptyList one reason)
-        }
-    }
-
-  /**
-    */
-  implicit def instrumentKeyPut[IsP: Validate[String, *]]: Put[ContractKey[IsP]] =
-    stringPut contramap (_.key.value)
 }
 
 /**
