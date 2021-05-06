@@ -901,3 +901,33 @@ Law: the set union of `Confirmation`s exactly equals the set union of `Folio`s.
 #### Contract Pricing Arbitrage Neutrality
 
 Law: the `Contract` pricing `Engine` obeys arbitrage neutrality
+
+---
+
+## Appendix: implementation notes
+
+### Why `scala 2.13`?
+- `LazyList` for better Haskell porting
+- `Map` is less broken
+- literal singleton types
+- `cats.evidence` integration
+
+### in-memory data definitions use `SADT`s and `SACC`s.
+
+- **`SADT`** := serialized algebraic data type with principled `codec` derivation
+  - json (circe)
+  - csv (cormorant)
+  - binary (scodec)
+  - jdbc (doobie)
+- **`SACC`** := sealed abstract case classes for "unforgable" typed values
+  - private constructors
+  - no copy methods
+
+### persistence roadmap
+- spreadsheet integration via csv file based persistence with json for adts
+- KeyValue database candidates:
+    - LightningDB:
+    - FoundationDB: Keys cannot exceed 10 kB in size. Values cannot exceed 100 kB in size.
+- Quill/Doobie/Postgres persistence layer
+    - use Kafka to push pg log to the cloud for replication?
+    - CockroachDB
