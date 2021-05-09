@@ -6,7 +6,7 @@ import model.slices.keys._
 import model.slices.{ CapitalStack, Metas }
 
 import cats.implicits._
-import cats.{ Contravariant, Defer, Eq, Monad, Order, Show }
+import cats.{ Contravariant, Defer, Eq, Eval, Monad, Order, Show }
 import cats.data.NonEmptyList
 import cats.derived.{ auto, semiauto }
 
@@ -23,7 +23,7 @@ trait Paper { module: ModuleTypes with Person =>
 
   sealed abstract case class ContractKey[IsP] private (
       final val key: String Refined IsP
-  ) extends Numéraire.InKind[IO]
+  ) extends Numéraire.InKind
 
   object ContractKey {
 
@@ -32,7 +32,7 @@ trait Paper { module: ModuleTypes with Person =>
     def usin(key: String Refined IsUSIN): ContractKey[IsUSIN] =
       new ContractKey(key) { self =>
 
-        final def contract: IO[Contract] = {
+        final val contract: Eval[Contract] = {
 
           // Note: papers.instrumentsForms has everything you need to define the contract
           // (and it's in scope!)
@@ -54,7 +54,7 @@ trait Paper { module: ModuleTypes with Person =>
           //   zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0)).pure[F]
 
           def res: Contract = ???
-          res.pure[IO]
+          Eval later res
         }
       }
 

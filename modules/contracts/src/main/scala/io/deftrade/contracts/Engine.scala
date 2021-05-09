@@ -64,11 +64,11 @@ sealed abstract case class Pricing[F[_], N](
   final def eval: Contract => PR[N] = {
 
     case Zero => konst(N.zero)
-    case One(n: Numéraire[F]) =>
+    case One(n: Numéraire) =>
       n match {
         case c: InCoin if coin == c => konst(N.one)
         case c2: InCoin             => exch(c2)
-        case k: InKind[F]           => exch(k)
+        case k: InKind              => exch(k)
       }
     case Scale(o, c, n) if n == N => konst(o.value.asInstanceOf[N]) * eval(c.value)
     case Scale(_, _, _)           => ??? // wrong N FIXME: convert and recurse! LOLOLOL
@@ -119,13 +119,13 @@ sealed abstract case class Pricing[F[_], N](
     *
     * FIXME: toy stub; implement for real.
     */
-  final def exch(n2: Numéraire[F]): PR[N] =
+  final def exch(n2: Numéraire): PR[N] =
     n2 match {
 
       case _: Numéraire.InCoin =>
         PR konst Fractional[N].one * 1.618
 
-      case _: Numéraire.InKind[F] =>
+      case _: Numéraire.InKind =>
         PR konst Fractional[N].one * 6.18
     }
 
@@ -525,16 +525,16 @@ sealed abstract case class Performing[F[_]: Sync: ContextShift, N: Fractional]()
     case Until(_, _)     => ???
     case One(n) =>
       n match {
-        case _: InCoin    => ???
-        case _: InKind[F] => ???
+        case _: InCoin => ???
+        case _: InKind => ???
       }
   }
 
-  def withdraw(amount: N, coin: InCoin): Return   = ???
-  def transfer(amount: N, coin: InCoin): Return   = ???
-  def deposit(amount: N, coin: InCoin): Return    = ???
-  def deliver(amount: N, kind: InKind[F]): Return = ???
-  def receive(amount: N, kind: InKind[F]): Return = ???
+  def withdraw(amount: N, coin: InCoin): Return = ???
+  def transfer(amount: N, coin: InCoin): Return = ???
+  def deposit(amount: N, coin: InCoin): Return  = ???
+  def deliver(amount: N, kind: InKind): Return  = ???
+  def receive(amount: N, kind: InKind): Return  = ???
 }
 
 /** placeholder

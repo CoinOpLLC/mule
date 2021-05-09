@@ -132,7 +132,7 @@ object CurrencyLike extends DtEnum[CurrencyLike] { self =>
 
   /**
     */
-  def unapply(n: Numéraire[cats.Id]): Option[CurrencyLike] =
+  def unapply(n: Numéraire): Option[CurrencyLike] =
     // def unapply[F[_]](n: Numéraire[F]): Option[CurrencyLike] =
     n match {
       case c: CurrencyLike if values contains c => Some(c)
