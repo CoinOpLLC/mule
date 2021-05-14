@@ -65,7 +65,7 @@ sealed trait csvDomainSpecificImplicits extends csv.implicits {
 trait csvStores extends csvDomainSpecificImplicits {
 
   // self: ModuleTypes with Person with Paper with Ledger with Accounts =>
-  self: ModuleTypes with Person with Paper with Ledger =>
+  self: ModuleTypes with Person with Paper with Ledger with Accounts =>
 
   final val dataDir: String = """target/data"""
 
@@ -111,11 +111,11 @@ trait csvStores extends csvDomainSpecificImplicits {
     ls
   }
 
-  // lazy val accounts = {
-  //   val Right(ret) = for {
-  //     accounts <- kvs[IO] at dataDir ofKeyChained Accounts
-  //     rosters  <- vs[IO] at dataDir ofChained Rosters
-  //   } yield (accounts, rosters)
-  //   ret
-  // }
+  lazy val accounts = {
+    val Right(ret) = for {
+      accounts <- kvs[IO] at dataDir ofKeyChained Accounts
+      rosters  <- vs[IO] at dataDir ofChained Rosters
+    } yield (accounts, rosters)
+    ret
+  }
 }
