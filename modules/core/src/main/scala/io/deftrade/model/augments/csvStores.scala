@@ -78,8 +78,7 @@ trait csvStores extends csvDomainSpecificImplicits {
   }
 
   lazy val people: People = {
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    val Right(ret) =
+    val Right(ret: People) =
       for {
         parties  <- kvs[IO] at dataDir ofKeyChained Parties
         contacts <- vs[IO] at dataDir ofContentAddressed Contacts
@@ -88,8 +87,7 @@ trait csvStores extends csvDomainSpecificImplicits {
   }
 
   lazy val papers: Papers = {
-    @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    val Right(ret) =
+    val Right(ret: Papers) =
       for {
         instruments      <- kvs[IO] at dataDir ofKeyChained Instruments
         forms            <- vs[IO] at dataDir ofChained Forms
@@ -111,11 +109,12 @@ trait csvStores extends csvDomainSpecificImplicits {
     ls
   }
 
-  lazy val accounts = {
-    val Right(ret) = for {
-      accounts <- kvs[IO] at dataDir ofKeyChained Accounts
-      rosters  <- vs[IO] at dataDir ofChained Rosters
-    } yield (accounts, rosters)
+  lazy val players: Players = {
+    val Right(ret: Players) =
+      for {
+        accounts <- kvs[IO] at dataDir ofKeyChained Accounts
+        rosters  <- vs[IO] at dataDir ofChained Rosters
+      } yield Players(accounts, rosters)
     ret
   }
 }
