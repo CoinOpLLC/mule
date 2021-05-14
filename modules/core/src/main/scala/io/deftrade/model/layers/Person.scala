@@ -69,51 +69,32 @@ trait Person { module: ModuleTypes =>
     implicit def partyEq: Eq[Party]     = { import auto.eq._; semiauto.eq }
     implicit def partyShow: Show[Party] = { import auto.show._; semiauto.show }
 
-    // sealed abstract case class Value private (
-    //     name: Label,
-    //     taxNo: Tax.No,
-    //     contact: Contacts.Id,
-    //     meta: Metas.Id
-    // ) extends Party
-    //
-    // object Value {
-    //
-    //   def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id, meta: Metas.Id): Value =
-    //     new Value(name, taxNo, contact, meta) {}
-    //
-    //   import refined.cats._
-    //
-    //   implicit def partyEq: Eq[Party.Value]     = { import auto.eq._; semiauto.eq }
-    //   implicit def partyShow: Show[Party.Value] = { import auto.show._; semiauto.show }
-    // }
+    sealed abstract case class Value private (
+        name: Label,
+        taxNo: Tax.No,
+        contact: Contacts.Id,
+        meta: Metas.Id
+    ) extends Party
+
+    object Value {
+
+      def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id, meta: Metas.Id): Value =
+        new Value(name, taxNo, contact, meta) {}
+
+      import refined.cats._
+
+      implicit def partyEq: Eq[Party.Value]     = { import auto.eq._; semiauto.eq }
+      implicit def partyShow: Show[Party.Value] = { import auto.show._; semiauto.show }
+    }
   }
-  // sealed abstract case class PartyValue private (
-  //     name: Label,
-  //     taxNo: Tax.No,
-  //     contact: Contacts.Id,
-  //     meta: Metas.Id
-  // ) extends Party
-  //
-  // object PartyValue {
-  //
-  //   def apply(name: Label, taxNo: Tax.No, contact: Contacts.Id, meta: Metas.Id): PartyValue =
-  //     new PartyValue(name, taxNo, contact, meta) {}
-  //
-  //   import refined.cats._
-  //
-  //   implicit def partyValueEq: Eq[PartyValue]     = { import auto.eq._; semiauto.eq }
-  //   implicit def partyValueShow: Show[PartyValue] = { import auto.show._; semiauto.show }
-  // }
 
   /**
     */
-  // case object Parties
-  //     extends KeyValueStores.SimpleCodec[FUUID, Party, Party.Value](
-  //       party => { import party._; Party.Value(name, taxNo, contact, meta) },
-  //       value => { import value._; Party(name, taxNo, contact, meta) }
-  //     )
-
-  case object Parties extends KeyValueStores.KV[FUUID, Party]
+  case object Parties
+      extends KeyValueStores.SimpleCodec[FUUID, Party, Party.Value](
+        party => { import party._; Party.Value(name, taxNo, contact, meta) },
+        value => { import value._; Party(name, taxNo, contact, meta) }
+      )
 
   /** `NaturalPerson`s are `Party`s.
     */

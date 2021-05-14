@@ -77,15 +77,15 @@ trait csvStores extends csvDomainSpecificImplicits {
     ret
   }
 
-  // lazy val people: People = {
-  //   @SuppressWarnings(Array("org.wartremover.warts.Any"))
-  //   val Right(ret) =
-  //     for {
-  //       parties  <- kvs[IO] at dataDir ofKeyChained Parties
-  //       contacts <- vs[IO] at dataDir ofContentAddressed Contacts
-  //     } yield People(parties, contacts)
-  //   ret
-  // }
+  lazy val people: People = {
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
+    val Right(ret) =
+      for {
+        parties  <- kvs[IO] at dataDir ofKeyChained Parties
+        contacts <- vs[IO] at dataDir ofContentAddressed Contacts
+      } yield People(parties, contacts)
+    ret
+  }
 
   lazy val papers: Papers = {
     @SuppressWarnings(Array("org.wartremover.warts.Any"))

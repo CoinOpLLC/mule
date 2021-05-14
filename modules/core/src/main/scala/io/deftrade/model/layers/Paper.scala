@@ -6,7 +6,7 @@ import model.slices.keys._
 import model.slices.{ CapitalStack, Metas }
 
 import cats.implicits._
-import cats.{ Contravariant, Defer, Eq, Eval, Monad, Order, Show }
+import cats.{ Contravariant, Defer, Eq, Eval, Monad, Order, Semigroup, Show }
 import cats.data.NonEmptyList
 import cats.derived.{ auto, semiauto }
 
@@ -21,52 +21,22 @@ import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 
 trait Paper { module: ModuleTypes with Person =>
 
-  sealed abstract case class ContractKey[IsP] private (
-      final val key: String Refined IsP
-  ) extends Numéraire.InKind
-
-  object ContractKey {
-
-    import CapitalStack._
-
-    def usin(key: String Refined IsUSIN): ContractKey[IsUSIN] =
-      new ContractKey(key) { self =>
-
-        final val contract: Eval[Contract] = {
-
-          // Note: papers.instrumentsForms has everything you need to define the contract
-          // (and it's in scope!)
-
-          val x = for {
-            links <- papers.instrumentsForms getAll key
-            ls = links.fold(List.empty[Forms.Link]) { case NonEmptyList(h, t) => h :: t }
-            form <- (ls map (link => papers.forms get link.form)).sequence
-          } yield form
-
-          //  map {
-          //   case Some(Bond(face, coupon, issued, matures, defaulted)) => ???
-          // }
-
-          // import std.zeroCouponBond
-
-          // /** A `Bill` is a kind of zero coupon bond. */
-          // def contract[F[_]: Monad]: F[Contract] =
-          //   zeroCouponBond(maturity = matures.toInstant, face = Currency.USD(1000.0)).pure[F]
-
-          def res: Contract = ???
-          Eval later res
-        }
-      }
-
-    implicit def contractKeyOrder[IsP]: Order[ContractKey[IsP]] =
-      Order by (_.key)
-
-    implicit def contractKeyShow[IsP]: Show[ContractKey[IsP]] =
-      Contravariant[Show].contramap(Show[String Refined IsP])(_.key)
-  }
-
   import model.slices.Form
-  // trait Form extends model.slices.Form
+
+  final def contractGoverning(instrument: Instruments.Key)(
+      implicit
+      sg: Semigroup[Form]
+  ): IO[Result[Contract]] =
+    for {
+      links <- papers.instrumentsForms getAll instrument
+      forms <- links.fold(???)(_ map (papers.forms get _.form)).sequence
+    } yield Result safe forms.sequence.fold(contracts.zero)(_.reduce.contract)
+
+  /**
+    * placeholder
+    */
+  final lazy val instrumentContracts: Map[Instruments.Key, IO[Result[Contract]]] =
+    Map.empty
 
   /** `Store`s related to `Contract`s.
     */
@@ -95,6 +65,19 @@ trait Paper { module: ModuleTypes with Person =>
     */
   object Instrument {
 
+    // /**
+    //   */
+    // sealed abstract case class Contract private (
+    //     final val contract: contracts.Contract
+    // ) extends Numéraire.InKind
+    //
+    // /**
+    //   */
+    // object Contract {
+    //   def apply(contract: => contracts.Contract): Contract =
+    //     new Contract(contract) {}
+    // }
+    //
     def apply(
         symbol: Label,
         issuedBy: LegalEntities.Key,
