@@ -20,11 +20,13 @@ import io.chrisdavenport.fuuid.FUUID
   */
 trait Accounts { self: ModuleTypes with Person with Ledger =>
 
+  case class Players(accounts: Accounts.KeyValueStore[IO], rosters: Rosters.ValueStore[IO])
+
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.
     */
   sealed abstract case class Account private (
-      final val roster: Rosters.Id,
+      final val people: Rosters.Id,
       final val positions: Portfolios.Id
   )
 
@@ -53,7 +55,7 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
       new Account(roster, positions) {}
 
     /** alt version FIXME: implement */
-    def fromRoster[F[_]](roster: Roster): F[Accounts.Id] =
+    def fresh[F[_]](roster: Roster): F[Accounts.Id] =
       // freshFolioKey, freshFolioKey, freshFolioKey
       ???
 

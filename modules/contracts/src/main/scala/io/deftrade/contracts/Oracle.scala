@@ -12,8 +12,9 @@ import Instant.now
 /**
   * `Oracle` values which affect [[Contract]] evaluation.
   *
-  * We follow the approach taken by [[http://netrium.org/ Netrium]]
-  * (`Oracle` is a lazy, stack safe GADT)
+  * Eval has most of what we need in `Oracle`; we'll just build the DSL around that.
+  *
+  * Informed by the approach taken by [[http://netrium.org/ Netrium]].
   */
 /**
   */

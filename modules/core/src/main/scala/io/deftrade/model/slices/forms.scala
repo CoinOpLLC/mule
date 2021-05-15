@@ -1,14 +1,9 @@
 package io.deftrade
 package model.slices
 
-import keyval._
-import time._
-import money.Currency
+import time._, contracts._, keyval._
 import model.slices.keys._
 import refinements.{ Label }
-
-import spire.math.Fractional
-// import spire.compat.numeric
 
 import enumeratum.EnumEntry
 
@@ -25,7 +20,9 @@ import io.circe.{ Decoder, Encoder }
 import io.circe.generic.semiauto.{ deriveDecoder, deriveEncoder }
 import io.circe.refined._
 
-sealed trait Form extends Product
+sealed trait Form extends Numéraire.InKind with Product {
+  override lazy val contract: Contract = ???
+}
 
 object Form {
 
@@ -104,7 +101,13 @@ object CapitalStack extends Columns[Double] {
                                   preference: Quantity Refined Positive,
                                   participating: Boolean,
   ) extends Form
-      with ShareClass
+      with ShareClass { self =>
+
+    /** Singleton; share classes are immutable
+      */
+    override lazy val contract: Contract =
+      unitOf(self)
+  }
 
   object PreferredStock {
 
@@ -126,7 +129,12 @@ object CapitalStack extends Columns[Double] {
                         matures: ZonedDateTime,
                         defaulted: Option[Instant])
       extends Form
-      with Maturity
+      with Maturity {
+
+    /** Effectively two states, defaulted and not
+      */
+    override lazy val contract: Contract = ???
+  }
 
   object Bond {
 
