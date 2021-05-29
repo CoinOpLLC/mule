@@ -242,8 +242,10 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
         */
       def unapply(role: Role): Option[NonPrincipal] =
         role match {
-          case Principal        => none
-          case np: NonPrincipal => np.some
+          case Principal => none
+          case Agent     => Agent.some
+          case Manager   => Manager.some
+          case Auditor   => Auditor.some
         }
     }
 

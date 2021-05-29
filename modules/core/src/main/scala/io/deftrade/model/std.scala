@@ -21,7 +21,7 @@ import model.layers._
 import model.augments._
 
 import cats.implicits._
-import cats.effect.{ ContextShift, IO }
+import cats.effect.{ IO }
 
 /**
   * Records and computations defining a layered set of financial domain models and services.
@@ -52,10 +52,6 @@ trait std
     with IRS1065 // replace or enhance as necessary
     // //
     with csvStores { // replace or enhance as necessary
-
-  /** FIXME
-    */
-  implicit protected lazy val X: ContextShift[IO] = ???
 }
 
 object std extends std

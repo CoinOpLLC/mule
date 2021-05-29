@@ -23,14 +23,14 @@ package csv
 import cats.implicits._
 import cats.data.{ NonEmptyList }
 
-import cats.effect.{ Blocker, ContextShift, Sync }
+import cats.effect.{ Sync }
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 import shapeless.labelled.field
 
 import fs2.{ text, Pipe, Stream }
 import fs2.io.file
-import file.{ pulls, FileHandle }
+import file.{ FileHandle }
 
 // import scodec.bits.ByteVector
 
@@ -250,7 +250,6 @@ sealed protected trait MemFile[F[_], V] {
   self: CsvStore[F, V] with Stores[V]#Store[F] =>
 
   implicit val F: Sync[F]
-  implicit val X: ContextShift[F]
 
   /**
     */
@@ -258,12 +257,12 @@ sealed protected trait MemFile[F[_], V] {
 
   /**
     */
-  final protected def readLines: Stream[F, String] =
-    Stream resource Blocker[F] flatMap { blocker =>
-      file.readAll[F](path, blocker, 1024 * 1024)
-    } through
-      text.utf8Decode through
-      text.lines
+  final protected def readLines: Stream[F, String] = ???
+  // Stream resource Blocker[F] flatMap { blocker =>
+  //   file.readAll[F](path, blocker, 1024 * 1024)
+  // } through
+  //   text.utf8Decode through
+  //   text.lines
 
   val discardValue: Any => Unit = (_: Any) => ()
   implicit final class PipeToFunction1[A](val a: A) {
@@ -285,19 +284,19 @@ sealed protected trait MemFile[F[_], V] {
         // DSYNC,
       )
 
-    def appendHandles: Stream[F, FileHandle[F]] =
-      Stream resource (for {
-        blocker <- Blocker[F]
-        handle  <- FileHandle.fromPath(path, blocker, openOptions)
-      } yield handle)
+    def appendHandles: Stream[F, FileHandle[F]] = ???
+    // Stream resource (for {
+    //   blocker <- Blocker[F]
+    //   handle  <- FileHandle.fromPath(path, blocker, openOptions)
+    // } yield handle)
 
     for {
       handle <- appendHandles
       s      <- _
-    } yield
-      pulls
-        .writeAllToFileHandle(Stream eval s.pure[F] through text.utf8Encode, handle)
-        .stream |> discardValue // nota bene this is intentional and necessary
+    } yield ???
+    // pulls
+    //   .writeAllToFileHandle(Stream eval s.pure[F] through text.utf8Encode, handle)
+    //   .stream |> discardValue // nota bene this is intentional and necessary
   }
 }
 

@@ -494,14 +494,14 @@ object Pricing {
 //     }
 //   ) {}
 
-import cats.effect.{ ContextShift, Sync }
+import cats.effect.{ Sync }
 
 /** `Contract` performance.
   *
   * - automated
   * - manual (workflow scheduling)
   */
-sealed abstract case class Performing[F[_]: Sync: ContextShift, N: Fractional]() extends Engine {
+sealed abstract case class Performing[F[_]: Sync, N: Fractional]() extends Engine {
 
   import Contract._, Numéraire._
 

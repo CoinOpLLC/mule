@@ -2,50 +2,49 @@ import sbt._
 import Keys._
 // import Tests._
 
-object Version {
-
-  val Scala = "2.13.5"
-  // val Scala = "2.12.10"
-  val Xml = "1.2.0"
-
-  val Cats       = "2.3.0" // "2.1.1"
-  val Kittens    = "2.2.0" // "2.1.0"
-  val CatsEffect = "2.3.0" // "2.1.3"
-
-  val Spire     = "0.17.0"
-  val Shapeless = "2.3.3"
-  val Refined   = "0.9.14"
-
-  val Enumeratum = "1.6.1"
-  val Fuiid      = "0.3.0"
-
-  val Circe          = "0.13.0"
-  val PureConfig     = "0.14.0" // "0.12.3"
-  val TypesafeConfig = "1.3.3"
-  val Slf4j          = "1.7.30"
-
-  val Fs2 = "2.4.2"
-  // val Fs2       = "3.0-5795280"
-  val Cormorant = "0.3.0"
-
-  val Http4s = "1.0.0-M8" // "0.21.4"
-  val Doobie = "0.9.0"
-
-  val Fansi = "0.2.7"
-
-  val OpenGamma = "2.3.2"
-
-  // Test libs
-
-  val ScalaTest  = "3.1.1"
-  val ScalaCheck = "1.14.3"
-
-  val CatsScalaCheck      = "0.2.0"
-  val ShapelessScalaCheck = "1.2.3"
-
-}
-
 object Deps {
+
+  object Version {
+
+    val Scala = "2.13.6"
+    val Xml = "1.2.0"
+
+    val Cats       = "2.6.0"
+    val Kittens    = "2.3.0"
+
+    val CatsEffect = "3.1.1"
+    val Fs2        = "3.0.3"
+
+    val Spire     = "0.17.0"
+    val Shapeless = "2.3.7"
+    val Refined   = "0.9.25"
+
+    val Enumeratum = "1.6.1"
+
+    val Fuiid      = "0.6.0"
+    val Cormorant = "0.3.0" // "0.6.0"
+
+    val Circe          = "0.14.1"
+    val PureConfig     = "0.15.0"
+    val TypesafeConfig = "1.4.1"
+
+    // val Http4s = "1.0.0-M8" // "0.21.4"
+    // val Doobie = "0.9.0"
+    //
+    // val Slf4j          = "1.7.30"
+
+    // val Fansi = "0.2.7"
+    // val OpenGamma = "2.3.2"
+
+    // Test libs
+
+    val ScalaTest  = "3.2.6"
+    val ScalaCheck = "1.15.3"
+    val ScalaTestPlusScalaCheck = "3.2.7.0"
+    val CatsScalaCheck      = "0.2.0"
+    val ShapelessScalaCheck = "1.2.5"
+    val CatsTime = "0.3.4"
+  }
 
   import Version._
 
@@ -53,24 +52,21 @@ object Deps {
   val reflection = "org.scala-lang"          % "scala-reflect"  % Scala
   val xml        = "org.scala-lang.modules" %% "scala-xml"      % Xml
   // val parserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.1"
+  lazy val misclibs =
+    List(
+      reflection,
+      scompiler,
+      xml,  // FIXME: check the state of available alternatives
+    )
 
-  val conf = "com.typesafe" % "config" % TypesafeConfig
-
-  val cats = "org.typelevel" %% "cats-core" % Cats
-
-  val catsFree = "org.typelevel" %% "cats-free" % Cats
-
-  val kittens = "org.typelevel" %% "kittens" % Kittens
-
-  val catsEffect = "org.typelevel" %% "cats-effect" % CatsEffect
-
-  val spire = "org.typelevel" %% "spire" % Spire
-
-  val shapeless = "com.chuusai" %% "shapeless" % Shapeless
-
-  // val squants = "org.typelevel" %% "squants" % Squants
-
-  val opengamma = "com.opengamma.strata" % "strata-measure" % OpenGamma
+  val typelevel = Seq(
+    "org.typelevel" %% "cats-core" % Cats,
+    "org.typelevel" %% "cats-free" % Cats,
+    "org.typelevel" %% "kittens" % Kittens,
+    "org.typelevel" %% "cats-effect" % CatsEffect,
+    "org.typelevel" %% "spire" % Spire,
+    "com.chuusai" %% "shapeless" % Shapeless,
+  )
 
   /** @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
@@ -104,7 +100,7 @@ object Deps {
     "io.circe" %% s"circe-$x" % Circe
   }
 
-  /** @see [Refined Configuration](https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html)
+  /** @see https://blog.vlovgr.se/posts/2016-12-24-refined-configuration.html
     */
   val pureConfigs = List(
     "pureconfig",
@@ -117,23 +113,14 @@ object Deps {
     "pureconfig-yaml"
   ) map (x => "com.github.pureconfig" %% x % PureConfig)
 
-  val testers = Seq(
-    "org.scalatest"              %% "scalatest"                 % ScalaTest,
-    "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
-    "org.scalatestplus"          %% "scalacheck-1-14"           % "3.1.0.1",
-    "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
-    "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
-    "io.circe"                   %% "circe-testing"             % Circe
-  ) map (_ % Test)
-
-  val fuiids = List(
+  val fuuids = Seq(
     "fuuid",       // core
     "fuuid-circe", // Circe integration
     "fuuid-http4s" // Http4s integration
     // "fuuid-doobie" // Doobie integration
   ) map (x => "io.chrisdavenport" %% s"$x" % Fuiid)
 
-  val cormorants = List(
+  val cormorants = Seq(
     "core",
     "generic",
     "parser",
@@ -142,55 +129,35 @@ object Deps {
     "http4s"
   ) map (x => "io.chrisdavenport" %% s"cormorant-$x" % Cormorant)
 
-  val fs2s = List(
+  val fs2s = Seq(
     "co.fs2" %% "fs2-core",
     "co.fs2" %% "fs2-io"
     // "co.fs2" %% "fs2-reactive-streams",
     // "co.fs2" %% "fs2-experimental",
   ) map (_ % Fs2)
 
-  val doobies = List(
-    // Start with this one
-    // And add any of these as needed
-    "org.tpolecat" %% "doobie-core"      % Doobie,
-    "org.tpolecat" %% "doobie-h2"        % Doobie, // H2 driver 1.4.200 + type mappings.
-    "org.tpolecat" %% "doobie-hikari"    % Doobie, // HikariCP transactor.
-    "org.tpolecat" %% "doobie-postgres"  % Doobie, // Postgres driver 42.2.9 + type mappings.
-    "org.tpolecat" %% "doobie-quill"     % Doobie, // Support for Quill
-    "org.tpolecat" %% "doobie-scalatest" % Doobie % "test" //
-  )
+  val testers = Seq(
+    "org.scalatest"              %% "scalatest"                 % ScalaTest,
+    "org.scalacheck"             %% "scalacheck"                % ScalaCheck,
+    "org.scalatestplus"          %% "scalacheck-1-15"           % ScalaTestPlusScalaCheck,
+    "io.chrisdavenport"          %% "cats-scalacheck"           % CatsScalaCheck,
+    "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % ShapelessScalaCheck,
+    "io.circe"                   %% "circe-testing"             % Circe,
+  ) map (_ % Test)
 
-  // val zios = List(
-  //   "zio",
-  //   "zio-streams",
-  // ) map (s => "dev.zio" %% s % Zio)
+  val catsTime = "io.chrisdavenport" %% "cats-time" % CatsTime
+
 
   /** Marginal ergonomics and sundry whatnots – non-canon. */
   // val amm   = "com.lihaoyi" % "ammonite" % Ammonite cross CrossVersion.full
-  val fansi = "com.lihaoyi" %% "fansi" % Fansi
+  // val fansi = "com.lihaoyi" %% "fansi" % Fansi
+  // val opengamma = "com.opengamma.strata" % "strata-measure" % OpenGamma
 
-  val http4s = "org.http4s" %% "http4s-core" % Http4s
-  val httplibs = List(
-    http4s
-  )
-
-  lazy val funlibs =
-    List(
-      cats,
-      catsFree,
-      catsEffect,
-      kittens,
-      spire,
-      shapeless
-    ) ++ fs2s ++ cormorants ++ fuiids ++ circeii
-
-  lazy val misclibs =
-    List(
-      reflection,
-      scompiler,
-      xml,  // FIXME: check the state of available alternatives
-      fansi // can't help myself
-    )
+  lazy val funlibs = typelevel ++ enumerata ++ refined
+    // fs2s ++
+    // cormorants ++
+    // fuuids ++
+    // circeii
 }
 
 object Args {
@@ -268,5 +235,4 @@ object License {
     s"""The CoinOp DefTrade distribution bundles $distname $version, copyright $entity,
   |which is available under $lic.
   |For details, see licenses/$entity-$distname.$licShort.""".stripMargin
-
 }

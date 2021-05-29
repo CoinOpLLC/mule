@@ -11,7 +11,7 @@ import cats.implicits._
 // import cats.{ Order, Show }
 // import cats.kernel.CommutativeGroup
 import cats.data.{ NonEmptyList }
-// import cats.effect.{ ContextShift, Sync }
+// import cats.effect.{ Sync }
 
 import money._
 

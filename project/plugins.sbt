@@ -1,7 +1,14 @@
 /**
+  * hack
+  */
+// addSbtPlugin("com.codecommit" % "sbt-github-packages" % "0.5.2")
+// addSbtPlugin("com.codecommit" % "sbt-github-actions" % "0.10.1")
+// addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.16")
+
+/**
   * TODO use this
   */
-addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
+// addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
 
 /**
   * [Flyway database migrations tool](https://flywaydb.org/):

@@ -4,7 +4,7 @@ package csv
 
 import cats.implicits._
 import cats.{ Eq, Order, Show }
-import cats.effect.{ ContextShift, Sync }
+import cats.effect.{ Sync }
 
 import shapeless.{ HList, LabelledGeneric, Lazy }
 
@@ -19,18 +19,18 @@ trait dsl {
 
   /**
     */
-  def vs[F[_]: Sync: ContextShift] = VsOps[F]()
+  def vs[F[_]: Sync] = VsOps[F]()
 
   /**
     */
-  def kvs[F[_]: Sync: ContextShift] = KvsOps[F]()
+  def kvs[F[_]: Sync] = KvsOps[F]()
 }
 
 /** DSL for value stores
   */
-final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
+final case class VsOps[F[_]: Sync]() { ops =>
 
-  val (x, y) = (ContextShift[F], Sync[F])
+  val y = Sync[F]
 
   /** `at` clause
     */
@@ -55,7 +55,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
-          implicit val X = x
           implicit val F = y
 
           def path: Path =
@@ -84,7 +83,6 @@ final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
-          implicit val X = x
           implicit val F = y
 
           def path: Path =
@@ -102,9 +100,9 @@ final case class VsOps[F[_]: Sync: ContextShift]() { ops =>
 
 /**
   */
-final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
+final case class KvsOps[F[_]: Sync]() { effect =>
 
-  val (x, y) = (ContextShift[F], Sync[F])
+  val y = Sync[F]
 
   /**
     */
@@ -129,7 +127,6 @@ final case class KvsOps[F[_]: Sync: ContextShift]() { effect =>
 
         new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
 
-          implicit val X = x
           implicit val F = y
 
           def path: Path =

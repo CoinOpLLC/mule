@@ -9,7 +9,8 @@ import shapeless.nat.{ _0, _1 }
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semiauto }
-import cats.effect.{ ContextShift, IO, Sync }
+import cats.effect.{ Concurrent, ExitCase, ExitCode, IO, IOApp, Sync, Timer }
+import cats.effect.concurrent.Deferred
 
 import enumeratum._
 
@@ -31,9 +32,11 @@ import fuuid.{ FUUID, FUUIDGen }
 
 import io.chrisdavenport.cats.time._
 
-import fs2.{ Stream }
+import fs2.{ Pipe, Pull, Stream }
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Random
 
 import java.time.Instant
 
@@ -378,8 +381,6 @@ object model {
 
 object mk {
 
-  implicit def __FIXME__contextShiftIO: ContextShift[IO] = IO contextShift global
-
   import model._
 
   import keyval._
@@ -387,15 +388,62 @@ object mk {
 
   final val dataDir = """target/testdata"""
 
-  def invoices[F[_]: Sync: ContextShift]: Result[Invoices.KeyValueStore[F]] =
+  def invoices[F[_]: Sync]: Result[Invoices.KeyValueStore[F]] =
     csv.kvs[F] at dataDir ofKeyChained Invoices
 
-  def products[F[_]: Sync: ContextShift]: Result[Products.KeyValueStore[F]] =
+  def products[F[_]: Sync]: Result[Products.KeyValueStore[F]] =
     csv.kvs[F] at dataDir ofKeyChained Products
 
-  def costs[F[_]: Sync: ContextShift]: Result[Costs.KeyValueStore[F]] =
+  def costs[F[_]: Sync]: Result[Costs.KeyValueStore[F]] =
     csv.kvs[F] at dataDir ofKeyChained Costs
 
-  def contacts[F[_]: Sync: ContextShift] =
+  def contacts[F[_]: Sync] =
     csv.vs[F] at dataDir ofContentAddressed Contacts
+}
+
+object repl extends IOApp {
+
+  def run(args: List[String]): IO[ExitCode] = IO.unit as ExitCode.Success
+
+  val randomInt: IO[Int] = IO(Random.nextInt())
+
+  //expose these for easier scripting
+  implicit val publicTimer = timer
+  implicit val publicShift = contextShift
+
+  implicit class ShowValues[A](stream: Stream[IO, A]) {
+
+    //A utility for worksheets that allows showing a couple values of a stream produced within reasonable time.
+    def showValues: String =
+      stream
+        .map(_.toString)
+        .through(limitedElements(10))
+        .through(maxTime(3.seconds))
+        .compile
+        .toList
+        .unsafeRunSync()
+        .mkString(", ")
+  }
+
+  // Split the stream at N elements, if the tail has any more values a "more" message is emitted.
+  def limitedElements[F[_]](n: Long): Pipe[F, String, String] =
+    _.map(_.toString).pull
+      .take(n)
+      .flatMap(_.flatTraverse(_.pull.uncons1))
+      .flatMap(_.as(Pull.output1(s"... (more than $n)")).sequence_)
+      .stream
+  // s =>
+  //   (s map { _.toString }).pull
+
+  // Interrupts the stream after the given time, emitting an extra element if it doesn't terminate normally.
+  def maxTime[F[_]: Timer: Concurrent](time: FiniteDuration): Pipe[F, String, String] =
+    s =>
+      Stream.eval(Deferred[F, Option[String]]).flatMap { extraElement =>
+        s.onFinalizeCase {
+            case ExitCase.Canceled =>
+              extraElement.complete(s"(timed out after $time)".some)
+            case _ => extraElement.complete(none)
+          }
+          .interruptAfter(time) ++ Stream.evals(extraElement.get)
+    }
 }

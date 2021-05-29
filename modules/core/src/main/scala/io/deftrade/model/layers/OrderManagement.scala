@@ -34,8 +34,9 @@ import fs2.Stream
 
 /**
   */
-@SuppressWarnings(Array("org.wartremover.warts.Any"))
-trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketData =>
+trait OrderManagement {
+
+  self: ModuleTypes with Person with Ledger with MarketData =>
 
   /**
     */
@@ -63,11 +64,12 @@ trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketDat
       final val meta: Metas.Id,
   ) {
 
-    type F[_]
+    protected type SIO[A] = Stream[IO, A]
+    protected type REZ[A] = ResultT[SIO, A]
 
     /**
       */
-    type ToStreamOf[T, R] = Kleisli[ResultT[Stream[F, *], *], T, R]
+    type ToStreamOf[T, R] = Kleisli[REZ, T, R]
 
     /** What it is that the client wants [[Execution]] of.
       */
@@ -165,6 +167,7 @@ trait OrderManagement { self: ModuleTypes with Person with Ledger with MarketDat
 
     /** Order processing is all just kleisli arrows? Always has been.
       */
+    @SuppressWarnings(Array("org.wartremover.warts.Any"))
     final def process(allocation: Allocation): Order ToStreamOf Confirmation =
       riskCheck andThen trade andThen allocate(allocation) andThen settle
   }

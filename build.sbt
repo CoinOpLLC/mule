@@ -5,8 +5,8 @@ scalacOptions += "-Yrangepos"
 resolvers += Resolver.sonatypeRepo("releases")
 
 // addCompilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch)
-
 // addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
 
 scalafmtOnCompile in ThisBuild := true // all projects
 
@@ -42,29 +42,22 @@ lazy val contracts = module(
   "contracts",
   """smart contract definition and evaluation"""
 ).settings(common)
-  .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
+  .settings(libraryDependencies ++= funlibs ++ testers)
+  .settings( // FIXME
+    libraryDependencies += catsTime
   )
-  .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ testers
-  )
-  .settings(
-    libraryDependencies += "io.chrisdavenport" %% "cats-time" % "0.3.4"
-  )
+
+lazy val localCormorant = RootProject(
+  uri("https://github.com/CoinOpLLC/cormorant.git")
+)
 
 lazy val keyval = module(
   "keyval",
   """key value algebra"""
-).settings(common)
-  .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
-  )
-  .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
-  )
-  .settings(
-    libraryDependencies += "io.chrisdavenport" %% "cats-time" % "0.3.4" % Test
-  )
+).dependsOn(localCormorant)
+  .settings(common)
+  .settings(libraryDependencies ++= funlibs ++ testers)
+  .settings(libraryDependencies ++= fs2s ++ cormorants ++ fuuids ++ circeii)
 
 lazy val core = module(
   "core",
@@ -72,38 +65,7 @@ lazy val core = module(
 ).dependsOn(keyval)
   .dependsOn(contracts)
   .settings(common)
-  .settings(
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
-  )
-  .settings(
-    libraryDependencies ++= funlibs ++ enumerata ++ refined ++ doobies ++ testers
-  )
-
-// lazy val demo = module("demo", "something to run")
-//   .dependsOn(core)
-//   .settings(common)
-//   .settings(
-//     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full)
-//   )
-//   .settings(
-//     libraryDependencies ++= pureConfigs ++ funlibs ++ enumerata ++ refined ++ doobies ++ testers
-//   )
-// .settings(
-//   libraryDependencies ++= funlibs ++ enumerata ++ refined ++
-//     pureConfigs ++
-//     Seq(opengamma) ++
-//     httplibs ++
-//     testers
-// )
-
-// // wip := work in progress
-// lazy val wip = module("wip", "back on my bullshit")
-//   .dependsOn(core)
-//   .settings(common)
-//   .settings(
-//     libraryDependencies ++=
-//       pureConfigs ++
-//         Seq(opengamma) ++
-//         httplibs ++
-//         testers
-//   )
+  .settings(libraryDependencies ++= funlibs ++ testers)
+  .settings(libraryDependencies ++= fs2s ++ cormorants ++ fuuids ++ circeii)
+// https://github.com/CoinOpLLC/cormorant/tree/ce3-v3
+// https://github.com/CoinOpLLC/cormorant

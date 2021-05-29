@@ -18,7 +18,7 @@ package io.deftrade
 package keyval
 
 import cats.implicits._
-import cats.effect.{ ContextShift, Sync }
+import cats.effect.{ Sync }
 
 import shapeless.labelled.FieldType
 
@@ -54,7 +54,6 @@ trait Stores[V] extends Product {
   trait Store[F[_]] {
 
     implicit val F: Sync[F]
-    implicit val X: ContextShift[F]
 
     /**
       */
