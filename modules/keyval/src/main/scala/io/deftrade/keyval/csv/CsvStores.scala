@@ -40,6 +40,8 @@ import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
+import Stores._
+
 /** Value parameter `V` carries type members specific to `type V`.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))

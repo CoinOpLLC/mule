@@ -35,6 +35,8 @@ import scala.collection.immutable.SortedMap
   */
 abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
+  import Stores._
+
   /** `Foo` tables are indexed by `Foo.Key`s
     */
   final type Key = K

@@ -4,9 +4,12 @@ scalacOptions += "-Yrangepos"
 
 resolvers += Resolver.sonatypeRepo("releases")
 
-// addCompilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch)
-// addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
-addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
+val compilerPlugins = List(
+  // compilerPlugin("io.tryp" % "splain" % "0.5.0" cross CrossVersion.patch),
+  compilerPlugin("org.typelevel" % "kind-projector" % "0.13.0" cross CrossVersion.full),
+  compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+  // compilerPlugin("com.kubukoz" %% "better-tostring" % "0.3.2" cross CrossVersion.full),
+)
 
 scalafmtOnCompile in ThisBuild := true // all projects
 
@@ -37,6 +40,7 @@ lazy val common = Seq(
 def module(id: String, d: String) =
   Project(id, file(s"modules/$id"))
     .settings(moduleName := id, name := id, description := d)
+    .settings(libraryDependencies ++= compilerPlugins)
 
 lazy val contracts = module(
   "contracts",
@@ -47,17 +51,20 @@ lazy val contracts = module(
     libraryDependencies += catsTime
   )
 
-lazy val localCormorant = RootProject(
+lazy val localCormorantCE3 = RootProject(
   uri("https://github.com/CoinOpLLC/cormorant.git")
 )
 
 lazy val keyval = module(
   "keyval",
   """key value algebra"""
-).dependsOn(localCormorant)
+).dependsOn(localCormorantCE3)
   .settings(common)
   .settings(libraryDependencies ++= funlibs ++ testers)
   .settings(libraryDependencies ++= fs2s ++ cormorants ++ fuuids ++ circeii)
+  .settings( // FIXME
+    libraryDependencies += catsTime % Test
+  )
 
 lazy val core = module(
   "core",
@@ -67,5 +74,3 @@ lazy val core = module(
   .settings(common)
   .settings(libraryDependencies ++= funlibs ++ testers)
   .settings(libraryDependencies ++= fs2s ++ cormorants ++ fuuids ++ circeii)
-// https://github.com/CoinOpLLC/cormorant/tree/ce3-v3
-// https://github.com/CoinOpLLC/cormorant

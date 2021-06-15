@@ -82,7 +82,8 @@ trait Accounts { self: ModuleTypes with Person with Ledger =>
       */
     lazy val roles: Role => NonEmptySet[Parties.Key] = {
       case Role.Principal        => principals.keys
-      case np: Role.NonPrincipal => nonPrincipals(np)
+      case Role.NonPrincipal(np) => nps(np)
+      case _                     => ??? // clear enuf, kills warning
     }
 
     /**

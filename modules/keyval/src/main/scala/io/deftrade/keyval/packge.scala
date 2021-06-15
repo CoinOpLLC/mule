@@ -38,17 +38,6 @@ package object keyval extends results.mixin {
   /**
     */
   type SHA = String Refined IsSHA
-
-  /** The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
-    *
-    * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
-    * useful for type member `T`, which is the (singleton) type of the id column label.
-    */
-  private[keyval] final val id = Symbol("id").witness
-
-  /** [[Key]] column type literal witness - same purpose as [[id]].
-    */
-  private[keyval] final val key = Symbol("key").witness
 }
 
 package keyval {

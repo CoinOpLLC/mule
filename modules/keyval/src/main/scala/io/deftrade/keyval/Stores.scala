@@ -21,6 +21,7 @@ import cats.implicits._
 import cats.effect.{ Sync }
 
 import shapeless.labelled.FieldType
+import shapeless.syntax.singleton._
 
 import eu.timepit.refined
 import refined.api.Refined
@@ -31,6 +32,8 @@ import fs2.{ Pipe, Stream }
 /** Defines `Id` and other persistence helpers for a given value class `V`.
   */
 trait Stores[V] extends Product {
+
+  import Stores._
 
   /**
     */
@@ -125,4 +128,16 @@ trait Stores[V] extends Product {
 
 /** Placeholder.
   */
-object Stores
+object Stores {
+
+  /** The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
+    *
+    * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
+    * useful for type member `T`, which is the (singleton) type of the id column label.
+    */
+  final val id = Symbol("id").witness
+
+  /** [[Key]] column type literal witness - same purpose as [[id]].
+    */
+  final val key = Symbol("key").witness
+}

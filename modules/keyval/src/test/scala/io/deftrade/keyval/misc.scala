@@ -9,8 +9,8 @@ import shapeless.nat.{ _0, _1 }
 import cats.implicits._
 import cats.{ Eq, Show }
 import cats.derived.{ auto, semiauto }
-import cats.effect.{ Concurrent, ExitCase, ExitCode, IO, IOApp, Sync, Timer }
-import cats.effect.concurrent.Deferred
+import cats.effect.{ ExitCode, IO, IOApp, Outcome, Sync, Temporal }
+import cats.effect.Deferred
 
 import enumeratum._
 
@@ -34,7 +34,6 @@ import io.chrisdavenport.cats.time._
 
 import fs2.{ Pipe, Pull, Stream }
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -401,20 +400,19 @@ object mk {
     csv.vs[F] at dataDir ofContentAddressed Contacts
 }
 
-object repl extends IOApp {
+object repl {
 
-  def run(args: List[String]): IO[ExitCode] = IO.unit as ExitCode.Success
+// def run(args: List[String]): IO[ExitCode] =
+//   IO.unit as ExitCode.Success
 
-  val randomInt: IO[Int] = IO(Random.nextInt())
-
-  //expose these for easier scripting
-  implicit val publicTimer = timer
-  implicit val publicShift = contextShift
+  val randomInt: IO[Int] =
+    IO(Random.nextInt())
 
   implicit class ShowValues[A](stream: Stream[IO, A]) {
 
     //A utility for worksheets that allows showing a couple values of a stream produced within reasonable time.
-    def showValues: String =
+    def showValues: String = {
+      import cats.effect.unsafe.implicits.global
       stream
         .map(_.toString)
         .through(limitedElements(10))
@@ -423,6 +421,7 @@ object repl extends IOApp {
         .toList
         .unsafeRunSync()
         .mkString(", ")
+    }
   }
 
   // Split the stream at N elements, if the tail has any more values a "more" message is emitted.
@@ -435,15 +434,15 @@ object repl extends IOApp {
   // s =>
   //   (s map { _.toString }).pull
 
+  import cats.effect.kernel.Resource.ExitCase.Canceled
   // Interrupts the stream after the given time, emitting an extra element if it doesn't terminate normally.
-  def maxTime[F[_]: Timer: Concurrent](time: FiniteDuration): Pipe[F, String, String] =
+  def maxTime[F[_]: Temporal](time: FiniteDuration): Pipe[F, String, String] =
     s =>
-      Stream.eval(Deferred[F, Option[String]]).flatMap { extraElement =>
-        s.onFinalizeCase {
-            case ExitCase.Canceled =>
-              extraElement.complete(s"(timed out after $time)".some)
-            case _ => extraElement.complete(none)
+      Stream eval Deferred[F, Option[String]] flatMap { x =>
+        s.onFinalizeCase[F] {
+            case Canceled => (x complete s"(timed out after $time)".some).void
+            case _        => (x complete none).void
           }
-          .interruptAfter(time) ++ Stream.evals(extraElement.get)
+          .interruptAfter(time) ++ Stream.evals(x.get)
     }
 }

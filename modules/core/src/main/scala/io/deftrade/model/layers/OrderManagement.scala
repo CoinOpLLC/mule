@@ -176,7 +176,7 @@ trait OrderManagement {
     */
   object OMS {
 
-    // /** TODO: evole
+    // /** TODO: evolve
     //   */
     private[deftrade] def apply(
         host: LegalEntities.Key,
