@@ -35,6 +35,14 @@ trait Stores[V] extends Product {
 
   import Stores._
 
+  /** What we `get` and `put`.
+    */
+  type Spec
+
+  /** A `Nel[ValueSpec] is how we store `Spec`s.
+    */
+  type ValueSpec
+
   /**
     */
   final type Value = V

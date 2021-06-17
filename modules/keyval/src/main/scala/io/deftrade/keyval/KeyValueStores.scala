@@ -47,14 +47,6 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
   final type Row = (K, Option[V])
 
-  /** What we `get` and `put`.
-    */
-  type Spec
-
-  /** A `Nel[ValueSpec] is how we store `Spec`s.
-    */
-  type ValueSpec
-
   /** A type representing the sum of all `Spec`s for a given `Key`.
     */
   type NelSpec

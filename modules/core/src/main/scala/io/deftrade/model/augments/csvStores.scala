@@ -21,7 +21,7 @@ import refined.api.Validate
 import refined.cats._
 
 import io.chrisdavenport.cormorant
-import cormorant._
+import cormorant.{ CSV, Error, Get, Put }
 import cormorant.implicits._
 import cormorant.refined._
 import cormorant.generic.semiauto._

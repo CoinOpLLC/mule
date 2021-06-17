@@ -31,16 +31,6 @@ abstract class ValueStores[V] extends Stores[V] { param =>
 
   final type Row = V
 
-  /**
-    */
-  type Spec
-
-  /**
-    */
-  type ValueSpec
-
-  /**
-    */
   implicit val IsV: ValueSpec =:= V
 
   /**

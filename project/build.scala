@@ -13,7 +13,7 @@ object Deps {
     val Kittens    = "2.3.0"
 
     val CatsEffect = "3.1.1"
-    val Fs2        = "3.0.3"
+    val Fs2        = "3.0.4"
 
     val Spire     = "0.17.0"
     val Shapeless = "2.3.7"

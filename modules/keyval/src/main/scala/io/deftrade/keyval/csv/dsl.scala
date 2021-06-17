@@ -6,7 +6,7 @@ import cats.implicits._
 import cats.{ Eq, Order, Show }
 import cats.effect.{ Sync }
 
-import shapeless.{ HList, LabelledGeneric, Lazy }
+import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
 
 import io.chrisdavenport.cormorant
 import cormorant.{ Get, LabelledRead, LabelledWrite, Put }
@@ -49,13 +49,16 @@ final case class VsOps[F[_]: Sync]() { ops =>
         VS: ValueStores[V]
     )(implicit
       lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[VS.ValueStore[F]] =
+      llr: Lazy[LabelledRead[VS.IdField :: HV]],
+      llw: Lazy[LabelledWrite[VS.IdField :: HV]]): Result[VS.ValueStore[F]] =
       Result safe {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
           implicit val F = y
+
+          implicit val lr = llr.value
+          implicit val lw = llw.value
 
           def path: Path =
             Paths get s"""${p}/${VS.productPrefix}"""
@@ -77,13 +80,16 @@ final case class VsOps[F[_]: Sync]() { ops =>
         VS: ValueStores[V]
     )(implicit
       lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[VS.ValueStore[F]] =
+      llr: Lazy[LabelledRead[VS.IdField :: HV]],
+      llw: Lazy[LabelledWrite[VS.IdField :: HV]]): Result[VS.ValueStore[F]] =
       Result safe {
 
         new CsvValueStore[F, V](VS) with VS.ValueStore[F] with MemFileV[F, V] {
 
           implicit val F = y
+
+          implicit val lr = llr.value
+          implicit val lw = llw.value
 
           def path: Path =
             Paths get s"""${p}/${VS.productPrefix}"""
@@ -121,13 +127,19 @@ final case class KvsOps[F[_]: Sync]() { effect =>
         KVS: KeyValueStores[K, V]
     )(implicit
       lgv: LabelledGeneric.Aux[V, HV],
-      llr: Lazy[LabelledRead[HV]],
-      llw: Lazy[LabelledWrite[HV]]): Result[KVS.KeyValueStore[F]] =
+      llr: Lazy[LabelledRead[KVS.IdField :: KVS.KeyField :: HV]],
+      llw: Lazy[LabelledWrite[KVS.IdField :: KVS.KeyField :: HV]],
+      llwe: Lazy[LabelledWrite[KVS.IdField :: KVS.KeyField :: HNil]])
+      : Result[KVS.KeyValueStore[F]] =
       Result safe {
 
         new CsvKeyValueStore[F, K, V](KVS) with KVS.KeyValueStore[F] with MemFileKV[F, K, V] {
 
           implicit val F = y
+
+          implicit val lr  = llr.value
+          implicit val lw  = llw.value
+          implicit val lwe = llwe.value
 
           def path: Path =
             Paths get s"""${p}/${KVS.productPrefix}"""
