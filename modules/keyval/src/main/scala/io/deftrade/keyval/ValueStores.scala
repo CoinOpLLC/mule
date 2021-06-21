@@ -27,9 +27,7 @@ import scala.collection.immutable.SortedMap
 
 /**
   */
-abstract class ValueStores[V] extends Stores[V] { param =>
-
-  final type Row = V
+trait ValueStores[V] extends Stores[V] { param =>
 
   implicit val IsV: ValueSpec =:= V
 
@@ -53,10 +51,12 @@ abstract class ValueStores[V] extends Stores[V] { param =>
     */
   trait ValueStore[F[_]] extends Store[F] {
 
+    final type Row = V
+
     final def get(id: Id): F[Option[Spec]] =
       for {
         row <- cachedRows(id)
-      } yield param toSpecOption (param.IsV substituteContra row)
+      } yield param toSpecOption IsV.substituteContra(row)
 
     final def put(spec: Spec): F[(Id, Boolean)] = {
 

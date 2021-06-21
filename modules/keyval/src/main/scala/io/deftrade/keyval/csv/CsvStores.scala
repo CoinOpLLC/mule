@@ -40,8 +40,6 @@ import cormorant.fs2.{ readLabelledCompleteSafe, writeLabelled }
 
 import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
-import Stores._
-
 /** Value parameter `V` carries type members specific to `type V`.
   */
 sealed abstract class CsvStore[F[_], V](
@@ -94,7 +92,7 @@ abstract class CsvValueStore[F[_], V](
 
   self: ValueStores[V]#ValueStore[F] =>
 
-  import VS.{ IdField }
+  import VS.{ id, IdField }
 
   /**
     */
@@ -153,7 +151,7 @@ abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
 
   self: KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KVS.{ IdField, KeyField }
+  import KVS.{ id, key, IdField, KeyField }
 
   /**
     */
@@ -284,7 +282,7 @@ sealed protected trait MemFile[F[_], V] {
 trait MemFileV[F[_], V] extends MemFile[F, V] {
   self: CsvValueStore[F, V] with ValueStores[V]#ValueStore[F] =>
 
-  import VS.{ Id, Row }
+  import VS.{ Id }
 
   override protected def cacheLookup(id: Id): F[List[Row]] =
     ???
@@ -298,7 +296,7 @@ trait MemFileV[F[_], V] extends MemFile[F, V] {
 trait MemFileKV[F[_], K, V] extends MemFile[F, V] {
   self: CsvKeyValueStore[F, K, V] with KeyValueStores[K, V]#KeyValueStore[F] =>
 
-  import KVS.{ Id, Row }
+  import KVS.{ Id }
 
   override protected def cacheLookup(key: K): F[Option[(Id, List[V])]] =
     ???

@@ -26,6 +26,7 @@ import eu.timepit.refined
 import refined.cats.refTypeOrder
 
 import shapeless.labelled.FieldType
+import shapeless.syntax.singleton._
 
 import io.circe.{ Decoder, Encoder }
 
@@ -35,17 +36,17 @@ import scala.collection.immutable.SortedMap
   */
 abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
-  import Stores._
-
   /** `Foo` tables are indexed by `Foo.Key`s
     */
   final type Key = K
 
+  /** [[Key]] column type literal witness - same purpose as [[id]].
+    */
+  final val key = Symbol("key").witness
+
   /** The ''labeled'' type of the [[Key]] column.
     */
   final type KeyField = FieldType[key.T, K]
-
-  final type Row = (K, Option[V])
 
   /** A type representing the sum of all `Spec`s for a given `Key`.
     */
@@ -74,6 +75,8 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
   /**
     */
   trait KeyValueStore[F[_]] extends Store[F] {
+
+    final type Row = (K, Option[V])
 
     /** Uncached.
       *

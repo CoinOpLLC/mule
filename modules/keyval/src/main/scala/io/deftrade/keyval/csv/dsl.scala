@@ -64,7 +64,7 @@ final case class VsOps[F[_]: Sync]() { ops =>
             Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            NextId.shaContent[VS.Row]
+            NextId.shaContent[Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
@@ -95,7 +95,7 @@ final case class VsOps[F[_]: Sync]() { ops =>
             Paths get s"""${p}/${VS.productPrefix}"""
 
           final override lazy val fresh =
-            NextId.shaChain[VS.Row]
+            NextId.shaChain[Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderV
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderV
@@ -144,8 +144,8 @@ final case class KvsOps[F[_]: Sync]() { effect =>
           def path: Path =
             Paths get s"""${p}/${KVS.productPrefix}"""
 
-          final protected lazy val fresh: NextId[KVS.Id, KVS.Row] =
-            NextId.shaChain[KVS.Row]
+          final protected lazy val fresh: NextId[KVS.Id, Row] =
+            NextId.shaChain[Row]
 
           final lazy val recordToCSV: Pipe[F, Record, String]         = deriveCsvEncoderKv
           final lazy val csvToRecord: Pipe[F, String, Result[Record]] = deriveCsvDecoderKv

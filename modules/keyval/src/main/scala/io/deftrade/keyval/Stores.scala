@@ -33,31 +33,33 @@ import fs2.{ Pipe, Stream }
   */
 trait Stores[V] extends Product {
 
-  import Stores._
-
-  /** What we `get` and `put`.
-    */
-  type Spec
-
-  /** A `Nel[ValueSpec] is how we store `Spec`s.
-    */
-  type ValueSpec
-
-  /**
-    */
-  final type Value = V
-
   /** `Id`s are primary keys, and defined to be secure hashes of some kind.
     */
   final type Id = SHA
+
+  /** Primary keys fields of type [[Id]]
+    * are by convention assigned a key column label: `'id: Symbol`.
+    *
+    * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
+    * useful for type member `T`, which is the (singleton) type of the id column label.
+    */
+  final val id = Symbol("id").witness
 
   /** The full type of the [[Id]] column.
     */
   final type IdField = FieldType[id.T, Id]
 
-  /** Think spreadsheet or relational table,
+  /**
     */
-  type Row
+  final type Value = V
+
+  /** A `Nel[ValueSpec] is how we store `Spec`s.
+    */
+  type ValueSpec
+
+  /** What we `get` and `put`.
+    */
+  type Spec
 
   /** Base class
     */
@@ -65,6 +67,10 @@ trait Stores[V] extends Product {
   trait Store[F[_]] {
 
     implicit val F: Sync[F]
+
+    /** Think spreadsheet or relational table,
+      */
+    type Row
 
     /**
       */
@@ -132,20 +138,4 @@ trait Stores[V] extends Product {
         _  <- (Stream evals (F delay { rs map (id -> _) }) through persist).compile.drain
       } yield id
   }
-}
-
-/** Placeholder.
-  */
-object Stores {
-
-  /** The [[Id]] column is by convention assigned a key column label: `'id: Symbol`.
-    *
-    * The `id` member is a `shapeless.Aux[Symbol @@ String(id)]` instance,
-    * useful for type member `T`, which is the (singleton) type of the id column label.
-    */
-  final val id = Symbol("id").witness
-
-  /** [[Key]] column type literal witness - same purpose as [[id]].
-    */
-  final val key = Symbol("key").witness
 }

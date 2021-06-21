@@ -16,8 +16,6 @@
 
 package io.deftrade
 
-import shapeless.syntax.singleton._
-
 import cats.implicits._
 import cats.{ Order, Show }
 
