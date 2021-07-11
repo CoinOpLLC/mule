@@ -22,6 +22,8 @@ import cats.{ Order }
 import cats.kernel.Monoid
 import cats.data.{ NonEmptyList }
 
+import cats.effect.Sync
+
 import eu.timepit.refined
 import refined.cats.refTypeOrder
 
@@ -83,7 +85,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
       * Note: `peek` cannot be used to distinguish whether an `Id` was never written,
       * or has been written and subsequently [[del]]eted. Both cases return `F[None]`.
       */
-    final def peek(id: Id): F[Option[(Key, Spec)]] =
+    final def peek(id: Id)(implicit F: Sync[F]): F[Option[(Key, Spec)]] =
       rows(id) map {
         case Nil => none
         // case ((h @ (k, _)) :: t) =>  // FIXME: triggers `scalac` bug!
@@ -97,18 +99,18 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
     /**
       */
-    final def probe(key: Key): F[Option[Id]] =
+    final def probe(key: Key)(implicit F: Sync[F]): F[Option[Id]] =
       probeAll(key) map (_.headOption)
 
     /** Nota Bene - Uncached.
       */
-    final def probeAll(key: Key): F[List[Id]] =
+    final def probeAll(key: Key)(implicit F: Sync[F]): F[List[Id]] =
       storeLookup(key) map { _ map { case (id, _) => id } }
 
     /** @return data from all [[Spec]]s ever associated with the given [[Key]],
       * aggregated as a single [[NelSpec]] via a [[cats.kernel.Monoid]] instance for that type.
       */
-    final def getAll(key: Key): F[Option[NelSpec]] =
+    final def getAll(key: Key)(implicit F: Sync[F]): F[Option[NelSpec]] =
       for {
         ivs <- storeLookup(key)
       } yield
@@ -126,7 +128,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
     /** @return the [[Spec]] associated with the given [[Key]], if present.
       */
-    final def get(key: Key): F[Option[Spec]] =
+    final def get(key: Key)(implicit F: Sync[F]): F[Option[Spec]] =
       for {
         hit  <- cacheLookup(key)
         miss <- storeLookup(key)
@@ -149,7 +151,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
     /** Fast. No uncached reads in the path.
       */
-    final def put(key: Key, spec: Spec): F[Id] = {
+    final def put(key: Key, spec: Spec)(implicit F: Sync[F]): F[Id] = {
       val NonEmptyList(h, t) = IsV.liftCo substituteCo (self fromSpec spec.some)
       append(key -> h, (t map (key -> _)): _*)
     }
@@ -158,7 +160,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
       *
       * TODO: revisit this. Could do cheap in-memory set inclusion for `key`s.
       */
-    final def let(key: Key, spec: Spec): F[Option[Id]] =
+    final def let(key: Key, spec: Spec)(implicit F: Sync[F]): F[Option[Id]] =
       probe(key)
         .flatMap {
           case None    => put(key, spec) map (_.some)
@@ -167,7 +169,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
     /** Uncached. TODO: revisit this.
       */
-    final def set(key: Key, spec: Spec): F[Option[Id]] =
+    final def set(key: Key, spec: Spec)(implicit F: Sync[F]): F[Option[Id]] =
       probe(key)
         .flatMap {
           case None    => none.pure[F]
@@ -179,7 +181,7 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
       *
       * Uncached. TODO: revisit this.
       */
-    final def del(key: Key): F[Option[Id]] =
+    final def del(key: Key)(implicit F: Sync[F]): F[Option[Id]] =
       probe(key)
         .flatMap {
           case None    => none.pure[F]
@@ -188,13 +190,13 @@ abstract class KeyValueStores[K: Order, V] extends Stores[V] { self =>
 
     /** Default behavior of "always miss" is overrideable.
       */
-    protected def cacheLookup(key: Key): F[Option[(Id, List[Value])]] = // F[Option[Spec]] =
+    protected def cacheLookup(key: Key)(implicit F: Sync[F]): F[Option[(Id, List[Value])]] = // F[Option[Spec]] =
       none.pure[F]
 
     /**
       */
     @SuppressWarnings(Array("org.wartremover.warts.Any"))
-    final protected def storeLookup(key: Key): F[List[(Id, List[Value])]] =
+    final protected def storeLookup(key: Key)(implicit F: Sync[F]): F[List[(Id, List[Value])]] =
       // import Key._
       records
         .filter { case (_, (k, _)) => k === key }

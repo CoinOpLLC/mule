@@ -21,6 +21,8 @@ import cats.implicits._
 import cats.{ Order }
 import cats.data.{ NonEmptyList, NonEmptyMap }
 
+import cats.effect.Sync
+
 import io.circe.{ Decoder, Encoder }
 
 import scala.collection.immutable.SortedMap
@@ -53,12 +55,12 @@ trait ValueStores[V] extends Stores[V] { param =>
 
     final type Row = V
 
-    final def get(id: Id): F[Option[Spec]] =
+    final def get(id: Id)(implicit F: Sync[F]): F[Option[Spec]] =
       for {
         row <- cachedRows(id)
       } yield param toSpecOption IsV.substituteContra(row)
 
-    final def put(spec: Spec): F[(Id, Boolean)] = {
+    final def put(spec: Spec)(implicit F: Sync[F]): F[(Id, Boolean)] = {
 
       val NonEmptyList(h, t) = param.IsV.liftCo(param fromSpec spec)
 
@@ -72,12 +74,12 @@ trait ValueStores[V] extends Stores[V] { param =>
 
     /** overrideable
       */
-    protected def cacheLookup(id: Id): F[List[Row]] =
+    protected def cacheLookup(id: Id)(implicit F: Sync[F]): F[List[Row]] =
       List.empty.pure[F]
 
     /** interrogates and fills cacheFill
       */
-    final protected def cachedRows(id: Id): F[List[Row]] =
+    final protected def cachedRows(id: Id)(implicit F: Sync[F]): F[List[Row]] =
       for {
         hit  <- cacheLookup(id)
         miss <- rows(id)

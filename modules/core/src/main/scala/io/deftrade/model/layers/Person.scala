@@ -42,7 +42,7 @@ trait Person { module: ModuleTypes =>
     def meta: Metas.Id
   }
 
-  /** Players that are recognized by the system (ours).
+  /** Participants that are recognized by the system (ours).
     */
   object Party {
 

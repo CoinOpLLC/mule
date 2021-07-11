@@ -20,7 +20,7 @@ import io.chrisdavenport.fuuid.FUUID
   */
 trait Accounts { self: ModuleTypes with Person with Ledger =>
 
-  case class Players(accounts: Accounts.KeyValueStore[IO], rosters: Rosters.ValueStore[IO])
+  case class Participants(accounts: Accounts.KeyValueStore[IO], rosters: Rosters.ValueStore[IO])
 
   /** `Accounts` link the personal information of the account holders
     * with the financial data of the ledgers.

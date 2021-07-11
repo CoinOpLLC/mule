@@ -25,7 +25,7 @@ import cats.data.{ NonEmptyList }
 
 import cats.effect.{ Sync }
 
-import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy }
+import shapeless.{ ::, HList, HNil, LabelledGeneric }
 import shapeless.labelled.field
 
 import fs2.{ Pipe, Stream }
@@ -42,7 +42,7 @@ import java.nio.file.{ Path, StandardOpenOption => OpenOption }
 
 /** Value parameter `V` carries type members specific to `type V`.
   */
-sealed abstract class CsvStore[F[_], V](
+sealed abstract class CsvStore[F[_]: Sync, V](
     final val V: Stores[V]
 ) {
 
@@ -86,7 +86,7 @@ sealed abstract class CsvStore[F[_], V](
 
 /**
   */
-abstract class CsvValueStore[F[_], V](
+abstract class CsvValueStore[F[_]: Sync, V](
     final val VS: ValueStores[V]
 ) extends CsvStore[F, V](VS) {
 
@@ -145,7 +145,7 @@ abstract class CsvValueStore[F[_], V](
 /**
   */
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
-abstract class CsvKeyValueStore[F[_], K: Get: Put, V](
+abstract class CsvKeyValueStore[F[_]: Sync, K: Get: Put, V](
     final val KVS: KeyValueStores[K, V]
 ) extends CsvStore[F, V](KVS) {
 
@@ -226,8 +226,6 @@ sealed protected trait MemFile[F[_], V] {
 
   self: CsvStore[F, V] with Stores[V]#Store[F] =>
 
-  implicit val F: Sync[F]
-
   /**
     */
   def path: Path
@@ -284,10 +282,10 @@ trait MemFileV[F[_], V] extends MemFile[F, V] {
 
   import VS.{ Id }
 
-  override protected def cacheLookup(id: Id): F[List[Row]] =
+  override protected def cacheLookup(id: Id)(implicit F: Sync[F]): F[List[Row]] =
     ???
 
-  override protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
+  override protected def cacheFill(id: Id, rows: List[Row])(implicit F: Sync[F]): F[Unit] =
     ???
 }
 
@@ -298,9 +296,9 @@ trait MemFileKV[F[_], K, V] extends MemFile[F, V] {
 
   import KVS.{ Id }
 
-  override protected def cacheLookup(key: K): F[Option[(Id, List[V])]] =
+  override protected def cacheLookup(key: K)(implicit F: Sync[F]): F[Option[(Id, List[V])]] =
     ???
 
-  override protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
+  override protected def cacheFill(id: Id, rows: List[Row])(implicit F: Sync[F]): F[Unit] =
     ???
 }

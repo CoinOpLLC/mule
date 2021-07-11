@@ -66,8 +66,6 @@ trait Stores[V] extends Product {
   @SuppressWarnings(Array("org.wartremover.warts.Any"))
   trait Store[F[_]] {
 
-    implicit val F: Sync[F]
-
     /** Think spreadsheet or relational table,
       */
     type Row
@@ -83,7 +81,7 @@ trait Stores[V] extends Product {
 
     /** implementations may override. TODO: Revisit this decision.
       */
-    def hasId(id: Id): F[Boolean] =
+    def hasId(id: Id)(implicit F: Sync[F]): F[Boolean] =
       (records exists (_._1 === id)).compile.lastOrError
 
     /** Returns a Stream of all persisted `Row`s prefaces with their `Id`s.
@@ -93,13 +91,13 @@ trait Stores[V] extends Product {
     /**  Returns ''all'' `Row`s with the given `Id` (none, if not found) as an [[fs2.Stream]].
       *  implementations may override. TODO: Revisit this decision.
       */
-    protected def rows(id: Id): F[List[Row]] =
+    protected def rows(id: Id)(implicit F: Sync[F]): F[List[Row]] =
       (records filter (_._1 === id) map (_._2)).compile.toList
 
     /** overrideable with default nop
       * empty List entails `del`etion (only applicable to [[KeyValueStores]])
       */
-    protected def cacheFill(id: Id, rows: List[Row]): F[Unit] =
+    protected def cacheFill(id: Id, rows: List[Row])(implicit F: Sync[F]): F[Unit] =
       ().pure[F]
 
     /**
@@ -130,7 +128,7 @@ trait Stores[V] extends Product {
       *
       * FIXME: not thread safe: put a `Ref` based queue in front
       */
-    final protected def append(row: Row, rows: Row*): F[Id] =
+    final protected def append(row: Row, rows: Row*)(implicit F: Sync[F]): F[Id] =
       for {
         id <- F delay nextId(row, rows: _*)
         rs <- F delay (row +: rows).toList

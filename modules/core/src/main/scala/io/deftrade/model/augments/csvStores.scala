@@ -1,8 +1,7 @@
 package io.deftrade
 package model.augments
 
-import keyval.csv
-import csv.{ kvs, vs }
+import keyval.csv.{ kvs, vs }
 import model.layers._
 import model.slices.{ Metas }
 import model.slices.keys.IsUSIN
@@ -26,7 +25,7 @@ import cormorant.implicits._
 import cormorant.refined._
 import cormorant.generic.semiauto._
 
-sealed trait csvDomainSpecificImplicits extends csv.implicits {
+sealed trait csvDomainSpecificImplicits extends keyval.csv.implicits {
   self: ModuleTypes with Paper =>
 
   /**
@@ -78,43 +77,39 @@ trait csvStores extends csvDomainSpecificImplicits {
   }
 
   lazy val people: People = {
-    val Right(ret: People) =
-      for {
-        parties  <- kvs[IO] at dataDir ofKeyChained Parties
-        contacts <- vs[IO] at dataDir ofContentAddressed Contacts
-      } yield People(parties, contacts)
+    val Right(ret: People) = (
+      kvs[IO] at dataDir ofKeyChained Parties,
+      vs[IO] at dataDir ofContentAddressed Contacts,
+    ) mapN People
     ret
   }
 
   lazy val papers: Papers = {
-    val Right(ret: Papers) =
-      for {
-        instruments      <- kvs[IO] at dataDir ofKeyChained Instruments
-        forms            <- vs[IO] at dataDir ofChained Forms
-        instrumentsForms <- kvs[IO] at dataDir ofKeyChained InstrumentsForms
-        novations        <- vs[IO] at dataDir ofChained Novations
-      } yield Papers(instruments, forms, instrumentsForms, novations)
+    val Right(ret: Papers) = (
+      kvs[IO] at dataDir ofKeyChained Instruments,
+      vs[IO] at dataDir ofChained Forms,
+      kvs[IO] at dataDir ofKeyChained InstrumentsForms,
+      vs[IO] at dataDir ofChained Novations,
+    ) mapN Papers
     ret
   }
 
   lazy val ledgers: Ledgers = {
-    val Right(ls: Ledgers) =
-      for {
-        trades        <- vs[IO] at dataDir ofContentAddressed Trades
-        folios        <- kvs[IO] at dataDir ofKeyChained Folios
-        portfolios    <- vs[IO] at dataDir ofContentAddressed Portfolios
-        transactions  <- vs[IO] at dataDir ofChained Transactions
-        confirmations <- kvs[IO] at dataDir ofKeyChained Confirmations
-      } yield Ledgers(trades, folios, portfolios, transactions, confirmations)
+    val Right(ls: Ledgers) = (
+      vs[IO] at dataDir ofContentAddressed Trades,
+      kvs[IO] at dataDir ofKeyChained Folios,
+      vs[IO] at dataDir ofContentAddressed Portfolios,
+      vs[IO] at dataDir ofChained Transactions,
+      kvs[IO] at dataDir ofKeyChained Confirmations,
+    ) mapN Ledgers
     ls
   }
 
-  lazy val players: Players = {
-    val Right(ret: Players) =
-      for {
-        accounts <- kvs[IO] at dataDir ofKeyChained Accounts
-        rosters  <- vs[IO] at dataDir ofChained Rosters
-      } yield Players(accounts, rosters)
+  lazy val participants: Participants = {
+    val Right(ret: Participants) = (
+      kvs[IO] at dataDir ofKeyChained Accounts,
+      vs[IO] at dataDir ofChained Rosters,
+    ) mapN Participants
     ret
   }
 }
